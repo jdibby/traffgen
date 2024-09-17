@@ -24,7 +24,7 @@ RUN apt-get update && apt-get install -y \
     tzdata \
     chrony
 
-RUN pip3 install fastcli requests beautifulsoup4
+RUN pip3 install fastcli requests beautifulsoup4 --break-system-packages
 
 COPY generator.py endpoints.py ./
 
