@@ -16,7 +16,7 @@ from urllib.parse import urljoin
 
 ### Bigfile Test suites
 def bigfile():
-    cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -o /dev/null http://link.testfile.org/10GB'
+    cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null http://link.testfile.org/10GB'
     print ("")
     print ("##############################################################")
     print ("Testing Bigfile: Download 10GB ZIP File")
@@ -100,17 +100,17 @@ def http_random():
 
 def http_download_zip():
     if ARGS.size == 'S':
-        target = 'files/test1Mb.db'
-        cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -o /dev/null http://speedtest.ftp.otenet.gr/'
+        target = '15MB'
+        cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null https://link.testfile.org/'
     elif ARGS.size == 'M':
-        target = 'files/test10Mb.db'
-        cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -o /dev/null http://speedtest.ftp.otenet.gr/'
+        target = '30MB'
+        cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null https://link.testfile.org/'
     elif ARGS.size == 'L':
-        target = '100MB.bin'
-        cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -o /dev/null https://speed.hetzner.de/'
+        target = '100MB'
+        cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null https://link.testfile.org/'
     elif ARGS.size == 'XL':
-        target = '1GB.bin'
-        cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -o /dev/null https://speed.hetzner.de/'
+        target = '1GB'
+        cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null https://link.testfile.org/'
     print ("")
     print ("##############################################################")
     print ("Testing HTTP: Download %s ZIP File" %(target))
