@@ -16,7 +16,7 @@ from urllib.parse import urljoin
 
 ### Bigfile Test suites
 def bigfile():
-    cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -o /dev/null https://speed.hetzner.de/10GB.bin'
+    cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -o /dev/null http://link.testfile.org/10GB'
     print ("")
     print ("##############################################################")
     print ("Testing Bigfile: Download 10GB ZIP File")
