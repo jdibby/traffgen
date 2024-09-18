@@ -1,5 +1,7 @@
 ### Clone The Directory ###
+```
 git clone https://github.com/jdibby/traffgen
+```
 
 ### Access New Directory
 cd traffgen
