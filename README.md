@@ -13,9 +13,14 @@ cd traffgen
 docker build -t jdibby/traffgen .
 ```
 
-### Help Pages ###
+### Help Page ###
 ```
 docker run --name traffgen jdibby/traffgen:latest --help
+```
+
+### Run Container Continuously ###
+```
+docker run --restart unless-stopped --name traffgen jdibby/traffgen:latest
 ```
 
 ### Update Repo ###
