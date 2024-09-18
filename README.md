@@ -15,7 +15,7 @@ docker build -t jdibby/traffgen .
 
 ### Help Pages ###
 ```
-docker run --restart unless-stopped --name traffgen jdibby/traffgen:latest --help
+docker run --name traffgen jdibby/traffgen:latest --help
 ```
 
 ### Update Repo ###
