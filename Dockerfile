@@ -7,19 +7,19 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 RUN apk update && apk add \
     python3 \
     py3-pip \
-	iputils-ping \
-	net-tools \
-	gcc \
-	musl-dev \
-	curl \
-	chrony \
-	tzdata \
-	bind-tools \
-	wget \
-	nmap \
-	openssh-client \
-	busybox-extras \
-	net-snmp
+    iputils-ping \
+    net-tools \
+    gcc \
+    musl-dev \
+    curl \
+    chrony \
+    tzdata \
+    bind-tools \
+    wget \
+    nmap \
+    openssh-client \
+    busybox-extras \
+    net-snmp
 
 RUN pip3 install fastcli requests beautifulsoup4 --break-system-packages
 
