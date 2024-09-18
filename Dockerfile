@@ -1,33 +1,30 @@
-FROM ubuntu:latest
+FROM alpine:latest
 
 ENV TZ=America/Denver
 
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-RUN apt-get update && apt-get install -y \
+RUN apk update && apk add \
     python3 \
-    python3-pip \
-    iputils-ping \
-    net-tools \
-    dnsutils \
-    bind9-utils \
-    traceroute \
-    wget \
-    telnet \
-    snmpd \
-    nmap \
-    openssh-client \
-    gcc \
-    curl \
-    musl-dev \
-    ntpdate \
-    tzdata \
-    chrony
+    py3-pip \
+	iputils-ping \
+	net-tools \
+	gcc \
+	musl-dev \
+	curl \
+	chrony \
+	tzdata \
+	bind-tools \
+	wget \
+	nmap \
+	openssh-client \
+	busybox-extras \
+	net-snmp
 
 RUN pip3 install fastcli requests beautifulsoup4 --break-system-packages
 
 COPY generator.py endpoints.py ./
 
-ENTRYPOINT ["python3", "generator.py", "--os=debian"]
+ENTRYPOINT ["python3", "generator.py", "--os=alpine"]
 
 CMD ["--suite=all", "--size=L", "--max-wait-secs=5", "--loop"]
