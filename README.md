@@ -26,7 +26,7 @@ git pull
 
 ### Stop and Cleanup Container ###
 ```
-docker stop jdibby/traffgen
-docker rm jdibby/traffgen
+docker stop traffgen
+docker rm traffgen
 docker rmi jdibby/traffgen
 ```
