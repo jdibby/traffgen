@@ -20,7 +20,7 @@ docker run --restart unless-stopped jdibby/traffgen:latest --help
 
 ### Reccomended Flags For Running Container ###
 ```
---restart unless-stopped jdibby/traffgen:latest
+--restart unless-stopped --name jdibby/traffgen:latest
 ```
 
 ### Update Repo ###
