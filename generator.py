@@ -337,6 +337,12 @@ def urlresponse_random():
                 continue
             except requests.ReadTimeout as e:
                 continue
+            except requests.ChunkedEncodingError as e:
+                continue
+            except urllib3.ProtocolError as e:
+                continue
+            except:
+                pass
             print ("")
             print ("##############################################################")
             print ("Testing HTTPS (%d of %d): %s" %((count_urls+1), target_urls, url))
