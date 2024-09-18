@@ -30,4 +30,4 @@ COPY generator.py endpoints.py ./
 
 ENTRYPOINT ["python3", "generator.py", "--os=debian"]
 
-CMD ["--suite=all", "--size=L", "--loop"]
+CMD ["--suite=all", "--size=L", "--max-wait-secs=5", "--loop"]
