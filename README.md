@@ -15,12 +15,7 @@ docker build -t jdibby/traffgen .
 
 ### Help Pages ###
 ```
-docker run --restart unless-stopped jdibby/traffgen:latest --help
-```
-
-### Reccomended Flags For Running Container ###
-```
---restart unless-stopped --name jdibby/traffgen:latest
+docker run --restart unless-stopped --name traffgen jdibby/traffgen:latest --help
 ```
 
 ### Update Repo ###
