@@ -20,7 +20,7 @@ docker run --name traffgen jdibby/traffgen:latest --help
 
 ### Run Container Continuously ###
 ```
-docker run --restart unless-stopped jdibby/traffgen:latest
+docker run --detach --restart unless-stopped jdibby/traffgen:latest
 ```
 
 ### Update Repo ###
