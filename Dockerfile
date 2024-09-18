@@ -27,4 +27,4 @@ COPY generator.py endpoints.py ./
 
 ENTRYPOINT ["python3", "generator.py", "--os=alpine"]
 
-CMD ["--suite=all", "--size=L", "--max-wait-secs=5", "--loop"]
+CMD ["--suite=all", "--size=XL", "--max-wait-secs=5", "--loop"]
