@@ -7,8 +7,9 @@ import subprocess
 import argparse
 import random
 import urllib.request
-
+import ssl
 import requests
+
 from bs4 import BeautifulSoup
 from time import sleep
 from urllib.parse import urljoin
@@ -317,6 +318,31 @@ def ssh_random():
             print ("")
             subprocess.call(cmd, shell=True)
 
+### URL Reponse Time Test suites
+def urlresponse_random():
+    if ARGS.size == 'S':
+        target_urls = 10
+    elif ARGS.size == 'M':
+        target_urls = 20
+    elif ARGS.size == 'L':
+        target_urls = 50
+    elif ARGS.size == 'XL':
+        target_urls = len(https_endpoints)
+    random.shuffle(https_endpoints)
+    for count_urls, url in enumerate(https_endpoints):
+        if count_urls < target_urls:
+            try:
+                time = requests.get(url, timeout=3).elapsed.total_seconds()
+            except requests.ConnectionError as e:
+                continue
+            except requests.ReadTimeout as e:
+                continue
+            print ("")
+            print ("##############################################################")
+            print ("Testing HTTPS (%d of %d): %s" %((count_urls+1), target_urls, url))
+            print ("Total Transaction Time -- ", time)
+            print ("##############################################################")
+            print ("")
 
 ### EICAR Virus Simulation suites
 # See description of these test files at https://www.eicar.org/?page_id=3950
@@ -580,6 +606,7 @@ if __name__ == "__main__":
                                 'ntp',
                                 'scaled',
                                 'ssh',
+                                'url-response',
                                 'virus-sim-http',
                                 'virus-sim-https',
                             ],
@@ -723,6 +750,10 @@ if __name__ == "__main__":
         elif ARGS.suite == 'ssh':
             testsuite = [
                 ssh_random,
+            ]
+        elif ARGS.suite == 'url-response':
+            testsuite = [
+                urlresponse_random,
             ]
         elif ARGS.suite == 'virus-sim-http':
             testsuite = [
