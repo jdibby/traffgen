@@ -5,6 +5,11 @@
 ### Run "chmod 755 stager.sh ###
 ### Run "./stager.sh         ###
 
+WHOAREYOU=`whoami`
+if [ $WHOAREYOU != root ]; then
+   echo "### YOU MUST BE ROOT TO RUN THIS SCRIPT ###"
+fi
+
 ### SET HOME DIRECTORY ###
 HOMEDIR=`pwd`
 
