@@ -7,11 +7,12 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 RUN apk update && apk add \
     python3 \
     py3-pip \
+    musl-dev \
+    libc-dev \
+    python3-dev \
     iputils-ping \
     net-tools \
     gcc \
-    musl-dev \
-    libc-dev \
     curl \
     chrony \
     tzdata \
