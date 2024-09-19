@@ -8,6 +8,7 @@
 WHOAREYOU=`whoami`
 if [ $WHOAREYOU != root ]; then
    echo "### YOU MUST BE ROOT TO RUN THIS SCRIPT ###"
+   exit
 fi
 
 ### SET HOME DIRECTORY ###
