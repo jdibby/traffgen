@@ -139,6 +139,7 @@ nmap_endpoints = [
     "192.168.2.2",
     "192.168.2.100",
     "192.168.2.200",
+    "12.12.12.12",
     "172.30.0.1",
     "172.30.0.21",
     "192.168.2.3",
@@ -210,6 +211,10 @@ https_endpoints = [
     "https://www.google.com",
     "https://www.gov.uk",
     "https://www.linkedin.com",
+    "https://www.imdb.com",
+    "https://bbc.co.uk",
+    "https://www.office.com",
+    "https://www.huffingtonpost.com",
     "https://www.yahoo.com",
     ]
 
