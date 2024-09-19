@@ -15,21 +15,22 @@ from time import sleep
 from urllib.parse import urljoin
 from tqdm import tqdm
 
-### Bigfile Test suites
+### Bigfile Test 
 def bigfile():
     url = 'http://ipv4.download.thinkbroadband.com/5GB.zip'
     response = requests.get(url, stream=True)
-
     total_size = int(response.headers.get('content-length', 0))
-    with tqdm(total=total_size, unit='B', unit_scale=True, desc='Downloading', ascii=True) as progress_bar:
-        for chunk in response.iter_content(chunk_size=1024):
-        # Update the progress bar with the size of the chunk
-            progress_bar.update(len(chunk))
+
     print ("")
     print ("##############################################################")
     print ("Testing Bigfile: Download 5GB ZIP File")
     print ("##############################################################")
     print ("")
+
+    with tqdm(total=total_size, unit='B', unit_scale=True, desc='Downloading', ascii=True) as progress_bar:
+        for chunk in response.iter_content(chunk_size=1024):
+        # Update the progress bar with the size of the chunk
+            progress_bar.update(len(chunk))
 
 ### DNS Test suites
 def dig_random():
@@ -223,23 +224,21 @@ def traceroute_random():
 
 ### Netflix Test suites
 def speedtest_fast():
-    # if ARGS.size == 'S':
-    #     duration = 1
-    # elif ARGS.size == 'M':
-    #     duration = 3
-    # elif ARGS.size == 'L':
-    #     duration = 8
-    # elif ARGS.size == 'XL':
-    #     duration = 15
-    # cmd = 'for i in `seq 1 %i`; do fastcli; done' % (duration)
-    # print ("")
-    # print ("##############################################################")
-    # print ("Testing Netflix: Fast.com Speedtest")
-    # print ("##############################################################")
-    # print ("")
-    # subprocess.call(cmd, shell=True)
-
-    ### Disabled 09-11-2020 due to Netflix bug sending too much traffic
+    if ARGS.size == 'S':
+         duration = 1
+    elif ARGS.size == 'M':
+         duration = 3
+    elif ARGS.size == 'L':
+         duration = 5
+    elif ARGS.size == 'XL':
+         duration = 10
+    cmd = 'for i in `seq 1 %i`; do python3 -m fastcli; done' % (duration)
+    print ("")
+    print ("##############################################################")
+    print ("Testing Netflix: Fast.com Speedtest")
+    print ("##############################################################")
+    print ("")
+    subprocess.call(cmd, shell=True)
     pass
 
 ### NMAP Test suites
@@ -612,7 +611,7 @@ if __name__ == "__main__":
                                 'http',
                                 'https',
                                 'icmp',
-                                # 'netflix',
+                                'netflix',
                                 'nmap',
                                 'ntp',
                                 'scaled',
