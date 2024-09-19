@@ -41,7 +41,8 @@ echo "STARTING TRAFFGEN INSTALL ###"
 ### Cleanup potential existing traffgen installs ###
 docker ps | grep jdibby/traffgen | awk '{print $1}' | xargs docker stop
 
-git clone https://github.com/jdibby/traffgen && cd $HOMEDIR/traffgen
+git clone https://github.com/jdibby/traffgen
+cd $HOMEDIR/traffgen
 docker build -t jdibby/traffgen .
 echo "### TRAFFGEN INSTALL COMPLETE ###"
 
