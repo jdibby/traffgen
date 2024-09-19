@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup
 from time import sleep
 from urllib.parse import urljoin
 from tqdm import tqdm
+from colorama import Fore, Back, Style
 
 ### Bigfile Test 
 def bigfile():
@@ -21,11 +22,13 @@ def bigfile():
     response = requests.get(url, stream=True)
     total_size = int(response.headers.get('content-length', 0))
 
-    print ("")
-    print ("##############################################################")
+    print (Fore.BLACK)
+    print (Back.GREEN + "##############################################################")
+    print (Style.RESET_ALL)
     print ("Testing Bigfile: Download 5GB ZIP File")
-    print ("##############################################################")
-    print ("")
+    print (Fore.BLACK) 
+    print (Back.GREEN + "##############################################################")
+    print (Style.RESET_ALL)
 
     with tqdm(total=total_size, unit='B', unit_scale=True, desc='Downloading', ascii=True) as progress_bar:
         for chunk in response.iter_content(chunk_size=1024):
@@ -55,11 +58,13 @@ def dig_random():
                 # Size limit of URLs to lookup
                 if count_urls < target_urls:
                     cmd = "dig %s @%s +time=1" % (url, ip)
-                    print ("")
-                    print ("##############################################################")
+                    print (Fore.BLACK)
+                    print (Back.GREEN + "##############################################################")
+                    print (Style.RESET_ALL)
                     print ("Testing DNS: Query %s (%d of %d) against %s (%d of %d)" %(url, (count_urls+1), target_urls, ip, (count_ips+1), target_ips))
-                    print ("##############################################################")
-                    print ("")
+                    print (Fore.BLACK)
+                    print (Back.GREEN + "##############################################################")
+                    print (Style.RESET_ALL)
                     subprocess.call(cmd, shell=True)
                     time.sleep(0.25) # Rate limit to prevent tripping alarms
 
@@ -74,11 +79,13 @@ def ftp_random():
     elif ARGS.size == 'XL':
         target = '1GB'
     cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -o /dev/null ftp://speedtest:speedtest@ftp.otenet.gr/test' + target + '.db'
-    print ("")
-    print ("##############################################################")
+    print (Fore.BLACK)
+    print (Back.GREEN + "##############################################################")
+    print (Style.RESET_ALL)
     print ("Testing FTP: Download %s DB File" %(target))
-    print ("##############################################################")
-    print ("")
+    print (Fore.BLACK)
+    print (Back.GREEN + "##############################################################")
+    print (Style.RESET_ALL)
     subprocess.call(cmd, shell=True)
 
 ### HTTP Test suites
@@ -96,11 +103,13 @@ def http_random():
     for count_urls, url in enumerate(http_endpoints + dns_urls):
         if count_urls < target_urls:
             cmd = "curl --insecure --silent --show-error --connect-timeout 5 -I --max-time 5 %s" % url
-            print ("")
-            print ("##############################################################")
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
             print ("Testing HTTP (%d of %d): %s" %((count_urls+1), target_urls, url))
-            print ("##############################################################")
-            print ("")
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
             subprocess.call(cmd, shell=True)
 
 def http_download_zip():
@@ -116,20 +125,24 @@ def http_download_zip():
     elif ARGS.size == 'XL':
         target = '1GB'
         cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null https://link.testfile.org/'
-    print ("")
-    print ("##############################################################")
+    print (Fore.BLACK)
+    print (Back.GREEN + "##############################################################")
+    print (Style.RESET_ALL)
     print ("Testing HTTP: Download %s ZIP File" %(target))
-    print ("##############################################################")
-    print ("")
+    print (Fore.BLACK)
+    print (Back.GREEN + "##############################################################")
+    print (Style.RESET_ALL)
     subprocess.call(cmd, shell=True)
 
 def http_download_targz():
     cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -o /dev/null http://wordpress.org/latest.tar.gz'
-    print ("")
-    print ("##############################################################")
+    print (Fore.BLACK)
+    print (Back.GREEN + "##############################################################")
+    print (Style.RESET_ALL)
     print ("Testing HTTP: Download Wordpress File")
-    print ("##############################################################")
-    print ("")
+    print (Fore.BLACK)
+    print (Back.GREEN + "##############################################################")
+    print (Style.RESET_ALL)
     subprocess.call(cmd, shell=True)
 
 ### HTTPS Test suites
@@ -146,11 +159,13 @@ def https_random():
     for count_urls, url in enumerate(https_endpoints):
         if count_urls < target_urls:
             cmd = "curl --insecure --silent --show-error --connect-timeout 5 -I --max-time 5 %s" % url
-            print ("")
-            print ("##############################################################")
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
             print ("Testing HTTPS (%d of %d): %s" %((count_urls+1), target_urls, url))
-            print ("##############################################################")
-            print ("")
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
             subprocess.call(cmd, shell=True)
 
 def https_crawl():
@@ -169,11 +184,13 @@ def https_crawl():
     random.shuffle(https_endpoints)
     for count_urls, url in enumerate(https_endpoints):
         if count_urls < target_urls:
-            print ("")
-            print ("##############################################################")
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
             print ("Crawling HTTPS (%d deep, site %d of %d) starting from %s" %(iterations, (count_urls+1), target_urls, url))
-            print ("##############################################################")
-            print ("")
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
             scrape_iterative(url, iterations)
 
 ### ICMP Test suites
@@ -190,11 +207,13 @@ def ping_random():
     for count_ips, ip in enumerate(icmp_endpoints):
         if count_ips < target_ips:
             cmd = "ping -c2 -i1 -s64 -W1 -w2 %s" % ip
-            print ("")
-            print ("##############################################################")
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
             print ("Testing ICMP (%d of %d): Ping %s" %((count_ips+1), target_ips, ip))
-            print ("##############################################################")
-            print ("")
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
             subprocess.call(cmd, shell=True)
 
 def traceroute_random():
@@ -210,11 +229,13 @@ def traceroute_random():
     for count_ips, ip in enumerate(icmp_endpoints):
         if count_ips < target_ips:
             cmd = "traceroute %s -w1 -q1 -m5" % (ip)
-            print ("")
-            print ("##############################################################")
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
             print ("Testing ICMP (%d of %d): Traceroute to %s" %((count_ips+1), target_ips, ip))
-            print ("##############################################################")
-            print ("")
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
             subprocess.call(cmd, shell=True)
 
 ### Netflix Test suites
@@ -228,11 +249,13 @@ def speedtest_fast():
     elif ARGS.size == 'XL':
          duration = 10
     cmd = 'for i in `seq 1 %i`; do python3 -m fastcli; done' % (duration)
-    print ("")
-    print ("##############################################################")
+    print (Fore.BLACK)
+    print (Back.GREEN + "##############################################################")
+    print (Style.RESET_ALL)
     print ("Testing Netflix: Fast.com Speedtest")
-    print ("##############################################################")
-    print ("")
+    print (Fore.BLACK)
+    print (Back.GREEN + "##############################################################")
+    print (Style.RESET_ALL)
     subprocess.call(cmd, shell=True)
     pass
 
@@ -241,11 +264,13 @@ def nmap_1024():
     random.shuffle(nmap_endpoints)
     for ip in nmap_endpoints:
         cmd = 'nmap -p 1-1024 %s -T5' % ip
-        print ("")
-        print ("##############################################################")
+        print (Fore.BLACK)
+        print (Back.GREEN + "##############################################################")
+        print (Style.RESET_ALL)
         print ("Testing NMAP: NMAP Scan First 1024 Ports of %s" %(ip))
-        print ("##############################################################")
-        print ("")
+        print (Fore.BLACK)
+        print (Back.GREEN + "##############################################################")
+        print (Style.RESET_ALL)
         subprocess.call(cmd, shell=True)
 
 ### NTP Test suites
@@ -265,11 +290,13 @@ def ntp_random():
                 cmd = "chronyd -q 'server %s iburst'" % (url)
             else:
                 cmd = "ntpdate %s" % url
-            print ("")
-            print ("##############################################################")
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
             print ("Testing NTP: Update time against %s" %(url))
-            print ("##############################################################")
-            print ("")
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
             subprocess.call(cmd, shell=True)
 
 ### Scaled Test suites
@@ -286,11 +313,13 @@ def scaled():
     for count_ips, ip in enumerate(scaled_endpoints):
         if count_ips < target_ips:
             cmd = "ping -c2 -i1 -s64 -W1 -w2 %s" % ip
-            print ("")
-            print ("##############################################################")
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
             print ("Testing ICMP (%d of %d): Ping %s" %((count_ips+1), target_ips, ip))
-            print ("##############################################################")
-            print ("")
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
             subprocess.call(cmd, shell=True)
 
 ### SSH Test suites
@@ -307,11 +336,13 @@ def ssh_random():
     for count_ips, ip in enumerate(ssh_endpoints):
         if count_ips < target_ips:
             cmd = "ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=1 %s" % (ip)
-            print ("")
-            print ("##############################################################")
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
             print ("Testing SSH (%d of %d): SSH to %s" %((count_ips+1), target_ips, ip))
-            print ("##############################################################")
-            print ("")
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
             subprocess.call(cmd, shell=True)
 
 ### URL Reponse Time Test suites
@@ -339,12 +370,14 @@ def urlresponse_random():
                 continue
             except:
                 pass
-            print ("")
-            print ("##############################################################")
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
             print ("Testing HTTPS (%d of %d): %s" %((count_urls+1), target_urls, url))
             print ("Total Transaction Time -- ", time)
-            print ("##############################################################")
-            print ("")
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
 
 ### EICAR Virus Simulation suit
 def virus_sim_http():
@@ -360,11 +393,13 @@ def virus_sim_http():
     for count_urls, url in enumerate(eicar_http_endpoints):
         if count_urls < target_urls:
             cmd = "curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -o /dev/null %s" % url
-            print ("")
-            print ("##############################################################")
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
             print ("Testing EICAR Virus Simulation (HTTP): Download %s" %(url))
-            print ("##############################################################")
-            print ("")
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
             subprocess.call(cmd, shell=True)
 
 def virus_sim_https():
@@ -380,11 +415,13 @@ def virus_sim_https():
     for count_urls, url in enumerate(eicar_https_endpoints):
         if count_urls < target_urls:
             cmd = "curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -o /dev/null %s" % url
-            print ("")
-            print ("##############################################################")
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
             print ("Testing EICAR Virus Simulation (HTTPS): Download %s" %(url))
-            print ("##############################################################")
-            print ("")
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
             subprocess.call(cmd, shell=True)
 
 ### Web Crawl
@@ -402,11 +439,13 @@ def webcrawl():
         iterations = 100
         attempts = 10
     for count, attempt in enumerate(range(attempts)):
-        print ("")
-        print ("##############################################################")
+        print (Fore.BLACK)
+        print (Back.GREEN + "##############################################################")
+        print (Style.RESET_ALL)
         print ("Crawling from %s (%d deep, attempt %d of %d)" %(ARGS.crawl_start, iterations, count+1, attempts))
-        print ("##############################################################")
-        print ("")
+        print (Fore.BLACK)
+        print (Back.GREEN + "##############################################################")
+        print (Style.RESET_ALL)
         scrape_iterative(ARGS.crawl_start, iterations)
 
 
@@ -434,14 +473,16 @@ def run_test(list):
         size = 'large'
     elif ARGS.size == 'XL':
         size = 'extra-large'
-
-    print ("")
+    print (Fore.WHITE)
+    print (Back.BLUE)
     print ("  [i] Running test suite %s size %s" %(ARGS.suite.upper(), size.upper()), end=" ", flush=True)
     if ARGS.loop:
         print ("in a CONTINUOUS LOOP with MAX %i SEC interval" %(int(ARGS.max_wait_secs)), end=" ", flush=True)
+        print(Style.RESET_ALL)
     if ARGS.nowait:
         print ("without waiting", end=" ", flush=True)
-    print ("")
+        print(Style.RESET_ALL)
+    print(Style.RESET_ALL)
     time.sleep(1)
 
     if ARGS.loop:
@@ -773,9 +814,10 @@ if __name__ == "__main__":
         ENDTIME = time.time()-STARTTIME
 
         ### Print run time of script
-        print ("")
+        print (Fore.WHITE)
+        print (Back.BLUE)
         print ("  [i] Total Run Time: %s" % (time.strftime("%H:%M:%S", time.gmtime(ENDTIME))))
-        print ("")
+        print (Style.RESET_ALL)
 
     ### Keyboard Ctrl-C Interupt
     except KeyboardInterrupt:
