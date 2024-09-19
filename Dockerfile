@@ -23,7 +23,7 @@ RUN apk update && apk add \
 
 RUN pip3 install fastcli requests beautifulsoup4 --break-system-packages
 
-ADD hhttps://raw.githubusercontent.com/jdibby/traffgen/main/generator.py ./
+ADD https://raw.githubusercontent.com/jdibby/traffgen/main/generator.py ./
 ADD https://raw.githubusercontent.com/jdibby/traffgen/main/endpoints.py ./
 
 ENTRYPOINT ["python3", "generator.py", "--os=alpine"]
