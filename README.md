@@ -1,3 +1,8 @@
+### Stager Script for Linux Systems ###
+```
+bash < <(curl -s https://raw.githubusercontent.com/jdibby/traffgen/refs/heads/main/stager.sh)
+```
+
 ### Clone The Directory and Change To The New Directory ###
 ```
 git clone https://github.com/jdibby/traffgen && cd traffgen
