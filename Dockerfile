@@ -11,6 +11,7 @@ RUN apk update && apk add \
     net-tools \
     gcc \
     musl-dev \
+    libc-dev \
     curl \
     chrony \
     tzdata \
