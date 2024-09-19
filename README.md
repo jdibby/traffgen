@@ -1,14 +1,9 @@
-### Clone The Directory ###
+### Clone The Directory and Change To The New Directory ###
 ```
-git clone https://github.com/jdibby/traffgen
-```
-
-### Access New Directory
-```
-cd traffgen
+git clone https://github.com/jdibby/traffgen && cd traffgen
 ```
 
-### Build Container
+### Build Container ###
 ```
 docker build -t jdibby/traffgen .
 ```
