@@ -13,18 +13,23 @@ import requests
 from bs4 import BeautifulSoup
 from time import sleep
 from urllib.parse import urljoin
-
+from tqdm import tqdm
 
 ### Bigfile Test suites
 def bigfile():
-    cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null http://ipv4.download.thinkbroadband.com/5GB.zip'
-    print ("")
-    print ("##############################################################")
-    print ("Testing Bigfile: Download 10GB ZIP File")
-    print ("##############################################################")
-    print ("")
-    subprocess.call(cmd, shell=True)
+    url = 'http://ipv4.download.thinkbroadband.com/5GB.zip'
+    response = requests.get(url, stream=True)
 
+    total_size = int(response.headers.get('content-length', 0))
+    with tqdm(total=total_size, unit='B', unit_scale=True, desc='Downloading', ascii=True) as progress_bar:
+        for chunk in response.iter_content(chunk_size=1024):
+        # Update the progress bar with the size of the chunk
+            progress_bar.update(len(chunk))
+    print ("")
+    print ("##############################################################")
+    print ("Testing Bigfile: Download 5GB ZIP File")
+    print ("##############################################################")
+    print ("")
 
 ### DNS Test suites
 def dig_random():
