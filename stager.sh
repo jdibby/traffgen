@@ -13,5 +13,9 @@ echo "### PORTAINER INSTALL COMPLETE ###"
 
 echo "STARTING TRAFFGEN INSTALL ###"
 git clone https://github.com/jdibby/traffgen && cd traffgen
-docker build -t jdibby/traffgen . && docker run --detach --restart unless-stopped jdibby/traffgen:latest
+docker build -t jdibby/traffgen .
 echo "### TRAFFGEN INSTALL COMPLETE ###"
+
+echo "### STARTING TRAFFGEN ###"
+docker run --detach --restart unless-stopped jdibby/traffgen:latest
+echo "### TRAFFGEN STARTED ###"
