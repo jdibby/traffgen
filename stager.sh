@@ -1,5 +1,10 @@
 #!/bin/bash
 
+### PLACE IN HOME DIR OF RPI ###
+### Run "sudo su"            ###
+### Run "chmod 755 stager.sh ###
+### Run "./stager.sh         ###
+
 ### SET HOME DIRECTORY ###
 HOMEDIR=pwd
 
