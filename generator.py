@@ -63,7 +63,6 @@ def dig_random():
                     subprocess.call(cmd, shell=True)
                     time.sleep(0.25) # Rate limit to prevent tripping alarms
 
-
 ### FTP Test suites
 def ftp_random():
     if ARGS.size == 'S':
@@ -81,7 +80,6 @@ def ftp_random():
     print ("##############################################################")
     print ("")
     subprocess.call(cmd, shell=True)
-
 
 ### HTTP Test suites
 def http_random():
@@ -134,7 +132,6 @@ def http_download_targz():
     print ("")
     subprocess.call(cmd, shell=True)
 
-
 ### HTTPS Test suites
 def https_random():
     if ARGS.size == 'S':
@@ -168,7 +165,7 @@ def https_crawl():
         iterations = 5
     elif ARGS.size == 'XL':
         target_urls = len(https_endpoints)
-        iterations = 8
+        iterations = 10
     random.shuffle(https_endpoints)
     for count_urls, url in enumerate(https_endpoints):
         if count_urls < target_urls:
@@ -178,7 +175,6 @@ def https_crawl():
             print ("##############################################################")
             print ("")
             scrape_iterative(url, iterations)
-
 
 ### ICMP Test suites
 def ping_random():
@@ -221,7 +217,6 @@ def traceroute_random():
             print ("")
             subprocess.call(cmd, shell=True)
 
-
 ### Netflix Test suites
 def speedtest_fast():
     if ARGS.size == 'S':
@@ -253,7 +248,6 @@ def nmap_1024():
         print ("")
         subprocess.call(cmd, shell=True)
 
-
 ### NTP Test suites
 def ntp_random():
     if ARGS.size == 'S':
@@ -278,7 +272,6 @@ def ntp_random():
             print ("")
             subprocess.call(cmd, shell=True)
 
-
 ### Scaled Test suites
 def scaled():
     if ARGS.size == 'S':
@@ -299,7 +292,6 @@ def scaled():
             print ("##############################################################")
             print ("")
             subprocess.call(cmd, shell=True)
-
 
 ### SSH Test suites
 def ssh_random():
@@ -354,8 +346,7 @@ def urlresponse_random():
             print ("##############################################################")
             print ("")
 
-### EICAR Virus Simulation suites
-# See description of these test files at https://www.eicar.org/?page_id=3950
+### EICAR Virus Simulation suit
 def virus_sim_http():
     if ARGS.size == 'S':
         target_urls = 1
@@ -396,7 +387,6 @@ def virus_sim_https():
             print ("")
             subprocess.call(cmd, shell=True)
 
-
 ### Web Crawl
 def webcrawl():
     if ARGS.size == 'S':
@@ -410,7 +400,7 @@ def webcrawl():
         attempts = 5
     elif ARGS.size == 'XL':
         iterations = 100
-        attempts = 8
+        attempts = 10
     for count, attempt in enumerate(range(attempts)):
         print ("")
         print ("##############################################################")
@@ -433,7 +423,6 @@ def progressbar(it, prefix="", size=60, file=sys.stdout):
         show(i+1)
     file.write("\n")
     file.flush()
-
 
 ### Randomize and run tests
 def run_test(list):
@@ -468,8 +457,7 @@ def run_test(list):
             func()
             finish_test()
 
-
-### Randomize a wait time between 2 and 40 seconds
+### Randomize a wait time between 2 and max seconds
 def finish_test():
     if ARGS.loop:
         print ("")
@@ -488,9 +476,8 @@ def finish_test():
 
 ### Package updates required for script
 def apt_acquisitions():
-    subprocess.call("sudo apt-get -y install traceroute mtr nmap curl wget ntp dnsutils fping snmp", shell=True)
-    subprocess.call("sudo apt-get -y update", shell=True)
-
+    subprocess.call("apk add traceroute mtr nmap curl wget ntp dnsutils fping snmp", shell=True)
+    subprocess.call("apk update", shell=True)
 
 ### Pull an updated list of co-located containers to test against
 def scaled_endpoints(url):
@@ -503,7 +490,6 @@ def scaled_endpoints(url):
         filetowrite.write("\n" + text)
     print ("")
 
-
 ### Pull an updated list of co-located containers to test against
 def replace_all_endpoints(url):
     print ("")
@@ -515,11 +501,10 @@ def replace_all_endpoints(url):
         filetowrite.write(text)
     print ("")
 
-
 ### Grab random link from website
 def scrape_single_link(url):
     # Randomize user agent and time between requets
-    sleep(random.uniform(0.2, 1.5))
+    sleep(random.uniform(0.2, 2))
     random.shuffle(user_agents)
 
     # Get site contents
@@ -579,7 +564,6 @@ def scrape_single_link(url):
     print("Dead end.")
     return None
 
-
 ### Loop over scraped links
 def scrape_iterative(base_url, iterations=3):
     next_link = scrape_single_link(base_url)
@@ -588,7 +572,6 @@ def scrape_iterative(base_url, iterations=3):
             next_link = scrape_single_link(next_link)
         else:
             break
-
 
 ### Do the thing
 if __name__ == "__main__":
@@ -774,31 +757,25 @@ if __name__ == "__main__":
                 virus_sim_https,
             ]
 
-
         ### Update first
         if ARGS.scaled_endpoints:
             scaled_endpoints(ARGS.scaled_endpoints)
         elif ARGS.replace_all_endpoints:
             replace_all_endpoints(ARGS.scaled_endpoints)
 
-
         ### Import targets from endpoints.py
         from endpoints import *
-
 
         ### Ship it
         run_test(testsuite)
 
-
         ### End time is time since epoch minus the start time since epoch (floating point)
         ENDTIME = time.time()-STARTTIME
-
 
         ### Print run time of script
         print ("")
         print ("  [i] Total Run Time: %s" % (time.strftime("%H:%M:%S", time.gmtime(ENDTIME))))
         print ("")
-
 
     ### Keyboard Ctrl-C Interupt
     except KeyboardInterrupt:
