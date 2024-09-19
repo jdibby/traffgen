@@ -43,7 +43,7 @@ docker ps | grep jdibby/traffgen | awk '{print $1}' | xargs docker stop
 
 git clone https://github.com/jdibby/traffgen
 cd $HOMEDIR/traffgen
-docker build -t jdibby/traffgen .
+docker build -t jdibby/traffgen $PWD/traffgen/.
 echo "### TRAFFGEN INSTALL COMPLETE ###"
 
 echo "### STARTING TRAFFGEN ###"
