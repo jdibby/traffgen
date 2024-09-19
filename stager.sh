@@ -37,7 +37,7 @@ docker volume create portainer_data
 docker run -d -p 8000:8000 -p 9443:9443 --name portainer --restart=always -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer-ce:2.21.1
 echo "### PORTAINER INSTALL COMPLETE WITH DEFAULT USERNAME ADMIN ###"
 
-echo "STARTING TRAFFGEN INSTALL ###"
+echo "### STARTING TRAFFGEN INSTALL ###"
 ### Cleanup potential existing traffgen installs ###
 docker ps | grep jdibby/traffgen | awk '{print $1}' | xargs docker stop
 
