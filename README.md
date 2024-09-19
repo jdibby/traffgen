@@ -13,14 +13,19 @@ cd traffgen
 docker build -t jdibby/traffgen .
 ```
 
+### Run Container Continuously in Background ###
+```
+docker run --detach --restart unless-stopped jdibby/traffgen:latest
+```
+
+### Run Container in Foreground ###
+```
+docker run -it jdibby/traffgen:latest
+```
+
 ### Help Page ###
 ```
 docker run jdibby/traffgen:latest --help
-```
-
-### Run Container Continuously ###
-```
-docker run --detach --restart unless-stopped jdibby/traffgen:latest
 ```
 
 ### Update Repo ###
