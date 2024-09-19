@@ -1,4 +1,4 @@
-#!/bin/bash
+ #!/bin/bash
 
 ### PLACE IN HOME DIR OF RPI ###
 ### Run "sudo su"            ###
@@ -7,7 +7,7 @@
 
 ### SET HOME DIRECTORY ###
 HOMEDIR=`pwd`
-
+echo $HOMEDIR
 echo "### UPDATING AND UPGRADING PACKAGES ###"
 apt update -y && apt upgrade -y
 
