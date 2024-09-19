@@ -16,7 +16,7 @@ echo "### UPDATING AND UPGRADING PACKAGES COMPLETE """
 
 echo -e -n "\n" 
 
-echo "### INSTALLING DOCKER AND GIT ###"
+echo "### STARTING DOCKER AND GIT INSTALL ###"
 # Add Docker's official GPG key:
 apt-get install ca-certificates curl git
 install -m 0755 -d /etc/apt/keyrings
@@ -65,7 +65,7 @@ echo "### TRAFFGEN STARTED ###"
 
 echo -e -n "\n" 
 
-echo "### FINAL CLEANUP ###"
+echo "### FINAL CLEANUP STARTED ###"
 rm -rf $HOMEDIR/traffgen
 rm -rf $HOMEDIR/stager.sh
 echo "### FINAL CLEANUP COMPLETE ###"
