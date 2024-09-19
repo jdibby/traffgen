@@ -6,7 +6,7 @@
 ### Run "./stager.sh         ###
 
 ### SET HOME DIRECTORY ###
-HOMEDIR=pwd
+HOMEDIR=`pwd`
 
 echo "### UPDATING AND UPGRADING PACKAGES ###"
 apt update -y && apt upgrade -y
