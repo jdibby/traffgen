@@ -23,7 +23,7 @@ RUN apk update && apk add \
     busybox-extras \
     net-snmp
 
-RUN pip3 install fastcli requests beautifulsoup4 tqdm --break-system-packages
+RUN pip3 install fastcli requests colorama beautifulsoup4 tqdm --break-system-packages
 
 ADD https://raw.githubusercontent.com/jdibby/traffgen/main/generator.py ./
 ADD https://raw.githubusercontent.com/jdibby/traffgen/main/endpoints.py ./
