@@ -1,5 +1,8 @@
 #!/bin/bash
 
+### SET HOME DIRECTORY ###
+HOMEDIR=pwd
+
 echo "### UPDATING AND UPGRADING PACKAGES ###"
 apt update -y && apt upgrade -y
 
@@ -12,7 +15,7 @@ docker run -d -p 8000:8000 -p 9443:9443 --name portainer --restart=always -v /va
 echo "### PORTAINER INSTALL COMPLETE WITH DEFAULT USERNAME ADMIN ###"
 
 echo "STARTING TRAFFGEN INSTALL ###"
-git clone https://github.com/jdibby/traffgen && cd traffgen
+git clone https://github.com/jdibby/traffgen && cd $HOMEDIR/traffgen
 docker build -t jdibby/traffgen .
 echo "### TRAFFGEN INSTALL COMPLETE ###"
 
