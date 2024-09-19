@@ -11,14 +11,23 @@ if [ $WHOAREYOU != root ]; then
    exit
 fi
 
+BOLD=$(tput bold)
+NORMAL=$(tput sgr0)
+
+echo "this is ${bold}bold${normal} but this isn't"
+
 ### SET HOME DIRECTORY ###
 HOMEDIR=`pwd`
 
 echo -e -n "\n" 
 
+$BOLD
 echo "### UPDATING AND UPGRADING PACKAGES ###"
+$NORMAL
 apt update -y && apt upgrade -y
+$BOLD
 echo "### UPDATING AND UPGRADING PACKAGES COMPLETE """
+$NORMAL
 
 echo -e -n "\n" 
 
