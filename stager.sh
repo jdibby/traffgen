@@ -57,15 +57,17 @@ echo "${BOLD}### PORTAINER INSTALL COMPLETE WITH DEFAULT USERNAME ADMIN ###${NOR
 
 echo -e -n "\n" 
 
-echo "${BOLD}### STARTING TRAFFGEN INSTALL ###${NORMAL}"
+#echo "${BOLD}### STARTING TRAFFGEN INSTALL ###${NORMAL}"
+echo "${BOLD}### STARTING TRAFFGEN CLEANUP ###${NORMAL}"
 ### Cleanup potential existing traffgen installs ###
 docker ps | grep jdibby/traffgen | awk '{print $1}' | xargs docker stop
 rm -rf $HOMEDIR/traffgen/
 
-git clone https://github.com/jdibby/traffgen
-cd $HOMEDIR/traffgen/
-docker build -t jdibby/traffgen $HOMEDIR/traffgen/.
-echo "${BOLD}### TRAFFGEN INSTALL COMPLETE ###${NORMAL}"
+#git clone https://github.com/jdibby/traffgen
+#cd $HOMEDIR/traffgen/
+#docker build -t jdibby/traffgen $HOMEDIR/traffgen/.
+#echo "${BOLD}### TRAFFGEN INSTALL COMPLETE ###${NORMAL}"
+echo "${BOLD}### TRAFFGEN CLEANUP COMPLETE ###${NORMAL}"
 
 echo -e -n "\n" 
 
