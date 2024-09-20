@@ -7,7 +7,7 @@
 
 WHOAREYOU=`whoami`
 if [ $WHOAREYOU != root ]; then
-   echo "### YOU MUST BE ROOT TO RUN THIS SCRIPT ###"
+   echo "### YOU MUST BE SUDO THIS SCRIPT ###"
    exit
 fi
 
