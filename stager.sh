@@ -69,6 +69,8 @@ echo -e -n "\n"
 echo "${BOLD}### STARTING TRAFFGEN CLEANUP ###${NORMAL}"
 ### Cleanup potential existing traffgen installs ###
 docker ps | grep jdibby/traffgen | awk '{print $1}' | xargs docker stop
+docker ps -a | grep jdibby/traffgen | awk '{print $1}' | xargs docker container rm
+docker images | grep "jdibby/traffgen" | awk '{print $3}' | xargs docker rmi
 rm -rf $HOMEDIR/traffgen/
 
 #git clone https://github.com/jdibby/traffgen
