@@ -1,6 +1,6 @@
 ### Stager Script for Linux Systems ###
 ```
-bash < <(curl -s https://raw.githubusercontent.com/jdibby/traffgen/refs/heads/main/stager.sh)
+sudo bash < <(curl -s https://raw.githubusercontent.com/jdibby/traffgen/refs/heads/main/stager.sh)
 ```
 
 ### Clone The Directory and Change To The New Directory ###
