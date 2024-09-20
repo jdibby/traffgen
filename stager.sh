@@ -44,11 +44,11 @@ echo "${BOLD}### INSTALLATION OF DOCKER AND GIT COMPLETE ###${NORMAL}"
 
 echo -e -n "\n" 
 
-echo "${BOLD}### STARTING DOCKER PREP ###${NORMAL}"
-groupadd docker
-usermod -aG docker $USER
-newgrp docker
-echo "${BOLD}### DOCKER PREP COMPLETE ###${NORMAL}"
+#echo "${BOLD}### STARTING DOCKER PREP ###${NORMAL}"
+#groupadd docker
+#usermod -aG docker $USER
+#newgrp docker
+#echo "${BOLD}### DOCKER PREP COMPLETE ###${NORMAL}"
 
 echo -e -n "\n" 
 
