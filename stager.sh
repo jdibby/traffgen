@@ -71,11 +71,11 @@ echo "${BOLD}### STARTING TRAFFGEN INSTALL ###${NORMAL}"
 docker ps | grep jdibby/traffgen | awk '{print $1}' | sudo xargs docker stop
 docker ps -a | grep jdibby/traffgen | awk '{print $1}' | sudo xargs docker container rm
 docker images | grep jdibby/traffgen | awk '{print $3}' | sudo xargs docker rmi
-rm -rf $HOMEDIR/traffgen/
 
 git clone https://github.com/jdibby/traffgen
 cd $HOMEDIR/traffgen/
 docker build -t jdibby/traffgen $HOMEDIR/traffgen/.
+rm -rf $HOMEDIR/traffgen/
 echo "${BOLD}### TRAFFGEN INSTALL COMPLETE ###${NORMAL}"
 #echo "${BOLD}### TRAFFGEN CLEANUP COMPLETE ###${NORMAL}"
 
