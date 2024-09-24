@@ -1,10 +1,5 @@
 #!/bin/bash
 
-### PLACE IN HOME DIR OF RPI ###
-### Run "sudo su"            ###
-### Run "chmod 755 stager.sh ###
-### Run "./stager.sh         ###
-
 WHOAREYOU=`whoami`
 if [ $WHOAREYOU != root ]; then
    echo "### YOU MUST BE SUDO THIS SCRIPT ###"
