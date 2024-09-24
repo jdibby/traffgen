@@ -44,20 +44,12 @@ echo "${BOLD}### INSTALLATION OF DOCKER AND GIT COMPLETE ###${NORMAL}"
 
 echo -e -n "\n" 
 
-#echo "${BOLD}### STARTING DOCKER PREP ###${NORMAL}"
-#groupadd docker
-#usermod -aG docker $USER
-#newgrp docker
-#echo "${BOLD}### DOCKER PREP COMPLETE ###${NORMAL}"
-
-echo -e -n "\n" 
-
 echo "${BOLD}### STARTING PORTAINER INSTALL ###${NORMAL}"
 ### Cleanup potential existing Portainer installs ###
 docker stop portainer
 docker rm portainer
 docker volume rm portainer_data
-docker images | grep portainer | awk '{print $3}' | sudo xargs docker rmi
+docker images | grep portainer | awk '{print $3}' | sudo xargs docker rmi -f
 
 docker volume create portainer_data
 docker run -d -p 8000:8000 -p 9443:9443 --name portainer --restart=always -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer-ce:2.21.1
@@ -66,30 +58,25 @@ echo "${BOLD}### PORTAINER INSTALL COMPLETE WITH DEFAULT USERNAME ADMIN ###${NOR
 echo -e -n "\n" 
 
 echo "${BOLD}### STARTING TRAFFGEN INSTALL ###${NORMAL}"
-#echo "${BOLD}### STARTING TRAFFGEN CLEANUP ###${NORMAL}"
 ### Cleanup potential existing traffgen installs ###
 docker ps | grep jdibby/traffgen | awk '{print $1}' | sudo xargs docker stop
-docker ps -a | grep jdibby/traffgen | awk '{print $1}' | sudo xargs docker container rm
-docker images | grep jdibby/traffgen | awk '{print $3}' | sudo xargs docker rmi
-
-git clone https://github.com/jdibby/traffgen
-cd $HOMEDIR/traffgen/
-docker build -t jdibby/traffgen $HOMEDIR/traffgen/.
-rm -rf $HOMEDIR/traffgen/
+docker ps -a | grep jdibby/traffgen | awk '{print $1}' | sudo xargs docker rm
+docker images | grep jdibby/traffgen | awk '{print $3}' | sudo xargs docker rmi -f
+docker images| awk '{print $1}' | grep -v REPOSITORY | sudo xargs docker rmi -f
 echo "${BOLD}### TRAFFGEN INSTALL COMPLETE ###${NORMAL}"
-#echo "${BOLD}### TRAFFGEN CLEANUP COMPLETE ###${NORMAL}"
 
-echo -e -n "\n" 
+#!/bin/bash
+if grep -q -i raspbian /etc/issue 2>/dev/null
+   then
+      docker run --detach --restart unless-stopped jdibby/traffgen:rpi
+    else
+      docker run --detach --restart unless-stopped jdibby/traffgen:amd64
+fi
 
-echo "${BOLD}### STARTING TRAFFGEN ###${NORMAL}"
-docker run --detach --restart unless-stopped jdibby/traffgen:latest
-echo "${BOLD}### TRAFFGEN STARTED ###${NORMAL}"
-
-echo -e -n "\n" 
+echo -e -n "\n"
 
 echo "${BOLD}### FINAL CLEANUP STARTED ###${NORMAL}"
-rm -rf $HOMEDIR/traffgen
-rm -rf $HOMEDIR/stager.sh
+#rm -rf $HOMEDIR/stager.sh
 echo "${BOLD}### FINAL CLEANUP COMPLETE ###${NORMAL}"
 
 echo -e -n "\n"
