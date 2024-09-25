@@ -99,7 +99,7 @@ docker images| awk '{print $1}' | grep -v REPOSITORY | sudo xargs docker rmi -f
 echo "${BOLD}### TRAFFGEN INSTALL COMPLETE ###${NORMAL}"
 
 #!/bin/bash
-if $ISRPI = Y
+if [ $ISRPI = "Y" ];
    then
       docker run --detach --restart unless-stopped jdibby/traffgen:rpi
    else
