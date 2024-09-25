@@ -38,7 +38,7 @@ echo -e -n "\n"
 
 echo "${BOLD}### STARTING DOCKER AND GIT INSTALL ###${NORMAL}"
 
-if $ISRPI = Y
+if [ $ISRPI = "Y" ];
    then
       for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
       # Add Docker's official GPG key:
