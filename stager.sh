@@ -104,7 +104,6 @@ docker images| awk '{print $1}' | grep -v REPOSITORY | sudo xargs docker rmi -f
 echo "${BOLD}### TRAFFGEN INSTALL COMPLETE ###${NORMAL}"
 
 ### Run specific docker images based on Raspberry Pi or not ###
-#!/bin/bash
 if [ $ISRPI = "Y" ];
    then
       docker run --detach --restart unless-stopped jdibby/traffgen:rpi
