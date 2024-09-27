@@ -1,22 +1,23 @@
 #!/bin/bash
 
+### Validate this is being run with sudo / root permissions ###
 WHOAREYOU=`whoami`
 if [ $WHOAREYOU != root ]; then
    echo "### YOU MUST BE SUDO THIS SCRIPT ###"
    exit
 fi
 
-### Create Bold and Normal Font Style ###
+### Adding capabilities to bold font ###
 BOLD=$(tput bold)
 NORMAL=$(tput sgr0)
 
-### SET HOME DIRECTORY ###
+### Set Home Directory ###
 HOMEDIR=`pwd`
 
 echo -e -n "\n" 
 
 echo "${BOLD}### DETECING OPERATING SYSTEM ###${NORMAL}"
-
+### Detect if it is an Raspberry Pi or Not ###
 #!/bin/bash
 if grep -q -i raspbian /etc/issue 2>/dev/null
    then
@@ -31,6 +32,7 @@ echo "${BOLD}### OPERATING SYSTEM DETECTED ###${NORMAL}"
 echo -e -n "\n" 
 
 echo "${BOLD}### UPDATING AND UPGRADING PACKAGES ###${NORMAL}"
+### Update and upgrade packages
 apt update -y && apt upgrade -y
 echo "${BOLD}### UPDATING AND UPGRADING PACKAGES COMPLETE ###${NORMAL}"
 
@@ -101,6 +103,7 @@ docker images | grep jdibby/traffgen | awk '{print $3}' | sudo xargs docker rmi 
 docker images| awk '{print $1}' | grep -v REPOSITORY | sudo xargs docker rmi -f
 echo "${BOLD}### TRAFFGEN INSTALL COMPLETE ###${NORMAL}"
 
+### Run specific docker images based on Raspberry Pi or not ###
 #!/bin/bash
 if [ $ISRPI = "Y" ];
    then
