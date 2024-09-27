@@ -54,6 +54,7 @@ if [ $ISRPI = "Y" ];
       sudo apt-get update -y
 
       apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+      systemctl restart docker
 else
    for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
    # Add Docker's official GPG key:
@@ -71,6 +72,8 @@ else
    apt-get update -y
 
    sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+   systemctl restart docker
+
 fi
 
 echo "${BOLD}### INSTALLATION OF DOCKER AND GIT COMPLETE ###${NORMAL}"
