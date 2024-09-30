@@ -1,6 +1,6 @@
 #!/bin/bash
 
-###
+### Test
 
 ### Validate this is being run with sudo / root permissions ###
 WHOAREYOU=`whoami`
