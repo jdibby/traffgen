@@ -20,8 +20,7 @@ echo -e -n "\n"
 
 echo "${BOLD}### DETECING OPERATING SYSTEM ###${NORMAL}"
 ### Detect if it is an Raspberry Pi or Not ###
-#!/bin/bash
-if grep -q -i raspbian /etc/issue 2>/dev/null
+if uname -a | grep -q -i '+rpt-rpi' 2>/dev/null
    then
       ISRPI=Y
       echo "System detected as a Raspberry Pi"
@@ -29,6 +28,7 @@ if grep -q -i raspbian /etc/issue 2>/dev/null
       ISRPI=N
       echo "System is NOT a Raspberry Pi"
 fi
+
 echo "${BOLD}### OPERATING SYSTEM DETECTED ###${NORMAL}"
 
 echo -e -n "\n" 
