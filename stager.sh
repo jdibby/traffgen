@@ -3,7 +3,7 @@
 ### Validate this is being run with sudo / root permissions ###
 WHOAREYOU=`whoami`
 if [ $WHOAREYOU != root ]; then
-   echo "### YOU MUST BE SUDO THIS SCRIPT ###"
+   echo "### YOU MUST BE ROOT OR SUDO THIS SCRIPT ###"
    exit
 fi
 
@@ -20,8 +20,6 @@ echo "${BOLD}### DETECING OPERATING SYSTEM ###${NORMAL}"
 ### Detect if it is an Raspberry Pi or Not and the version ###
 RPIVER=`grep -a "Raspberry" /proc/device-tree/model | awk '{print $3}'`
 UBUNTU=`grep 'NAME="Ubuntu"' /etc/os-release | wc -l`
-
-echo $RPIVER
 
 if [ $RPIVER > 0 ]; then
    echo "System detected as a Raspberry Pi $RPIVER"
