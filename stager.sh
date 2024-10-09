@@ -22,7 +22,7 @@ RPIVER = 'grep -a "Raspberry" /proc/device-tree/model | awk '{print $3}''
 
 echo $RPIVER
 
-if [ $RPIVER > 0 ];
+if [ $RPIVER > 0 ]; then
    echo "System detected as a Raspberry Pi $RPIVER"
 fi
 
