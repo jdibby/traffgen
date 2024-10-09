@@ -18,7 +18,7 @@ echo -e -n "\n"
 
 echo "${BOLD}### DETECING OPERATING SYSTEM ###${NORMAL}"
 ### Detect if it is an Raspberry Pi or Not and the version ###
-RPIVER = `grep -a "Raspberry" /proc/device-tree/model | awk '{print $3}'`
+RPIVER = 'grep -a "Raspberry" /proc/device-tree/model | awk '{print $3}''
 
 echo $RPIVER
 
