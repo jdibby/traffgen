@@ -1,7 +1,5 @@
 #!/bin/bash
 
-### TEST ###
-
 ### Validate this is being run with sudo / root permissions ###
 WHOAREYOU=`whoami`
 if [ $WHOAREYOU != root ]; then
@@ -19,14 +17,11 @@ HOMEDIR=`pwd`
 echo -e -n "\n" 
 
 echo "${BOLD}### DETECING OPERATING SYSTEM ###${NORMAL}"
-### Detect if it is an Raspberry Pi or Not ###
-if uname -a | grep -q -i '+rpt-rpi' 2>/dev/null
-   then
-      ISRPI=Y
-      echo "System detected as a Raspberry Pi"
-    else
-      ISRPI=N
-      echo "System is NOT a Raspberry Pi"
+### Detect if it is an Raspberry Pi or Not and the version ###
+RPIVER = `grep -a "Raspberry" /proc/device-tree/model | awk '{print $3}'`
+
+if [ $RPIVER > 0 ];
+   echo "System detected as a Raspberry Pi $RPIVER"
 fi
 
 echo "${BOLD}### OPERATING SYSTEM DETECTED ###${NORMAL}"
@@ -42,42 +37,58 @@ echo -e -n "\n"
 
 echo "${BOLD}### STARTING DOCKER AND GIT INSTALL ###${NORMAL}"
 
-if [ $ISRPI = "Y" ];
-   then
-      for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
-      # Add Docker's official GPG key:
-      apt-get install ca-certificates curl git -y
-      install -m 0755 -d /etc/apt/keyrings
-      curl -fsSL https://download.docker.com/linux/raspbian/gpg -o /etc/apt/keyrings/docker.asc
-      chmod a+r /etc/apt/keyrings/docker.asc
+if [ $RPIVER < 5 ]; then
+   for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
+   # Add Docker's official GPG key:
+   apt-get install ca-certificates curl git -y
+   install -m 0755 -d /etc/apt/keyrings
+   curl -fsSL https://download.docker.com/linux/raspbian/gpg -o /etc/apt/keyrings/docker.asc
+   chmod a+r /etc/apt/keyrings/docker.asc
 
-      echo \
-        "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/raspbian \
-        $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-        sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-      sudo apt-get update -y
+   echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/raspbian \
+      $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+      sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+   apt-get update -y
 
-      apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
-      systemctl restart docker
+   apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+   systemctl restart docker
+elif [ $RPIVER = 5 ]; then
+   for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
+   # Add Docker's official GPG key:
+   apt-get update
+   apt-get install ca-certificates curl
+   install -m 0755 -d /etc/apt/keyrings
+   curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+   chmod a+r /etc/apt/keyrings/docker.asc
+
+   # Add the repository to Apt sources:
+   echo \
+   "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian \
+   $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+   tee /etc/apt/sources.list.d/docker.list > /dev/null
+   apt-get update -y
+
+   apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+   systemctl restart docker
 else
    for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
    # Add Docker's official GPG key:
-   apt-get update -y
-   apt-get install ca-certificates curl -y
+   apt-get update
+   apt-get install ca-certificates curl
    install -m 0755 -d /etc/apt/keyrings
    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
    chmod a+r /etc/apt/keyrings/docker.asc
 
    # Add the repository to Apt sources:
    echo \
-     "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
-     $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-     tee /etc/apt/sources.list.d/docker.list > /dev/null
+   "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+   $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+   sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
    apt-get update -y
 
-   sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+   apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
    systemctl restart docker
-
 fi
 
 echo "${BOLD}### INSTALLATION OF DOCKER AND GIT COMPLETE ###${NORMAL}"
@@ -106,7 +117,7 @@ docker images| awk '{print $1}' | grep -v REPOSITORY | sudo xargs docker rmi -f
 echo "${BOLD}### TRAFFGEN INSTALL COMPLETE ###${NORMAL}"
 
 ### Run specific docker images based on Raspberry Pi or not ###
-if [ $ISRPI = "Y" ];
+if [ $RPIVER = "Y" ];
    then
       docker run --detach --restart unless-stopped jdibby/traffgen:rpi
    else
