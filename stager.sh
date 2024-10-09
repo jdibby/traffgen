@@ -74,7 +74,7 @@ elif [ $RPIVER = 5 ]; then
 
    apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
    systemctl restart docker
-else
+elif [ UBUNTU > 0 ]; then
    for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
    # Add Docker's official GPG key:
    apt-get update
@@ -120,11 +120,12 @@ docker images| awk '{print $1}' | grep -v REPOSITORY | sudo xargs docker rmi -f
 echo "${BOLD}### TRAFFGEN INSTALL COMPLETE ###${NORMAL}"
 
 ### Run specific docker images based on Raspberry Pi or not ###
-if [ $RPIVER = "Y" ];
-   then
-      docker run --detach --restart unless-stopped jdibby/traffgen:rpi
-   else
-      docker run --detach --restart unless-stopped jdibby/traffgen:amd64
+if [ $RPIVER < 5  ]; then
+   docker run --detach --restart unless-stopped jdibby/traffgen:armv7
+elif [ $RPIVER = 5 ]; then
+   docker run --detach --restart unless-stopped jdibby/traffgen:armv8
+elif [ UBUNTU > 0 ]; then
+   docker run --detach --restart unless-stopped jdibby/traffgen:amd64
 fi
 
 echo -e -n "\n"
