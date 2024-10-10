@@ -90,6 +90,9 @@ elif [ UBUNTU -gt 0 ]; then
 
    apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
    systemctl restart docker
+else
+   echo "### YOU ARE RUNNING AN UNSUPPORTED OPERATING SYSTEM ###"
+   exit 1
 fi
 
 echo "${BOLD}### INSTALLATION OF DOCKER AND GIT COMPLETE ###${NORMAL}"
