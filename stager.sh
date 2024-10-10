@@ -1,10 +1,10 @@
 #!/bin/bash
 
 ### Validate this is being run with sudo / root permissions ###
-WHOAREYOU=`whoami`
-if [ $WHOAREYOU != root ]; then
+WHOAREYOU=$(whoami)
+if [ "$WHOAREYOU" != "root" ]; then
    echo "### YOU MUST BE ROOT OR SUDO THIS SCRIPT ###"
-   exit
+   exit 1
 fi
 
 ### Adding capabilities to bold font ###
@@ -12,7 +12,7 @@ BOLD=$(tput bold)
 NORMAL=$(tput sgr0)
 
 ### Set Home Directory ###
-HOMEDIR=`pwd`
+HOMEDIR=$(pwd)
 
 echo -e -n "\n" 
 
@@ -40,7 +40,7 @@ echo -e -n "\n"
 
 echo "${BOLD}### STARTING DOCKER INSTALL ###${NORMAL}"
 
-if [ "$RPIVER" -lt 5 ]; then
+if [ -n "$RPIVER" ] && [ "$RPIVER" -lt 5 ]; then
    for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
    # Add Docker's official GPG key:
    apt-get install ca-certificates curl git -y
@@ -123,11 +123,11 @@ docker images| awk '{print $1}' | grep -v REPOSITORY | sudo xargs docker rmi -f
 echo "${BOLD}### TRAFFGEN INSTALL COMPLETE ###${NORMAL}"
 
 ### Run specific docker images based on Raspberry Pi or not ###
-if [ $RPIVER -lt 5  ]; then
+if [ -n "$RPIVER" ] && [ "$RPIVER" -lt 5 ]; then
    docker run --detach --restart unless-stopped jdibby/traffgen:armv7
-elif [ $RPIVER -eq 5 ]; then
+elif [ "$RPIVER" -eq 5 ]; then
    docker run --detach --restart unless-stopped jdibby/traffgen:armv8
-elif [ UBUNTU -gt 0 ]; then
+elif [ "$UBUNTU" -gt 0 ]; then
    docker run --detach --restart unless-stopped jdibby/traffgen:amd64
 fi
 
