@@ -23,8 +23,11 @@ UBUNTU=$(grep 'NAME="Ubuntu"' /etc/os-release | wc -l)
 
 if [ -n "$RPIVER" ] && [ "$RPIVER" -gt 0 ]; then
    echo "System detected as a Raspberry Pi $RPIVER"
+elif [ "$UBUNTU" -gt 0 ]; then
+   echo "System detected as Ubuntu"
 else
-   echo "Not detected as a Raspberry Pi"
+   echo "Not detected as a Raspberry Pi or Ubuntu"
+   exit 1
 fi
 
 echo "${BOLD}### OPERATING SYSTEM DETECTED ###${NORMAL}"
