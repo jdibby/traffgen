@@ -16,13 +16,15 @@ HOMEDIR=`pwd`
 
 echo -e -n "\n" 
 
-echo "${BOLD}### DETECING OPERATING SYSTEM ###${NORMAL}"
-### Detect if it is an Raspberry Pi or Not and the version ###
-RPIVER=`grep -a "Raspberry" /proc/device-tree/model | awk '{print $3}'`
-UBUNTU=`grep 'NAME="Ubuntu"' /etc/os-release | wc -l`
+echo "${BOLD}### DETECTING OPERATING SYSTEM ###${NORMAL}"
+# Detect if it is a Raspberry Pi or not and the version
+RPIVER=$(grep -a "Raspberry" /proc/device-tree/model | awk '{print $3}')
+UBUNTU=$(grep 'NAME="Ubuntu"' /etc/os-release | wc -l)
 
-if [ $RPIVER > "0" ]; then
+if [ -n "$RPIVER" ] && [ "$RPIVER" -gt 0 ]; then
    echo "System detected as a Raspberry Pi $RPIVER"
+else
+   echo "Not detected as a Raspberry Pi"
 fi
 
 echo "${BOLD}### OPERATING SYSTEM DETECTED ###${NORMAL}"
@@ -38,7 +40,7 @@ echo -e -n "\n"
 
 echo "${BOLD}### STARTING DOCKER INSTALL ###${NORMAL}"
 
-if [ $RPIVER < "5" ]; then
+if [ "$RPIVER" -lt 5 ]; then
    for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
    # Add Docker's official GPG key:
    apt-get install ca-certificates curl git -y
@@ -54,7 +56,7 @@ if [ $RPIVER < "5" ]; then
 
    apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
    systemctl restart docker
-elif [ $RPIVER == "5" ]; then
+elif [ "$RPIVER" -eq 5 ]; then
    for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
    # Add Docker's official GPG key:
    apt-get update
@@ -72,7 +74,7 @@ elif [ $RPIVER == "5" ]; then
 
    apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
    systemctl restart docker
-elif [ UBUNTU > "0" ]; then
+elif [ "$UBUNTU" -gt 0 ]; then
    for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
    # Add Docker's official GPG key:
    apt-get update
