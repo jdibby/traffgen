@@ -17,17 +17,31 @@ HOMEDIR=$(pwd)
 echo -e -n "\n" 
 
 echo "${BOLD}### DETECTING OPERATING SYSTEM ###${NORMAL}"
-# Detect if the script is running on a supported operating system and what it is
-RPIVER=$(grep -a "Raspberry" /proc/device-tree/model | awk '{print $3}')
-UBUNTU=$(grep 'NAME="Ubuntu"' /etc/os-release | wc -l)
 
-if [ -n "$RPIVER" ] && [ "$RPIVER" -gt 0 ]; then
-   echo "System detected as a Raspberry Pi $RPIVER"
-elif [ "$UBUNTU" -gt 0 ]; then
-   echo "System detected as Ubuntu"
+# Check if the file for Raspberry Pi detection exists
+if [ -f /proc/device-tree/model ]; then
+    RPIVER=$(grep -a "Raspberry" /proc/device-tree/model | awk '{print $3}')
 else
-   echo "Not detected as a Raspberry Pi or Ubuntu"
-   exit 1
+    RPIVER=""
+    echo "Raspberry Pi detection file not found."
+fi
+
+# Check if the file for Ubuntu detection exists
+if [ -f /etc/os-release ]; then
+    UBUNTU=$(grep 'NAME="Ubuntu"' /etc/os-release | wc -l)
+else
+    UBUNTU=0
+    echo "Ubuntu detection file not found."
+fi
+
+# Proceed with the operating system detection logic
+if [ -n "$RPIVER" ] && [ "$RPIVER" -gt 0 ]; then
+    echo "System detected as a Raspberry Pi $RPIVER"
+elif [ "$UBUNTU" -gt 0 ]; then
+    echo "System detected as Ubuntu"
+else
+    echo "Not detected as a Raspberry Pi or Ubuntu"
+    exit 1
 fi
 
 echo "${BOLD}### OPERATING SYSTEM DETECTED ###${NORMAL}"
