@@ -17,7 +17,7 @@ HOMEDIR=$(pwd)
 echo -e -n "\n" 
 
 echo "${BOLD}### DETECTING OPERATING SYSTEM ###${NORMAL}"
-# Detect if it is a Raspberry Pi or not and the version
+# Detect if the script is running on a supported operating system and what it is
 RPIVER=$(grep -a "Raspberry" /proc/device-tree/model | awk '{print $3}')
 UBUNTU=$(grep 'NAME="Ubuntu"' /etc/os-release | wc -l)
 
