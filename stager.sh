@@ -132,9 +132,3 @@ elif [ "$UBUNTU" -gt 0 ]; then
 fi
 
 echo -e -n "\n"
-
-echo "${BOLD}### FINAL CLEANUP STARTED ###${NORMAL}"
-#rm -rf $HOMEDIR/stager.sh
-echo "${BOLD}### FINAL CLEANUP COMPLETE ###${NORMAL}"
-
-echo -e -n "\n"
