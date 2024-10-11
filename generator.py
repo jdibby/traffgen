@@ -448,6 +448,16 @@ def webcrawl():
         print (Style.RESET_ALL)
         scrape_iterative(ARGS.crawl_start, iterations)
 
+def ips():
+    cmd = 'curl -A BlackSun www.testmyids.com'
+    print (Fore.BLACK)
+    print (Back.GREEN + "##############################################################")
+    print (Style.RESET_ALL)
+    print ("Testing IPS: BlackSun")
+    print (Fore.BLACK)
+    print (Back.GREEN + "##############################################################")
+    print (Style.RESET_ALL)
+    subprocess.call(cmd, shell=True)
 
 ### Wait timer progress bar
 def progressbar(it, prefix="", size=60, file=sys.stdout):
@@ -455,7 +465,7 @@ def progressbar(it, prefix="", size=60, file=sys.stdout):
     def show(j):
         x = int(size*j/count)
         file.write("%s[%s%s] %is \r" % (prefix, "#"*x, "."*(size-x), (count - j)))
-        file.flush()        
+        file.flush()
     show(0)
     for i, item in enumerate(it):
         yield item
@@ -635,6 +645,7 @@ if __name__ == "__main__":
                                 'http',
                                 'https',
                                 'icmp',
+                                'ips',
                                 'netflix',
                                 'nmap',
                                 'ntp',
@@ -722,6 +733,7 @@ if __name__ == "__main__":
                 http_random,
                 https_random,
                 https_crawl,
+                ips,
                 nmap_1024,
                 ntp_random,
                 ping_random,
@@ -764,6 +776,10 @@ if __name__ == "__main__":
             testsuite = [
                 ping_random,
                 traceroute_random,
+            ]
+        elif ARGS.suite == 'ips':
+            testsuite = [
+                ips,
             ]
         elif ARGS.suite == 'netflix':
             testsuite = [
