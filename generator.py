@@ -459,6 +459,28 @@ def ips():
     print (Style.RESET_ALL)
     subprocess.call(cmd, shell=True)
 
+def ads_random():
+    if ARGS.size == 'S':
+        target_urls = 10
+    elif ARGS.size == 'M':
+        target_urls = 20
+    elif ARGS.size == 'L':
+        target_urls = 50
+    elif ARGS.size == 'XL':
+        target_urls = len(ads_endpoints)
+    random.shuffle(ads_endpoints)
+    for count_urls, url in enumerate(ads_endpoints):
+        if count_urls < target_urls:
+            cmd = "curl --insecure --silent --show-error --connect-timeout 5 -I --max-time 5 %s" % url
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
+            print ("Testing Ad Sites (%d of %d): %s" %((count_urls+1), target_urls, url))
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
+            subprocess.call(cmd, shell=True)
+
 ### Wait timer progress bar
 def progressbar(it, prefix="", size=60, file=sys.stdout):
     count = len(it)
@@ -638,6 +660,7 @@ if __name__ == "__main__":
                             type=str.lower,
                             choices=[
                                 'all',
+                                'ads',
                                 'bigfile',
                                 'crawl',
                                 'dns',
@@ -734,6 +757,7 @@ if __name__ == "__main__":
                 https_random,
                 https_crawl,
                 ips,
+                ads_random,
                 nmap_1024,
                 ntp_random,
                 ping_random,
@@ -781,6 +805,10 @@ if __name__ == "__main__":
             testsuite = [
                 ips,
             ]
+        elif ARGS.suite == 'ads':
+            testsuite = [
+                ads_random,
+            ]            
         elif ARGS.suite == 'netflix':
             testsuite = [
                 speedtest_fast,
