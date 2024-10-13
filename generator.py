@@ -467,9 +467,9 @@ def ads_random():
     elif ARGS.size == 'L':
         target_urls = 50
     elif ARGS.size == 'XL':
-        target_urls = len(ads_endpoints)
-    random.shuffle(ads_endpoints)
-    for count_urls, url in enumerate(ads_endpoints):
+        target_urls = len(ad_endpoints)
+    random.shuffle(ad_endpoints)
+    for count_urls, url in enumerate(ad_endpoints):
         if count_urls < target_urls:
             cmd = "curl --insecure --silent --show-error --connect-timeout 5 -I --max-time 5 %s" % url
             print (Fore.BLACK)
