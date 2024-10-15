@@ -130,14 +130,14 @@ def http_download_zip():
     elif ARGS.size == 'XL':
         target = '1GB'
         cmd = f'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null -A {user_agent} https://link.testfile.org/'
-    print (Fore.BLACK)
-    print (Back.GREEN + "##############################################################")
-    print (Style.RESET_ALL)
-    print ("Testing HTTP: Download %s ZIP File" %(target))
-    print (f"Agent: {user_agent}")
-    print (Fore.BLACK)
-    print (Back.GREEN + "##############################################################")
-    print (Style.RESET_ALL)
+    #print (Fore.BLACK)
+    #print (Back.GREEN + "##############################################################")
+    #print (Style.RESET_ALL)
+    #print ("Testing HTTP: Download %s ZIP File" %(target))
+    #print (f"Agent: {user_agent}")
+    #print (Fore.BLACK)
+    #print (Back.GREEN + "##############################################################")
+    #print (Style.RESET_ALL)
     subprocess.call(cmd, shell=True)
 
 def http_download_targz():
