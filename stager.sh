@@ -136,10 +136,11 @@ else
    echo -e -n "\n" 
    exit 1
 fi
-#################################################################
+
 echo -e -n "\n" 
 echo "${BOLD}### INSTALLATION OF DOCKER COMPLETE ###${NORMAL}"
 echo -e -n "\n" 
+
 echo "${BOLD}### STARTING PORTAINER INSTALL ###${NORMAL}"
 echo -e -n "\n"
 ### Cleanup potential existing Portainer installs ###
@@ -149,7 +150,6 @@ docker volume rm portainer_data
 docker images | grep portainer | awk '{print $3}' | sudo xargs docker rmi -f
 docker volume create portainer_data
 docker run -d -p 8000:8000 -p 9443:9443 --name portainer --restart=always -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer-ce:2.21.1
-#################################################################
 echo -e -n "\n"
 echo "${BOLD}### PORTAINER INSTALL COMPLETE WITH DEFAULT USERNAME ADMIN ###${NORMAL}"
 echo -e -n "\n" 
@@ -160,9 +160,9 @@ docker ps | grep jdibby/traffgen | awk '{print $1}' | sudo xargs docker stop
 docker ps -a | grep jdibby/traffgen | awk '{print $1}' | sudo xargs docker rm
 docker images | grep jdibby/traffgen | awk '{print $3}' | sudo xargs docker rmi -f
 docker images| awk '{print $1}' | grep -v REPOSITORY | sudo xargs docker rmi -f
-#################################################################
 echo -e -n "\n" 
 echo "${BOLD}### TRAFFGEN INSTALL COMPLETE ###${NORMAL}"
+
 echo -e -n "\n" 
 ### Run specific docker images based on Raspberry Pi or not ###
 if [ -n "$RPIVER" ] && [ "$RPIVER" -lt 5 ]; then
