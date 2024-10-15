@@ -99,10 +99,11 @@ def http_random():
     elif ARGS.size == 'XL':
         target_urls = len(http_endpoints + dns_urls)
     random.shuffle(http_endpoints)
+    random.shuffle(user_agents)
     random.shuffle(dns_urls)
     for count_urls, url in enumerate(http_endpoints + dns_urls):
         if count_urls < target_urls:
-            cmd = "curl --insecure --silent --show-error --connect-timeout 5 -I --max-time 5 %s" % url
+            cmd = "curl --insecure --silent --show-error --connect-timeout 5 -I --max-time 5 %s" -a user_agents % url
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
@@ -389,7 +390,7 @@ def virus_sim_https():
     random.shuffle(eicar_https_endpoints)
     for count_urls, url in enumerate(eicar_https_endpoints):
         if count_urls < target_urls:
-            cmd = "curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -o /dev/null %s" % url
+            cmd = "curl --limit-rate 3M --insecure --show-error --connect-timeout 5 -o /dev/null %s" % url
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
@@ -616,7 +617,6 @@ if __name__ == "__main__":
 
         ### Start time measured since the epoch (floating point)
         STARTTIME = time.time()
-
 
         ### Argument Parsing (CLI variables)
         PARSER = argparse.ArgumentParser()
