@@ -134,6 +134,7 @@ def http_download_zip():
     print (Back.GREEN + "##############################################################")
     print (Style.RESET_ALL)
     print ("Testing HTTP: Download %s ZIP File" %(target))
+    print (f"Agent: {user_agent}")
     print (Fore.BLACK)
     print (Back.GREEN + "##############################################################")
     print (Style.RESET_ALL)
