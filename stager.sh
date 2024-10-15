@@ -20,6 +20,7 @@ HOMEDIR=$(pwd)
 echo -e -n "\n" 
 
 echo "${BOLD}### DETECTING OPERATING SYSTEM AND PERFORMING UPDATES ###${NORMAL}"
+echo -e -n "\n" 
 
 ### Check for Raspberry Pi ###
 if [ -f /proc/device-tree/model ]; then
