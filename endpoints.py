@@ -52,6 +52,7 @@ icmp_endpoints = [
     "1.1.1.1",
     "1.0.0.1",
     "172.30.0.1",
+    "172.16.0.1",
     "172.22.11.1",
     "192.168.1.1",
     "12.12.12.12",
@@ -164,8 +165,10 @@ http_endpoints = [
     "www.facebook.com",
     "www.foxnews.com",
     "www.google.com",
+    "neverssl.com",
     "www.linkedin.com",
     "www.spotify.com",
+    "info.cern.ch",
     "www.twitter.com",
     ]
 
