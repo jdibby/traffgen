@@ -103,7 +103,7 @@ def http_random():
     random.shuffle(dns_urls)
     for count_urls, url in enumerate(http_endpoints + dns_urls):
         if count_urls < target_urls:
-            cmd = "curl --insecure --silent --show-error --connect-timeout 5 -I --max-time 5 %s" -a user_agents % url
+            cmd = "curl --insecure --silent --show-error --connect-timeout 5 -I --max-time 5 %s" -A {user_agents{} % url
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
