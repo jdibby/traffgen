@@ -21,7 +21,6 @@ def bigfile():
     url = 'http://ipv4.download.thinkbroadband.com/5GB.zip'
     response = requests.get(url, stream=True)
     total_size = int(response.headers.get('content-length', 0))
-
     print (Fore.BLACK)
     print (Back.GREEN + "##############################################################")
     print (Style.RESET_ALL)
@@ -29,7 +28,6 @@ def bigfile():
     print (Fore.BLACK) 
     print (Back.GREEN + "##############################################################")
     print (Style.RESET_ALL)
-
     with tqdm(total=total_size, unit='B', unit_scale=True, desc='Downloading', ascii=True) as progress_bar:
         for chunk in response.iter_content(chunk_size=1024):
         # Update the progress bar with the size of the chunk
