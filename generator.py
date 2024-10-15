@@ -129,7 +129,7 @@ def http_download_zip():
         cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null https://link.testfile.org/ -A %(user_agent)s'
     elif ARGS.size == 'XL':
         target = '1GB'
-        cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null https://link.testfile.org/ -A {user_agent}'
+        cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null https://link.testfile.org/ -A %(user_agent)s'
     print (Fore.BLACK)
     print (Back.GREEN + "##############################################################")
     print (Style.RESET_ALL)
