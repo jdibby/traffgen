@@ -75,11 +75,13 @@ else
     exit 1
 fi
 #################################################################
+echo -e -n "\n" 
 echo "${BOLD}### OPERATING SYSTEM DETECTED AND UPDATES COMPLETED ###${NORMAL}"
 
 echo -e -n "\n" 
 
 echo "${BOLD}### STARTING DOCKER INSTALL ###${NORMAL}"
+echo -e -n "\n" 
 ### Different installation options for different OS' ###
 if [ -n "$RPIVER" ] && [ "$RPIVER" -lt 5 ]; then
    for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
@@ -172,10 +174,9 @@ docker images | grep jdibby/traffgen | awk '{print $3}' | sudo xargs docker rmi 
 docker images| awk '{print $1}' | grep -v REPOSITORY | sudo xargs docker rmi -f
 #################################################################
 echo -e -n "\n" 
-
 echo "${BOLD}### TRAFFGEN INSTALL COMPLETE ###${NORMAL}"
-echo -e -n "\n" 
 
+echo -e -n "\n" 
 ### Run specific docker images based on Raspberry Pi or not ###
 if [ -n "$RPIVER" ] && [ "$RPIVER" -lt 5 ]; then
    docker run --detach --restart unless-stopped jdibby/traffgen:armv7
