@@ -8,7 +8,7 @@ if [ "$WHOAREYOU" != "root" ]; then
 fi
 ###############################################################
 
-### Adding capabilities to bold font ###
+### Adding capabilities of bold fonts ###
 BOLD=$(tput bold)
 NORMAL=$(tput sgr0)
 ###############################################################
@@ -19,7 +19,7 @@ HOMEDIR=$(pwd)
 
 echo -e -n "\n" 
 
-echo "${BOLD}### DETECTING OPERATING SYSTEM ###${NORMAL}"
+echo "${BOLD}### DETECTING OPERATING SYSTEM AND PERFORMING UPDATES ###${NORMAL}"
 
 ### Check for Raspberry Pi ###
 if [ -f /proc/device-tree/model ]; then
@@ -51,25 +51,19 @@ fi
 ### Proceed with the operating system detection logic ###
 if [ -n "$RPIVER" ] && [ "$RPIVER" -gt 0 ]; then
     echo "System detected as Raspberry Pi $RPIVER"
+    apt update -y && apt upgrade -y
 elif [ "$UBUNTU" -gt 0 ]; then
     echo "System detected as Ubuntu Linux"
+    apt update -y && apt upgrade -y
 elif [ "$ROCKY" -gt 0 ]; then
     echo "System detected as Rocky Linux"
+    dnf update -y && dnf upgrade -y
 else
-    echo "Not detected as a Raspberry Pi or Ubuntu"
+    echo "NOT A SUPPORTED OPERATING SYSTEM"
     exit 1
 fi
 #################################################################
-
-echo "${BOLD}### OPERATING SYSTEM DETECTED ###${NORMAL}"
-
-echo -e -n "\n" 
-
-echo "${BOLD}### UPDATING AND UPGRADING PACKAGES ###${NORMAL}"
-
-### Update and upgrade packages ###
-apt update -y && apt upgrade -y
-echo "${BOLD}### UPDATING AND UPGRADING PACKAGES COMPLETE ###${NORMAL}"
+echo "${BOLD}### OPERATING SYSTEM DETECTED AND UPDATES COMPLETED ###${NORMAL}"
 
 echo -e -n "\n" 
 
