@@ -7,21 +7,16 @@ if [ "$WHOAREYOU" != "root" ]; then
    exit 1
 fi
 ###############################################################
-
 ### Adding capabilities of bold fonts ###
 BOLD=$(tput bold)
 NORMAL=$(tput sgr0)
 ###############################################################
-
 ### Set Home Directory ###
 HOMEDIR=$(pwd)
 ###############################################################
-
 echo -e -n "\n" 
-
 echo "${BOLD}### DETECTING OPERATING SYSTEM AND PERFORMING UPDATES ###${NORMAL}"
 echo -e -n "\n" 
-
 ### Check for Raspberry Pi ###
 if [ -f /proc/device-tree/model ]; then
     RPIVER=$(grep -a "Raspberry" /proc/device-tree/model | awk '{print $3}')
@@ -29,7 +24,6 @@ else
     RPIVER=""
 fi
 ################################################################
-
 ### Check for Ubuntu Linux ###
 if [ -f /etc/os-release ]; then
     UBUNTU=$(grep 'NAME="Ubuntu"' /etc/os-release | wc -l)
@@ -37,7 +31,6 @@ else
     UBUNTU=0
 fi
 #################################################################
-
 ### Check for Rocky Linux ###
 if [ -f /etc/os-release ]; then
     ROCKY=$(grep -i 'NAME="Rocky Linux"' /etc/os-release | wc -l)
@@ -45,7 +38,6 @@ else
     ROCKY=0
 fi
 #################################################################
-
 ### Proceed with the operating system detection logic ###
 if [ -n "$RPIVER" ] && [ "$RPIVER" -gt 0 ]; then
     echo "#######################################################################"
@@ -77,9 +69,7 @@ fi
 #################################################################
 echo -e -n "\n" 
 echo "${BOLD}### OPERATING SYSTEM DETECTED AND UPDATES COMPLETED ###${NORMAL}"
-
 echo -e -n "\n" 
-
 echo "${BOLD}### STARTING DOCKER INSTALL ###${NORMAL}"
 echo -e -n "\n" 
 ### Different installation options for different OS' ###
@@ -146,9 +136,7 @@ fi
 #################################################################
 echo -e -n "\n" 
 echo "${BOLD}### INSTALLATION OF DOCKER COMPLETE ###${NORMAL}"
-
 echo -e -n "\n" 
-
 echo "${BOLD}### STARTING PORTAINER INSTALL ###${NORMAL}"
 echo -e -n "\n"
 ### Cleanup potential existing Portainer installs ###
@@ -156,15 +144,12 @@ docker stop portainer
 docker rm portainer
 docker volume rm portainer_data
 docker images | grep portainer | awk '{print $3}' | sudo xargs docker rmi -f
-
 docker volume create portainer_data
 docker run -d -p 8000:8000 -p 9443:9443 --name portainer --restart=always -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer-ce:2.21.1
 #################################################################
 echo -e -n "\n"
 echo "${BOLD}### PORTAINER INSTALL COMPLETE WITH DEFAULT USERNAME ADMIN ###${NORMAL}"
-
 echo -e -n "\n" 
-
 echo "${BOLD}### STARTING TRAFFGEN INSTALL ###${NORMAL}"
 echo -e -n "\n" 
 ### Cleanup potential existing traffgen installs ###
@@ -175,7 +160,6 @@ docker images| awk '{print $1}' | grep -v REPOSITORY | sudo xargs docker rmi -f
 #################################################################
 echo -e -n "\n" 
 echo "${BOLD}### TRAFFGEN INSTALL COMPLETE ###${NORMAL}"
-
 echo -e -n "\n" 
 ### Run specific docker images based on Raspberry Pi or not ###
 if [ -n "$RPIVER" ] && [ "$RPIVER" -lt 5 ]; then
@@ -188,5 +172,6 @@ elif [ "$ROCKY" -gt 0 ]; then
    docker run --detach --restart unless-stopped jdibby/traffgen:amd64
 fi
 #################################################################
+echo -e -n "\n"
 echo "${BOLD}### TRAFFGEN INSTALL COMPLETE ###${NORMAL}"
 echo -e -n "\n"
