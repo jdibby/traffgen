@@ -3,17 +3,20 @@
 ### Validate this is being run with sudo / root permissions ###
 WHOAREYOU=$(whoami)
 if [ "$WHOAREYOU" != "root" ]; then
-   echo "### YOU MUST BE ROOT OR SUDO THIS SCRIPT ###"
+   echo "#######################################################################"
+   echo "################ YOU MUST BE ROOT OR SUDO THIS SCRIPT #################"
+   echo "#######################################################################"
    exit 1
 fi
-###############################################################
+
 ### Adding capabilities of bold fonts ###
 BOLD=$(tput bold)
 NORMAL=$(tput sgr0)
-###############################################################
+
 ### Set Home Directory ###
 HOMEDIR=$(pwd)
 ###############################################################
+
 echo -e -n "\n" 
 echo "${BOLD}### DETECTING OPERATING SYSTEM AND PERFORMING UPDATES ###${NORMAL}"
 echo -e -n "\n" 
@@ -23,21 +26,21 @@ if [ -f /proc/device-tree/model ]; then
 else
     RPIVER=""
 fi
-################################################################
+
 ### Check for Ubuntu Linux ###
 if [ -f /etc/os-release ]; then
     UBUNTU=$(grep 'NAME="Ubuntu"' /etc/os-release | wc -l)
 else
     UBUNTU=0
 fi
-#################################################################
+
 ### Check for Rocky Linux ###
 if [ -f /etc/os-release ]; then
     ROCKY=$(grep -i 'NAME="Rocky Linux"' /etc/os-release | wc -l)
 else
     ROCKY=0
 fi
-#################################################################
+
 ### Proceed with the operating system detection logic ###
 if [ -n "$RPIVER" ] && [ "$RPIVER" -gt 0 ]; then
     echo "#######################################################################"
