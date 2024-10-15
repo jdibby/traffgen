@@ -41,7 +41,7 @@ fi
 
 ### Check for Rocky Linux ###
 if [ -f /etc/os-release ]; then
-    ROCKY=$(grep 'NAME="Ubuntu"' /etc/os-release | wc -l)
+    ROCKY=$(grep -i 'NAME="Rocky Linux"' /etc/os-release | wc -l)
 else
     ROCKY=0
     echo "Not Rocky Linux"
