@@ -109,7 +109,7 @@ def http_random():
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
-            print ("Testing HTTP with {user_agent} (%d of %d): %s" %((count_urls+1), target_urls, url))
+            print (f"Testing HTTP with {user_agent} (%d of %d): %s" %((count_urls+1), target_urls, url))
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
