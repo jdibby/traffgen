@@ -47,16 +47,27 @@ fi
 
 ### Proceed with the operating system detection logic ###
 if [ -n "$RPIVER" ] && [ "$RPIVER" -gt 0 ]; then
-    echo "System detected as Raspberry Pi $RPIVER"
+    echo "#######################################################################"
+    echo "############${BOLD} System detected as Raspberry Pi $RPIVER ${NORMAL}##################"
+    echo "#######################################################################"
     apt update -y && apt upgrade -y
 elif [ "$UBUNTU" -gt 0 ]; then
-    echo "System detected as Ubuntu Linux"
+    echo "#######################################################################"
+    echo "##################${BOLD} System detected as Ubuntu Linux ${NORMAL}####################"
+    echo "#######################################################################"
+
     apt update -y && apt upgrade -y
 elif [ "$ROCKY" -gt 0 ]; then
-    echo "System detected as Rocky Linux"
+    echo "#######################################################################"
+    echo "###################${BOLD} System detected as Rocky Linux ${NORMAL}####################"
+    echo "#######################################################################"
     dnf update -y && dnf upgrade -y
 else
-    echo "NOT A SUPPORTED OPERATING SYSTEM"
+    echo "#######################################################################"
+    echo "#######################################################################"
+    echo "#################${BOLD} NOT A SUPPORTED OPERATING SYSTEM ${NORMAL}####################"
+    echo "#######################################################################"
+    echo "#######################################################################"
     exit 1
 fi
 #################################################################
