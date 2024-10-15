@@ -623,10 +623,8 @@ def scrape_iterative(base_url, iterations=3):
 ### Do the thing
 if __name__ == "__main__":
     try:
-
         ### Start time measured since the epoch (floating point)
         STARTTIME = time.time()
-
         ### Argument Parsing (CLI variables)
         PARSER = argparse.ArgumentParser()
         PARSER.add_argument('--suite',
