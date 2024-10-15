@@ -99,15 +99,17 @@ def http_random():
     elif ARGS.size == 'XL':
         target_urls = len(http_endpoints + dns_urls)
     random.shuffle(http_endpoints)
-    random.shuffle(user_agents)
     random.shuffle(dns_urls)
     for count_urls, url in enumerate(http_endpoints + dns_urls):
         if count_urls < target_urls:
-            cmd = "curl --insecure --silent --show-error --connect-timeout 5 -I --max-time 5 -A {user_agents} %s" % url
+            random.shuffle(user_agents)
+            user_agent = (user_agents[0]) 
+            cmd = "curl --insecure --silent --show-error --connect-timeout 5 -I --max-time 5 %s" % url
+            print (user_agent)
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
-            print (f"Testing HTTP with Agenda {user_agents} (%d of %d): %s" %((count_urls+1), target_urls, url))
+            print ("Testing HTTP with Agent {user_agents} (%d of %d): %s" %((count_urls+1), target_urls, url))
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
