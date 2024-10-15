@@ -118,7 +118,7 @@ elif [ "$ROCKY" -gt 0 ]; then
    rm -rf /var/lib/containerd
    dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
    dnf update -y
-   dnf install docker-ce docker-ce-cli containerd.io docker-compose-plugin
+   dnf install docker-ce docker-ce-cli containerd.io docker-compose-plugin -y
    systemctl start docker
    systemctl enable docker
 else
