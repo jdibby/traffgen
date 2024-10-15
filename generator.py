@@ -105,14 +105,14 @@ def http_random():
             random.shuffle(user_agents)
             user_agent = (user_agents[0]) 
             cmd = f"curl --insecure --silent --show-error --connect-timeout 5 -I --max-time 5 -A {user_agent} {url}"
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            print ("Testing HTTP: (%d of %d): %s" %((count_urls+1), target_urls, url))
-            print (f"Agent: {user_agent}")
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
+            #print (Fore.BLACK)
+            #print (Back.GREEN + "##############################################################")
+            #print (Style.RESET_ALL)
+            #print ("Testing HTTP: (%d of %d): %s" %((count_urls+1), target_urls, url))
+            #print (f"Agent: {user_agent}")
+            #print (Fore.BLACK)
+            #print (Back.GREEN + "##############################################################")
+            #print (Style.RESET_ALL)
             subprocess.call(cmd, shell=True)
 
 def http_download_zip():
