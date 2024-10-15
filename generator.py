@@ -238,7 +238,7 @@ def traceroute_random():
             print (Style.RESET_ALL)
             subprocess.call(cmd, shell=True)
 
-### Netflix Test suites
+### Netflix Test
 def speedtest_fast():
     if ARGS.size == 'S':
          duration = 1
@@ -259,7 +259,7 @@ def speedtest_fast():
     subprocess.call(cmd, shell=True)
     pass
 
-### NMAP Test suites
+### NMAP Test
 def nmap_1024():
     random.shuffle(nmap_endpoints)
     for ip in nmap_endpoints:
@@ -273,7 +273,7 @@ def nmap_1024():
         print (Style.RESET_ALL)
         subprocess.call(cmd, shell=True)
 
-### NTP Test suites
+### NTP Test
 def ntp_random():
     if ARGS.size == 'S':
         target_urls = 1
@@ -297,30 +297,7 @@ def ntp_random():
             print (Style.RESET_ALL)
             subprocess.call(cmd, shell=True)
 
-### Scaled Test suites
-def scaled():
-    if ARGS.size == 'S':
-        target_ips = 1
-    elif ARGS.size == 'M':
-        target_ips = 2
-    elif ARGS.size == 'L':
-        target_ips = 5
-    elif ARGS.size == 'XL':
-        target_ips = len(scaled_endpoints)
-    random.shuffle(scaled_endpoints)
-    for count_ips, ip in enumerate(scaled_endpoints):
-        if count_ips < target_ips:
-            cmd = "ping -c2 -i1 -s64 -W1 -w2 %s" % ip
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            print ("Testing ICMP (%d of %d): Ping %s" %((count_ips+1), target_ips, ip))
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            subprocess.call(cmd, shell=True)
-
-### SSH Test suites
+### SSH Test
 def ssh_random():
     if ARGS.size == 'S':
         target_ips = 1
@@ -343,7 +320,7 @@ def ssh_random():
             print (Style.RESET_ALL)
             subprocess.call(cmd, shell=True)
 
-### URL Reponse Time Test suites
+### URL Reponse Time Test
 def urlresponse_random():
     if ARGS.size == 'S':
         target_urls = 10
@@ -377,7 +354,7 @@ def urlresponse_random():
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
 
-### EICAR Virus Simulation suit
+### EICAR Virus Simulation
 def virus_sim_http():
     if ARGS.size == 'S':
         target_urls = 1
@@ -551,17 +528,6 @@ def apt_acquisitions():
     subprocess.call("apk update", shell=True)
 
 ### Pull an updated list of co-located containers to test against
-def scaled_endpoints(url):
-    print ("")
-    print ("  [i] Retrieving scaled endpoints from %s" %(url), end=" ", flush=True)
-    response = urllib.request.urlopen(url)
-    data = response.read()
-    text = data.decode('utf-8')
-    with open('endpoints.py', 'a') as filetowrite:
-        filetowrite.write("\n" + text)
-    print ("")
-
-### Pull an updated list of co-located containers to test against
 def replace_all_endpoints(url):
     print ("")
     print ("  [i] Replacing endpoints.py with %s" %(url), end=" ", flush=True)
@@ -670,7 +636,6 @@ if __name__ == "__main__":
                                 'netflix',
                                 'nmap',
                                 'ntp',
-                                'scaled',
                                 'ssh',
                                 'url-response',
                                 'virus-sim-http',
@@ -722,16 +687,6 @@ if __name__ == "__main__":
                             action="store_true",
                             required=False,
                             help='Install dependent packages'
-                            )
-        PARSER.add_argument('--scaled_endpoints',
-                            action="store",
-                            required=False,
-                            help='URL to query for scaled endpoints file'
-                            )
-        PARSER.add_argument('--replace_all_endpoints',
-                            action="store",
-                            required=False,
-                            help='URL to query for replacement endpoints.py file'
                             )
         PARSER.add_argument('--crawl-start',
                             action="store",
@@ -819,10 +774,6 @@ if __name__ == "__main__":
             testsuite = [
                 ntp_random,
             ]
-        elif ARGS.suite == 'scaled':
-            testsuite = [
-                scaled,
-            ]
         elif ARGS.suite == 'ssh':
             testsuite = [
                 ssh_random,
@@ -839,12 +790,6 @@ if __name__ == "__main__":
             testsuite = [
                 virus_sim_https,
             ]
-
-        ### Update first
-        if ARGS.scaled_endpoints:
-            scaled_endpoints(ARGS.scaled_endpoints)
-        elif ARGS.replace_all_endpoints:
-            replace_all_endpoints(ARGS.scaled_endpoints)
 
         ### Import targets from endpoints.py
         from endpoints import *
