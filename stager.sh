@@ -26,7 +26,6 @@ if [ -f /proc/device-tree/model ]; then
     RPIVER=$(grep -a "Raspberry" /proc/device-tree/model | awk '{print $3}')
 else
     RPIVER=""
-    echo "Not a Raspberry Pi"
 fi
 ################################################################
 
@@ -35,7 +34,6 @@ if [ -f /etc/os-release ]; then
     UBUNTU=$(grep 'NAME="Ubuntu"' /etc/os-release | wc -l)
 else
     UBUNTU=0
-    echo "Not Ubuntu Linux"
 fi
 #################################################################
 
@@ -44,7 +42,6 @@ if [ -f /etc/os-release ]; then
     ROCKY=$(grep -i 'NAME="Rocky Linux"' /etc/os-release | wc -l)
 else
     ROCKY=0
-    echo "Not Rocky Linux"
 fi
 #################################################################
 
