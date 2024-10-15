@@ -574,7 +574,7 @@ def replace_all_endpoints(url):
         filetowrite.write(text)
     print ("")
 
-### Grab random link from website
+### Grab random links from website
 def scrape_single_link(url):
     # Randomize user agent and time between requets
     sleep(random.uniform(0.2, 2))
