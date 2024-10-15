@@ -120,7 +120,6 @@ elif [ "$ROCKY" -gt 0 ]; then
    dnf update -y
    dnf install docker-ce docker-ce-cli containerd.io docker-compose-plugin
    systemctl start docker
-   systemctl status docker
    systemctl enable docker
 else
    echo "### YOU ARE RUNNING AN UNSUPPORTED OPERATING SYSTEM ###"
