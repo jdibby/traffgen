@@ -116,18 +116,20 @@ def http_random():
             subprocess.call(cmd, shell=True)
 
 def http_download_zip():
+    random.shuffle(user_agents)
+    user_agent = (user_agents[0]) 
     if ARGS.size == 'S':
         target = '15MB'
-        cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null https://link.testfile.org/'
+        cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null https://link.testfile.org/ -A {user_agent}'
     elif ARGS.size == 'M':
         target = '30MB'
-        cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null https://link.testfile.org/'
+        cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null https://link.testfile.org/ -A {user_agent}'
     elif ARGS.size == 'L':
         target = '100MB'
-        cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null https://link.testfile.org/'
+        cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null https://link.testfile.org/ -A {user_agent}'
     elif ARGS.size == 'XL':
         target = '1GB'
-        cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null https://link.testfile.org/'
+        cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null https://link.testfile.org/ -A {user_agent}'
     print (Fore.BLACK)
     print (Back.GREEN + "##############################################################")
     print (Style.RESET_ALL)
