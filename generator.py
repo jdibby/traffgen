@@ -76,7 +76,7 @@ def ftp_random():
         target = '100MB'
     elif ARGS.size == 'XL':
         target = '1GB'
-    cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -o /dev/null ftp://speedtest:speedtest@ftp.otenet.gr/test' + target + '.db'
+    cmd = 'curl --limit-rate 3M --insecure --show-error --connect-timeout 5 -o /dev/null ftp://speedtest:speedtest@ftp.otenet.gr/test' + target + '.db'
     print (Fore.BLACK)
     print (Back.GREEN + "##############################################################")
     print (Style.RESET_ALL)
