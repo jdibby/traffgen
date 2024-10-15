@@ -104,12 +104,12 @@ def http_random():
         if count_urls < target_urls:
             random.shuffle(user_agents)
             user_agent = (user_agents[0]) 
-            cmd = "curl --insecure --silent --show-error --connect-timeout 5 -I --max-time 5 -A {user_agent} %s" % url
+            cmd = "curl --insecure --silent --show-error --connect-timeout 5 -I --max-time 5 -A %(user_agent)s %s" % url
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
             print ("Testing HTTP: (%d of %d): %s" %((count_urls+1), target_urls, url))
-            print (f"Agent: {user_agent}")
+            print ("Agent: %(user_agent)s")
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
@@ -120,13 +120,13 @@ def http_download_zip():
     user_agent = (user_agents[0]) 
     if ARGS.size == 'S':
         target = '15MB'
-        cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null https://link.testfile.org/ -A {user_agent}'
+        cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null https://link.testfile.org/ -A %(user_agent)s'
     elif ARGS.size == 'M':
         target = '30MB'
-        cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null https://link.testfile.org/ -A {user_agent}'
+        cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null https://link.testfile.org/ -A %(user_agent)s'
     elif ARGS.size == 'L':
         target = '100MB'
-        cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null https://link.testfile.org/ -A {user_agent}'
+        cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null https://link.testfile.org/ -A %(user_agent)s'
     elif ARGS.size == 'XL':
         target = '1GB'
         cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null https://link.testfile.org/ -A {user_agent}'
@@ -134,7 +134,7 @@ def http_download_zip():
     print (Back.GREEN + "##############################################################")
     print (Style.RESET_ALL)
     print ("Testing HTTP: Download %s ZIP File" %(target))
-    print (f"Agent: {user_agent}")
+    print ("Agent: %(user_agent)s")
     print (Fore.BLACK)
     print (Back.GREEN + "##############################################################")
     print (Style.RESET_ALL)
