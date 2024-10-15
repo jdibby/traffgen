@@ -191,10 +191,13 @@ def https_crawl():
     random.shuffle(https_endpoints)
     for count_urls, url in enumerate(https_endpoints):
         if count_urls < target_urls:
+            random.shuffle(user_agents)
+            user_agent = user_agents[0]
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
             print ("Crawling HTTPS (%d deep, site %d of %d) starting from %s" %(iterations, (count_urls+1), target_urls, url))
+            print (f"Agent: {user_agent}")
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
