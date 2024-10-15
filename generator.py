@@ -288,8 +288,6 @@ def ntp_random():
         if count_urls < target_urls:
             if ARGS.os == 'alpine':
                 cmd = "chronyd -q 'server %s iburst'" % (url)
-            else:
-                cmd = "ntpdate %s" % url
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
