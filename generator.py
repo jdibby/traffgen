@@ -138,7 +138,7 @@ def http_download_zip():
     print (Fore.BLACK)
     print (Back.GREEN + "##############################################################")
     print (Style.RESET_ALL)
-"""    subprocess.call(cmd, shell=True)
+""" subprocess.call(cmd, shell=True)
 
 def http_download_targz():
     cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -o /dev/null http://wordpress.org/latest.tar.gz'
