@@ -4,7 +4,7 @@
 WHOAREYOU=$(whoami)
 if [ "$WHOAREYOU" != "root" ]; then
    echo "#######################################################################"
-   echo "################ YOU MUST BE ROOT OR SUDO THIS SCRIPT #################"
+   echo "############## YOU MUST BE ROOT OR ELSE SUDO THIS SCRIPT ##############"
    echo "#######################################################################"
    exit 1
 fi
