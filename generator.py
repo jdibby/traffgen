@@ -120,16 +120,16 @@ def http_download_zip():
     user_agent = (user_agents[0]) 
     if ARGS.size == 'S':
         target = '15MB'
-        cmd = f'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null https://link.testfile.org/ -A {user_agent}'
+        cmd = f'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null -A {user_agent} https://link.testfile.org/'
     elif ARGS.size == 'M':
         target = '30MB'
-        cmd = f'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null https://link.testfile.org/ -A {user_agent}'
+        cmd = f'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null-A {user_agent} https://link.testfile.org/'
     elif ARGS.size == 'L':
         target = '100MB'
-        cmd = f'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null https://link.testfile.org/ -A {user_agent}'
+        cmd = f'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null -A {user_agent} https://link.testfile.org/'
     elif ARGS.size == 'XL':
         target = '1GB'
-        cmd = f'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null https://link.testfile.org/ -A {user_agent}'
+        cmd = f'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null -A {user_agent} https://link.testfile.org/'
     print (Fore.BLACK)
     print (Back.GREEN + "##############################################################")
     print (Style.RESET_ALL)
