@@ -117,7 +117,7 @@ def http_random():
 
 def http_download_zip():
     random.shuffle(user_agents)
-    user_agent = (user_agents[0]) 
+    user_agent = (user_agents[0])
     if ARGS.size == 'S':
         target = '15MB'
         cmd = f'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null -A {user_agent} https://link.testfile.org/'
