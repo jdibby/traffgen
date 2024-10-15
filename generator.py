@@ -104,7 +104,7 @@ def http_random():
         if count_urls < target_urls:
             random.shuffle(user_agents)
             user_agent = (user_agents[0]) 
-            cmd = "curl --insecure --silent --show-error --connect-timeout 5 -I --max-time 5 %s" % url
+            cmd = "curl --insecure --silent --show-error --connect-timeout 5 -I --max-time 5 -A {user_agent} %s" % url
             print (user_agent)
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
