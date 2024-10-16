@@ -34,6 +34,7 @@ def bigfile():
             if chunk:  # Filter out keep-alive new chunks
                 progress_bar.update(len(chunk))
 
+"""
 ### DNS Test suites
 def dig_random():
     if ARGS.size == 'S':
@@ -66,6 +67,36 @@ def dig_random():
                     print (Style.RESET_ALL)
                     subprocess.call(cmd, shell=True)
                     time.sleep(0.25) # Rate limit to prevent tripping alarms
+"""                    
+def dig_random(dns_endpoints, dns_urls, ARGS):
+    # Set target sizes based on input argument
+    size_map = {
+        'S': (1, 10),
+        'M': (2, 20),
+        'L': (4, 50),
+        'XL': (len(dns_endpoints), len(dns_urls))
+    }
+    target_ips, target_urls = size_map.get(ARGS.size, (1, 10))  # Default to small size if ARGS.size is invalid
+    
+    random.shuffle(dns_endpoints)
+
+    # Iterate over DNS endpoints
+    for count_ips, ip in enumerate(dns_endpoints[:target_ips]):  # Limit to target_ips
+        random.shuffle(dns_urls)
+        
+        # Iterate over URLs for DNS query
+        for count_urls, url in enumerate(dns_urls[:target_urls]):  # Limit to target_urls
+            cmd = f"dig {url} @{ip} +time=1"
+            
+            # Display progress
+            print(Fore.BLACK + Back.GREEN + "##############################################################")
+            print(Style.RESET_ALL)
+            print(f"Testing DNS: Query {url} ({count_urls+1} of {target_urls}) against {ip} ({count_ips+1} of {target_ips})")
+            print(Fore.BLACK + Back.GREEN + "##############################################################")
+            print(Style.RESET_ALL)
+            
+            subprocess.call(cmd, shell=True)
+            time.sleep(0.25)  # Rate limit to prevent tripping alarms
 
 ### FTP Test suites
 def ftp_random():
