@@ -16,22 +16,23 @@ from urllib.parse import urljoin
 from tqdm import tqdm
 from colorama import Fore, Back, Style
 
-### Bigfile Test 
 def bigfile():
     url = 'http://ipv4.download.thinkbroadband.com/5GB.zip'
     response = requests.get(url, stream=True)
     total_size = int(response.headers.get('content-length', 0))
-    print (Fore.BLACK)
-    print (Back.GREEN + "##############################################################")
-    print (Style.RESET_ALL)
-    print ("Testing Bigfile: Download 5GB ZIP File")
-    print (Fore.BLACK) 
-    print (Back.GREEN + "##############################################################")
-    print (Style.RESET_ALL)
+
+    # Display progress information
+    print(Fore.BLACK + Back.GREEN + "##############################################################")
+    print(Style.RESET_ALL)
+    print("Testing Bigfile: Downloading 5GB ZIP File")
+    print(Fore.BLACK + Back.GREEN + "##############################################################")
+    print(Style.RESET_ALL)
+
+    # Progress bar
     with tqdm(total=total_size, unit='B', unit_scale=True, desc='Downloading', ascii=True) as progress_bar:
         for chunk in response.iter_content(chunk_size=1024):
-        # Update the progress bar with the size of the chunk
-            progress_bar.update(len(chunk))
+            if chunk:  # Filter out keep-alive new chunks
+                progress_bar.update(len(chunk))
 
 ### DNS Test suites
 def dig_random():
