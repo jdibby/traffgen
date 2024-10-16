@@ -34,7 +34,6 @@ def bigfile():
             if chunk:  # Filter out keep-alive new chunks
                 progress_bar.update(len(chunk))
 
-"""
 ### DNS Test suites
 def dig_random():
     if ARGS.size == 'S':
@@ -67,7 +66,7 @@ def dig_random():
                     print (Style.RESET_ALL)
                     subprocess.call(cmd, shell=True)
                     time.sleep(0.25) # Rate limit to prevent tripping alarms
-"""                    
+"""
 def dig_random(dns_endpoints, dns_urls, ARGS):
     # Set target sizes based on input argument
     size_map = {
@@ -97,7 +96,7 @@ def dig_random(dns_endpoints, dns_urls, ARGS):
             
             subprocess.call(cmd, shell=True)
             time.sleep(0.25)  # Rate limit to prevent tripping alarms
-
+"""
 ### FTP Test suites
 def ftp_random():
     if ARGS.size == 'S':
