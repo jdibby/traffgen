@@ -670,19 +670,6 @@ if __name__ == "__main__":
                             required=False,
                             help='Don\'t wait random intervals between tests or loops'
                             )
-        PARSER.add_argument('--os',
-                            type=str.lower,
-                            choices=['debian', 'alpine'],
-                            action="store",
-                            required=False,
-                            help='Host OS running the script',
-                            default='debian'
-                            )
-        PARSER.add_argument('--update_packages',
-                            action="store_true",
-                            required=False,
-                            help='Install dependent packages'
-                            )
         PARSER.add_argument('--crawl-start',
                             action="store",
                             required=False,
@@ -712,8 +699,8 @@ if __name__ == "__main__":
                 virus_sim_http,
                 virus_sim_https,
                 ]
-            if ARGS.size == 'XL':
-                testsuite.append(bigfile)
+        if ARGS.size == 'XL':
+            testsuite.append(bigfile)
         elif ARGS.suite == 'bigfile':
             testsuite = [
                 bigfile,
