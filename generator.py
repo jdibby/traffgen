@@ -426,8 +426,11 @@ def webcrawl():
         print (Style.RESET_ALL)
         scrape_iterative(ARGS.crawl_start, iterations)
 
+### Trigger an IPS
 def ips():
-    cmd = 'curl -A BlackSun www.testmyids.com'
+    random.shuffle(user_agents)
+    user_agent = user_agents[0]
+    cmd = 'curl --insecure --silet --show-error --connect-tieout 5 -I --max-time 5 -A BlackSun www.testmyids.com'
     print (Fore.BLACK)
     print (Back.GREEN + "##############################################################")
     print (Style.RESET_ALL)
