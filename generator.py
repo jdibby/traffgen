@@ -69,7 +69,7 @@ def ftp_random():
         target = '100MB'
     elif ARGS.size == 'XL':
         target = '1GB'
-    cmd = 'curl --limit-rate 3M --insecure --show-error --connect-timeout 5 -o /dev/null ftp://speedtest:speedtest@ftp.otenet.gr/test' + target + '.db'
+    cmd = 'curl --limit-rate 3M -k --show-error --connect-timeout 5 -o /dev/null ftp://speedtest:speedtest@ftp.otenet.gr/test' + target + '.db'
     print (Fore.BLACK)
     print (Back.GREEN + "##############################################################")
     print (Style.RESET_ALL)
@@ -95,7 +95,7 @@ def http_random():
         if count_urls < target_urls:
             random.shuffle(user_agents)
             user_agent = user_agents[0]
-            cmd = f"curl --insecure --silent --show-error --connect-timeout 5 -I --max-time 5 -A '{user_agent}' {url}"
+            cmd = f"curl -k -s --show-error --connect-timeout 5 -I --max-time 5 -A '{user_agent}' {url}"
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
@@ -111,16 +111,16 @@ def http_download_zip():
     user_agent = user_agents[0]
     if ARGS.size == 'S':
         target = '15MB'
-        cmd = f"curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null -A '{user_agent}' https://link.testfile.org/{target}"
+        cmd = f"curl --limit-rate 3M -k  --show-error --connect-timeout 5 -L -o /dev/null -A '{user_agent}' https://link.testfile.org/{target}"
     elif ARGS.size == 'M':
         target = '30MB'
-        cmd = f"curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null-A '{user_agent}' https://link.testfile.org/{target}"
+        cmd = f"curl --limit-rate 3M -k  --show-error --connect-timeout 5 -L -o /dev/null-A '{user_agent}' https://link.testfile.org/{target}"
     elif ARGS.size == 'L':
         target = '100MB'
-        cmd = f"curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null -A '{user_agent}' https://link.testfile.org/{target}"
+        cmd = f"curl --limit-rate 3M -k  --show-error --connect-timeout 5 -L -o /dev/null -A '{user_agent}' https://link.testfile.org/{target}"
     elif ARGS.size == 'XL':
         target = '1GB'
-        cmd = f"curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -L -o /dev/null -A '{user_agent}' https://link.testfile.org/{target}"
+        cmd = f"curl --limit-rate 3M -k  --show-error --connect-timeout 5 -L -o /dev/null -A '{user_agent}' https://link.testfile.org/{target}"
     print (Fore.BLACK)
     print (Back.GREEN + "##############################################################")
     print (Style.RESET_ALL)
@@ -132,7 +132,7 @@ def http_download_zip():
     subprocess.call(cmd, shell=True)
 
 def http_download_targz():
-    cmd = 'curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -o /dev/null http://wordpress.org/latest.tar.gz'
+    cmd = 'curl --limit-rate 3M -k  --show-error --connect-timeout 5 -o /dev/null http://wordpress.org/latest.tar.gz'
     print (Fore.BLACK)
     print (Back.GREEN + "##############################################################")
     print (Style.RESET_ALL)
@@ -157,7 +157,7 @@ def https_random():
         if count_urls < target_urls:
             random.shuffle(user_agents)
             user_agent = user_agents[0]
-            cmd = f"curl --insecure --silent --show-error --connect-timeout 5 -I --max-time 5 -A '{user_agent}' {url}"
+            cmd = f"curl -k -s --show-error --connect-timeout 5 -I --max-time 5 -A '{user_agent}' {url}"
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
@@ -370,7 +370,7 @@ def virus_sim_http():
     random.shuffle(eicar_http_endpoints)
     for count_urls, url in enumerate(eicar_http_endpoints):
         if count_urls < target_urls:
-            cmd = "curl --limit-rate 3M --insecure  --show-error --connect-timeout 5 -o /dev/null %s" % url
+            cmd = "curl --limit-rate 3M -k  --show-error --connect-timeout 5 -o /dev/null %s" % url
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
@@ -392,7 +392,7 @@ def virus_sim_https():
     random.shuffle(eicar_https_endpoints)
     for count_urls, url in enumerate(eicar_https_endpoints):
         if count_urls < target_urls:
-            cmd = "curl --limit-rate 3M --insecure --show-error --connect-timeout 5 -o /dev/null %s" % url
+            cmd = "curl --limit-rate 3M -k --show-error --connect-timeout 5 -o /dev/null %s" % url
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
@@ -430,7 +430,7 @@ def webcrawl():
 def ips():
     random.shuffle(user_agents)
     user_agent = user_agents[0]
-    cmd = 'curl --insecure --silent --show-error --connect-timeout 5 -I --max-time 5 -A BlackSun www.testmyids.com'
+    cmd = 'curl -k -s --show-error --connect-timeout 5 -I --max-time 5 -A BlackSun www.testmyids.com'
     print (Fore.BLACK)
     print (Back.GREEN + "##############################################################")
     print (Style.RESET_ALL)
@@ -452,7 +452,7 @@ def ads_random():
     random.shuffle(ad_endpoints)
     for count_urls, url in enumerate(ad_endpoints):
         if count_urls < target_urls:
-            cmd = "curl --insecure --silent --show-error --connect-timeout 5 -I --max-time 5 %s" % url
+            cmd = "curl -k -s --show-error --connect-timeout 5 -I --max-time 5 %s" % url
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
