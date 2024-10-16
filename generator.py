@@ -525,12 +525,6 @@ def finish_test():
         print ("")
         print ("  [i] Looping...")
 
-
-### Package updates required for script
-def apt_acquisitions():
-    subprocess.call("apk add traceroute mtr nmap curl wget ntp dnsutils fping snmp", shell=True)
-    subprocess.call("apk update", shell=True)
-
 ### Pull an updated list of co-located containers to test against
 def replace_all_endpoints(url):
     print ("")
@@ -697,9 +691,6 @@ if __name__ == "__main__":
                             )
 
         ARGS = PARSER.parse_args()
-
-        if ARGS.update_packages:
-            apt_acquisitions()
 
         if ARGS.suite == 'all':
             testsuite = [
