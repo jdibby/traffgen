@@ -67,36 +67,6 @@ def dig_random():
                     subprocess.call(cmd, shell=True)
                     time.sleep(0.25) # Rate limit to prevent tripping alarms
 """
-def dig_random(dns_endpoints, dns_urls, ARGS):
-    # Set target sizes based on input argument
-    size_map = {
-        'S': (1, 10),
-        'M': (2, 20),
-        'L': (4, 50),
-        'XL': (len(dns_endpoints), len(dns_urls))
-    }
-    target_ips, target_urls = size_map.get(ARGS.size, (1, 10))  # Default to small size if ARGS.size is invalid
-    
-    random.shuffle(dns_endpoints)
-
-    # Iterate over DNS endpoints
-    for count_ips, ip in enumerate(dns_endpoints[:target_ips]):  # Limit to target_ips
-        random.shuffle(dns_urls)
-        
-        # Iterate over URLs for DNS query
-        for count_urls, url in enumerate(dns_urls[:target_urls]):  # Limit to target_urls
-            cmd = f"dig {url} @{ip} +time=1"
-            
-            # Display progress
-            print(Fore.BLACK + Back.GREEN + "##############################################################")
-            print(Style.RESET_ALL)
-            print(f"Testing DNS: Query {url} ({count_urls+1} of {target_urls}) against {ip} ({count_ips+1} of {target_ips})")
-            print(Fore.BLACK + Back.GREEN + "##############################################################")
-            print(Style.RESET_ALL)
-            
-            subprocess.call(cmd, shell=True)
-            time.sleep(0.25)  # Rate limit to prevent tripping alarms
-"""
 ### FTP Test suites
 def ftp_random():
     if ARGS.size == 'S':
@@ -115,6 +85,29 @@ def ftp_random():
     print (Fore.BLACK)
     print (Back.GREEN + "##############################################################")
     print (Style.RESET_ALL)
+    subprocess.call(cmd, shell=True)
+"""
+def ftp_random(ARGS):
+    # Set target size based on input argument
+    size_map = {
+        'S': '1MB',
+        'M': '10MB',
+        'L': '100MB',
+        'XL': '1GB'
+    }
+    target = size_map.get(ARGS.size, '1MB')  # Default to '1MB' if ARGS.size is invalid
+
+    # Construct the curl command
+    cmd = f'curl --limit-rate 3M --insecure --show-error --connect-timeout 5 -o /dev/null ftp://speedtest:speedtest@ftp.otenet.gr/test{target}.db'
+
+    # Display progress information
+    print(Fore.BLACK + Back.GREEN + "##############################################################")
+    print(Style.RESET_ALL)
+    print(f"Testing FTP: Download {target} DB File")
+    print(Fore.BLACK + Back.GREEN + "##############################################################")
+    print(Style.RESET_ALL)
+
+    # Execute the command
     subprocess.call(cmd, shell=True)
 
 ### HTTP Test suites
