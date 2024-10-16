@@ -1,15 +1,7 @@
 #!/usr/local/bin python3
 
-### Importing of required modules
-import time
-import sys
-import subprocess
-import argparse
-import random
-import urllib.request
-import ssl
-import requests
-
+### Import of required modules
+import time, sys, subprocess, argparse, random, urllib.request, ssl, requests
 from bs4 import BeautifulSoup
 from time import sleep
 from urllib.parse import urljoin
@@ -621,7 +613,7 @@ def scrape_iterative(base_url, iterations=3):
         else:
             break
 
-### Do the thing
+### Menus
 if __name__ == "__main__":
     try:
         ### Start time measured since the epoch (floating point)
