@@ -168,6 +168,7 @@ def https_random():
             print (Style.RESET_ALL)
             subprocess.call(cmd, shell=True)
 
+### HTTPS crawl through URLs
 def https_crawl():
     if ARGS.size == 'S':
         target_urls = 10
@@ -196,7 +197,7 @@ def https_crawl():
             print (Style.RESET_ALL)
             scrape_iterative(url, iterations)
 
-### ICMP Test suites
+### ICMP Test
 def ping_random():
     if ARGS.size == 'S':
         target_ips = 1
@@ -219,6 +220,7 @@ def ping_random():
             print (Style.RESET_ALL)
             subprocess.call(cmd, shell=True)
 
+### Traceroute test
 def traceroute_random():
     if ARGS.size == 'S':
         target_ips = 1
@@ -426,7 +428,7 @@ def webcrawl():
         print (Style.RESET_ALL)
         scrape_iterative(ARGS.crawl_start, iterations)
 
-### Trigger an IPS
+### Trigger an IPS system
 def ips():
     cmd = 'curl -k -s --show-error --connect-timeout 5 -I --max-time 5 -A BlackSun www.testmyids.com'
     print (Fore.BLACK)
@@ -438,6 +440,7 @@ def ips():
     print (Style.RESET_ALL)
     subprocess.call(cmd, shell=True)
 
+### Test ad filtering
 def ads_random():
     if ARGS.size == 'S':
         target_urls = 10
