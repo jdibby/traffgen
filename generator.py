@@ -428,8 +428,6 @@ def webcrawl():
 
 ### Trigger an IPS
 def ips():
-    random.shuffle(user_agents)
-    user_agent = user_agents[0]
     cmd = 'curl -k -s --show-error --connect-timeout 5 -I --max-time 5 -A BlackSun www.testmyids.com'
     print (Fore.BLACK)
     print (Back.GREEN + "##############################################################")
