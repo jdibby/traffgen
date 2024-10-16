@@ -66,7 +66,7 @@ def dig_random():
                     print (Style.RESET_ALL)
                     subprocess.call(cmd, shell=True)
                     time.sleep(0.25) # Rate limit to prevent tripping alarms
-"""
+
 ### FTP Test suites
 def ftp_random():
     if ARGS.size == 'S':
@@ -85,31 +85,6 @@ def ftp_random():
     print (Fore.BLACK)
     print (Back.GREEN + "##############################################################")
     print (Style.RESET_ALL)
-    subprocess.call(cmd, shell=True)
-"""    
-
-def ftp_random(ARGS):
-    # Set target size based on input argument
-    size_map = {
-        'S': '1MB',
-        'M': '10MB',
-        'L': '100MB',
-        'XL': '1GB'
-    }
-    ARGS = type('', (), {})()  # Create an empty object
-    target = size_map.get(ARGS.size, '1MB')  # Default to '1MB' if ARGS.size is invalid
-
-    # Construct the curl command
-    cmd = f'curl --limit-rate 3M --insecure --show-error --connect-timeout 5 -o /dev/null ftp://speedtest:speedtest@ftp.otenet.gr/test{target}.db'
-
-    # Display progress information
-    print(Fore.BLACK + Back.GREEN + "##############################################################")
-    print(Style.RESET_ALL)
-    print(f"Testing FTP: Download {target} DB File")
-    print(Fore.BLACK + Back.GREEN + "##############################################################")
-    print(Style.RESET_ALL)
-
-    # Execute the command
     subprocess.call(cmd, shell=True)
 
 ### HTTP Test suites
