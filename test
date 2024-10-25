@@ -1,0 +1,13 @@
+fastcgi.server = (
+    "/smokeping.fcgi" => (
+        "localhost" => (
+            "socket" => "/var/run/lighttpd/smokeping-fastcgi.sock",
+            "bin-path" => "/usr/share/webapps/smokeping/cgi-bin/smokeping.fcgi",
+            "max-procs" => 2,
+            "idle-timeout" => 20,
+            "bin-environment" => (
+                "FCGI_ROLE" => "RESPONDER"
+            )
+        )
+    )
+)
