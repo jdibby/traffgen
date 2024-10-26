@@ -28,6 +28,6 @@ RUN pip3 install fastcli requests colorama beautifulsoup4 tqdm --break-system-pa
 ADD https://raw.githubusercontent.com/jdibby/traffgen/main/generator.py ./
 ADD https://raw.githubusercontent.com/jdibby/traffgen/main/endpoints.py ./
 
-ENTRYPOINT ["python3", "generator.py", "--os=alpine"]
+ENTRYPOINT ["python3", "generator.py"]
 
-CMD ["--suite=all", "--size=XL", "--max-wait-secs=5", "--loop"]
+CMD ["--suite=all", "--size=M", "--max-wait-secs=5", "--loop"]

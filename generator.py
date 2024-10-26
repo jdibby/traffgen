@@ -291,8 +291,7 @@ def ntp_random():
     random.shuffle(ntp_endpoints)
     for count_urls, url in enumerate(ntp_endpoints):
         if count_urls < target_urls:
-            if ARGS.os == 'alpine':
-                cmd = "chronyd -q 'server %s iburst'" % (url)
+            cmd = "chronyd -q 'server %s iburst'" % (url)
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
