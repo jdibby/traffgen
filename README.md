@@ -1,3 +1,4 @@
+
 # 🧪 Network Test Script Summary
 
 This diagnostic script runs a suite of tests across multiple network protocols and services, including DNS, HTTP(S), FTP, SSH, ICMP, NTP, and more. The tests help evaluate connectivity, performance, latency, security filtering, and reliability.
@@ -86,6 +87,8 @@ This diagnostic script runs a suite of tests across multiple network protocols a
 ## 🧠 Full Test Suite (`--suite all`)
 
 When run with `--suite all`, the following functions are executed:
+
+```
 dig_random
 ftp_random
 http_download_targz
@@ -96,6 +99,7 @@ https_crawl
 ai_https_random
 ips
 ads_random
+ai_https_random
 nmap_1024os
 nmap_cve
 ntp_random
@@ -105,6 +109,7 @@ ssh_random
 traceroute_random
 virus_sim_http
 virus_sim_https
+```
 
 ---
 
@@ -125,5 +130,6 @@ To run the full test suite continuously with minimal delay:
 
 ```bash
 python3 testscript.py --suite all --size XL --loop --max-wait-secs 10 --nowait
+```
 
-
+---
