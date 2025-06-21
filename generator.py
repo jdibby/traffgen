@@ -294,7 +294,7 @@ def speedtest_fast():
 def nmap_1024os():
     random.shuffle(nmap_endpoints)
     for ip in nmap_endpoints:
-        cmd = 'nmap -p 1-1024 %s -T5' % ip
+        cmd = 'nmap -Pn -p 1-1024 %s -T5' % ip
         print (Fore.BLACK)
         print (Back.GREEN + "##############################################################")
         print (Style.RESET_ALL)
@@ -307,7 +307,7 @@ def nmap_1024os():
 def nmap_cve():
     random.shuffle(nmap_endpoints)
     for ip in nmap_endpoints:
-        cmd = 'nmap -sV --script=ALL %s -T5 -debug' % ip
+        cmd = 'nmap -Pn -sV --script=ALL %s -T5 -debug' % ip
         print (Fore.BLACK)
         print (Back.GREEN + "##############################################################")
         print (Style.RESET_ALL)
