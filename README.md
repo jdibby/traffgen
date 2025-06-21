@@ -23,13 +23,13 @@ This diagnostic script runs a suite of tests across multiple network protocols a
 
 | ✅ Test                  | 🧩 Function                      | 🔍 Description                                              |
 |--------------------------|----------------------------------|--------------------------------------------------------------|
-| **HTTP HEAD**            | `http_random`                   | Send HTTP requests with random user agents                    |
-| **HTTPS HEAD**           | `https_random`                  | Perform HTTPS requests with random user agents                |
+| **HTTP**                 | `http_random`                   | Send HTTP requests with random user agents                    |
+| **HTTPS**                | `https_random`                  | Perform HTTPS requests with random user agents                |
 | **ZIP File Download**    | `http_download_zip`             | Download test ZIP files of various sizes                     |
 | **TAR.GZ Download**      | `http_download_targz`           | Download the latest WordPress tarball                        |
-| **Response Time**        | `urlresponse_random`            | Measures HTTP/HTTPS response times in seconds                   |
-| **HTTPS Crawl**          | `https_crawl`                   | Follow links recursively on HTTPS sites                      |
-| **Web Crawl**            | `webcrawl`                      | Crawl external sites from starting point                      |
+| **URL Response Times**   | `urlresponse_random`            | Measures HTTP/HTTPS response times in seconds                   |
+| **HTTPS Crawling**       | `https_crawl`                   | Follow links recursively on HTTPS sites                      |
+| **Web Crawling**         | `webcrawl`                      | Crawl external sites from starting point                      |
 
 ---
 
@@ -39,9 +39,9 @@ This diagnostic script runs a suite of tests across multiple network protocols a
 |----------------------------|------------------------------|-------------------------------------------------------------|
 | **EICAR via HTTP**         | `virus_sim_http`            | Simulate virus downloads to test HTTP AV/Malware filtering           |
 | **EICAR via HTTPS**        | `virus_sim_https`           | Simulate virus downloads to test HTTPS AV/Malware filtering          |
-| **IPS Trigger**            | `ips`                       | Send malicious-looking User-Agent to trigger IPS            |
-| **Nmap Port Scan**         | `nmap_1024os`               | Scan ports 1-1024 using NMAP                                 |
-| **Nmap CVE Scan**          | `nmap_cve`                  | Full CVE/script scan with NMAP                              |
+| **IPS Triggering**         | `ips`                       | Send malicious-looking User-Agent to trigger IPS            |
+| **NMAP Port Scan**         | `nmap_1024os`               | Scan ports 1-1024 using NMAP                                 |
+| **NMAP CVE Scan**          | `nmap_cve`                  | Full CVE/script scan with NMAP                              |
 
 ---
 
@@ -49,8 +49,8 @@ This diagnostic script runs a suite of tests across multiple network protocols a
 
 | ✅ Test            | 🧩 Function     | 🔍 Description                                         |
 |-------------------|----------------|--------------------------------------------------------|
-| **FTP Download**  | `ftp_random`   | Download sample DB files via FTP                      |
-| **Big File Test** | `bigfile`      | Download a 5GB file to test throughput                |
+| **FTP Downloads**  | `ftp_random`   | Download sample DB files via FTP                      |
+| **Big File Downloads** | `bigfile`      | Download a 5GB file to test throughput                |
 
 ---
 
@@ -59,7 +59,7 @@ This diagnostic script runs a suite of tests across multiple network protocols a
 | ✅ Test           | 🧩 Function        | 🔍 Description                                  |
 |------------------|-------------------|-------------------------------------------------|
 | **AI Endpoints** | `ai_https_random` | HTTPS tests to common AI-related services       |
-| **Ad Blocking**  | `ads_random`      | Tests if AD sites are blocked or filtered       |
+| **Ad Blocking**  | `ads_random`      | Tests if ad sites are blocked or filtered       |
 
 ---
 
@@ -67,7 +67,7 @@ This diagnostic script runs a suite of tests across multiple network protocols a
 
 | ✅ Test              | 🧩 Function       | 🔍 Description                         |
 |---------------------|------------------|----------------------------------------|
-| **Netflix**   | `speedtest_fast` | Uses `fastcli` to test Netflix detection and throughput |
+| **Netflix Throughput**   | `speedtest_fast` | Uses `fastcli` to test Netflix detection and throughput |
 
 ---
 
