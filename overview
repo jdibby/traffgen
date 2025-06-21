@@ -21,4 +21,74 @@ This script is a comprehensive diagnostic tool that performs various connectivit
 ### 🌐 HTTP/HTTPS Tests
 
 | **Test**                   | **Function**             | **Description**                                               |
-|----------------------------|--------------------------|------------------------------------------------
+|----------------------------|--------------------------|---------------------------------------------------------------|
+| HTTP Requests              | `http_random`            | Sends HTTP HEAD requests with various User-Agent headers      |
+| HTTPS Requests             | `https_random`           | Sends HTTPS HEAD requests                                     |
+| HTTP Download (ZIP/TAR)    | `http_download_zip`, `http_download_targz` | Downloads test files over HTTP                         |
+| HTTPS Crawl                | `https_crawl`            | Crawls HTTPS sites, following links up to a specified depth   |
+| URL Response Time          | `urlresponse_random`     | Measures time taken for HTTPS responses                       |
+
+---
+
+### 🤖 AI & Ad Network Tests
+
+| **Test**       | **Function**        | **Description**                                 |
+|----------------|---------------------|-------------------------------------------------|
+| AI URLs        | `ai_https_random`   | HTTPS requests to AI-related endpoints          |
+| Ad URLs        | `ads_random`        | Requests to ad-serving domains                  |
+
+---
+
+### 📥 File Transfer & Download
+
+| **Test**         | **Function**     | **Description**                                           |
+|------------------|------------------|-----------------------------------------------------------|
+| FTP Download     | `ftp_random`     | FTP download of sample database files                     |
+| Big File Test    | `bigfile`        | Downloads a 5GB file to test max throughput               |
+
+---
+
+### 🔐 Security & Threat Simulation
+
+| **Test**               | **Function**         | **Description**                                          |
+|------------------------|----------------------|----------------------------------------------------------|
+| Virus Sim HTTP/HTTPS   | `virus_sim_http`, `virus_sim_https` | Downloads EICAR test file to trigger AV systems     |
+| IPS Trigger            | `ips`                | Sends suspicious User-Agent to trigger IPS              |
+| Nmap Port Scan         | `nmap_1024os`        | Scans TCP ports 1–1024 on targets                        |
+| Nmap CVE Scan          | `nmap_cve`           | Vulnerability detection via Nmap script engine           |
+
+---
+
+### 📶 Streaming and Speed Tests
+
+| **Test**        | **Function**      | **Description**                           |
+|-----------------|-------------------|-------------------------------------------|
+| Netflix Speed   | `speedtest_fast`  | Uses `fastcli` to test via fast.com       |
+
+---
+
+### 🔎 Web Crawling
+
+| **Test**       | **Function**     | **Description**                                      |
+|----------------|------------------|------------------------------------------------------|
+| Web Crawl      | `webcrawl`       | Recursive browsing from a specified starting URL     |
+
+---
+
+## ⚙️ CLI Flags
+
+| **Flag**             | **Purpose**                                                  |
+|----------------------|--------------------------------------------------------------|
+| `--suite`            | Selects a test suite (`all`, `http`, `dns`, `nmap`, etc.)    |
+| `--size`             | Sets test intensity: `S`, `M`, `L`, `XL`                      |
+| `--loop`             | Runs tests in an infinite loop                               |
+| `--max-wait-secs`    | Max interval between loop iterations (if `--loop` is used)   |
+| `--nowait`           | Disables random wait between tests                           |
+| `--crawl-start`      | URL to begin web crawling from                               |
+
+---
+
+## 🧠 Default Full Test Suite (`--suite all`)
+
+Includes:
+
