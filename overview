@@ -1,52 +1,94 @@
-### Stager Script for Linux Systems ###
-```
-sudo bash < <(curl -s https://raw.githubusercontent.com/jdibby/traffgen/refs/heads/main/stager.sh)
-```
+# 📋 Network Test Script Summary
 
-### Clone The Directory and Change To The New Directory ###
-```
-git clone https://github.com/jdibby/traffgen && cd traffgen
-```
+This script is a comprehensive diagnostic tool that performs various connectivity, performance, and security tests. The test suite and intensity are controlled via command-line flags.
 
-### Build Container ###
-```
-docker build -t jdibby/traffgen .
-```
+---
 
-### Run Container Continuously in Background ###
-```
-docker run --detach --restart unless-stopped jdibby/traffgen:latest
-```
+## ✅ **Test Categories and Descriptions**
 
-### Run Container in Foreground ###
-```
-docker run -it jdibby/traffgen:latest
-```
+### 🔗 Connectivity Tests
 
-### Help Page ###
-```
-docker run jdibby/traffgen:latest --help
-```
+| **Test**             | **Function**         | **Description**                                             |
+|----------------------|----------------------|-------------------------------------------------------------|
+| DNS Lookup           | `dig_random`         | DNS resolution using randomized domains and DNS servers     |
+| ICMP Ping            | `ping_random`        | Tests host reachability using `ping`                        |
+| Traceroute           | `traceroute_random`  | Traces path to endpoints using `traceroute`                 |
+| SSH Connection       | `ssh_random`         | Tests SSH access to known hosts                             |
+| NTP Sync             | `ntp_random`         | Time sync validation using `chronyd`                        |
 
-### Update Repo ###
-```
-cd traffgen && git pull
-```
+---
 
-### Running Help File ###
-```
-usage: generator.py [-h] [--suite {all,ads,ai,bigfile,crawl,dns,ftp,http,https,icmp,ips,netflix,nmap,ntp,ssh,url-response,virus-sim-http,virus-sim-https}] [--size {S,M,L,XL}] [--loop]
-                    [--max-wait-secs MAX_WAIT_SECS] [--nowait] [--crawl-start CRAWL_START]
+### 🌐 HTTP/HTTPS Tests
 
-options:
-  -h, --help            show this help message and exit
-  --suite {all,ads,ai,bigfile,crawl,dns,ftp,http,https,icmp,ips,netflix,nmap,ntp,ssh,url-response,virus-sim-http,virus-sim-https}
-                        Test suite to run
-  --size {S,M,L,XL}     Size of tests to run
-  --loop                Loop test continuously
-  --max-wait-secs MAX_WAIT_SECS
-                        Maximum possible time (in seconds) for random intervals between tests or loops
-  --nowait              Don't wait random intervals between tests or loops
-  --crawl-start CRAWL_START
-                        URL to start crawling from
-```
+| **Test**                   | **Function**             | **Description**                                               |
+|----------------------------|--------------------------|---------------------------------------------------------------|
+| HTTP Requests              | `http_random`            | Sends HTTP HEAD requests with various User-Agent headers      |
+| HTTPS Requests             | `https_random`           | Sends HTTPS HEAD requests                                     |
+| HTTP Download (ZIP/TAR)    | `http_download_zip`, `http_download_targz` | Downloads test files over HTTP                         |
+| HTTPS Crawl                | `https_crawl`            | Crawls HTTPS sites, following links up to a specified depth   |
+| URL Response Time          | `urlresponse_random`     | Measures time taken for HTTPS responses                       |
+
+---
+
+### 🤖 AI & Ad Network Tests
+
+| **Test**       | **Function**        | **Description**                                 |
+|----------------|---------------------|-------------------------------------------------|
+| AI URLs        | `ai_https_random`   | HTTPS requests to AI-related endpoints          |
+| Ad URLs        | `ads_random`        | Requests to ad-serving domains                  |
+
+---
+
+### 📥 File Transfer & Download
+
+| **Test**         | **Function**     | **Description**                                           |
+|------------------|------------------|-----------------------------------------------------------|
+| FTP Download     | `ftp_random`     | FTP download of sample database files                     |
+| Big File Test    | `bigfile`        | Downloads a 5GB file to test max throughput               |
+
+---
+
+### 🔐 Security & Threat Simulation
+
+| **Test**               | **Function**         | **Description**                                          |
+|------------------------|----------------------|----------------------------------------------------------|
+| Virus Sim HTTP/HTTPS   | `virus_sim_http`, `virus_sim_https` | Downloads EICAR test file to trigger AV systems     |
+| IPS Trigger            | `ips`                | Sends suspicious User-Agent to trigger IPS              |
+| Nmap Port Scan         | `nmap_1024os`        | Scans TCP ports 1–1024 on targets                        |
+| Nmap CVE Scan          | `nmap_cve`           | Vulnerability detection via Nmap script engine           |
+
+---
+
+### 📶 Streaming and Speed Tests
+
+| **Test**        | **Function**      | **Description**                           |
+|-----------------|-------------------|-------------------------------------------|
+| Netflix Speed   | `speedtest_fast`  | Uses `fastcli` to test via fast.com       |
+
+---
+
+### 🔎 Web Crawling
+
+| **Test**       | **Function**     | **Description**                                      |
+|----------------|------------------|------------------------------------------------------|
+| Web Crawl      | `webcrawl`       | Recursive browsing from a specified starting URL     |
+
+---
+
+## ⚙️ CLI Flags
+
+| **Flag**             | **Purpose**                                                  |
+|----------------------|--------------------------------------------------------------|
+| `--suite`            | Selects a test suite (`all`, `http`, `dns`, `nmap`, etc.)    |
+| `--size`             | Sets test intensity: `S`, `M`, `L`, `XL`                      |
+| `--loop`             | Runs tests in an infinite loop                               |
+| `--max-wait-secs`    | Max interval between loop iterations (if `--loop` is used)   |
+| `--nowait`           | Disables random wait between tests                           |
+| `--crawl-start`      | URL to begin web crawling from                               |
+
+---
+
+## 🧠 Default Full Test Suite (`--suite all`)
+
+Includes:
+
