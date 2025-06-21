@@ -14,8 +14,8 @@ This diagnostic script runs a suite of tests across multiple network protocols a
 | **DNS Lookup**    | `dig_random`        | Resolve random domains using various DNS servers    |
 | **ICMP Ping**     | `ping_random`       | Basic reachability test using `ping`                |
 | **Traceroute**    | `traceroute_random` | Trace network path to destination hosts             |
-| **SSH Access**    | `ssh_random`        | Attempt SSH connection to test reachability/auth    |
-| **NTP Sync**      | `ntp_random`        | Time sync test using `chronyd` with public servers  |
+| **SSH Access**    | `ssh_random`        | Attempt SSH connections to test reachability/auth    |
+| **NTP Sync**      | `ntp_random`        | Time sync test using `chronyd` with public time servers  |
 
 ---
 
@@ -23,13 +23,13 @@ This diagnostic script runs a suite of tests across multiple network protocols a
 
 | ✅ Test                  | 🧩 Function                      | 🔍 Description                                              |
 |--------------------------|----------------------------------|--------------------------------------------------------------|
-| **HTTP HEAD**            | `http_random`                   | Send HTTP HEAD requests with random user agents              |
-| **HTTPS HEAD**           | `https_random`                  | Perform HTTPS HEAD requests                                  |
+| **HTTP HEAD**            | `http_random`                   | Send HTTP requests with random user agents                    |
+| **HTTPS HEAD**           | `https_random`                  | Perform HTTPS requests with random user agents                |
 | **ZIP File Download**    | `http_download_zip`             | Download test ZIP files of various sizes                     |
 | **TAR.GZ Download**      | `http_download_targz`           | Download the latest WordPress tarball                        |
-| **Response Time**        | `urlresponse_random`            | Measure response time in seconds                             |
+| **Response Time**        | `urlresponse_random`            | Measures HTTP/HTTPS response times in seconds                   |
 | **HTTPS Crawl**          | `https_crawl`                   | Follow links recursively on HTTPS sites                      |
-| **Web Crawl**            | `webcrawl`                      | Crawl external site from starting point                      |
+| **Web Crawl**            | `webcrawl`                      | Crawl external sites from starting point                      |
 
 ---
 
@@ -37,11 +37,11 @@ This diagnostic script runs a suite of tests across multiple network protocols a
 
 | ✅ Test                     | 🧩 Function                  | 🔍 Description                                              |
 |----------------------------|------------------------------|-------------------------------------------------------------|
-| **EICAR via HTTP**         | `virus_sim_http`            | Simulate virus download to test HTTP AV filtering           |
-| **EICAR via HTTPS**        | `virus_sim_https`           | Simulate virus download to test HTTPS AV filtering          |
+| **EICAR via HTTP**         | `virus_sim_http`            | Simulate virus downloads to test HTTP AV/Malware filtering           |
+| **EICAR via HTTPS**        | `virus_sim_https`           | Simulate virus downloads to test HTTPS AV/Malware filtering          |
 | **IPS Trigger**            | `ips`                       | Send malicious-looking User-Agent to trigger IPS            |
-| **Nmap Port Scan**         | `nmap_1024os`               | Scan ports 1-1024 using Nmap                                 |
-| **Nmap CVE Scan**          | `nmap_cve`                  | Full CVE/script scan with Nmap                              |
+| **Nmap Port Scan**         | `nmap_1024os`               | Scan ports 1-1024 using NMAP                                 |
+| **Nmap CVE Scan**          | `nmap_cve`                  | Full CVE/script scan with NMAP                              |
 
 ---
 
@@ -59,7 +59,7 @@ This diagnostic script runs a suite of tests across multiple network protocols a
 | ✅ Test           | 🧩 Function        | 🔍 Description                                  |
 |------------------|-------------------|-------------------------------------------------|
 | **AI Endpoints** | `ai_https_random` | HTTPS tests to common AI-related services       |
-| **Ad Blocking**  | `ads_random`      | Tests if ad sites are blocked or filtered       |
+| **Ad Blocking**  | `ads_random`      | Tests if AD sites are blocked or filtered       |
 
 ---
 
@@ -67,7 +67,7 @@ This diagnostic script runs a suite of tests across multiple network protocols a
 
 | ✅ Test              | 🧩 Function       | 🔍 Description                         |
 |---------------------|------------------|----------------------------------------|
-| **Netflix Speed**   | `speedtest_fast` | Uses `fastcli` to test fast.com speeds |
+| **Netflix**   | `speedtest_fast` | Uses `fastcli` to test Netflix detection and throughput |
 
 ---
 
@@ -129,12 +129,12 @@ virus_sim_https
 To run the full test suite continuously with minimal delay:
 
 ```bash
-python3 testscript.py --suite all --size XL --loop --max-wait-secs 10 --nowait
+python3 testscript.py --suite all --size S --loop --max-wait-secs 10 --nowait
 ```
 
 ## 💡 Tip 2
 
-To stage a linux system to turn into a traffic generator, use this... beware, this will need to be run as root
+To stage a linux system to turn it into a traffic generator, use this... beware, this will need to be run as root
 
 ```bash
 sudo bash < <(curl -s https://raw.githubusercontent.com/jdibby/traffgen/refs/heads/main/stager.sh)
