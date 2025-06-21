@@ -4,7 +4,7 @@ ENV TZ=America/Denver
 
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-RUN apk update && apk add \
+RUN apk update && apk add --no-cache \
     python3 \
     py3-pip \
     musl-dev \
@@ -21,9 +21,18 @@ RUN apk update && apk add \
     nmap \
     openssh-client \
     busybox-extras \
+    git \
     net-snmp
 
 RUN pip3 install fastcli requests colorama beautifulsoup4 tqdm --break-system-packages
+
+RUN git clone https://github.com/nmap/nmap.git /nmap-src \
+ && mkdir -p /usr/share/nmap \
+ && cp /nmap-src/nse_main.lua /usr/share/nmap/ \
+ && cp -r /nmap-src/scripts /usr/share/nmap/ \
+ && cp -r /nmap-src/nselib /usr/share/nmap/
+
+ENV NMAPDIR=/usr/share/nmap
 
 ADD https://raw.githubusercontent.com/jdibby/traffgen/main/generator.py ./
 ADD https://raw.githubusercontent.com/jdibby/traffgen/main/endpoints.py ./
