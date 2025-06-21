@@ -1,94 +1,52 @@
-✅ Connectivity Tests
-DNS Queries (dig_random)
-Tests resolution of randomized domains using a shuffled list of DNS servers.
+### Stager Script for Linux Systems ###
+```
+sudo bash < <(curl -s https://raw.githubusercontent.com/jdibby/traffgen/refs/heads/main/stager.sh)
+```
 
-Ping/ICMP (ping_random)
-Sends ICMP ping requests to a list of IPs to test reachability.
+### Clone The Directory and Change To The New Directory ###
+```
+git clone https://github.com/jdibby/traffgen && cd traffgen
+```
 
-Traceroute (traceroute_random)
-Traces the network path to a list of IPs using traceroute.
+### Build Container ###
+```
+docker build -t jdibby/traffgen .
+```
 
-SSH Connectivity (ssh_random)
-Attempts SSH connections to various endpoints using batch mode (non-interactive).
+### Run Container Continuously in Background ###
+```
+docker run --detach --restart unless-stopped jdibby/traffgen:latest
+```
 
-NTP Sync (ntp_random)
-Uses chronyd to query NTP servers for time synchronization.
+### Run Container in Foreground ###
+```
+docker run -it jdibby/traffgen:latest
+```
 
-✅ HTTP/HTTPS Performance and Behavior
-HTTP Requests (http_random)
-Sends randomized HTTP HEAD requests to various URLs using different User-Agent headers.
+### Help Page ###
+```
+docker run jdibby/traffgen:latest --help
+```
 
-HTTP File Downloads (http_download_zip, http_download_targz)
-Tests download performance for ZIP and .tar.gz files over HTTP.
+### Update Repo ###
+```
+cd traffgen && git pull
+```
 
-HTTPS Requests (https_random)
-Same as HTTP requests but over HTTPS.
+### Running Help File ###
+```
+usage: generator.py [-h] [--suite {all,ads,ai,bigfile,crawl,dns,ftp,http,https,icmp,ips,netflix,nmap,ntp,ssh,url-response,virus-sim-http,virus-sim-https}] [--size {S,M,L,XL}] [--loop]
+                    [--max-wait-secs MAX_WAIT_SECS] [--nowait] [--crawl-start CRAWL_START]
 
-HTTPS Web Crawling (https_crawl)
-Crawls HTTPS sites to a configurable depth by following anchor links.
-
-AI Site Test (ai_https_random)
-Sends HTTPS HEAD requests to a list of AI-related URLs.
-
-Ad Filtering Test (ads_random)
-Sends HEAD requests to ad-serving domains.
-
-URL Response Time (urlresponse_random)
-Measures response time of HTTPS requests to determine latency/performance.
-
-✅ File and Content Downloads
-FTP File Download (ftp_random)
-Uses curl to download DB files via FTP from a public speed test server.
-
-Big File Download (bigfile)
-Downloads a 5GB file with progress bar to test large file handling and throughput.
-
-✅ Security and Threat Simulation
-EICAR Virus Simulation over HTTP/HTTPS (virus_sim_http, virus_sim_https)
-Downloads EICAR test files to trigger antivirus or web security tools.
-
-Nmap Port Scan (nmap_1024os)
-Performs a scan of TCP ports 1–1024 on target IPs.
-
-Nmap CVE/Script Scan (nmap_cve)
-Performs an in-depth vulnerability scan using Nmap scripts.
-
-IPS Detection Trigger (ips)
-Sends a known test User-Agent string (BlackSun) to simulate malicious traffic and trigger intrusion prevention systems.
-
-✅ Streaming and Speed Test
-Netflix Speed Test (speedtest_fast)
-Uses the fastcli CLI for fast.com to measure download speed.
-
-✅ Web Crawling and Link Traversal
-Web Crawl (webcrawl)
-Starts from a specified URL and crawls a number of links up to a set depth.
-
-✅ Meta Features
---suite flag: Select which test suite(s) to run.
-
---size flag: Controls number of targets and intensity (S, M, L, XL).
-
---loop flag: Repeats tests continuously with a random wait between runs.
-
---nowait flag: Skips the wait between loop iterations.
-
---max-wait-secs flag: Sets the upper bound of the random wait interval.
-
-Summary Table
-Category	Test Name	Purpose
-DNS	dig_random	Resolve domains via public DNS servers
-FTP	ftp_random	FTP throughput test
-HTTP	http_random, http_download_*	HTTP site and file access tests
-HTTPS	https_random, https_crawl	Secure site testing and crawling
-AI	ai_https_random	Tests access to AI-related URLs
-ICMP	ping_random, traceroute_random	Basic network reachability and path tracing
-IPS	ips	Triggers security systems
-Ads	ads_random	Tests ad-blockers
-Speed/Video	speedtest_fast, bigfile	Measures throughput via downloads and streaming
-Nmap	nmap_1024os, nmap_cve	Port and vulnerability scanning
-NTP	ntp_random	NTP sync validation
-SSH	ssh_random	SSH availability testing
-Webcrawl	webcrawl	Deep link exploration
-Response Time	urlresponse_random	Measures server response latency
-Virus Sim	virus_sim_*	EICAR tests for AV/IDS triggering
+options:
+  -h, --help            show this help message and exit
+  --suite {all,ads,ai,bigfile,crawl,dns,ftp,http,https,icmp,ips,netflix,nmap,ntp,ssh,url-response,virus-sim-http,virus-sim-https}
+                        Test suite to run
+  --size {S,M,L,XL}     Size of tests to run
+  --loop                Loop test continuously
+  --max-wait-secs MAX_WAIT_SECS
+                        Maximum possible time (in seconds) for random intervals between tests or loops
+  --nowait              Don't wait random intervals between tests or loops
+  --crawl-start CRAWL_START
+                        URL to start crawling from
+```
