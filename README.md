@@ -86,4 +86,44 @@ This diagnostic script runs a suite of tests across multiple network protocols a
 ## 🧠 Full Test Suite (`--suite all`)
 
 When run with `--suite all`, the following functions are executed:
+dig_random
+ftp_random
+http_download_targz
+http_download_zip
+http_random
+https_random
+https_crawl
+ai_https_random
+ips
+ads_random
+nmap_1024os
+nmap_cve
+ntp_random
+ping_random
+speedtest_fast
+ssh_random
+traceroute_random
+virus_sim_http
+virus_sim_https
+
+---
+
+## 🧰 Additional Features
+
+- ✅ Random test execution order
+- ⏱️ Optional randomized delay between tests
+- 🔁 Infinite loop mode for stress or long-term testing
+- 🌐 Endpoint list fetched via remote `endpoints.py` file
+- 🧹 Output colorized using `colorama`
+- 📊 Download progress via `tqdm`
+
+---
+
+## 💡 Tip
+
+To run the full test suite continuously with minimal delay:
+
+```bash
+python3 testscript.py --suite all --size XL --loop --max-wait-secs 10 --nowait
+
 
