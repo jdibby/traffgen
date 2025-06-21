@@ -797,9 +797,6 @@ if __name__ == "__main__":
         elif ARGS.suite == 'nmap':
             testsuite = [
                 nmap_1024os,
-            ]
-        elif ARGS.suite == 'nmap':
-            testsuite = [
                 nmap_cve,
             ]
         elif ARGS.suite == 'ntp':
