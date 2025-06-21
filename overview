@@ -1,94 +1,24 @@
-✅ Connectivity Tests
-DNS Queries (dig_random)
-Tests resolution of randomized domains using a shuffled list of DNS servers.
+# 📋 Network Test Script Summary
 
-Ping/ICMP (ping_random)
-Sends ICMP ping requests to a list of IPs to test reachability.
+This script is a comprehensive diagnostic tool that performs various connectivity, performance, and security tests. The test suite and intensity are controlled via command-line flags.
 
-Traceroute (traceroute_random)
-Traces the network path to a list of IPs using traceroute.
+---
 
-SSH Connectivity (ssh_random)
-Attempts SSH connections to various endpoints using batch mode (non-interactive).
+## ✅ **Test Categories and Descriptions**
 
-NTP Sync (ntp_random)
-Uses chronyd to query NTP servers for time synchronization.
+### 🔗 Connectivity Tests
 
-✅ HTTP/HTTPS Performance and Behavior
-HTTP Requests (http_random)
-Sends randomized HTTP HEAD requests to various URLs using different User-Agent headers.
+| **Test**             | **Function**         | **Description**                                             |
+|----------------------|----------------------|-------------------------------------------------------------|
+| DNS Lookup           | `dig_random`         | DNS resolution using randomized domains and DNS servers     |
+| ICMP Ping            | `ping_random`        | Tests host reachability using `ping`                        |
+| Traceroute           | `traceroute_random`  | Traces path to endpoints using `traceroute`                 |
+| SSH Connection       | `ssh_random`         | Tests SSH access to known hosts                             |
+| NTP Sync             | `ntp_random`         | Time sync validation using `chronyd`                        |
 
-HTTP File Downloads (http_download_zip, http_download_targz)
-Tests download performance for ZIP and .tar.gz files over HTTP.
+---
 
-HTTPS Requests (https_random)
-Same as HTTP requests but over HTTPS.
+### 🌐 HTTP/HTTPS Tests
 
-HTTPS Web Crawling (https_crawl)
-Crawls HTTPS sites to a configurable depth by following anchor links.
-
-AI Site Test (ai_https_random)
-Sends HTTPS HEAD requests to a list of AI-related URLs.
-
-Ad Filtering Test (ads_random)
-Sends HEAD requests to ad-serving domains.
-
-URL Response Time (urlresponse_random)
-Measures response time of HTTPS requests to determine latency/performance.
-
-✅ File and Content Downloads
-FTP File Download (ftp_random)
-Uses curl to download DB files via FTP from a public speed test server.
-
-Big File Download (bigfile)
-Downloads a 5GB file with progress bar to test large file handling and throughput.
-
-✅ Security and Threat Simulation
-EICAR Virus Simulation over HTTP/HTTPS (virus_sim_http, virus_sim_https)
-Downloads EICAR test files to trigger antivirus or web security tools.
-
-Nmap Port Scan (nmap_1024os)
-Performs a scan of TCP ports 1–1024 on target IPs.
-
-Nmap CVE/Script Scan (nmap_cve)
-Performs an in-depth vulnerability scan using Nmap scripts.
-
-IPS Detection Trigger (ips)
-Sends a known test User-Agent string (BlackSun) to simulate malicious traffic and trigger intrusion prevention systems.
-
-✅ Streaming and Speed Test
-Netflix Speed Test (speedtest_fast)
-Uses the fastcli CLI for fast.com to measure download speed.
-
-✅ Web Crawling and Link Traversal
-Web Crawl (webcrawl)
-Starts from a specified URL and crawls a number of links up to a set depth.
-
-✅ Meta Features
---suite flag: Select which test suite(s) to run.
-
---size flag: Controls number of targets and intensity (S, M, L, XL).
-
---loop flag: Repeats tests continuously with a random wait between runs.
-
---nowait flag: Skips the wait between loop iterations.
-
---max-wait-secs flag: Sets the upper bound of the random wait interval.
-
-Summary Table
-Category	Test Name	Purpose
-DNS	dig_random	Resolve domains via public DNS servers
-FTP	ftp_random	FTP throughput test
-HTTP	http_random, http_download_*	HTTP site and file access tests
-HTTPS	https_random, https_crawl	Secure site testing and crawling
-AI	ai_https_random	Tests access to AI-related URLs
-ICMP	ping_random, traceroute_random	Basic network reachability and path tracing
-IPS	ips	Triggers security systems
-Ads	ads_random	Tests ad-blockers
-Speed/Video	speedtest_fast, bigfile	Measures throughput via downloads and streaming
-Nmap	nmap_1024os, nmap_cve	Port and vulnerability scanning
-NTP	ntp_random	NTP sync validation
-SSH	ssh_random	SSH availability testing
-Webcrawl	webcrawl	Deep link exploration
-Response Time	urlresponse_random	Measures server response latency
-Virus Sim	virus_sim_*	EICAR tests for AV/IDS triggering
+| **Test**                   | **Function**             | **Description**                                               |
+|----------------------------|--------------------------|------------------------------------------------
