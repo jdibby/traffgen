@@ -307,7 +307,7 @@ def nmap_1024os():
 def nmap_cve():
     random.shuffle(nmap_endpoints)
     for ip in nmap_endpoints:
-        cmd = 'nmap -Pn -sV --script=ALL %s -T5 -debug' % ip
+        cmd = 'nmap -sV --script=ALL %s -T5 -debug' % ip
         print (Fore.BLACK)
         print (Back.GREEN + "##############################################################")
         print (Style.RESET_ALL)
