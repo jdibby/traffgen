@@ -137,7 +137,7 @@ This test suite is also available as a prebuilt Docker container:
 To run the full test suite continuously with minimal delay:
 
 ```bash
-python3 testscript.py --suite all --size S --loop --max-wait-secs 10 --nowait
+docker run -it jdibby/traffgen:<version> --suite all --size S --loop --max-wait-secs 10 --nowait
 ```
 
 ## 💡 Tip 2
