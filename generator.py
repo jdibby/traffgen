@@ -661,6 +661,7 @@ if __name__ == "__main__":
                             choices=[
                                 'all',
                                 'ads',
+                                'ai',
                                 'bigfile',
                                 'crawl',
                                 'dns',
@@ -732,6 +733,7 @@ if __name__ == "__main__":
                 ai_https_random,
                 ips,
                 ads_random,
+                ai_https_random,
                 nmap_1024os,
                 nmap_cve,
                 ntp_random,
