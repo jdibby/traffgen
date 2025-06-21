@@ -124,6 +124,14 @@ virus_sim_https
 
 ---
 
+## 🐳 Docker Image
+
+This test suite is also available as a prebuilt Docker container:
+
+> **Docker Hub**: [jdibby/traffgen](https://hub.docker.com/r/jdibby/traffgen)
+
+---
+
 ## 💡 Tip 1
 
 To run the full test suite continuously with minimal delay:
