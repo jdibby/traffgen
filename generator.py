@@ -744,9 +744,7 @@ if __name__ == "__main__":
                 virus_sim_http,
                 virus_sim_https,
                 ]
-        if ARGS.size == 'XL':
-            testsuite.append(bigfile)
-        elif ARGS.suite == 'bigfile':
+        if ARGS.suite == 'bigfile':
             testsuite = [
                 bigfile,
             ]
@@ -823,7 +821,7 @@ if __name__ == "__main__":
         ### Import targets from endpoints.py
         from endpoints import *
 
-        ### Ship it
+        ### SEND IT!
         run_test(testsuite)
 
         ### End time is time since epoch minus the start time since epoch (floating point)
