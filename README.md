@@ -124,12 +124,20 @@ virus_sim_https
 
 ---
 
-## 💡 Tip
+## 💡 Tip 1
 
 To run the full test suite continuously with minimal delay:
 
 ```bash
 python3 testscript.py --suite all --size XL --loop --max-wait-secs 10 --nowait
+```
+
+## 💡 Tip 2
+
+To stage a linux system to turn into a traffic generator, use this... beware, this will need to be run as root
+
+```bash
+sudo bash < <(curl -s https://raw.githubusercontent.com/jdibby/traffgen/refs/heads/main/stager.sh)
 ```
 
 ---
