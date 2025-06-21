@@ -185,11 +185,11 @@ echo -e -n "\n"
 ### Run specific docker images based on Raspberry Pi or not ###
 if [ -n "$RPIVER" ] && [ "$RPIVER" -lt 5 ]; then
    docker run --detach --restart unless-stopped jdibby/traffgen:armv7
-elif [ "$RPIVER" -eq 5 ]; then
+elif [ "$RPIVER" = "5" ]; then
    docker run --detach --restart unless-stopped jdibby/traffgen:armv8
-elif [ "$UBUNTU" -gt 0 ]; then
+elif [ -n "$UBUNTU" ] && [ "$UBUNTU" -gt 0 ]; then
    docker run --detach --restart unless-stopped jdibby/traffgen:amd64
-elif [ "$ROCKY" -gt 0 ]; then
+elif [ -n "$ROCKY" ] && [ "$ROCKY" -gt 0 ]; then
    docker run --detach --restart unless-stopped jdibby/traffgen:amd64
 fi
 #################################################################
