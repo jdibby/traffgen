@@ -35,24 +35,18 @@ cd traffgen && git pull
 
 ### Running Help File ###
 ```
-usage: generator.py [-h] [--suite {all,bigfile,crawl,dns,ftp,http,https,icmp,netflix,nmap,ntp,scaled,ssh,url-response,virus-sim-http,virus-sim-https}] [--size {S,M,L,XL}] [--loop] [--max-wait-secs MAX_WAIT_SECS] [--nowait]
-                    [--os {debian,alpine}] [--update_packages] [--scaled_endpoints SCALED_ENDPOINTS] [--replace_all_endpoints REPLACE_ALL_ENDPOINTS] [--crawl-start CRAWL_START]
+usage: generator.py [-h] [--suite {all,ads,ai,bigfile,crawl,dns,ftp,http,https,icmp,ips,netflix,nmap,ntp,ssh,url-response,virus-sim-http,virus-sim-https}] [--size {S,M,L,XL}] [--loop]
+                    [--max-wait-secs MAX_WAIT_SECS] [--nowait] [--crawl-start CRAWL_START]
 
 options:
   -h, --help            show this help message and exit
-  --suite {all,bigfile,crawl,dns,ftp,http,https,icmp,netflix,nmap,ntp,scaled,ssh,url-response,virus-sim-http,virus-sim-https}
+  --suite {all,ads,ai,bigfile,crawl,dns,ftp,http,https,icmp,ips,netflix,nmap,ntp,ssh,url-response,virus-sim-http,virus-sim-https}
                         Test suite to run
   --size {S,M,L,XL}     Size of tests to run
   --loop                Loop test continuously
   --max-wait-secs MAX_WAIT_SECS
                         Maximum possible time (in seconds) for random intervals between tests or loops
   --nowait              Don't wait random intervals between tests or loops
-  --os {debian,alpine}  Host OS running the script
-  --update_packages     Install dependent packages
-  --scaled_endpoints SCALED_ENDPOINTS
-                        URL to query for scaled endpoints file
-  --replace_all_endpoints REPLACE_ALL_ENDPOINTS
-                        URL to query for replacement endpoints.py file
   --crawl-start CRAWL_START
                         URL to start crawling from
 ```
