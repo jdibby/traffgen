@@ -384,6 +384,11 @@ malware_endpoints = [
 
 ai_endpoints = [
     "https://chat.openai.com",
+    "https://www.whyzehealth.com",
+    "https://www.yedahealth.com",
+    "https://www.brightlight.health",
+    "https://www.aihack.us",
+    "https://www.kodu.ai",
     "https://bard.google.com",
     "https://claude.ai",
     "https://perplexity.ai",
