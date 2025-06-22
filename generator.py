@@ -223,7 +223,7 @@ def https_crawl():
             print (Style.RESET_ALL)
             scrape_iterative(url, iterations)
 
-### HTTPS crawl through URLs
+### Malware crawl through URLs
 def malware_crawl():
     if ARGS.size == 'S':
         target_urls = 10
@@ -240,13 +240,13 @@ def malware_crawl():
     random.shuffle(malware_endpoints)
     for count_urls, url in enumerate(malware_endpoints):
         if count_urls < target_urls:
-            random.shuffle(user_agents)
-            user_agent = user_agents[0]
+            random.shuffle(malware_user_agents)
+            user_agent = malware_user_agents[0]
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
             print ("Crawling HTTPS with Malware (%d deep, site %d of %d) starting from %s" %(iterations, (count_urls+1), target_urls, url))
-            print (f"Agent: {user_agent}")
+            print (f"Agent: {malware_user_agent}")
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
