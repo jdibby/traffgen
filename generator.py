@@ -700,6 +700,7 @@ if __name__ == "__main__":
                                 'icmp',
                                 'ips',
                                 'netflix',
+                                'malware',
                                 'nmap',
                                 'ntp',
                                 'ssh',
