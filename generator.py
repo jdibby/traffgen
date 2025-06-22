@@ -223,34 +223,31 @@ def https_crawl():
             print (Style.RESET_ALL)
             scrape_iterative(url, iterations)
 
-### Malware crawl through URLs
-def malware_crawl():
+### Malware Test suites
+def malware_random():
     if ARGS.size == 'S':
         target_urls = 10
-        iterations = 1
     elif ARGS.size == 'M':
         target_urls = 20
-        iterations = 3
     elif ARGS.size == 'L':
         target_urls = 50
-        iterations = 5
     elif ARGS.size == 'XL':
         target_urls = len(malware_endpoints)
-        iterations = 10
     random.shuffle(malware_endpoints)
     for count_urls, url in enumerate(malware_endpoints):
         if count_urls < target_urls:
             random.shuffle(malware_user_agents)
-            user_agent = malware_user_agents[0]
+            malware_user_agent = malware_user_agents[0]
+            cmd = f"curl -k -s --show-error --connect-timeout 5 -I --max-time 5 -A '{malware_user_agent}' {url}"
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
-            print ("Crawling HTTPS with Malware (%d deep, site %d of %d) starting from %s" %(iterations, (count_urls+1), target_urls, url))
+            print ("Testing HTTPS (%d of %d): %s" %((count_urls+1), target_urls, url))
             print (f"Agent: {malware_user_agent}")
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
-            scrape_iterative(url, iterations)
+            subprocess.call(cmd, shell=True)
 
 ### ICMP Test
 def ping_random():
@@ -760,7 +757,7 @@ if __name__ == "__main__":
                 http_random,
                 https_random,
                 https_crawl,
-                malware_crawl,
+                malware_random,
                 ai_https_random,
                 ips,
                 ads_random,
@@ -804,7 +801,7 @@ if __name__ == "__main__":
             ]
         elif ARGS.suite == 'malware':
             testsuite = [
-                malware_crawl,
+                malware_random,
             ]
         elif ARGS.suite == 'ai':
             testsuite = [
