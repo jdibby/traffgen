@@ -377,7 +377,9 @@ https_endpoints = [
 
 malware_endpoints = [
     "http://www.testmyids.com",
+    "https://www.testmyids.com",
     "http://scanme.nmap.org",
+    "https://scanme.nmap.org",
 ]
 
 ai_endpoints = [
