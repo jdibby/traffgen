@@ -223,6 +223,35 @@ def https_crawl():
             print (Style.RESET_ALL)
             scrape_iterative(url, iterations)
 
+### HTTPS crawl through URLs
+def malware_crawl():
+    if ARGS.size == 'S':
+        target_urls = 10
+        iterations = 1
+    elif ARGS.size == 'M':
+        target_urls = 20
+        iterations = 3
+    elif ARGS.size == 'L':
+        target_urls = 50
+        iterations = 5
+    elif ARGS.size == 'XL':
+        target_urls = len(malware_endpoints)
+        iterations = 10
+    random.shuffle(malware_endpoints)
+    for count_urls, url in enumerate(malware_endpoints):
+        if count_urls < target_urls:
+            random.shuffle(user_agents)
+            user_agent = user_agents[0]
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
+            print ("Crawling HTTPS with Malware (%d deep, site %d of %d) starting from %s" %(iterations, (count_urls+1), target_urls, url))
+            print (f"Agent: {user_agent}")
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
+            scrape_iterative(url, iterations)
+
 ### ICMP Test
 def ping_random():
     if ARGS.size == 'S':
@@ -730,6 +759,7 @@ if __name__ == "__main__":
                 http_random,
                 https_random,
                 https_crawl,
+                malware_crawl,
                 ai_https_random,
                 ips,
                 ads_random,
@@ -770,6 +800,10 @@ if __name__ == "__main__":
             testsuite = [
                 https_random,
                 https_crawl,
+            ]
+        elif ARGS.suite == 'malware':
+            testsuite = [
+                malware_crawl,
             ]
         elif ARGS.suite == 'ai':
             testsuite = [
