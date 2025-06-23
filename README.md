@@ -155,7 +155,7 @@ docker run -it jdibby/traffgen:<version> --help
 To run the full test suite continuously with minimal delay:
 
 ```bash
-docker run -it jdibby/traffgen:<version> --suite=all --size=L --loop --max-wait-secs 10
+docker run -it jdibby/traffgen:<version> --suite=all --size=L --loop --max-wait-secs=10
 ```
 
 
