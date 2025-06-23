@@ -1,5 +1,5 @@
 
-# 🧪 Network Traffic Script Summary
+# 🧪 Traffic Generation Summary
 
 This traffic generator script runs a suite of tests across multiple network protocols and services, including DNS, HTTP, HTTPS, FTP, SSH, ICMP, NTP, and more. The tests help evaluate connectivity, performance, latency, security filtering, and reliability.
 
