@@ -134,20 +134,30 @@ This test suite is also available as a prebuilt Docker container:
 
 ---
 
-## 💡 Tip 1
-
-To run the full test suite continuously with minimal delay:
-
-```bash
-docker run -it jdibby/traffgen:<version> --suite all --size S --loop --max-wait-secs 10 --nowait
-```
-
-## 💡 Tip 2
+## 💡 Stage a linux system and turn it into a traffic generator
 
 To stage a linux system to turn it into a traffic generator, use this... beware, this will need to be run as root
 
 ```bash
 sudo bash < <(curl -s https://raw.githubusercontent.com/jdibby/traffgen/refs/heads/main/stager.sh)
 ```
+
+## 💡 Show the help file
+
+To run the container to show the help file:
+
+```bash
+docker run -it jdibby/traffgen:<version> --help
+```
+
+## 💡 Full test suite with inject user simulated delay
+
+To run the full test suite continuously with minimal delay:
+
+```bash
+docker run -it jdibby/traffgen:<version> --suite all --size S --loop --max-wait-secs 10
+```
+
+
 
 ---
