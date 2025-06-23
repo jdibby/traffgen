@@ -29,7 +29,7 @@ This traffic generator script runs a suite of tests across multiple network prot
 | **TAR.GZ Download**      | `http_download_targz`           | Download the latest WordPress tarball                        |
 | **URL Response Times**   | `urlresponse_random`            | Measures HTTP/HTTPS response times in seconds                   |
 | **HTTPS Crawling**       | `https_crawl`                   | Follow links recursively on HTTPS sites                      |
-| **Web Crawling**         | `webcrawl`                      | Crawl external sites from starting point                      |
+| **HTTP Crawling**         | `webcrawl`                      | Crawl external sites from starting point                      |
 
 ---
 
@@ -101,6 +101,7 @@ ai_https_random
 ips
 ads_random
 ai_https_random
+malware
 nmap_1024os
 nmap_cve
 ntp_random
