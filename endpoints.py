@@ -65,6 +65,11 @@ icmp_endpoints = [
     "84.200.70.40",
     "149.112.112.112",
     "68.87.85.98",
+    "4.2.2.2",
+    "4.2.2.3",
+    "4.2.2.4",
+    "64.6.64.6",
+    "64.6.65.6",
     "68.87.64.146",
     "68.105.28.11",
     "24.116.0.201",
@@ -146,6 +151,8 @@ ssh_endpoints = [
     "192.168.2.1",
     "172.30.0.1",
     "192.168.2.2",
+    "www.testmyids.com",
+    "scanme.nmap.org",
     ]
 
 nmap_endpoints = [
@@ -162,6 +169,8 @@ nmap_endpoints = [
     "172.30.0.1",
     "172.30.0.21",
     "192.168.2.3",
+    "www.testmyids.com",
+    "scanme.nmap.org",
     ]
 
 http_endpoints = [
@@ -399,6 +408,7 @@ ai_endpoints = [
     "https://heidihealth.com",
     "https://zzzcode.ai",
     "https://myninja.ai",
+    "https://copilot.microsoft.com",
     "https://github.com/github-copilot",
     "https://mindtrip.ai",
     "https://www.notion.so/ai",
@@ -428,6 +438,7 @@ ai_endpoints = [
     "https://www.adobe.com/sensei.html",
     "https://fireflies.ai",
     "https://otter.ai",
+    "https://spiny.ai",
     "https://voicemod.net",
     "https://speechify.com",
     "https://www.respeecher.com",
