@@ -196,3 +196,5 @@ fi
 echo -e -n "\n"
 echo "${BOLD}### TRAFFGEN INSTALL COMPLETE ###${NORMAL}"
 echo -e -n "\n"
+docker ps -a --format "table {{.ID}} -- {{.Image}} -- {{.Names}} -- {{.Status}}"
+echo -e -n "\n"
