@@ -126,6 +126,25 @@ virus_sim_https
 
 ---
 
+## 🛠️ Stager Script (stager.sh)
+
+To stage a linux system to turn it into a traffic generator, use this... beware, this will need to be run as root
+
+- ✅ Autodetects Hardware/OS
+- ✅ Supports Ubuntu and Rocky Linux
+- ✅ Supports Raspberry Pi4 and Raspberry Pi5
+
+| Docker Image Used         | Description                                                             |
+|-----------------------|-----------------------------------------------------------------------------|
+| jdibby/traffgen:armv7 | Raspberry Pi4 and other armv7 processors                                    |
+| jdibby/traffgen:armv8 | Raspberry Pi5 and other armv8 processors                                    |
+| jdibby/traffgen:amd64 | Other 64bit processors (default option)                                     |
+
+```bash
+sudo bash < <(curl -s https://raw.githubusercontent.com/jdibby/traffgen/refs/heads/main/stager.sh)
+
+---
+
 ## 🐳 Docker Image
 
 This test suite is also available as a prebuilt Docker container:
@@ -134,12 +153,6 @@ This test suite is also available as a prebuilt Docker container:
 
 ---
 
-## 💡 Stage a linux system and turn it into a traffic generator
-
-To stage a linux system to turn it into a traffic generator, use this... beware, this will need to be run as root
-
-```bash
-sudo bash < <(curl -s https://raw.githubusercontent.com/jdibby/traffgen/refs/heads/main/stager.sh)
 ```
 
 ## 💡 Show the help file
