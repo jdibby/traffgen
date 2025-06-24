@@ -153,8 +153,6 @@ This test suite is also available as a prebuilt Docker container:
 
 ---
 
-```
-
 ## 💡 Show the help file
 
 To run the container to show the help file:
