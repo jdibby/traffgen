@@ -565,12 +565,12 @@ def run_test(list):
 
     if ARGS.loop:
         while True:
-            # For looping, chose a test at random from the list for each iteration
+            ### For looping, choose a test at random from the list for each iteration
             func = random.choice(list)
             func()
             finish_test()
     else:
-        # For single runs, run tests in random order
+        ### For single runs, run tests in random order
         random.shuffle(list)
         for func in list:
             func()
@@ -609,7 +609,7 @@ def scrape_single_link(url):
     sleep(random.uniform(0.2, 2))
     random.shuffle(user_agents)
 
-    # Get site contents
+    ### Get site contents
     try:
         response = requests.request(
             method="GET",
@@ -637,20 +637,20 @@ def scrape_single_link(url):
         print(f"Error: General failure for {url}")
         return None
 
-    # Parse HTML
+    ### Parse HTML
     soup = BeautifulSoup(response.content, 'html.parser')
 
-    # Print page URL and title
+    ### Print page URL and title
     try:
         print(f"{url} - {soup.title.string.encode('unicode_escape').decode('utf-8')}")
     except:
         print(f"{url} - no title")
 
-    # Find and randomize all links on page
+    ### Find and randomize all links on page
     all_links = soup.find_all("a")
     random.shuffle(all_links)
 
-    # Pick one, format it, and return it
+    ### Pick one, format it, and return it
     for link in all_links:
         if link.has_attr('href'):
             if '#' in link['href']:
