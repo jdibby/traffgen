@@ -320,7 +320,7 @@ def speedtest_fast():
 def nmap_1024os():
     random.shuffle(nmap_endpoints)
     for ip in nmap_endpoints:
-        cmd = 'nmap -Pn -p 1-1024 %s -T5' % ip
+        cmd = 'nmap -Pn -p 1-1024 %s -T3 --randomize-hosts --http.useragent "Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko" -debug' % ip
         print (Fore.BLACK)
         print (Back.GREEN + "##############################################################")
         print (Style.RESET_ALL)
@@ -333,7 +333,7 @@ def nmap_1024os():
 def nmap_cve():
     random.shuffle(nmap_endpoints)
     for ip in nmap_endpoints:
-        cmd = 'nmap -sV --script=ALL %s -T5 -debug' % ip
+        cmd = 'nmap -sV --script=ALL %s -T3 --randomize-hosts --http.useragent "Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko" -debug' % ip
         print (Fore.BLACK)
         print (Back.GREEN + "##############################################################")
         print (Style.RESET_ALL)
@@ -436,7 +436,7 @@ def virus_sim_http():
     random.shuffle(eicar_http_endpoints)
     for count_urls, url in enumerate(eicar_http_endpoints):
         if count_urls < target_urls:
-            cmd = "curl --limit-rate 3M -k  --show-error --connect-timeout 5 -o /dev/null %s" % url
+            cmd = "curl --limit-rate 3M -k --show-error --connect-timeout 4 -o /dev/null %s" % url
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
@@ -458,7 +458,7 @@ def virus_sim_https():
     random.shuffle(eicar_https_endpoints)
     for count_urls, url in enumerate(eicar_https_endpoints):
         if count_urls < target_urls:
-            cmd = "curl --limit-rate 3M -k --show-error --connect-timeout 5 -o /dev/null %s" % url
+            cmd = "curl --limit-rate 3M -k --show-error --connect-timeout 4 -o /dev/null %s" % url
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
@@ -494,7 +494,7 @@ def webcrawl():
 
 ### Trigger an IPS system
 def ips():
-    cmd = 'curl -k -s --show-error --connect-timeout 5 -I --max-time 5 -A BlackSun www.testmyids.com'
+    cmd = 'curl -k -s --show-error --connect-timeout 3 -I --max-time 5 -A BlackSun www.testmyids.com'
     print (Fore.BLACK)
     print (Back.GREEN + "##############################################################")
     print (Style.RESET_ALL)
