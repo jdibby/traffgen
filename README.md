@@ -142,7 +142,7 @@ To stage a linux system to turn it into a traffic generator, use this... beware,
 
 ```bash
 sudo bash < <(curl -s https://raw.githubusercontent.com/jdibby/traffgen/refs/heads/main/stager.sh)
-
+```
 ---
 
 ## 🐳 Docker Image
