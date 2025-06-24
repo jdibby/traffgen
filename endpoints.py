@@ -182,6 +182,8 @@ http_endpoints = [
     "www.spotify.com",
     "info.cern.ch",
     "www.twitter.com",
+    "www.testmyids.com",
+    "scanme.nmap.org",
     ]
 
 ad_endpoints = [
