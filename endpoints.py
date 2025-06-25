@@ -179,11 +179,14 @@ http_endpoints = [
     "www.google.com",
     "neverssl.com",
     "www.linkedin.com",
+    "baidu.com",
     "www.spotify.com",
     "info.cern.ch",
+    "gnu.org",
     "www.twitter.com",
     "www.testmyids.com",
     "scanme.nmap.org",
+    "httpforever.com",
     ]
 
 ad_endpoints = [
