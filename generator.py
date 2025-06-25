@@ -95,7 +95,7 @@ def http_random():
         if count_urls < target_urls:
             random.shuffle(user_agents)
             user_agent = user_agents[0]
-            cmd = f"curl -k -s --show-error --connect-timeout 5 -I --max-time 5 -A '{user_agent}' {url}"
+            cmd = f"curl -k -s --show-error --connect-timeout 5 -I -L -o /dev/null --max-time 5 -A '{user_agent}' {url}"
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
@@ -157,7 +157,7 @@ def https_random():
         if count_urls < target_urls:
             random.shuffle(user_agents)
             user_agent = user_agents[0]
-            cmd = f"curl -k -s --show-error --connect-timeout 5 -I --max-time 5 -A '{user_agent}' {url}"
+            cmd = f"curl -k -s --show-error --connect-timeout 5 -I -o /dev/null --max-time 5 -A '{user_agent}' {url}"
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
@@ -183,7 +183,7 @@ def ai_https_random():
         if count_urls < target_urls:
             random.shuffle(user_agents)
             user_agent = user_agents[0]
-            cmd = f"curl -k -s --show-error --connect-timeout 3 -I --max-time 5 -A '{user_agent}' {url}"
+            cmd = f"curl -k -s --show-error --connect-timeout 3 -I -o /dev/null --max-time 5 -A '{user_agent}' {url}"
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
@@ -238,7 +238,7 @@ def malware_random():
         if count_urls < target_urls:
             random.shuffle(malware_user_agents)
             malware_user_agent = malware_user_agents[0]
-            cmd = f"curl -k -s --show-error --connect-timeout 3 -I --max-time 5 -A '{malware_user_agent}' {url}"
+            cmd = f"curl -k -s --show-error --connect-timeout 3 -I -o /dev/null --max-time 5 -A '{malware_user_agent}' {url}"
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
