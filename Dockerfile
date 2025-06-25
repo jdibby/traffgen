@@ -24,6 +24,7 @@ RUN apk update && apk add --no-cache \
     nmap \
     openssh-client \
     busybox-extras \
+    ca-certificates \
     git \
     net-snmp
 
