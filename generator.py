@@ -899,7 +899,7 @@ if __name__ == "__main__":
             testsuite = [
                 ads_random,
             ]            
-        elif ARGS.suite == 'github_domain_check':
+        elif ARGS.suite == 'domain-check':
             testsuite = [
                 github_domain_check,
             ]                
