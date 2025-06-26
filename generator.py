@@ -770,6 +770,7 @@ if __name__ == "__main__":
                                 'crawl',
                                 'dns',
                                 'ftp',
+                                'github_domain_check',
                                 'http',
                                 'https',
                                 'icmp',
