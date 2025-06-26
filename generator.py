@@ -591,7 +591,7 @@ def github_domain_check_read_file(local_filename, num_random_domains=10):
 
     print("\nQuery operations completed for selected domains.")
 
-def github_domain_check()
+def github_domain_check():
     github_domain_list = "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/domains/multi.txt"
     local_domains_filename = "git-blocklist"
 
