@@ -603,7 +603,7 @@ def github_domain_check():
     else:
         print(f"Local domain file '{local_domains_filename}' already exists. Skipping download.")
 
-    _file(local_domains_filename, num_random_domains=10)
+    github_domain_check_read_file(local_domains_filename, num_random_domains=10)
 
 ### Wait timer progress bar
 def progressbar(it, prefix="", size=60, file=sys.stdout):
