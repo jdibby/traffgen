@@ -69,7 +69,7 @@ else
     RASPBIAN=0
 fi
 
-### NEW: Check for Pure Debian OS ###
+### Check for Pure Debian OS ###
 if [ -f /etc/os-release ]; then
     DEBIAN=$(grep '^ID=debian$' /etc/os-release | wc -l)
     # Ensure it's not Raspbian which also has ID_LIKE=debian
@@ -229,20 +229,6 @@ else
 fi
 
 echo "${BOLD}### INSTALLATION OF DOCKER COMPLETE ###${NORMAL}"
-echo ""
-
-echo "${BOLD}### STARTING PORTAINER INSTALL ###${NORMAL}"
-echo ""
-### Cleanup potential existing Portainer installs
-docker stop portainer &> /dev/null
-docker rm portainer &> /dev/null
-docker volume rm portainer_data &> /dev/null
-docker images | grep portainer | awk '{print $3}' | xargs docker rmi -f &> /dev/null
-
-docker volume create portainer_data
-docker run -d -p 8000:8000 -p 9443:9443 --name portainer --restart=always -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer-ce:2.21.1
-echo ""
-echo "${BOLD}### PORTAINER INSTALL COMPLETE WITH DEFAULT USERNAME ADMIN ###${NORMAL}"
 echo ""
 
 echo "${BOLD}### STARTING TRAFFGEN INSTALL ###${NORMAL}"
