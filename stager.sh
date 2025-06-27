@@ -3,23 +3,20 @@
 ### Validate this is being run with sudo / root permissions ###
 WHOAREYOU=$(whoami)
 if [ "$WHOAREYOU" != "root" ]; then
-   echo "#######################################################################"
-   echo "############## YOU MUST BE ROOT OR ELSE SUDO THIS SCRIPT ##############"
-   echo "#######################################################################"
-   exit 1
+    echo "#######################################################################"
+    echo "############## YOU MUST BE ROOT OR ELSE SUDO THIS SCRIPT ##############"
+    echo "#######################################################################"
+    exit 1
 fi
 
 ### Adding capabilities of bold fonts ###
 BOLD=$(tput bold)
 NORMAL=$(tput sgr0)
 
-### Set Home Directory ###
-HOMEDIR=$(pwd)
-###############################################################
-
-echo -e -n "\n" 
+echo ""
 echo "${BOLD}### DETECTING OPERATING SYSTEM AND PERFORMING UPDATES ###${NORMAL}"
-echo -e -n "\n" 
+echo ""
+
 ### Check for Raspberry Pi ###
 if [ -f /proc/device-tree/model ]; then
     RPIVER=$(grep -a "Raspberry" /proc/device-tree/model | awk '{print $3}')
@@ -41,24 +38,66 @@ else
     ROCKY=0
 fi
 
-### Proceed with the operating system detection logic ###
-if [ -n "$RPIVER" ] && [ "$RPIVER" -gt 0 ]; then
+### Check for Raspbian OS (Raspberry Pi OS) ###
+if [ -f /etc/os-release ]; then
+    RASPBIAN=$(grep 'ID=raspbian' /etc/os-release | wc -l)
+else
+    RASPBIAN=0
+fi
+
+### NEW: Check for Pure Debian OS ###
+if [ -f /etc/os-release ]; then
+    DEBIAN=$(grep '^ID=debian$' /etc/os-release | wc -l)
+    # Ensure it's not Raspbian which also has ID_LIKE=debian
+    if [ "$DEBIAN" -gt 0 ] && [ "$RASPBIAN" -gt 0 ]; then
+        DEBIAN=0 # If it's Raspbian, don't treat it as pure Debian
+    fi
+else
+    DEBIAN=0
+fi
+
+
+### Proceed with the operating system detection logic and updates ###
+
+### Prioritize Raspbian detections as they are more specific Raspberry Pi cases
+if [ "$RASPBIAN" -gt 0 ]; then
+    if [ -n "$RPIVER" ] && [ "$RPIVER" -eq 5 ]; then
+        echo "#######################################################################"
+        echo "############${BOLD} System detected as Raspberry Pi 5 (Raspbian) ${NORMAL}#############"
+        echo "#######################################################################"
+    elif [ -n "$RPIVER" ] && [ "$RPIVER" -eq 4 ]; then
+        echo "#######################################################################"
+        echo "############${BOLD} System detected as Raspberry Pi 4 (Raspbian) ${NORMAL}#############"
+        echo "#######################################################################"
+    elif [ -n "$RPIVER" ] && [ "$RPIVER" -gt 0 ]; then
+        echo "#######################################################################"
+        echo "############${BOLD} System detected as Raspberry Pi $RPIVER (Raspbian) ${NORMAL}########"
+        echo "#######################################################################"
+    else
+        echo "#######################################################################"
+        echo "############${BOLD} System detected as Raspbian (Non-Pi Hardware) ${NORMAL}#########"
+        echo "#######################################################################"
+    fi
+    echo ""
+    apt update -y && apt upgrade -y
+### Pure Debian detection
+elif [ "$DEBIAN" -gt 0 ]; then
     echo "#######################################################################"
-    echo "############${BOLD} System detected as Raspberry Pi $RPIVER ${NORMAL}##################"
+    echo "###################${BOLD} System detected as Pure Debian Linux ${NORMAL}################"
     echo "#######################################################################"
-    echo -e -n "\n" 
+    echo ""
     apt update -y && apt upgrade -y
 elif [ "$UBUNTU" -gt 0 ]; then
     echo "#######################################################################"
     echo "##################${BOLD} System detected as Ubuntu Linux ${NORMAL}####################"
     echo "#######################################################################"
-    echo -e -n "\n" 
+    echo ""
     apt update -y && apt upgrade -y
 elif [ "$ROCKY" -gt 0 ]; then
     echo "#######################################################################"
     echo "###################${BOLD} System detected as Rocky Linux ${NORMAL}####################"
     echo "#######################################################################"
-    echo -e -n "\n" 
+    echo ""
     dnf update -y && dnf upgrade -y
 else
     echo "#######################################################################"
@@ -66,135 +105,147 @@ else
     echo "#################${BOLD} NOT A SUPPORTED OPERATING SYSTEM ${NORMAL}####################"
     echo "#######################################################################"
     echo "#######################################################################"
-    echo -e -n "\n" 
+    echo ""
     exit 1
 fi
 #################################################################
-echo -e -n "\n" 
+echo ""
 echo "${BOLD}### OPERATING SYSTEM DETECTED AND UPDATES COMPLETED ###${NORMAL}"
-echo -e -n "\n" 
-if [ -x "$(command -v docker)" ]; then
-    echo -e -n "\n" 
+echo ""
+
+if command -v docker &> /dev/null; then
+    echo ""
     echo "${BOLD}### DOCKER IS ALREADY INSTALLED AND IS READY TO USE ###${NORMAL}"
-    echo -e -n "\n" 
-    else
-        echo "${BOLD}### STARTING DOCKER INSTALL ###${NORMAL}"
-        echo -e -n "\n" 
-        ### Different installation options for different OS' ###
-        if [ -n "$RPIVER" ] && [ "$RPIVER" -lt 5 ]; then
-            for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
-            # Add Docker's official GPG key:
-            apt-get install ca-certificates curl git -y
-            install -m 0755 -d /etc/apt/keyrings
+    echo ""
+else
+    echo "${BOLD}### STARTING DOCKER INSTALL ###${NORMAL}"
+    echo ""
+    ### Docker installation logic based on detected OS ###
+
+    ### Raspbian (Raspberry Pi OS) family
+    if [ "$RASPBIAN" -gt 0 ]; then
+        for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do apt-get remove $pkg; done
+        apt-get update -y
+        apt-get install ca-certificates curl git -y
+        install -m 0755 -d /etc/apt/keyrings
+        chmod a+r /etc/apt/keyrings/docker.asc
+
+        if [ -n "$RPIVER" ] && [ "$RPIVER" -eq 5 ]; then
+            ### RPi 5 Raspbian uses Docker's Debian repository
+            curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+            echo \
+                "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian \
+                $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+                tee /etc/apt/sources.list.d/docker.list > /dev/null
+            echo "${BOLD}### DOCKER INSTALLED AND IS READY TO USE FOR RASPBERRY PI 5 (RASPBIAN) ###${NORMAL}"
+        else
+            ### RPi < 5 Raspbian and other non-Pi Raspbian installations use Docker's Raspbian repository
             curl -fsSL https://download.docker.com/linux/raspbian/gpg -o /etc/apt/keyrings/docker.asc
-            chmod a+r /etc/apt/keyrings/docker.asc
             echo \
                 "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/raspbian \
                 $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-                sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-            apt-get update -y
-            apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
-            systemctl restart docker
-            echo -e -n "\n" 
-            echo "${BOLD}### DOCKER INSTALLED AND IS READY TO USE ###${NORMAL}"
-            echo -e -n "\n" 
-        elif [ -n "$RPIVER" ] && [ "$RPIVER" -eq 5 ]; then
-            for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
-            # Add Docker's official GPG key:
-            apt-get update -y
-            apt-get install ca-certificates curl -y
-            install -m 0755 -d /etc/apt/keyrings
-            curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
-            chmod a+r /etc/apt/keyrings/docker.asc
-            # Add the repository to Apt sources:
-            echo \
+                tee /etc/apt/sources.list.d/docker.list > /dev/null
+            if [ -n "$RPIVER" ] && [ "$RPIVER" -eq 4 ]; then
+                echo "${BOLD}### DOCKER INSTALLED AND IS READY TO USE FOR RASPBERRY PI 4 (RASPBIAN) ###${NORMAL}"
+            else
+                echo "${BOLD}### DOCKER INSTALLED AND IS READY TO USE FOR RASPBERRY PI (OLDER RASPBIAN) ###${NORMAL}"
+            fi
+        fi
+        apt-get update -y
+        apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+        systemctl restart docker
+        echo ""
+
+    ### Pure Debian
+    elif [ "$DEBIAN" -gt 0 ]; then
+        for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do apt-get remove $pkg; done
+        apt-get update -y
+        apt-get install ca-certificates curl -y
+        install -m 0755 -d /etc/apt/keyrings
+        curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+        chmod a+r /etc/apt/keyrings/docker.asc
+        echo \
             "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian \
             $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
             tee /etc/apt/sources.list.d/docker.list > /dev/null
-            apt-get update -y
-            apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
-            systemctl restart docker
-            echo -e -n "\n" 
-            echo "${BOLD}### DOCKER INSTALLED AND IS READY TO USE ###${NORMAL}"
-            echo -e -n "\n" 
-        elif [ "$UBUNTU" -gt 0 ]; then
-            for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
-            # Add Docker's official GPG key:
-            apt-get update -y
-            apt-get install ca-certificates curl -y
-            install -m 0755 -d /etc/apt/keyrings
-            curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-            chmod a+r /etc/apt/keyrings/docker.asc
-            # Add the repository to Apt sources:
-            echo \
+        apt-get update -y
+        apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+        systemctl restart docker
+        echo ""
+        echo "${BOLD}### DOCKER INSTALLED AND IS READY TO USE FOR PURE DEBIAN ###${NORMAL}"
+        echo ""
+
+    ### Ubuntu
+    elif [ "$UBUNTU" -gt 0 ]; then
+        for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do apt-get remove $pkg; done
+        apt-get update -y
+        apt-get install ca-certificates curl -y
+        install -m 0755 -d /etc/apt/keyrings
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+        chmod a+r /etc/apt/keyrings/docker.asc
+        echo \
             "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
             $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-            sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-            apt-get update -y
-            apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
-            systemctl restart docker
-            echo -e -n "\n" 
-            echo "${BOLD}### DOCKER INSTALLED AND IS READY TO USE ###${NORMAL}"
-            echo -e -n "\n" 
-        elif [ "$ROCKY" -gt 0 ]; then
-            dnf remove -y docker-ce docker-ce-cli containerd.io
-            rm -rf /var/lib/docker
-            rm -rf /var/lib/containerd
-            dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
-            dnf update -y
-            dnf install docker-ce docker-ce-cli containerd.io docker-compose-plugin -y
-            systemctl start docker
-            systemctl enable docker
-            echo -e -n "\n" 
-            echo "${BOLD}### INSTALLATION OF DOCKER COMPLETE ###${NORMAL}"
-            echo -e -n "\n" 
-        else
-            echo -e -n "\n" 
-            echo "### YOU ARE RUNNING AN UNSUPPORTED OPERATING SYSTEM ###"
-            echo -e -n "\n" 
-            exit 1
-        fi
+            tee /etc/apt/sources.list.d/docker.list > /dev/null
+        apt-get update -y
+        apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+        systemctl restart docker
+        echo ""
+        echo "${BOLD}### DOCKER INSTALLED AND IS READY TO USE ###${NORMAL}"
+        echo ""
+
+    ### Rocky Linux
+    elif [ "$ROCKY" -gt 0 ]; then
+        dnf remove -y docker-ce docker-ce-cli containerd.io
+        rm -rf /var/lib/docker
+        rm -rf /var/lib/containerd
+        dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
+        dnf update -y
+        dnf install docker-ce docker-ce-cli containerd.io docker-compose-plugin -y
+        systemctl start docker
+        systemctl enable docker
+        echo ""
+        echo "${BOLD}### INSTALLATION OF DOCKER COMPLETE ###${NORMAL}"
+        echo ""
+    else
+        echo ""
+        echo "### YOU ARE RUNNING AN UNSUPPORTED OPERATING SYSTEM FOR DOCKER INSTALLATION ###"
+        echo ""
+        exit 1
+    fi
 fi
 
 echo "${BOLD}### INSTALLATION OF DOCKER COMPLETE ###${NORMAL}"
-echo -e -n "\n" 
+echo ""
 
 echo "${BOLD}### STARTING PORTAINER INSTALL ###${NORMAL}"
-echo -e -n "\n"
+echo ""
 ### Cleanup potential existing Portainer installs ###
-docker stop portainer
-docker rm portainer
-docker volume rm portainer_data
-docker images | grep portainer | awk '{print $3}' | sudo xargs docker rmi -f
+docker stop portainer &> /dev/null
+docker rm portainer &> /dev/null
+docker volume rm portainer_data &> /dev/null
+docker images | grep portainer | awk '{print $3}' | xargs docker rmi -f &> /dev/null
+
 docker volume create portainer_data
 docker run -d -p 8000:8000 -p 9443:9443 --name portainer --restart=always -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer-ce:2.21.1
-echo -e -n "\n"
+echo ""
 echo "${BOLD}### PORTAINER INSTALL COMPLETE WITH DEFAULT USERNAME ADMIN ###${NORMAL}"
-echo -e -n "\n" 
-echo "${BOLD}### STARTING TRAFFGEN INSTALL ###${NORMAL}"
-echo -e -n "\n" 
-### Cleanup potential existing traffgen installs ###
-docker ps | grep jdibby/traffgen | awk '{print $1}' | sudo xargs docker stop
-docker ps -a | grep jdibby/traffgen | awk '{print $1}' | sudo xargs docker rm
-docker images | grep jdibby/traffgen | awk '{print $3}' | sudo xargs docker rmi -f
-docker images| awk '{print $1}' | grep -v REPOSITORY | sudo xargs docker rmi -f
-echo -e -n "\n" 
-echo "${BOLD}### TRAFFGEN INSTALL COMPLETE ###${NORMAL}"
+echo ""
 
-echo -e -n "\n" 
-### Run specific docker images based on Raspberry Pi or not ###
-if [ -n "$RPIVER" ] && [ "$RPIVER" -lt 5 ]; then
-   docker run --detach --restart unless-stopped jdibby/traffgen:latest
-elif [ "$RPIVER" = "5" ]; then
-   docker run --detach --restart unless-stopped jdibby/traffgen:latest
-elif [ -n "$UBUNTU" ] && [ "$UBUNTU" -gt 0 ]; then
-   docker run --detach --restart unless-stopped jdibby/traffgen:latest
-elif [ -n "$ROCKY" ] && [ "$ROCKY" -gt 0 ]; then
-   docker run --detach --restart unless-stopped jdibby/traffgen:latest
-fi
+echo "${BOLD}### STARTING TRAFFGEN INSTALL ###${NORMAL}"
+echo ""
+### Cleanup
+docker stop $(docker ps -a -q) &> /dev/null
+docker rm $(docker ps -a -q) &> /dev/null
+docker images | awk '{print $3}' | xargs docker rmi -f &> /dev/null
+
+echo ""
+echo "${BOLD}### TRAFFGEN CONTAINER BEING STARTED ###${NORMAL}"
+### Run the traffgen docker image (this command is universal across architectures and OSes as long as Docker is installed)
+docker run --detach --restart unless-stopped jdibby/traffgen:latest
 #################################################################
-echo -e -n "\n"
+echo ""
 echo "${BOLD}### TRAFFGEN INSTALL COMPLETE ###${NORMAL}"
-echo -e -n "\n"
+echo ""
 docker ps -a --format "table {{.ID}} -- {{.Image}} -- {{.Names}} -- {{.Status}}"
-echo -e -n "\n"
+echo ""
