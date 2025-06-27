@@ -59,7 +59,7 @@ fi
 
 ### Proceed with the operating system detection logic and updates ###
 
-### Prioritize Raspbian detections as they are more specific Raspberry Pi cases
+### Raspbian detection
 if [ "$RASPBIAN" -gt 0 ]; then
     if [ -n "$RPIVER" ] && [ "$RPIVER" -eq 5 ]; then
         echo "#######################################################################"
@@ -113,7 +113,7 @@ echo ""
 echo "${BOLD}### OPERATING SYSTEM DETECTED AND UPDATES COMPLETED ###${NORMAL}"
 echo ""
 
-### Raspbian (Raspberry Pi OS) family
+### Raspbian (Raspberry Pi OS)
 if [ "$RASPBIAN" -gt 0 ]; then
     for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do apt-get remove $pkg; done
     apt-get update -y
@@ -211,7 +211,7 @@ echo ""
 
 echo "${BOLD}### STARTING PORTAINER INSTALL ###${NORMAL}"
 echo ""
-### Cleanup potential existing Portainer installs ###
+### Cleanup potential existing Portainer installs
 docker stop portainer &> /dev/null
 docker rm portainer &> /dev/null
 docker volume rm portainer_data &> /dev/null
@@ -225,16 +225,16 @@ echo ""
 
 echo "${BOLD}### STARTING TRAFFGEN INSTALL ###${NORMAL}"
 echo ""
-### Cleanup
+### Cleanup all other containers
 docker stop $(docker ps -a -q) &> /dev/null
 docker rm $(docker ps -a -q) &> /dev/null
 docker images | awk '{print $3}' | xargs docker rmi -f &> /dev/null
 
 echo ""
 echo "${BOLD}### TRAFFGEN CONTAINER BEING STARTED ###${NORMAL}"
-### Run the traffgen docker image (this command is universal across architectures and OSes as long as Docker is installed)
+### Run the traffgen docker image (this command is universal across architectures and OSes as long as Docker is installed) 
 docker run --detach --restart unless-stopped jdibby/traffgen:latest
-#################################################################
+
 echo ""
 echo "${BOLD}### TRAFFGEN INSTALL COMPLETE ###${NORMAL}"
 echo ""
