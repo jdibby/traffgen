@@ -80,7 +80,7 @@ else
     DEBIAN=0
 fi
 
-### Proceed with the operating system detection logic and updates ###
+### Proceed with the operating system detection logic and updates
 
 ### Raspbian detection
 if [ "$RASPBIAN" -gt 0 ]; then

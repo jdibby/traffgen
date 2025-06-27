@@ -136,9 +136,9 @@ To stage a linux system to turn it into a traffic generator, use this... beware,
 
 | Docker Image Used         | Description                                                             |
 |-----------------------|-----------------------------------------------------------------------------|
-| jdibby/traffgen:armv7 | Raspberry Pi4 and other armv7 processors                                    |
-| jdibby/traffgen:armv8 | Raspberry Pi5 and other armv8 processors                                    |
-| jdibby/traffgen:amd64 | Other 64bit processors (default option)                                     |
+| jdibby/traffgen:latest | Raspberry Pi4 and other armv7 processors                                    |
+| jdibby/traffgen:latest | Raspberry Pi5 64bit processors                                |
+| jdibby/traffgen:latest | Other 64bit processors (default option)                                     |
 
 ```bash
 sudo bash < <(curl -s https://raw.githubusercontent.com/jdibby/traffgen/refs/heads/main/stager.sh)
