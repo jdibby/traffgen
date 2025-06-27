@@ -1336,3 +1336,14 @@ eicar_https_endpoints = [
     "https://secure.eicar.org/eicar_com.zip",
     "https://secure.eicar.org/eicarcom2.zip",
 ]
+
+snmp_strings = [
+    "public",
+    "private",
+    "trap",
+    "system",
+    "access",
+    "agent",
+    "monitor",
+    "secret",
+]
