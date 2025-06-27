@@ -113,48 +113,39 @@ echo ""
 echo "${BOLD}### OPERATING SYSTEM DETECTED AND UPDATES COMPLETED ###${NORMAL}"
 echo ""
 
-if command -v docker &> /dev/null; then
-    echo ""
-    echo "${BOLD}### DOCKER IS ALREADY INSTALLED AND IS READY TO USE ###${NORMAL}"
-    echo ""
-else
-    echo "${BOLD}### STARTING DOCKER INSTALL ###${NORMAL}"
-    echo ""
-    ### Docker installation logic based on detected OS ###
+### Raspbian (Raspberry Pi OS) family
+if [ "$RASPBIAN" -gt 0 ]; then
+    for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do apt-get remove $pkg; done
+    apt-get update -y
+    apt-get install ca-certificates curl git -y
+    install -m 0755 -d /etc/apt/keyrings
+    chmod a+r /etc/apt/keyrings/docker.asc
 
-    ### Raspbian (Raspberry Pi OS) family
-    if [ "$RASPBIAN" -gt 0 ]; then
-        for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do apt-get remove $pkg; done
-        apt-get update -y
-        apt-get install ca-certificates curl git -y
-        install -m 0755 -d /etc/apt/keyrings
-        chmod a+r /etc/apt/keyrings/docker.asc
-
-        if [ -n "$RPIVER" ] && [ "$RPIVER" -eq 5 ]; then
-            ### RPi 5 Raspbian uses Docker's Debian repository
-            curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
-            echo \
-                "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian \
-                $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-                tee /etc/apt/sources.list.d/docker.list > /dev/null
-            echo "${BOLD}### DOCKER INSTALLED AND IS READY TO USE FOR RASPBERRY PI 5 (RASPBIAN) ###${NORMAL}"
+    if [ -n "$RPIVER" ] && [ "$RPIVER" -eq 5 ]; then
+        ### RPi 5 Raspbian uses Docker's Debian repository
+        curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+        echo \
+            "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian \
+            $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+            tee /etc/apt/sources.list.d/docker.list > /dev/null
+        echo "${BOLD}### DOCKER INSTALLED AND IS READY TO USE FOR RASPBERRY PI 5 (RASPBIAN) ###${NORMAL}"
+    else
+        ### RPi < 5 Raspbian and other non-Pi Raspbian installations use Docker's Raspbian repository
+        curl -fsSL https://download.docker.com/linux/raspbian/gpg -o /etc/apt/keyrings/docker.asc
+        echo \
+            "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/raspbian \
+            $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+            tee /etc/apt/sources.list.d/docker.list > /dev/null
+        if [ -n "$RPIVER" ] && [ "$RPIVER" -eq 4 ]; then
+            echo "${BOLD}### DOCKER INSTALLED AND IS READY TO USE FOR RASPBERRY PI 4 (RASPBIAN) ###${NORMAL}"
         else
-            ### RPi < 5 Raspbian and other non-Pi Raspbian installations use Docker's Raspbian repository
-            curl -fsSL https://download.docker.com/linux/raspbian/gpg -o /etc/apt/keyrings/docker.asc
-            echo \
-                "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/raspbian \
-                $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-                tee /etc/apt/sources.list.d/docker.list > /dev/null
-            if [ -n "$RPIVER" ] && [ "$RPIVER" -eq 4 ]; then
-                echo "${BOLD}### DOCKER INSTALLED AND IS READY TO USE FOR RASPBERRY PI 4 (RASPBIAN) ###${NORMAL}"
-            else
-                echo "${BOLD}### DOCKER INSTALLED AND IS READY TO USE FOR RASPBERRY PI (OLDER RASPBIAN) ###${NORMAL}"
-            fi
+            echo "${BOLD}### DOCKER INSTALLED AND IS READY TO USE FOR RASPBERRY PI (OLDER RASPBIAN) ###${NORMAL}"
         fi
-        apt-get update -y
-        apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
-        systemctl restart docker
-        echo ""
+    fi
+    apt-get update -y
+    apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+    systemctl restart docker
+    echo ""
 
     ### Pure Debian
     elif [ "$DEBIAN" -gt 0 ]; then
