@@ -21,16 +21,16 @@ echo ""
 ### Install dependencies (if not already present)
 sudo apt install python3-apt python3-regex
 
-### Download the script (check for the latest version on the GitHub page)
+### Download the script
 wget https://github.com/davidfoerster/aptsources-cleanup/releases/download/v0.1.7.5.2/aptsources-cleanup.pyz
 
 ### Make it executable
 chmod +x aptsources-cleanup.pyz
 
-### Run the script with 'all' to process all sources and '--yes' to confirm changes
+### Run the script
 sudo bash -c "echo all | ./aptsources-cleanup.pyz --yes"
 
-### Remove the script after use (optional)
+### Remove the script after use
 rm aptsources-cleanup.pyz
 
 echo ""
@@ -79,7 +79,6 @@ if [ -f /etc/os-release ]; then
 else
     DEBIAN=0
 fi
-
 
 ### Proceed with the operating system detection logic and updates ###
 
