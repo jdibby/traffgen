@@ -147,63 +147,62 @@ if [ "$RASPBIAN" -gt 0 ]; then
     systemctl restart docker
     echo ""
 
-    ### Pure Debian
-    elif [ "$DEBIAN" -gt 0 ]; then
-        for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do apt-get remove $pkg; done
-        apt-get update -y
-        apt-get install ca-certificates curl -y
-        install -m 0755 -d /etc/apt/keyrings
-        curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
-        chmod a+r /etc/apt/keyrings/docker.asc
-        echo \
-            "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian \
-            $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-            tee /etc/apt/sources.list.d/docker.list > /dev/null
-        apt-get update -y
-        apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
-        systemctl restart docker
-        echo ""
-        echo "${BOLD}### DOCKER INSTALLED AND IS READY TO USE FOR PURE DEBIAN ###${NORMAL}"
-        echo ""
+### Pure Debian
+elif [ "$DEBIAN" -gt 0 ]; then
+    for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do apt-get remove $pkg; done
+    apt-get update -y
+    apt-get install ca-certificates curl -y
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+    chmod a+r /etc/apt/keyrings/docker.asc
+    echo \
+        "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian \
+        $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+        tee /etc/apt/sources.list.d/docker.list > /dev/null
+    apt-get update -y
+    apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+    systemctl restart docker
+    echo ""
+    echo "${BOLD}### DOCKER INSTALLED AND IS READY TO USE FOR PURE DEBIAN ###${NORMAL}"
+    echo ""
 
-    ### Ubuntu
-    elif [ "$UBUNTU" -gt 0 ]; then
-        for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do apt-get remove $pkg; done
-        apt-get update -y
-        apt-get install ca-certificates curl -y
-        install -m 0755 -d /etc/apt/keyrings
-        curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-        chmod a+r /etc/apt/keyrings/docker.asc
-        echo \
-            "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
-            $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-            tee /etc/apt/sources.list.d/docker.list > /dev/null
-        apt-get update -y
-        apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
-        systemctl restart docker
-        echo ""
-        echo "${BOLD}### DOCKER INSTALLED AND IS READY TO USE ###${NORMAL}"
-        echo ""
+### Ubuntu
+elif [ "$UBUNTU" -gt 0 ]; then
+    for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do apt-get remove $pkg; done
+    apt-get update -y
+    apt-get install ca-certificates curl -y
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+    chmod a+r /etc/apt/keyrings/docker.asc
+    echo \
+        "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+        $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+        tee /etc/apt/sources.list.d/docker.list > /dev/null
+    apt-get update -y
+    apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+    systemctl restart docker
+    echo ""
+    echo "${BOLD}### DOCKER INSTALLED AND IS READY TO USE ###${NORMAL}"
+    echo ""
 
-    ### Rocky Linux
-    elif [ "$ROCKY" -gt 0 ]; then
-        dnf remove -y docker-ce docker-ce-cli containerd.io
-        rm -rf /var/lib/docker
-        rm -rf /var/lib/containerd
-        dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
-        dnf update -y
-        dnf install docker-ce docker-ce-cli containerd.io docker-compose-plugin -y
-        systemctl start docker
-        systemctl enable docker
-        echo ""
-        echo "${BOLD}### INSTALLATION OF DOCKER COMPLETE ###${NORMAL}"
-        echo ""
-    else
-        echo ""
-        echo "### YOU ARE RUNNING AN UNSUPPORTED OPERATING SYSTEM FOR DOCKER INSTALLATION ###"
-        echo ""
-        exit 1
-    fi
+### Rocky Linux
+elif [ "$ROCKY" -gt 0 ]; then
+    dnf remove -y docker-ce docker-ce-cli containerd.io
+    rm -rf /var/lib/docker
+    rm -rf /var/lib/containerd
+    dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
+    dnf update -y
+    dnf install docker-ce docker-ce-cli containerd.io docker-compose-plugin -y
+    systemctl start docker
+    systemctl enable docker
+    echo ""
+    echo "${BOLD}### INSTALLATION OF DOCKER COMPLETE ###${NORMAL}"
+    echo ""
+else
+    echo ""
+    echo "### YOU ARE RUNNING AN UNSUPPORTED OPERATING SYSTEM FOR DOCKER INSTALLATION ###"
+    echo ""
+    exit 1
 fi
 
 echo "${BOLD}### INSTALLATION OF DOCKER COMPLETE ###${NORMAL}"
