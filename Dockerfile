@@ -41,9 +41,9 @@ RUN git clone https://github.com/nmap/nmap.git /nmap-src \
 ### Set NMAP directory environment
 ENV NMAPDIR=/usr/share/nmap
 
-### Pull down latest github data for building the container image
-ADD https://raw.githubusercontent.com/jdibby/traffgen/main/generator.py ./
-ADD https://raw.githubusercontent.com/jdibby/traffgen/main/endpoints.py ./
+### Scripts used within the container
+ADD generator.py ./
+ADD endpoints.py ./
 
 ### Set the generatory script as the entrypoint of the container
 ENTRYPOINT ["python3", "generator.py"]
