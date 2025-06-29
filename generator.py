@@ -956,7 +956,7 @@ if __name__ == "__main__":
             testsuite = [
                 virus_sim_https,
             ]
-        elif ARGS.suite == 'dlp-sim-https':
+        elif ARGS.suite == 'dlp':
             testsuite = [
                 dlp_sim_https,
             ]
