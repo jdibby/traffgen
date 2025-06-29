@@ -790,7 +790,7 @@ if __name__ == "__main__":
                                 'ai',
                                 'bigfile',
                                 'crawl',
-                                'dlp'
+                                'dlp',
                                 'dns',
                                 'ftp',
                                 'domain-check',
