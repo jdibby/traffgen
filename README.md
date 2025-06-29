@@ -40,6 +40,7 @@ This traffic generator script runs a suite of tests across multiple network prot
 | **EICAR via HTTP**         | `virus_sim_http`            | Simulate virus downloads to test HTTP AV/Malware filtering           |
 | **EICAR via HTTPS**        | `virus_sim_https`           | Simulate virus downloads to test HTTPS AV/Malware filtering          |
 | **IPS Triggering**         | `ips`                       | Send malicious-looking User-Agent to trigger IPS            |
+| **DLP Tests**              | `dlp`                       | Downloading of simulated personal data PII and PCI information (PDF, XLSX, XLS, CSV, and zip files)           |
 | **Malware Agents**         | `malware`                   | Send malicious-looking random User-Agents to trigger IPS           |
 | **NMAP Port Scan**         | `nmap_1024os`               | Scan ports 1-1024 using NMAP                                 |
 | **NMAP CVE Scan**          | `nmap_cve`                  | Full CVE/script scan with NMAP                              |
