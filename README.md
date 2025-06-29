@@ -98,11 +98,12 @@ http_download_zip
 http_random
 https_random
 https_crawl
-ai_https_random
+malware_random
 ips
+dlp_sim_https
 ads_random
 ai_https_random
-malware
+github_domain_check
 nmap_1024os
 nmap_cve
 ntp_random
