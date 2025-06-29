@@ -1347,3 +1347,16 @@ snmp_strings = [
     "monitor",
     "secret",
 ]
+
+dlp_https_endpoints = [
+    "https://dlptest.com/sample-data.pdf",
+    "https://dlptest.com/1-MB-Test.docx",
+    "https://dlptest.com/1-MB-Test.xlsx",
+    "https://dlptest.com/111-MB-Test.csv",
+    "https://dlptest.com/334-MB-Test-CSV.csv",
+    "https://dlptest.com/DLP-Test-State-Data.zip",
+    "https://dlptest.com/10-MB-Test.xlsx",
+    "https://dlptest.com/30-MB-Test.xlsx",
+    "https://dlptest.com/DLP-Test-State-Data.zip",
+    "https://dlptest.com/103-MB-Test.xlsx",
+]

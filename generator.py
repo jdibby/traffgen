@@ -445,6 +445,28 @@ def virus_sim_http():
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
             subprocess.call(cmd, shell=True)
+            
+def dlp_sim_https():
+    if ARGS.size == 'S':
+        target_urls = 1
+    elif ARGS.size == 'M':
+        target_urls = 2
+    elif ARGS.size == 'L':
+        target_urls = 3
+    elif ARGS.size == 'XL':
+        target_urls = len(dlp_https_endpoints)
+    random.shuffle(dlp_https_endpoints)
+    for count_urls, url in enumerate(dlp_https_endpoints):
+        if count_urls < target_urls:
+            cmd = "curl --limit-rate 3M -k --show-error --connect-timeout 4 -o /dev/null %s" % url
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
+            print ("DLP Simulation (HTTPS): Download %s" %(url))
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
+            subprocess.call(cmd, shell=True)
 
 def virus_sim_https():
     if ARGS.size == 'S':
@@ -768,6 +790,7 @@ if __name__ == "__main__":
                                 'ai',
                                 'bigfile',
                                 'crawl',
+                                'dlp'
                                 'dns',
                                 'ftp',
                                 'domain-check',
@@ -838,6 +861,7 @@ if __name__ == "__main__":
                 https_crawl,
                 malware_random,
                 ips,
+                dlp_sim_https
                 ads_random,
                 ai_https_random,
                 github_domain_check,
@@ -932,7 +956,10 @@ if __name__ == "__main__":
             testsuite = [
                 virus_sim_https,
             ]
-
+        elif ARGS.suite == 'dlp-sim-https':
+            testsuite = [
+                dlp_sim_https,
+            ]
         ### Import targets from endpoints.py
         from endpoints import *
 
