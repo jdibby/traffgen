@@ -69,7 +69,7 @@ This traffic generator script runs a suite of tests across multiple network prot
 
 | ✅ Test              | 🧩 Function       | 🔍 Description                         |
 |---------------------|------------------|----------------------------------------|
-| **Netflix Throughput**   | `speedtest_fast` | Uses `fastcli` to test Netflix detection and throughput |
+| **Netflix Speedtest**   | `speedtest_fast` | Uses `fastcli` to test Netflix app detection and throughput |
 
 ---
 
