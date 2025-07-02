@@ -25,6 +25,7 @@ RUN apk update && apk add --no-cache \
     openssh-client \
     busybox-extras \
     ca-certificates \
+    update-ca-certificates \
     git \
     net-snmp
 

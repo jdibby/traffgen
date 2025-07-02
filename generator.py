@@ -1,12 +1,15 @@
 #!/usr/local/bin python3
 
 ### Import of required modules
-import time, os, sys, subprocess, argparse, random, urllib.request, ssl, requests
+import time, os, sys, subprocess, argparse, random, urllib.request, urllib3, ssl, requests
 from bs4 import BeautifulSoup
 from time import sleep
 from urllib.parse import urljoin
 from tqdm import tqdm
 from colorama import Fore, Back, Style
+
+# Disable SSL warning for self-signed certs
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def bigfile():
     url = 'http://ipv4.download.thinkbroadband.com/5GB.zip'
