@@ -597,7 +597,7 @@ def github_domain_check_read_file(local_filename, num_random_domains=10):
         print(f"[{i+1}/{len(selected_domains)}] Attempting to query: {url}")
 
         try:
-            response = requests.get(url, timeout=1, allow_redirects=True)
+            response = requests.get(url, timeout=1, verify=False, allow_redirects=True)
             print(f"  Status: {response.status_code} - OK (Redirected to: {response.url if response.history else 'N/A'})")
         except requests.exceptions.ConnectionError:
             print(f"  Error: Connection failed for {url}")
