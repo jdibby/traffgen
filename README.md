@@ -41,7 +41,8 @@ This traffic generator script runs a suite of tests across multiple network prot
 | **EICAR via HTTPS**        | `virus_sim_https`           | Simulate virus downloads to test HTTPS AV/Malware filtering          |
 | **IPS Triggering**         | `ips`                       | Send malicious-looking User-Agent to trigger IPS            |
 | **DLP Tests**              | `dlp`                       | Downloading of simulated personal data PII and PCI information (PDF, XLSX, XLS, CSV, and zip files)           |
-| **Malware Agents**         | `malware`                   | Send malicious-looking random User-Agents to trigger IPS           |
+| **Malware Agents**         | `malware-agents`            | Send malicious-looking random User-Agents to trigger IPS           |
+| **Malware Downloads**      | `malware-download`          | Download malware files from Github with the goal of sandbox scanning to be triggered           |
 | **NMAP Port Scan**         | `nmap_1024os`               | Scan ports 1-1024 using NMAP                                 |
 | **NMAP CVE Scan**          | `nmap_cve`                  | Full CVE/script scan with NMAP                              |
 
@@ -99,6 +100,7 @@ http_random
 https_random
 https_crawl
 malware_random
+malware_download
 ips
 dlp_sim_https
 ads_random
@@ -140,6 +142,7 @@ To stage a linux system to turn it into a traffic generator, use this... beware,
 |-----------------------|-----------------------------------------------------------------------------|
 | jdibby/traffgen:latest | Raspberry Pi4 and other armv7 processors                                    |
 | jdibby/traffgen:latest | Raspberry Pi5 64bit processors                                |
+| jdibby/traffgen:latest | Mac OS X                                |
 | jdibby/traffgen:latest | Other 64bit processors (default option)                                     |
 
 ```bash
