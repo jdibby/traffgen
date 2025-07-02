@@ -448,7 +448,8 @@ def virus_sim_http():
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
             subprocess.call(cmd, shell=True)
-            
+
+### DLP Tests            
 def dlp_sim_https():
     if ARGS.size == 'S':
         target_urls = 1
@@ -466,6 +467,29 @@ def dlp_sim_https():
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
             print ("DLP Simulation (HTTPS): Download %s" %(url))
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
+            subprocess.call(cmd, shell=True)
+
+### Malware Tests            
+def malware_download():
+    if ARGS.size == 'S':
+        target_urls = 1
+    elif ARGS.size == 'M':
+        target_urls = 2
+    elif ARGS.size == 'L':
+        target_urls = 3
+    elif ARGS.size == 'XL':
+        target_urls = len(malware_files)
+    random.shuffle(malware_files)
+    for count_urls, url in enumerate(malware_files):
+        if count_urls < target_urls:
+            cmd = "curl --limit-rate 3M -k --show-error --connect-timeout 4 -o /dev/null %s" % url
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
+            print ("Malware File Downloads (HTTPS): Download %s" %(url))
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
@@ -802,7 +826,8 @@ if __name__ == "__main__":
                                 'icmp',
                                 'ips',
                                 'netflix',
-                                'malware',
+                                'malware-agents',
+                                'malware-download'
                                 'nmap',
                                 'ntp',
                                 'ssh',
@@ -865,6 +890,7 @@ if __name__ == "__main__":
                 malware_random,
                 ips,
                 dlp_sim_https,
+                malware_download,
                 ads_random,
                 ai_https_random,
                 github_domain_check,
@@ -905,7 +931,7 @@ if __name__ == "__main__":
                 https_random,
                 https_crawl,
             ]
-        elif ARGS.suite == 'malware':
+        elif ARGS.suite == 'malware-agents':
             testsuite = [
                 malware_random,
             ]
@@ -962,6 +988,10 @@ if __name__ == "__main__":
         elif ARGS.suite == 'dlp':
             testsuite = [
                 dlp_sim_https,
+            ]
+        elif ARGS.suite == 'malware_download':
+            testsuite = [
+                malware_download,
             ]
         ### Import targets from endpoints.py
         from endpoints import *
