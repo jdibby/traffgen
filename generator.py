@@ -489,12 +489,13 @@ def malware_download():
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
-            print ("Malware File Downloads (HTTPS): Download %s" %(url))
+            print ("Malware File Download (HTTPS): Download %s" %(url))
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
             subprocess.call(cmd, shell=True)
 
+### Virus Download (EICAR)
 def virus_sim_https():
     if ARGS.size == 'S':
         target_urls = 1
@@ -827,7 +828,7 @@ if __name__ == "__main__":
                                 'ips',
                                 'netflix',
                                 'malware-agents',
-                                'malware-download'
+                                'malware-download',
                                 'nmap',
                                 'ntp',
                                 'ssh',
