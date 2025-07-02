@@ -990,7 +990,7 @@ if __name__ == "__main__":
             testsuite = [
                 dlp_sim_https,
             ]
-        elif ARGS.suite == 'malware_download':
+        elif ARGS.suite == 'malware-download':
             testsuite = [
                 malware_download,
             ]
