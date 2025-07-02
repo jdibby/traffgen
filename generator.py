@@ -553,7 +553,7 @@ def ads_random():
 def github_domain_check_download_file(url, local_filename):
     print(f"Attempting to download '{url}' to '{local_filename}'...")
     try:
-        with requests.get(url, stream=True, timeout=5) as r:
+        with requests.get(url, stream=True, verify=False, timeout=5) as r:
             r.raise_for_status()
             with open(local_filename, 'wb') as f:
                 for chunk in r.iter_content(chunk_size=8192):
