@@ -142,7 +142,6 @@ To stage a linux system to turn it into a traffic generator, use this... beware,
 |-----------------------|-----------------------------------------------------------------------------|
 | jdibby/traffgen:latest | Raspberry Pi4 and other armv7 processors                                    |
 | jdibby/traffgen:latest | Raspberry Pi5 64bit processors                                |
-| jdibby/traffgen:latest | Mac OS X                                |
 | jdibby/traffgen:latest | Other 64bit processors (default option)                                     |
 
 ```bash
