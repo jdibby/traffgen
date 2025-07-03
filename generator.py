@@ -941,8 +941,6 @@ performance analysis, or security simulations.
         print(f"No wait enabled: {ARGS.nowait}")
         print(f"Crawl start URL: {ARGS.crawl_start}")
 
-        ARGS = PARSER.parse_args()
-
         if ARGS.suite == 'all':
             testsuite = [
                 dig_random,
