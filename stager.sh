@@ -138,9 +138,9 @@ echo ""
 
 ### Raspbian (Raspberry Pi OS)
 if [ "$RASPBIAN" -gt 0 ]; then
-    for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do apt-get remove $pkg; done
-    apt-get update -y
-    apt-get install ca-certificates curl git -y
+    for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do apt remove $pkg; done
+    apt update -y
+    apt install ca-certificates curl git -y
     install -m 0755 -d /etc/apt/keyrings
     chmod a+r /etc/apt/keyrings/docker.asc
 
@@ -165,16 +165,16 @@ if [ "$RASPBIAN" -gt 0 ]; then
             echo "${BOLD}### DOCKER INSTALLED AND IS READY TO USE FOR RASPBERRY PI (OLDER RASPBIAN) ###${NORMAL}"
         fi
     fi
-    apt-get update -y
-    apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+    apt update -y
+    apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
     systemctl restart docker
     echo ""
 
 ### Pure Debian
 elif [ "$DEBIAN" -gt 0 ]; then
-    for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do apt-get remove $pkg; done
-    apt-get update -y
-    apt-get install ca-certificates curl -y
+    for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do apt remove $pkg; done
+    apt update -y
+    apt install ca-certificates curl -y
     install -m 0755 -d /etc/apt/keyrings
     curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
     chmod a+r /etc/apt/keyrings/docker.asc
@@ -182,8 +182,8 @@ elif [ "$DEBIAN" -gt 0 ]; then
         "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian \
         $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
         tee /etc/apt/sources.list.d/docker.list > /dev/null
-    apt-get update -y
-    apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+    apt update -y
+    apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
     systemctl restart docker
     echo ""
     echo "${BOLD}### DOCKER INSTALLED AND IS READY TO USE FOR PURE DEBIAN ###${NORMAL}"
@@ -191,9 +191,9 @@ elif [ "$DEBIAN" -gt 0 ]; then
 
 ### Ubuntu
 elif [ "$UBUNTU" -gt 0 ]; then
-    for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do apt-get remove $pkg; done
-    apt-get update -y
-    apt-get install ca-certificates curl -y
+    for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do apt remove $pkg; done
+    apt update -y
+    apt install ca-certificates curl -y
     install -m 0755 -d /etc/apt/keyrings
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
     chmod a+r /etc/apt/keyrings/docker.asc
@@ -201,8 +201,8 @@ elif [ "$UBUNTU" -gt 0 ]; then
         "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
         $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
         tee /etc/apt/sources.list.d/docker.list > /dev/null
-    apt-get update -y
-    apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+    apt update -y
+    apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
     systemctl restart docker
     echo ""
     echo "${BOLD}### DOCKER INSTALLED AND IS READY TO USE ###${NORMAL}"
