@@ -941,9 +941,6 @@ performance analysis, or security simulations.
         print(f"No wait enabled: {ARGS.nowait}")
         print(f"Crawl start URL: {ARGS.crawl_start}")
 
-    except Exception as e:
-        print(f"An error occurred: {e}")
-
         ARGS = PARSER.parse_args()
 
         if ARGS.suite == 'all':
@@ -1080,6 +1077,9 @@ performance analysis, or security simulations.
         print (Back.BLUE)
         print ("  [i] Total Run Time: %s" % (time.strftime("%H:%M:%S", time.gmtime(ENDTIME))))
         print (Style.RESET_ALL)
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
     ### Keyboard Ctrl-C Interupt
     except KeyboardInterrupt:
