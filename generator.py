@@ -844,12 +844,12 @@ if __name__ == "__main__":
 Use this script to generate realistic network activity for testing,
 performance analysis, or security simulations.
 
-""", # Added an extra newline here for spacing after the description
+""", ### Added an extra newline
             formatter_class=argparse.RawTextHelpFormatter,
             usage=argparse.SUPPRESS
         )
 
-        # Define common choices to avoid repetition and make it easier to manage
+        ### Define common choices to avoid repetition
         suite_choices = [
             'all', 'ads', 'ai', 'bigfile', 'crawl', 'dlp', 'dns', 'ftp',
             'domain-check', 'http', 'https', 'icmp', 'ips', 'netflix',
@@ -859,13 +859,12 @@ performance analysis, or security simulations.
         ]
         size_choices = ['S', 'M', 'L', 'XL']
 
-        # Add empty arguments with blank help text as separators
-        # This is a common trick to insert blank lines between groups
+        ### Add empty arguments with blank help text as separators
         parser.add_argument('--_spacer1', action='store_true', help=argparse.SUPPRESS) # Suppress this arg from appearing
         parser.add_argument('--_spacer2', action='store_true', help=argparse.SUPPRESS) # Suppress this arg from appearing
 
 
-        # Group for core traffic generation options
+        ### Group for core traffic generation options
         traffic_group = parser.add_argument_group('Traffic Generation Options')
         traffic_group.add_argument(
             '--suite',
@@ -878,7 +877,7 @@ performance analysis, or security simulations.
                 'Specify the test suite to run.\n'
                 'Available suites:\n'
                 '  ' + '\n  '.join(sorted(suite_choices)) + '\n'
-                'Default: "all" (runs all available test suites).\n\n' # Added two newlines here
+                'Default: "all" (runs all available test suites).\n\n'
             )
         )
         traffic_group.add_argument(
@@ -894,17 +893,17 @@ performance analysis, or security simulations.
                 '  S (Small): Minimal traffic generation.\n'
                 '  M (Medium): Moderate traffic (default).\n'
                 '  L (Large): Significant traffic volume.\n'
-                '  XL (Extra Large): High-intensity traffic.\n\n' # Added two newlines here
+                '  XL (Extra Large): High-intensity traffic.\n\n'
             )
         )
 
-        # Group for timing and looping options
+        ### Group for timing and looping options
         timing_group = parser.add_argument_group('Timing and Loop Options')
         timing_group.add_argument(
             '--loop',
             action="store_true",
             required=False,
-            help='Continuously loop the selected test suite(s).\n\n' # Added two newlines here
+            help='Continuously loop the selected test suite(s).\n\n'
         )
         timing_group.add_argument(
             '--max-wait-secs',
@@ -912,13 +911,13 @@ performance analysis, or security simulations.
             action="store",
             required=False,
             default=40,
-            help='Maximum possible time (in seconds) for random intervals between tests or loops. Default: 40 seconds.\n\n' # Added two newlines here
+            help='Maximum possible time (in seconds) for random intervals between tests or loops. Default: 40 seconds.\n\n'
         )
         timing_group.add_argument(
             '--nowait',
             action="store_true",
             required=False,
-            help='Disable random waiting intervals between tests or loops, making them run consecutively.\n\n' # Added two newlines here
+            help='Disable random waiting intervals between tests or loops, making them run consecutively.\n\n'
         )
 
         # Group for specific suite options
@@ -928,20 +927,20 @@ performance analysis, or security simulations.
             action="store",
             required=False,
             default='https://www.wikipedia.org',
-            help='For the "crawl" suite: Specifies the initial URL to start web crawling from. Default: https://www.wikipedia.org' # No extra newlines here if it's the last option
+            help='For the "crawl" suite: Specifies the initial URL to start web crawling from. Default: https://www.wikipedia.org'
         )
 
         ARGS = parser.parse_args()
 
-        # Example of how you'd use args (replace with your actual logic)
+        # Output Summary
         print(Fore.BLACK + Back.GREEN + "##############################################################")
         print(Style.RESET_ALL)
-        print(f"Running suite: {ARGS.suite}")
-        print(f"Test size: {ARGS.size}")
-        print(f"Looping enabled: {ARGS.loop}")
-        print(f"Max wait seconds: {ARGS.max_wait_secs}")
-        print(f"No wait enabled: {ARGS.nowait}")
-        print(f"Crawl start URL: {ARGS.crawl_start}")
+        print(f"Running Suite: {ARGS.suite}")
+        print(f"Test Size: {ARGS.size}")
+        print(f"Looping Enabled: {ARGS.loop}")
+        print(f"Max Wait Time (secs): {ARGS.max_wait_secs}")
+        print(f"No Wait Enabled: {ARGS.nowait}")
+        print(f"Crawl Start URL: {ARGS.crawl_start}")
         print(Fore.BLACK + Back.GREEN + "##############################################################")
         print(Style.RESET_ALL)
         time.sleep(5)
