@@ -390,7 +390,7 @@ def ntp_random():
     random.shuffle(ntp_endpoints)
     for count_urls, url in enumerate(ntp_endpoints):
         if count_urls < target_urls:
-            cmd = 'echo "NTP TRAFFIC" | nc -u -w 1' %(url) "123'"
+            cmd = "chronyd -q 'server %s iburst'" % (url)
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
@@ -751,7 +751,7 @@ def finish_test():
         print ("")
         print ("  [i] Looping...")
 
-### Pull an updated list of colocated containers to test against
+### Pull an updated list of co-located containers to test against
 def replace_all_endpoints(url):
     print ("")
     print ("  [i] Replacing endpoints.py with %s" %(url), end=" ", flush=True)
