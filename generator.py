@@ -390,7 +390,7 @@ def ntp_random():
     random.shuffle(ntp_endpoints)
     for count_urls, url in enumerate(ntp_endpoints):
         if count_urls < target_urls:
-            cmd = 'ntpdate' % url
+            cmd = 'echo "NTP TRAFFIC" | nc -u -w 1' %(url) "123'"
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
