@@ -837,75 +837,105 @@ if __name__ == "__main__":
     try:
         ### Start time measured since the epoch (floating point)
         STARTTIME = time.time()
+
         ### Argument Parsing (CLI variables)
-        PARSER = argparse.ArgumentParser()
-        PARSER.add_argument('--suite',
-                            type=str.lower,
-                            choices=[
-                                'all',
-                                'ads',
-                                'ai',
-                                'bigfile',
-                                'crawl',
-                                'dlp',
-                                'dns',
-                                'ftp',
-                                'domain-check',
-                                'http',
-                                'https',
-                                'icmp',
-                                'ips',
-                                'netflix',
-                                'malware-agents',
-                                'malware-download',
-                                'nmap',
-                                'ntp',
-                                'pornography',
-                                'ssh',
-                                'url-response',
-                                'virus-sim-http',
-                                'virus-sim-https',
-                            ],
-                            action="store",
-                            required=False,
-                            help='Test suite to run',
-                            default='all'
-                            )
-        PARSER.add_argument('--size',
-                            type=str.upper,
-                            choices=[
-                                'S',
-                                'M',
-                                'L',
-                                'XL'
-                            ],
-                            action="store",
-                            required=False,
-                            help='Size of tests to run',
-                            default='M'
-                            )
-        PARSER.add_argument('--loop',
-                            action="store_true",
-                            required=False,
-                            help='Loop test continuously'
-                            )
-        PARSER.add_argument('--max-wait-secs',
-                            action="store",
-                            required=False,
-                            help='Maximum possible time (in seconds) for random intervals between tests or loops',
-                            default=40
-                            )
-        PARSER.add_argument('--nowait',
-                            action="store_true",
-                            required=False,
-                            help='Don\'t wait random intervals between tests or loops'
-                            )
-        PARSER.add_argument('--crawl-start',
-                            action="store",
-                            required=False,
-                            help='URL to start crawling from',
-                            default='https://www.wikipedia.org'
-                            )
+        parser = argparse.ArgumentParser(
+            description="""
+            Traffic Generator: A versatile tool for simulating various network traffic types.
+            Use this script to generate realistic network activity for testing,
+            performance analysis, or security simulations.
+            """,
+            formatter_class=argparse.RawTextHelpFormatter # Keeps multi-line description formatting
+        )
+
+        # Suite choices
+        suite_choices = [
+            'all', 'ads', 'ai', 'bigfile', 'crawl', 'dlp', 'dns', 'ftp',
+            'domain-check', 'http', 'https', 'icmp', 'ips', 'netflix',
+            'malware-agents', 'malware-download', 'nmap', 'ntp',
+            'pornography', 'ssh', 'url-response', 'virus-sim-http',
+            'virus-sim-https',
+        ]
+        size_choices = ['S', 'M', 'L', 'XL']
+
+        # Group for core traffic generation options
+        traffic_group = parser.add_argument_group('Traffic Generation Options')
+        traffic_group.add_argument(
+            '--suite',
+            type=str.lower,
+            choices=suite_choices,
+            action="store",
+            required=False,
+            default='all',
+            help=(
+                'Specify the test suite to run.\n'
+                'Available suites:\n'
+                '  ' + '\n  '.join(sorted(suite_choices)) + '\n' # Sort and format for readability
+                'Default: "all" (runs all available test suites).'
+            )
+        )
+        traffic_group.add_argument(
+            '--size',
+            type=str.upper,
+            choices=size_choices,
+            action="store",
+            required=False,
+            default='M',
+            help=(
+                'Determines the scale/volume of tests to run.\n'
+                'Choices:\n'
+                '  S (Small): Minimal traffic generation.\n'
+                '  M (Medium): Moderate traffic (default).\n'
+                '  L (Large): Significant traffic volume.\n'
+                '  XL (Extra Large): High-intensity traffic.\n'
+            )
+        )
+
+        # Group for timing and looping options
+        timing_group = parser.add_argument_group('Timing and Loop Options')
+        timing_group.add_argument(
+            '--loop',
+            action="store_true",
+            required=False,
+            help='Continuously loop the selected test suite(s).'
+        )
+        timing_group.add_argument(
+            '--max-wait-secs',
+            type=int, # Changed type to int as it's seconds
+            action="store",
+            required=False,
+            default=40,
+            help='Maximum possible time (in seconds) for random intervals between tests or loops. Default: 40 seconds.'
+        )
+        timing_group.add_argument(
+            '--nowait',
+            action="store_true",
+            required=False,
+            help='Disable random waiting intervals between tests or loops, making them run consecutively.'
+        )
+
+        # Group for specific suite options
+        specific_suite_group = parser.add_argument_group('Suite-Specific Options')
+        specific_suite_group.add_argument(
+            '--crawl-start',
+            action="store",
+            required=False,
+            default='https://www.wikipedia.org',
+            help='For the "crawl" suite: Specifies the initial URL to start web crawling from. Default: https://www.wikipedia.org'
+        )
+
+        args = parser.parse_args()
+
+        # Example of how you'd use args (replace with your actual logic)
+        print(f"Running suite: {args.suite}")
+        print(f"Test size: {args.size}")
+        print(f"Looping enabled: {args.loop}")
+        print(f"Max wait seconds: {args.max_wait_secs}")
+        print(f"No wait enabled: {args.nowait}")
+        print(f"Crawl start URL: {args.crawl_start}")
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
         ARGS = PARSER.parse_args()
 
