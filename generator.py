@@ -226,6 +226,35 @@ def https_crawl():
             print (Style.RESET_ALL)
             scrape_iterative(url, iterations)
 
+### Pornography crawl through URLs
+def pornography_crawl():
+    if ARGS.size == 'S':
+        target_urls = 10
+        iterations = 1
+    elif ARGS.size == 'M':
+        target_urls = 20
+        iterations = 3
+    elif ARGS.size == 'L':
+        target_urls = 50
+        iterations = 5
+    elif ARGS.size == 'XL':
+        target_urls = len(pornography_endpoints)
+        iterations = 10
+    random.shuffle(pornography_endpoints)
+    for count_urls, url in enumerate(pornography_endpoints):
+        if count_urls < target_urls:
+            random.shuffle(user_agents)
+            user_agent = user_agents[0]
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
+            print ("Crawling Pornography (%d deep, site %d of %d) starting from %s" %(iterations, (count_urls+1), target_urls, url))
+            print (f"Agent: {user_agent}")
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
+            scrape_iterative(url, iterations)
+
 ### Malware Test suites
 def malware_random():
     if ARGS.size == 'S':
@@ -888,6 +917,7 @@ if __name__ == "__main__":
                 http_random,
                 https_random,
                 https_crawl,
+                pornography_crawl,
                 malware_random,
                 ips,
                 dlp_sim_https,
@@ -931,6 +961,10 @@ if __name__ == "__main__":
             testsuite = [
                 https_random,
                 https_crawl,
+            ]
+        elif ARGS.suite == 'pornography':
+            testsuite = [
+                pornography_crawl,
             ]
         elif ARGS.suite == 'malware-agents':
             testsuite = [

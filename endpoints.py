@@ -1330,6 +1330,28 @@ eicar_http_endpoints = [
     "http://2016.eicar.org/download/eicarcom2.zip",
 ]
 
+pornography_endpoints = [
+    "pornhub.com",
+    "xvideos.com",
+    "xhamster.com",
+    "xnxx.com",
+    "onlyfans.com",
+    "rutube.ru",
+    "yandex.com.tr",
+    "theporndude.com",
+    "patreon.com",
+    "xhamsterlive.com",
+    "xvideos.es",
+    "thisvid.com",
+    "deviantart.com",
+    "redtube.com",
+    "xnxx.tv",
+    "jerkmate.com",
+    "redgifs.com",
+    "dlsite.com",
+    "pornzog.com",
+]
+
 eicar_https_endpoints = [
     "https://secure.eicar.org/eicar.com",
     "https://secure.eicar.org/eicar.com.txt",
