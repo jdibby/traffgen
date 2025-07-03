@@ -18,10 +18,10 @@ This document outlines the various network connectivity, web protocol, security,
 | ✅ Test | 🧩 Function | 🧩 Suite Flag |🔍 Description |
 |---|---|---|---|
 | **DNS Lookup** | `dig_random` | `dns` |Performs **DNS A record resolution** for a set of pseudo-randomly selected domains using multiple pre-configured **DNS recursive resolvers**. This assesses **DNS service availability** and **name resolution latency**. |
-| **ICMP Ping** | `ping_random` | `ping_random`  |Executes **ICMP Echo Request/Reply transactions** to a range of dynamically generated or pre-defined IP addresses. This verifies fundamental **network layer reachability** and measures **round-trip time (RTT)** and **packet loss**. |
+| **ICMP Ping** | `ping_random` `traceroute_random` | `icmp`  |Executes **ICMP Echo Request/Reply transactions** to a range of dynamically generated or pre-defined IP addresses. This verifies fundamental **network layer reachability** and measures **round-trip time (RTT)** and **packet loss**. |
 | **Traceroute** | `traceroute_random` | `ping_random` | Initiates **network path discovery** using **ICMP or UDP-based traceroute** to diverse target destinations. This maps the **router hops** and identifies potential **routing anomalies** or **latency bottlenecks**. |
-| **SSH Access** | `ssh_random` | `ping_random` | Attempts **Secure Shell (SSH) protocol connections** to various remote endpoints. This validates **SSH service availability**, **TCP port 22 accessibility**, and basic **authentication mechanism functionality**. |
-| **NTP Sync** | `ntp_random` | `ping_random` | Verifies **Network Time Protocol (NTP) synchronization** status and offset against public NTP stratum 1 servers via the `chronyd` daemon. This ensures **accurate system clock synchronization** critical for security and logging. |
+| **SSH Access** | `ssh_random` | `ssh` | Attempts **Secure Shell (SSH) protocol connections** to various remote endpoints. This validates **SSH service availability**, **TCP port 22 accessibility**, and basic **authentication mechanism functionality**. |
+| **NTP Sync** | `ntp_random` | `ntp` | Verifies **Network Time Protocol (NTP) synchronization** status and offset against public NTP stratum 1 servers via the `chronyd` daemon. This ensures **accurate system clock synchronization** critical for security and logging. |
 
 ---
 
@@ -33,7 +33,7 @@ This document outlines the various network connectivity, web protocol, security,
 | **HTTPS Requests** | `https_crawl` `https_random` | `https` | Transmits **HTTPS/TLS GET requests** to secure web servers, utilizing randomized `User-Agent` strings. This validates **TLS handshake completion**, **certificate chain validation**, and **secure web content retrieval**. |
 | **ZIP File Download** | `http_download_zip` | `ping_random` | Initiates **HTTP downloads of `.zip` archives** across multiple predefined file sizes (e.g., 1MB, 10MB, 100MB). This evaluates **data throughput**, **file integrity**, and **HTTP range request support**. |
 | **TAR.GZ Download** | `http_download_targz` | `ping_random` | Downloads the latest stable release of the **WordPress core `.tar.gz` archive** via HTTP. This specifically tests retrieval of a common, large, compressed software distribution. |
-| **URL Response Timing** | `urlresponse_random` | `ping_random` | Measures the **end-to-end response time** for both HTTP and HTTPS requests to a diverse set of URLs. This provides metrics on **web server latency** and **network performance** for web traffic. |
+| **URL Response Timing** | `urlresponse_random` | `url-response` | Measures the **end-to-end response time** for both HTTP and HTTPS requests to a diverse set of URLs. This provides metrics on **web server latency** and **network performance** for web traffic. |
 | **HTTPS Crawler** | `https_crawl` | `ping_random` | Recursively traverses hyperlinks within **HTTPS-secured web pages** from a specified starting Uniform Resource Locator (URL). This simulates legitimate web Browse and tests the ability to navigate secure sites. |
 | **HTTP Crawler** | `webcrawl` | `crawl` | Initiates a **web crawling operation** on external HTTP websites, following discovered links from a user-defined initial URL. This assesses accessibility and navigability of unencrypted web resources. |
 
@@ -43,15 +43,15 @@ This document outlines the various network connectivity, web protocol, security,
 
 | ✅ Test | 🧩 Function | 🧩 Suite Flag |🔍 Description |
 |---|---|---|---|
-| **EICAR Test (HTTP)** | `virus_sim_http` | `ping_random` | Attempts to download the **EICAR (European Institute for Computer Antivirus Research) test file** over HTTP. This is designed to trigger **antivirus and malware detection mechanisms** without causing actual harm. |
-| **EICAR Test (HTTPS)** | `virus_sim_https` | `ping_random` | Attempts to download the **EICAR test file** over HTTPS. This validates whether **TLS-inspecting security solutions** can detect the EICAR signature within encrypted traffic. |
-| **IPS Detection** | `ips` | `ping_random` | Sends HTTP requests containing **known malicious `User-Agent` strings** or **HTTP request patterns** designed to trigger **Intrusion Prevention Systems (IPS)**. This verifies the efficacy of signature-based IPS rules. |
-| **DLP Simulation** | `dlp` | `ping_random` | Initiates downloads of files containing **simulated Personally Identifiable Information (PII)** and **Payment Card Industry (PCI) data patterns**. This evaluates the detection capabilities of **Data Loss Prevention (DLP) systems**. |
+| **EICAR Test (HTTP)** | `virus_sim_http` | `virus-sim-http` | Attempts to download the **EICAR (European Institute for Computer Antivirus Research) test file** over HTTP. This is designed to trigger **antivirus and malware detection mechanisms** without causing actual harm. |
+| **EICAR Test (HTTPS)** | `virus_sim_https` | `virus-sim-https` | Attempts to download the **EICAR test file** over HTTPS. This validates whether **TLS-inspecting security solutions** can detect the EICAR signature within encrypted traffic. |
+| **IPS Detection** | `ips` | `ips` | Sends HTTP requests containing **known malicious `User-Agent` strings** or **HTTP request patterns** designed to trigger **Intrusion Prevention Systems (IPS)**. This verifies the efficacy of signature-based IPS rules. |
+| **DLP Simulation** | `dlp_sim_https` | `dlp` | Initiates downloads of files containing **simulated Personally Identifiable Information (PII)** and **Payment Card Industry (PCI) data patterns**. This evaluates the detection capabilities of **Data Loss Prevention (DLP) systems**. |
 | **Malware User-Agents** | `malware_random` | `malware-agents` | Transmits HTTP requests with **`User-Agent` headers associated with known malware, botnets, or malicious scanners**. This aims to provoke responses from **web application firewalls (WAFs)** or **threat intelligence feeds**. |
-| **Malware Downloads** | `malware-download` | `ping_random` | Attempts to download **non-executable, benign files specifically flagged as malware-related** by public threat intelligence feeds. This is intended for **sandbox environments** to observe security control reactions. |
-| **NMAP Port Scan** | `nmap_1024os` | `ping_random` | Executes a **TCP SYN port scan (stealth scan)** using Nmap against target hosts, focusing on the first 1024 well-known ports. This identifies **open ports** and potential **service enumeration**. |
-| **NMAP CVE Scan** | `nmap_cve` | `ping_random` | Conducts a **vulnerability scan** using Nmap's scripting engine (`NSE`) modules specifically targeting **Common Vulnerabilities and Exposures (CVEs)**. This identifies systems with known security weaknesses. |
+| **Malware Downloads** | `malware_download` | `malware-download` | Attempts to download **non-executable, benign files specifically flagged as malware-related** by public threat intelligence feeds. This is intended for **sandbox environments** to observe security control reactions. |
+| **NMAP Port Scan** | `nmap_1024os` `nmap_cve` | `nmap` | Executes a **TCP SYN port scan (stealth scan)** using Nmap against target hosts, focusing on the first 1024 well-known ports. This identifies **open ports** and potential **service enumeration** also conducts a **vulnerability scan** using Nmap's scripting engine (`NSE`) modules specifically targeting **Common Vulnerabilities and Exposures (CVEs)**. This identifies systems with known security weaknesses. |
 | **Pornography Crawl** | `pornography_crawl` | `pornography` | Initiates a web crawl targeting publicly available web pages categorized as **pornographic content**. This evaluates the effectiveness of **content filtering mechanisms**. |
+| **Domain Filtering Checks** | `github_domain_check` | `domain-check` | This check executes **domain resolution and reachability test** against a verified list of policy-mandated filtered domains. This list is maintained as a **publicly accessible data stream** via GitHub. The process is designed to test **operational integrity and enforcement effectiveness** of security controls preventing access to known undesirable domains, encompassing categories such as **adware distribution, malicious software propagation, host-based viral infections, deceptive content delivery, and various forms of online fraud and social engineering schemes**. |
 
 ---
 
@@ -77,7 +77,7 @@ This document outlines the various network connectivity, web protocol, security,
 
 | ✅ Test | 🧩 Function | 🧩 Suite Flag |🔍 Description |
 |---|---|---|---|
-| **Netflix Speedtest** | `speedtest_fast` | Utilizes the `fastcli` command-line utility to emulate the **Netflix speed test methodology**. This assesses perceived **internet throughput and latency** as experienced by streaming services, and verifies if the traffic is identified as legitimate streaming by network appliances. |
+| **Netflix Speedtest** | `speedtest_fast` | `netflix` | Utilizes the `fastcli` command-line utility to emulate the **Netflix speed test methodology**. This assesses perceived **internet throughput and latency** as experienced by streaming services, and verifies if the traffic is identified as legitimate streaming by network appliances. |
 
 ---
 
