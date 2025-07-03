@@ -931,15 +931,15 @@ performance analysis, or security simulations.
             help='For the "crawl" suite: Specifies the initial URL to start web crawling from. Default: https://www.wikipedia.org' # No extra newlines here if it's the last option
         )
 
-        args = parser.parse_args()
+        ARGS = parser.parse_args()
 
         # Example of how you'd use args (replace with your actual logic)
-        print(f"Running suite: {args.suite}")
-        print(f"Test size: {args.size}")
-        print(f"Looping enabled: {args.loop}")
-        print(f"Max wait seconds: {args.max_wait_secs}")
-        print(f"No wait enabled: {args.nowait}")
-        print(f"Crawl start URL: {args.crawl_start}")
+        print(f"Running suite: {ARGS.suite}")
+        print(f"Test size: {ARGS.size}")
+        print(f"Looping enabled: {ARGS.loop}")
+        print(f"Max wait seconds: {ARGS.max_wait_secs}")
+        print(f"No wait enabled: {ARGS.nowait}")
+        print(f"Crawl start URL: {ARGS.crawl_start}")
 
     except Exception as e:
         print(f"An error occurred: {e}")
