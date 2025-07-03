@@ -109,6 +109,7 @@ def http_random():
             print (Style.RESET_ALL)
             subprocess.call(cmd, shell=True)
 
+### HTTP downloads
 def http_download_zip():
     random.shuffle(user_agents)
     user_agent = user_agents[0]
@@ -134,6 +135,7 @@ def http_download_zip():
     print (Style.RESET_ALL)
     subprocess.call(cmd, shell=True)
 
+### HTTP downloads of targz files
 def http_download_targz():
     cmd = 'curl --limit-rate 3M -k  --show-error --connect-timeout 5 -o /dev/null http://wordpress.org/latest.tar.gz'
     print (Fore.BLACK)
@@ -945,6 +947,7 @@ performance analysis, or security simulations.
         print(Style.RESET_ALL)
         time.sleep(5)
 
+        ### All tests and the functions they call    
         if ARGS.suite == 'all':
             testsuite = [
                 dig_random,
