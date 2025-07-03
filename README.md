@@ -1,126 +1,97 @@
-# 🧪 Traffgen - Network Traffic Generator
 
-[![Docker Pulls](https://img.shields.io/docker/pulls/jdibby/traffgen)](https://hub.docker.com/r/jdibby/traffgen)
-[![Image Size](https://img.shields.io/docker/image-size/jdibby/traffgen/latest)](https://hub.docker.com/r/jdibby/traffgen)
-[![License](https://img.shields.io/github/license/jdibby/traffgen)](LICENSE)
+# 🧪 Traffgen: Network Traffic Generator
 
-> A modular traffic generator designed for network observability, anomaly detection validation, IPS/IDS testing, and firewall policy verification.
+Traffgen is a comprehensive network traffic generator designed to test connectivity, performance, security filtering, and reliability across a broad range of network protocols. It supports DNS, HTTP(S), FTP, SSH, ICMP, NTP, and more.
 
 ---
 
-## 📚 Table of Contents
-
-- [Traffic Generation Summary](#-traffic-generation-summary)
-- [Test Categories](#-test-categories)
-  - [Connectivity Tests](#-connectivity-tests)
-  - [Web Protocol Tests](#-web-protocol-tests)
-  - [Security & Filtering Tests](#-security--filtering-tests)
-  - [File Transfer Tests](#-file-transfer-tests)
-  - [AI & Ad Filtering](#-ai--ad-filtering)
-  - [Streaming & Speed](#-streaming--speed)
-- [Command-Line Flags](#-command-line-flags)
-- [Full Test Suite](#-full-test-suite---suite-all)
-- [Additional Features](#-additional-features)
-- [Stager Script](#-stager-script-stagersh)
-- [Docker Image](#-docker-image)
-- [Usage Examples](#-usage-examples)
-
----
-
-## 🧪 Traffic Generation Summary
-
-Traffgen is a lightweight, test-driven framework for validating network connectivity, protocol-specific behavior, content inspection, throughput limits, and deep packet inspection (DPI) behavior. It's optimized for headless operation in testbeds, CI/CD pipelines, and edge devices.
-
----
-
-## 📌 Test Categories
+## 📁 Test Categories
 
 ### 🔧 Connectivity Tests
 
-| ✅ Test            | 🧩 Function         | 🔍 Description                                                |
-|-------------------|---------------------|----------------------------------------------------------------|
-| **DNS Lookup**    | `dig_random`        | Resolves pseudo-random domains against multiple public resolvers to validate DNS reachability and caching behavior |
-| **ICMP Ping**     | `ping_random`       | Sends ICMP echo requests to test L3 reachability and latency  |
-| **Traceroute**    | `traceroute_random` | Maps layer 3 hops to destination domains using TTL-expired UDP probes |
-| **SSH Access**    | `ssh_random`        | Initiates TCP handshakes to SSH ports and attempts login using keyless/noauth methods |
-| **NTP Sync**      | `ntp_random`        | Queries NTP servers via `chronyd` to assess time sync performance and port 123 UDP behavior |
+| ✅ Test        | 🧩 Function         | 🔍 Description                                                    |
+|---------------|---------------------|-------------------------------------------------------------------|
+| DNS Lookup     | `dig_random`        | Resolves random domains using multiple DNS servers                |
+| ICMP Ping      | `ping_random`       | Verifies basic reachability using ICMP ping                       |
+| Traceroute     | `traceroute_random` | Traces network paths to target destinations                       |
+| SSH Access     | `ssh_random`        | Attempts SSH connections to assess availability and authentication |
+| NTP Sync       | `ntp_random`        | Tests time synchronization with public NTP servers via `chronyd`  |
 
 ---
 
 ### 🌐 Web Protocol Tests
 
-| ✅ Test                  | 🧩 Function            | 🔍 Description                                                  |
-|--------------------------|------------------------|------------------------------------------------------------------|
-| **HTTP**                 | `http_random`         | Sends GET requests with randomized headers and User-Agent strings |
-| **HTTPS**                | `https_random`        | Executes TLS handshakes and GETs to HTTPS endpoints; logs handshake timing |
-| **ZIP File Download**    | `http_download_zip`   | Downloads binary ZIP files (10KB–5MB) to evaluate HTTP transfer performance |
-| **TAR.GZ Download**      | `http_download_targz` | Downloads the latest WordPress release (tar.gz) to test large file pulls |
-| **URL Response Times**   | `urlresponse_random`  | Performs GETs and logs DNS, connect, TLS, and TTFB timings individually |
-| **HTTPS Crawling**       | `https_crawl`         | Recursively crawls hyperlinks on HTTPS domains to simulate bot or scraper behavior |
-| **HTTP Crawling**        | `webcrawl`            | Performs depth-limited crawling over HTTP (plaintext) targets using random seed URLs |
+| ✅ Test               | 🧩 Function            | 🔍 Description                                         |
+|----------------------|------------------------|--------------------------------------------------------|
+| HTTP Requests         | `http_random`          | Sends HTTP requests with randomized User-Agent headers |
+| HTTPS Requests        | `https_random`         | Sends HTTPS requests using randomized User-Agent headers |
+| ZIP File Download     | `http_download_zip`    | Downloads sample ZIP files of various sizes            |
+| TAR.GZ Download       | `http_download_targz`  | Downloads the latest WordPress `.tar.gz` archive       |
+| URL Response Timing   | `urlresponse_random`   | Measures HTTP/HTTPS response times                     |
+| HTTPS Crawler         | `https_crawl`          | Recursively follows links on HTTPS web pages           |
+| HTTP Crawler          | `webcrawl`             | Crawls external HTTP websites from a defined starting point |
 
 ---
 
 ### 🔒 Security & Filtering Tests
 
-| ✅ Test                 | 🧩 Function         | 🔍 Description                                                  |
-|------------------------|---------------------|------------------------------------------------------------------|
-| **EICAR via HTTP**     | `virus_sim_http`    | Downloads the EICAR string over HTTP to trigger antivirus/DPI or web proxy scanning |
-| **EICAR via HTTPS**    | `virus_sim_https`   | Same as above but using TLS; tests SSL interception and AV inspection |
-| **IPS Triggering**     | `ips`               | Sends malformed or suspicious headers (e.g., SQLi strings, known malicious UAs) to test IPS rule matching |
-| **DLP Tests**          | `dlp`               | Fetches fake documents containing PII/PCI patterns (PDF, XLS, CSV, ZIP) to test Data Loss Prevention |
-| **Malware Agents**     | `malware-agents`    | Sends requests with User-Agent strings from known malware bots (e.g., Mirai variants, BlackEnergy) |
-| **Malware Downloads**  | `malware-download`  | Pulls files commonly used to trigger endpoint sandboxing (e.g., executables hosted on GitHub) |
-| **NMAP Port Scan**     | `nmap_1024os`       | Performs TCP SYN scan against well-known ports 1–1024 with OS detection enabled |
-| **NMAP CVE Scan**      | `nmap_cve`          | Runs vulnerability and NSE-based scans using `nmap --script vuln` |
+| ✅ Test               | 🧩 Function         | 🔍 Description                                                               |
+|----------------------|---------------------|------------------------------------------------------------------------------|
+| EICAR Test (HTTP)     | `virus_sim_http`    | Simulates antivirus/malware detection using EICAR over HTTP                  |
+| EICAR Test (HTTPS)    | `virus_sim_https`   | Simulates antivirus/malware detection using EICAR over HTTPS                 |
+| IPS Detection         | `ips`               | Sends known malicious User-Agents to trigger Intrusion Prevention Systems    |
+| DLP Simulation        | `dlp`               | Downloads sample PII/PCI data to evaluate Data Loss Prevention mechanisms    |
+| Malware User-Agents   | `malware-agents`    | Sends suspicious User-Agents to provoke security filtering responses         |
+| Malware Downloads     | `malware-download`  | Attempts to download malware-related files for sandbox inspection            |
+| NMAP Port Scan        | `nmap_1024os`       | Performs port scan on ports 1–1024 using Nmap                                |
+| NMAP CVE Scan         | `nmap_cve`          | Conducts vulnerability scanning using Nmap scripts (CVE-based)               |
 
 ---
 
 ### 📦 File Transfer Tests
 
-| ✅ Test               | 🧩 Function     | 🔍 Description                                        |
-|----------------------|----------------|--------------------------------------------------------|
-| **FTP Downloads**    | `ftp_random`   | Connects to FTP endpoints and downloads structured files (e.g., SQL dumps) |
-| **Big File Downloads** | `bigfile`    | Downloads a 5GB binary blob to test max throughput and disk write I/O under load |
+| ✅ Test             | 🧩 Function     | 🔍 Description                                         |
+|--------------------|----------------|--------------------------------------------------------|
+| FTP Downloads       | `ftp_random`   | Retrieves sample files via FTP                         |
+| Large File Download | `bigfile`      | Downloads a 5GB file to assess bandwidth and throughput |
 
 ---
 
 ### 🤖 AI & Ad Filtering
 
-| ✅ Test         | 🧩 Function        | 🔍 Description                                                     |
-|----------------|-------------------|--------------------------------------------------------------------|
-| **AI Endpoints** | `ai_https_random` | Sends requests to OpenAI, Anthropic, HuggingFace, etc., to test AI app accessibility |
-| **Ad Blocking**  | `ads_random`      | Hits known ad server URLs (e.g., `doubleclick.net`) to test DNS/content blocking policies |
+| ✅ Test         | 🧩 Function        | 🔍 Description                                      |
+|----------------|-------------------|-----------------------------------------------------|
+| AI Endpoints    | `ai_https_random` | Sends HTTPS traffic to common AI service endpoints  |
+| Ad Blocking     | `ads_random`      | Verifies access to known ad networks and trackers   |
 
 ---
 
-### 🎥 Streaming & Speed
+### 🎥 Streaming & Speed Tests
 
-| ✅ Test               | 🧩 Function       | 🔍 Description                                                  |
-|----------------------|------------------|------------------------------------------------------------------|
-| **Netflix Speedtest** | `speedtest_fast` | Runs Netflix’s `fast.com` CLI to test CDN speed and identify if video streaming is deprioritized |
-
----
-
-## 🛠️ Command-Line Flags
-
-| Flag                  | Description                                                                |
-|-----------------------|----------------------------------------------------------------------------|
-| `--suite`             | Select specific suite (`all`, `http`, `dns`, `nmap`, etc.)                 |
-| `--size`              | Scale of the run: `S` (light), `M`, `L`, `XL` (exhaustive)                 |
-| `--loop`              | Repeats the test suite indefinitely until interrupted                     |
-| `--max-wait-secs`     | Max randomized delay (in seconds) between test executions                  |
-| `--nowait`            | Disables randomized delay                                                  |
-| `--crawl-start`       | Custom seed URL for `webcrawl` or `https_crawl`                            |
+| ✅ Test            | 🧩 Function       | 🔍 Description                                                       |
+|-------------------|------------------|----------------------------------------------------------------------|
+| Netflix Speedtest | `speedtest_fast` | Uses `fastcli` to emulate Netflix throughput testing and detection   |
 
 ---
 
-## 🧠 Full Test Suite (`--suite all`)
+## ⚙️ Command-Line Flags
 
-<details>
-<summary>🧠 Click to expand full function list</summary>
+| Flag              | Description                                                               |
+|-------------------|---------------------------------------------------------------------------|
+| `--suite`         | Selects test suite: `all`, `http`, `dns`, `nmap`, etc.                    |
+| `--size`          | Defines test scale: `S`, `M`, `L`, `XL`                                   |
+| `--loop`          | Enables continuous execution in an infinite loop                         |
+| `--max-wait-secs` | Sets max randomized wait time (in seconds) between loop iterations        |
+| `--nowait`        | Disables random delays between tests                                      |
+| `--crawl-start`   | Specifies the starting URL for HTTP/HTTPS crawlers                        |
 
-```bash
+---
+
+## 🧪 Full Test Suite (`--suite all`)
+
+The following functions are executed when running the complete suite:
+
+```
 dig_random
 ftp_random
 http_download_targz
@@ -148,60 +119,56 @@ virus_sim_https
 
 ---
 
-## 🧰 Additional Features
+## 🧰 Features
 
-- ✅ Random test execution order
-- ⏱️ Optional randomized delay between tests
-- 🔁 Infinite loop mode for stress or long-term testing
-- 🌐 Endpoint list fetched via remote `endpoints.py` file
-- 🧹 Output colorized using `colorama`
-- 📊 Download progress via `tqdm`
+- 🔀 Randomized test execution order
+- ⏱️ Optional randomized delays between test runs
+- 🔁 Infinite loop mode for long-term testing or stress testing
+- 🌍 Dynamic endpoint retrieval via `endpoints.py`
+- 🎨 Colorized terminal output using `colorama`
+- 📈 Download progress indicators via `tqdm`
 
 ---
 
-## 🛠️ Stager Script (stager.sh)
+## 🚀 Quick Deployment with `stager.sh`
 
-To stage a linux system to turn it into a traffic generator, use this... beware, this will need to be run as root
-
-- ✅ Autodetects Hardware/OS
-- ✅ Supports Ubuntu and Rocky Linux
-- ✅ Supports Raspberry Pi4 and Raspberry Pi5
-
-| Docker Image Used         | Description                                                             |
-|-----------------------|-----------------------------------------------------------------------------|
-| jdibby/traffgen:latest | Raspberry Pi4 and other armv7 processors                                    |
-| jdibby/traffgen:latest | Raspberry Pi5 64bit processors                                |
-| jdibby/traffgen:latest | Other 64bit processors (default option)                                     |
+To prepare a system as a test node, run the staging script as root:
 
 ```bash
 sudo bash < <(curl -s https://raw.githubusercontent.com/jdibby/traffgen/refs/heads/main/stager.sh)
 ```
+
+- 🖥️ Auto-detects hardware and operating system
+- ✅ Supports Ubuntu, Rocky Linux, Raspberry Pi 4 & 5
+
+| Image Tag              | Description                                |
+|------------------------|--------------------------------------------|
+| `jdibby/traffgen`      | For ARMv7 (e.g., Raspberry Pi 4)           |
+| `jdibby/traffgen`      | For ARM64 (e.g., Raspberry Pi 5)           |
+| `jdibby/traffgen`      | For x86_64 and other 64-bit platforms      |
+
 ---
 
 ## 🐳 Docker Image
 
-This test suite is also available as a prebuilt Docker container:
+A pre-built containerized version is available on Docker Hub:
 
-> **Docker Hub**: [jdibby/traffgen](https://hub.docker.com/r/jdibby/traffgen)
+🔗 [Docker Hub: jdibby/traffgen](https://hub.docker.com/r/jdibby/traffgen)
 
----
-
-## 💡 Show the help file
-
-To run the container to show the help file:
+### View Help Menu
 
 ```bash
 docker run -it jdibby/traffgen:<version> --help
 ```
 
-## 💡 Full test suite with inject user simulated delay
-
-To run the full test suite continuously with minimal delay:
+### Run Full Suite in Loop Mode with Minimal Delay
 
 ```bash
 docker run -it jdibby/traffgen:<version> --suite=all --size=L --loop --max-wait-secs=10
 ```
 
-
-
 ---
+
+## 📫 Feedback & Contributions
+
+We welcome contributions and suggestions. Please open issues or submit PRs on the [GitHub repo](https://github.com/jdibby/traffgen).
