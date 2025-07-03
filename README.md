@@ -1,7 +1,7 @@
 
 # 🧪 Traffgen: Network Traffic Generator
 
-Traffgen is a comprehensive network traffic generator designed to test connectivity, performance, security filtering, and reliability across a broad range of network protocols. It supports DNS, HTTP(S), FTP, SSH, ICMP, NTP, and more.
+Traffgen is a comprehensive network traffic generator designed to test connectivity, performance, security filtering, URL filtering, and reliability across a broad range of network protocols. It supports DNS, HTTP(S), FTP, SSH, ICMP, NTP, and more.
 
 ---
 
@@ -45,6 +45,7 @@ Traffgen is a comprehensive network traffic generator designed to test connectiv
 | Malware Downloads     | `malware-download`  | Attempts to download malware-related files for sandbox inspection            |
 | NMAP Port Scan        | `nmap_1024os`       | Performs port scan on ports 1–1024 using Nmap                                |
 | NMAP CVE Scan         | `nmap_cve`          | Conducts vulnerability scanning using Nmap scripts (CVE-based)               |
+| Pornography Crawl        | `pornography_crawl`          | Conducts vulnerability scanning using Nmap scripts (CVE-based)               |
 
 ---
 
@@ -101,6 +102,7 @@ https_random
 https_crawl
 malware_random
 malware_download
+pornography_crawl
 ips
 dlp_sim_https
 ads_random
@@ -164,11 +166,11 @@ docker run -it jdibby/traffgen:<version> --help
 ### Run Full Suite in Loop Mode with Minimal Delay
 
 ```bash
-docker run -it jdibby/traffgen:<version> --suite=all --size=L --loop --max-wait-secs=10
+docker run -it jdibby/traffgen:<version> --suite=all --size=S --loop --max-wait-secs=20
 ```
 
 ---
 
 ## 📫 Feedback & Contributions
 
-We welcome contributions and suggestions. Please open issues or submit PRs on the [GitHub repo](https://github.com/jdibby/traffgen).
+I welcome contributions and suggestions. Please open issues or submit PRs on the [GitHub repo](https://github.com/jdibby/traffgen).
