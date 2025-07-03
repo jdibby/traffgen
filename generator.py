@@ -840,15 +840,18 @@ if __name__ == "__main__":
 
         ### Argument Parsing (CLI variables)
         parser = argparse.ArgumentParser(
-            description="""
-            Traffic Generator: A versatile tool for simulating various network traffic types.
-            Use this script to generate realistic network activity for testing,
-            performance analysis, or security simulations.
-            """,
-            formatter_class=argparse.RawTextHelpFormatter # Keeps multi-line description formatting
+            description="""Traffic Generator: A versatile tool for simulating various network traffic types.
+Use this script to generate realistic network activity for testing,
+performance analysis, or security simulations.
+""",
+            formatter_class=argparse.RawTextHelpFormatter,
+            # **********************************************
+            # Add this line to suppress the usage message
+            usage=argparse.SUPPRESS
+            # **********************************************
         )
 
-        # Suite choices
+        # Define common choices to avoid repetition and make it easier to manage
         suite_choices = [
             'all', 'ads', 'ai', 'bigfile', 'crawl', 'dlp', 'dns', 'ftp',
             'domain-check', 'http', 'https', 'icmp', 'ips', 'netflix',
@@ -870,7 +873,7 @@ if __name__ == "__main__":
             help=(
                 'Specify the test suite to run.\n'
                 'Available suites:\n'
-                '  ' + '\n  '.join(sorted(suite_choices)) + '\n' # Sort and format for readability
+                '  ' + '\n  '.join(sorted(suite_choices)) + '\n'
                 'Default: "all" (runs all available test suites).'
             )
         )
@@ -901,7 +904,7 @@ if __name__ == "__main__":
         )
         timing_group.add_argument(
             '--max-wait-secs',
-            type=int, # Changed type to int as it's seconds
+            type=int,
             action="store",
             required=False,
             default=40,
