@@ -17,7 +17,7 @@ RUN apk update && apk add --no-cache \
     net-tools \
     gcc \
     curl \
-    ntp \
+    openntpd \
     tzdata \
     bind-tools \
     wget \
