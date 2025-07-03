@@ -16,7 +16,7 @@ This document outlines the various network connectivity, web protocol, security,
 ### 🔧 Connectivity Tests
 
 | ✅ Test | 🧩 Function | 🧩 Suite Flag |🔍 Description |
-|---|---|---|
+|---|---|---|---|
 | **DNS Lookup** | `dig_random` | `dns` |Performs **DNS A record resolution** for a set of pseudo-randomly selected domains using multiple pre-configured **DNS recursive resolvers**. This assesses **DNS service availability** and **name resolution latency**. |
 | **ICMP Ping** | `ping_random` | `ping_random`  |Executes **ICMP Echo Request/Reply transactions** to a range of dynamically generated or pre-defined IP addresses. This verifies fundamental **network layer reachability** and measures **round-trip time (RTT)** and **packet loss**. |
 | **Traceroute** | `traceroute_random` | `ping_random` | Initiates **network path discovery** using **ICMP or UDP-based traceroute** to diverse target destinations. This maps the **router hops** and identifies potential **routing anomalies** or **latency bottlenecks**. |
@@ -28,7 +28,7 @@ This document outlines the various network connectivity, web protocol, security,
 ### 🌐 Web Protocol Tests
 
 | ✅ Test | 🧩 Function | 🧩 Suite Flag |🔍 Description |
-|---|---|---|
+|---|---|---|---|
 | **HTTP Requests** | `http_random` `http_download_zip` `http_download_targz` | `http` | Dispatches **HTTP/1.1 GET requests** to a variety of web servers, dynamically generating diverse `User-Agent` headers to simulate varied client types. This assesses **unencrypted web service availability** and **HTTP response codes**. |
 | **HTTPS Requests** | `https_crawl` `https_random` | `https` | Transmits **HTTPS/TLS GET requests** to secure web servers, utilizing randomized `User-Agent` strings. This validates **TLS handshake completion**, **certificate chain validation**, and **secure web content retrieval**. |
 | **ZIP File Download** | `http_download_zip` | `ping_random` | Initiates **HTTP downloads of `.zip` archives** across multiple predefined file sizes (e.g., 1MB, 10MB, 100MB). This evaluates **data throughput**, **file integrity**, and **HTTP range request support**. |
@@ -42,7 +42,7 @@ This document outlines the various network connectivity, web protocol, security,
 ### 🔒 Security & Filtering Tests
 
 | ✅ Test | 🧩 Function | 🧩 Suite Flag |🔍 Description |
-|---|---|---|
+|---|---|---|---|
 | **EICAR Test (HTTP)** | `virus_sim_http` | `ping_random` | Attempts to download the **EICAR (European Institute for Computer Antivirus Research) test file** over HTTP. This is designed to trigger **antivirus and malware detection mechanisms** without causing actual harm. |
 | **EICAR Test (HTTPS)** | `virus_sim_https` | `ping_random` | Attempts to download the **EICAR test file** over HTTPS. This validates whether **TLS-inspecting security solutions** can detect the EICAR signature within encrypted traffic. |
 | **IPS Detection** | `ips` | `ping_random` | Sends HTTP requests containing **known malicious `User-Agent` strings** or **HTTP request patterns** designed to trigger **Intrusion Prevention Systems (IPS)**. This verifies the efficacy of signature-based IPS rules. |
@@ -58,7 +58,7 @@ This document outlines the various network connectivity, web protocol, security,
 ### 📦 File Transfer Tests
 
 | ✅ Test | 🧩 Function | 🧩 Suite Flag |🔍 Description |
-|---|---|---|
+|---|---|---|---|
 | **FTP Downloads** | `ftp_random` | `ftp` | Retrieves a series of **sample files** from an FTP server using the **File Transfer Protocol (FTP)**. This assesses **FTP service availability**, **data integrity**, and **firewall egress rules** for port 21/20. |
 | **Large File Download** | `bigfile` | `bigfile` | Downloads a **5 Gigabyte (GB) test file** from a designated HTTP endpoint. This is specifically designed to assess **sustained network bandwidth**, **throughput limitations**, and **network stability** over prolonged transfers. |
 
@@ -67,7 +67,7 @@ This document outlines the various network connectivity, web protocol, security,
 ### 🤖 AI & Ad Filtering
 
 | ✅ Test | 🧩 Function | 🧩 Suite Flag |🔍 Description |
-|---|---|---|
+|---|---|---|---|
 | **AI Endpoints** | `ai_https_random` | `ai` | Sends **HTTPS traffic** to the API endpoints of common **Artificial Intelligence (AI) and Machine Learning (ML) services**. This verifies reachability and potential filtering of AI-related network communications. |
 | **Ad Blocking** | `ads_random` | `ads` | Attempts to access Uniform Resource Locators (URLs) associated with **known advertising networks and tracking domains**. This test determines the efficacy of **ad-blocking software or network-level content filtering**. |
 
@@ -76,7 +76,7 @@ This document outlines the various network connectivity, web protocol, security,
 ### 🎥 Streaming & Speed Tests
 
 | ✅ Test | 🧩 Function | 🧩 Suite Flag |🔍 Description |
-|---|---|---|
+|---|---|---|---|
 | **Netflix Speedtest** | `speedtest_fast` | Utilizes the `fastcli` command-line utility to emulate the **Netflix speed test methodology**. This assesses perceived **internet throughput and latency** as experienced by streaming services, and verifies if the traffic is identified as legitimate streaming by network appliances. |
 
 ---
