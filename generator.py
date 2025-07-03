@@ -843,12 +843,10 @@ if __name__ == "__main__":
             description="""Traffic Generator: A versatile tool for simulating various network traffic types.
 Use this script to generate realistic network activity for testing,
 performance analysis, or security simulations.
-""",
+
+""", # Added an extra newline here for spacing after the description
             formatter_class=argparse.RawTextHelpFormatter,
-            # **********************************************
-            # Add this line to suppress the usage message
             usage=argparse.SUPPRESS
-            # **********************************************
         )
 
         # Define common choices to avoid repetition and make it easier to manage
@@ -860,6 +858,12 @@ performance analysis, or security simulations.
             'virus-sim-https',
         ]
         size_choices = ['S', 'M', 'L', 'XL']
+
+        # Add empty arguments with blank help text as separators
+        # This is a common trick to insert blank lines between groups
+        parser.add_argument('--_spacer1', action='store_true', help=argparse.SUPPRESS) # Suppress this arg from appearing
+        parser.add_argument('--_spacer2', action='store_true', help=argparse.SUPPRESS) # Suppress this arg from appearing
+
 
         # Group for core traffic generation options
         traffic_group = parser.add_argument_group('Traffic Generation Options')
@@ -874,7 +878,7 @@ performance analysis, or security simulations.
                 'Specify the test suite to run.\n'
                 'Available suites:\n'
                 '  ' + '\n  '.join(sorted(suite_choices)) + '\n'
-                'Default: "all" (runs all available test suites).'
+                'Default: "all" (runs all available test suites).\n\n' # Added two newlines here
             )
         )
         traffic_group.add_argument(
@@ -890,7 +894,7 @@ performance analysis, or security simulations.
                 '  S (Small): Minimal traffic generation.\n'
                 '  M (Medium): Moderate traffic (default).\n'
                 '  L (Large): Significant traffic volume.\n'
-                '  XL (Extra Large): High-intensity traffic.\n'
+                '  XL (Extra Large): High-intensity traffic.\n\n' # Added two newlines here
             )
         )
 
@@ -900,7 +904,7 @@ performance analysis, or security simulations.
             '--loop',
             action="store_true",
             required=False,
-            help='Continuously loop the selected test suite(s).'
+            help='Continuously loop the selected test suite(s).\n\n' # Added two newlines here
         )
         timing_group.add_argument(
             '--max-wait-secs',
@@ -908,13 +912,13 @@ performance analysis, or security simulations.
             action="store",
             required=False,
             default=40,
-            help='Maximum possible time (in seconds) for random intervals between tests or loops. Default: 40 seconds.'
+            help='Maximum possible time (in seconds) for random intervals between tests or loops. Default: 40 seconds.\n\n' # Added two newlines here
         )
         timing_group.add_argument(
             '--nowait',
             action="store_true",
             required=False,
-            help='Disable random waiting intervals between tests or loops, making them run consecutively.'
+            help='Disable random waiting intervals between tests or loops, making them run consecutively.\n\n' # Added two newlines here
         )
 
         # Group for specific suite options
@@ -924,7 +928,7 @@ performance analysis, or security simulations.
             action="store",
             required=False,
             default='https://www.wikipedia.org',
-            help='For the "crawl" suite: Specifies the initial URL to start web crawling from. Default: https://www.wikipedia.org'
+            help='For the "crawl" suite: Specifies the initial URL to start web crawling from. Default: https://www.wikipedia.org' # No extra newlines here if it's the last option
         )
 
         args = parser.parse_args()
