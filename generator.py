@@ -751,7 +751,7 @@ def finish_test():
         print ("")
         print ("  [i] Looping...")
 
-### Pull an updated list of co-located containers to test against
+### Pull an updated list of colocated containers to test against
 def replace_all_endpoints(url):
     print ("")
     print ("  [i] Replacing endpoints.py with %s" %(url), end=" ", flush=True)
@@ -864,7 +864,6 @@ performance analysis, or security simulations.
         ### Add empty arguments with blank help text as separators
         parser.add_argument('--_spacer1', action='store_true', help=argparse.SUPPRESS) # Suppress this arg from appearing
         parser.add_argument('--_spacer2', action='store_true', help=argparse.SUPPRESS) # Suppress this arg from appearing
-
 
         ### Group for core traffic generation options
         traffic_group = parser.add_argument_group('Traffic Generation Options')
