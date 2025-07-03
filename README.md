@@ -15,67 +15,67 @@ This document outlines the various network connectivity, web protocol, security,
 
 ### 🔧 Connectivity Tests
 
-| ✅ Test | 🧩 Function | 🔍 Description |
+| ✅ Test | 🧩 Function | 🧩 Suite Flag |🔍 Description |
 |---|---|---|
-| **DNS Lookup** | `dig_random` | Performs **DNS A record resolution** for a set of pseudo-randomly selected domains using multiple pre-configured **DNS recursive resolvers**. This assesses **DNS service availability** and **name resolution latency**. |
-| **ICMP Ping** | `ping_random` | Executes **ICMP Echo Request/Reply transactions** to a range of dynamically generated or pre-defined IP addresses. This verifies fundamental **network layer reachability** and measures **round-trip time (RTT)** and **packet loss**. |
-| **Traceroute** | `traceroute_random` | Initiates **network path discovery** using **ICMP or UDP-based traceroute** to diverse target destinations. This maps the **router hops** and identifies potential **routing anomalies** or **latency bottlenecks**. |
-| **SSH Access** | `ssh_random` | Attempts **Secure Shell (SSH) protocol connections** to various remote endpoints. This validates **SSH service availability**, **TCP port 22 accessibility**, and basic **authentication mechanism functionality**. |
-| **NTP Sync** | `ntp_random` | Verifies **Network Time Protocol (NTP) synchronization** status and offset against public NTP stratum 1 servers via the `chronyd` daemon. This ensures **accurate system clock synchronization** critical for security and logging. |
+| **DNS Lookup** | `dig_random` | `dns` |Performs **DNS A record resolution** for a set of pseudo-randomly selected domains using multiple pre-configured **DNS recursive resolvers**. This assesses **DNS service availability** and **name resolution latency**. |
+| **ICMP Ping** | `ping_random` | `ping_random`  |Executes **ICMP Echo Request/Reply transactions** to a range of dynamically generated or pre-defined IP addresses. This verifies fundamental **network layer reachability** and measures **round-trip time (RTT)** and **packet loss**. |
+| **Traceroute** | `traceroute_random` | `ping_random` | Initiates **network path discovery** using **ICMP or UDP-based traceroute** to diverse target destinations. This maps the **router hops** and identifies potential **routing anomalies** or **latency bottlenecks**. |
+| **SSH Access** | `ssh_random` | `ping_random` | Attempts **Secure Shell (SSH) protocol connections** to various remote endpoints. This validates **SSH service availability**, **TCP port 22 accessibility**, and basic **authentication mechanism functionality**. |
+| **NTP Sync** | `ntp_random` | `ping_random` | Verifies **Network Time Protocol (NTP) synchronization** status and offset against public NTP stratum 1 servers via the `chronyd` daemon. This ensures **accurate system clock synchronization** critical for security and logging. |
 
 ---
 
 ### 🌐 Web Protocol Tests
 
-| ✅ Test | 🧩 Function | 🔍 Description |
+| ✅ Test | 🧩 Function | 🧩 Suite Flag |🔍 Description |
 |---|---|---|
-| **HTTP Requests** | `http_random` | Dispatches **HTTP/1.1 GET requests** to a variety of web servers, dynamically generating diverse `User-Agent` headers to simulate varied client types. This assesses **unencrypted web service availability** and **HTTP response codes**. |
-| **HTTPS Requests** | `https_random` | Transmits **HTTPS/TLS GET requests** to secure web servers, utilizing randomized `User-Agent` strings. This validates **TLS handshake completion**, **certificate chain validation**, and **secure web content retrieval**. |
-| **ZIP File Download** | `http_download_zip` | Initiates **HTTP downloads of `.zip` archives** across multiple predefined file sizes (e.g., 1MB, 10MB, 100MB). This evaluates **data throughput**, **file integrity**, and **HTTP range request support**. |
-| **TAR.GZ Download** | `http_download_targz` | Downloads the latest stable release of the **WordPress core `.tar.gz` archive** via HTTP. This specifically tests retrieval of a common, large, compressed software distribution. |
-| **URL Response Timing** | `urlresponse_random` | Measures the **end-to-end response time** for both HTTP and HTTPS requests to a diverse set of URLs. This provides metrics on **web server latency** and **network performance** for web traffic. |
-| **HTTPS Crawler** | `https_crawl` | Recursively traverses hyperlinks within **HTTPS-secured web pages** from a specified starting Uniform Resource Locator (URL). This simulates legitimate web Browse and tests the ability to navigate secure sites. |
-| **HTTP Crawler** | `webcrawl` | Initiates a **web crawling operation** on external HTTP websites, following discovered links from a user-defined initial URL. This assesses accessibility and navigability of unencrypted web resources. |
+| **HTTP Requests** | `http_random` `http_download_zip` `http_download_targz` | `http` | Dispatches **HTTP/1.1 GET requests** to a variety of web servers, dynamically generating diverse `User-Agent` headers to simulate varied client types. This assesses **unencrypted web service availability** and **HTTP response codes**. |
+| **HTTPS Requests** | `https_crawl` `https_random` | `https` | Transmits **HTTPS/TLS GET requests** to secure web servers, utilizing randomized `User-Agent` strings. This validates **TLS handshake completion**, **certificate chain validation**, and **secure web content retrieval**. |
+| **ZIP File Download** | `http_download_zip` | `ping_random` | Initiates **HTTP downloads of `.zip` archives** across multiple predefined file sizes (e.g., 1MB, 10MB, 100MB). This evaluates **data throughput**, **file integrity**, and **HTTP range request support**. |
+| **TAR.GZ Download** | `http_download_targz` | `ping_random` | Downloads the latest stable release of the **WordPress core `.tar.gz` archive** via HTTP. This specifically tests retrieval of a common, large, compressed software distribution. |
+| **URL Response Timing** | `urlresponse_random` | `ping_random` | Measures the **end-to-end response time** for both HTTP and HTTPS requests to a diverse set of URLs. This provides metrics on **web server latency** and **network performance** for web traffic. |
+| **HTTPS Crawler** | `https_crawl` | `ping_random` | Recursively traverses hyperlinks within **HTTPS-secured web pages** from a specified starting Uniform Resource Locator (URL). This simulates legitimate web Browse and tests the ability to navigate secure sites. |
+| **HTTP Crawler** | `webcrawl` | `crawl` | Initiates a **web crawling operation** on external HTTP websites, following discovered links from a user-defined initial URL. This assesses accessibility and navigability of unencrypted web resources. |
 
 ---
 
 ### 🔒 Security & Filtering Tests
 
-| ✅ Test | 🧩 Function | 🔍 Description |
+| ✅ Test | 🧩 Function | 🧩 Suite Flag |🔍 Description |
 |---|---|---|
-| **EICAR Test (HTTP)** | `virus_sim_http` | Attempts to download the **EICAR (European Institute for Computer Antivirus Research) test file** over HTTP. This is designed to trigger **antivirus and malware detection mechanisms** without causing actual harm. |
-| **EICAR Test (HTTPS)** | `virus_sim_https` | Attempts to download the **EICAR test file** over HTTPS. This validates whether **TLS-inspecting security solutions** can detect the EICAR signature within encrypted traffic. |
-| **IPS Detection** | `ips` | Sends HTTP requests containing **known malicious `User-Agent` strings** or **HTTP request patterns** designed to trigger **Intrusion Prevention Systems (IPS)**. This verifies the efficacy of signature-based IPS rules. |
-| **DLP Simulation** | `dlp` | Initiates downloads of files containing **simulated Personally Identifiable Information (PII)** and **Payment Card Industry (PCI) data patterns**. This evaluates the detection capabilities of **Data Loss Prevention (DLP) systems**. |
-| **Malware User-Agents** | `malware-agents` | Transmits HTTP requests with **`User-Agent` headers associated with known malware, botnets, or malicious scanners**. This aims to provoke responses from **web application firewalls (WAFs)** or **threat intelligence feeds**. |
-| **Malware Downloads** | `malware-download` | Attempts to download **non-executable, benign files specifically flagged as malware-related** by public threat intelligence feeds. This is intended for **sandbox environments** to observe security control reactions. |
-| **NMAP Port Scan** | `nmap_1024os` | Executes a **TCP SYN port scan (stealth scan)** using Nmap against target hosts, focusing on the first 1024 well-known ports. This identifies **open ports** and potential **service enumeration**. |
-| **NMAP CVE Scan** | `nmap_cve` | Conducts a **vulnerability scan** using Nmap's scripting engine (`NSE`) modules specifically targeting **Common Vulnerabilities and Exposures (CVEs)**. This identifies systems with known security weaknesses. |
-| **Pornography Crawl** | `pornography_crawl` | Initiates a web crawl targeting publicly available web pages categorized as **pornographic content**. This evaluates the effectiveness of **content filtering mechanisms**. |
+| **EICAR Test (HTTP)** | `virus_sim_http` | `ping_random` | Attempts to download the **EICAR (European Institute for Computer Antivirus Research) test file** over HTTP. This is designed to trigger **antivirus and malware detection mechanisms** without causing actual harm. |
+| **EICAR Test (HTTPS)** | `virus_sim_https` | `ping_random` | Attempts to download the **EICAR test file** over HTTPS. This validates whether **TLS-inspecting security solutions** can detect the EICAR signature within encrypted traffic. |
+| **IPS Detection** | `ips` | `ping_random` | Sends HTTP requests containing **known malicious `User-Agent` strings** or **HTTP request patterns** designed to trigger **Intrusion Prevention Systems (IPS)**. This verifies the efficacy of signature-based IPS rules. |
+| **DLP Simulation** | `dlp` | `ping_random` | Initiates downloads of files containing **simulated Personally Identifiable Information (PII)** and **Payment Card Industry (PCI) data patterns**. This evaluates the detection capabilities of **Data Loss Prevention (DLP) systems**. |
+| **Malware User-Agents** | `malware_random` | `malware-agents` | Transmits HTTP requests with **`User-Agent` headers associated with known malware, botnets, or malicious scanners**. This aims to provoke responses from **web application firewalls (WAFs)** or **threat intelligence feeds**. |
+| **Malware Downloads** | `malware-download` | `ping_random` | Attempts to download **non-executable, benign files specifically flagged as malware-related** by public threat intelligence feeds. This is intended for **sandbox environments** to observe security control reactions. |
+| **NMAP Port Scan** | `nmap_1024os` | `ping_random` | Executes a **TCP SYN port scan (stealth scan)** using Nmap against target hosts, focusing on the first 1024 well-known ports. This identifies **open ports** and potential **service enumeration**. |
+| **NMAP CVE Scan** | `nmap_cve` | `ping_random` | Conducts a **vulnerability scan** using Nmap's scripting engine (`NSE`) modules specifically targeting **Common Vulnerabilities and Exposures (CVEs)**. This identifies systems with known security weaknesses. |
+| **Pornography Crawl** | `pornography_crawl` | `pornography` | Initiates a web crawl targeting publicly available web pages categorized as **pornographic content**. This evaluates the effectiveness of **content filtering mechanisms**. |
 
 ---
 
 ### 📦 File Transfer Tests
 
-| ✅ Test | 🧩 Function | 🔍 Description |
+| ✅ Test | 🧩 Function | 🧩 Suite Flag |🔍 Description |
 |---|---|---|
-| **FTP Downloads** | `ftp_random` | Retrieves a series of **sample files** from an FTP server using the **File Transfer Protocol (FTP)**. This assesses **FTP service availability**, **data integrity**, and **firewall egress rules** for port 21/20. |
-| **Large File Download** | `bigfile` | Downloads a **5 Gigabyte (GB) test file** from a designated HTTP endpoint. This is specifically designed to assess **sustained network bandwidth**, **throughput limitations**, and **network stability** over prolonged transfers. |
+| **FTP Downloads** | `ftp_random` | `ftp` | Retrieves a series of **sample files** from an FTP server using the **File Transfer Protocol (FTP)**. This assesses **FTP service availability**, **data integrity**, and **firewall egress rules** for port 21/20. |
+| **Large File Download** | `bigfile` | `bigfile` | Downloads a **5 Gigabyte (GB) test file** from a designated HTTP endpoint. This is specifically designed to assess **sustained network bandwidth**, **throughput limitations**, and **network stability** over prolonged transfers. |
 
 ---
 
 ### 🤖 AI & Ad Filtering
 
-| ✅ Test | 🧩 Function | 🔍 Description |
+| ✅ Test | 🧩 Function | 🧩 Suite Flag |🔍 Description |
 |---|---|---|
-| **AI Endpoints** | `ai_https_random` | Sends **HTTPS traffic** to the API endpoints of common **Artificial Intelligence (AI) and Machine Learning (ML) services**. This verifies reachability and potential filtering of AI-related network communications. |
-| **Ad Blocking** | `ads_random` | Attempts to access Uniform Resource Locators (URLs) associated with **known advertising networks and tracking domains**. This test determines the efficacy of **ad-blocking software or network-level content filtering**. |
+| **AI Endpoints** | `ai_https_random` | `ai` | Sends **HTTPS traffic** to the API endpoints of common **Artificial Intelligence (AI) and Machine Learning (ML) services**. This verifies reachability and potential filtering of AI-related network communications. |
+| **Ad Blocking** | `ads_random` | `ads` | Attempts to access Uniform Resource Locators (URLs) associated with **known advertising networks and tracking domains**. This test determines the efficacy of **ad-blocking software or network-level content filtering**. |
 
 ---
 
 ### 🎥 Streaming & Speed Tests
 
-| ✅ Test | 🧩 Function | 🔍 Description |
+| ✅ Test | 🧩 Function | 🧩 Suite Flag |🔍 Description |
 |---|---|---|
 | **Netflix Speedtest** | `speedtest_fast` | Utilizes the `fastcli` command-line utility to emulate the **Netflix speed test methodology**. This assesses perceived **internet throughput and latency** as experienced by streaming services, and verifies if the traffic is identified as legitimate streaming by network appliances. |
 
