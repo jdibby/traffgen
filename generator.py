@@ -934,14 +934,15 @@ performance analysis, or security simulations.
         ARGS = parser.parse_args()
 
         # Example of how you'd use args (replace with your actual logic)
-        print (Fore.WHITE)
-        print (Back.BLUE)
+        print(Fore.BLACK + Back.GREEN + "##############################################################")
+        print(Style.RESET_ALL)
         print(f"Running suite: {ARGS.suite}")
         print(f"Test size: {ARGS.size}")
         print(f"Looping enabled: {ARGS.loop}")
         print(f"Max wait seconds: {ARGS.max_wait_secs}")
         print(f"No wait enabled: {ARGS.nowait}")
         print(f"Crawl start URL: {ARGS.crawl_start}")
+        print(Fore.BLACK + Back.GREEN + "##############################################################")
         print(Style.RESET_ALL)
         time.sleep(5)
 
