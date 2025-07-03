@@ -19,7 +19,7 @@ echo ""
 
 ### Cleanup apt repo deduplicates
 ### Install dependencies (if not already present)
-sudo apt install python3-apt python3-regex
+sudo apt install python3-apt python3-regex -y
 
 ### Download the script
 wget https://github.com/davidfoerster/aptsources-cleanup/releases/download/v0.1.7.5.2/aptsources-cleanup.pyz
