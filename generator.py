@@ -860,6 +860,7 @@ if __name__ == "__main__":
                                 'malware-download',
                                 'nmap',
                                 'ntp',
+                                'pornography',
                                 'ssh',
                                 'url-response',
                                 'virus-sim-http',
