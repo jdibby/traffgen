@@ -14,30 +14,6 @@ BOLD=$(tput bold)
 NORMAL=$(tput sgr0)
 
 echo ""
-echo "${BOLD}### CLEANING UP APT SOURCE REPOS ###${NORMAL}"
-echo ""
-
-### Cleanup apt repo deduplicates
-### Install dependencies (if not already present)
-sudo apt install python3-apt python3-regex -y
-
-### Download the script
-wget https://github.com/davidfoerster/aptsources-cleanup/releases/download/v0.1.7.5.2/aptsources-cleanup.pyz
-
-### Make it executable
-chmod +x aptsources-cleanup.pyz
-
-### Run the script
-sudo bash -c "echo all | ./aptsources-cleanup.pyz --yes"
-
-### Remove the script after use
-rm aptsources-cleanup.pyz
-
-echo ""
-echo "${BOLD}### APT SOURCE REPOS ARE NOW CLEAN ###${NORMAL}"
-echo ""
-
-echo ""
 echo "${BOLD}### DETECTING OPERATING SYSTEM AND PERFORMING UPDATES ###${NORMAL}"
 echo ""
 
@@ -140,6 +116,35 @@ echo ""
 if [ "$RASPBIAN" -gt 0 ]; then
     for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do apt remove $pkg; done
     apt update -y
+
+    ### Adding capabilities of bold fonts ###
+    BOLD=$(tput bold)
+    NORMAL=$(tput sgr0)
+
+    echo ""
+    echo "${BOLD}### CLEANING UP APT SOURCE REPOS ###${NORMAL}"
+    echo ""
+
+    ### Cleanup apt repo deduplicates
+    ### Install dependencies (if not already present)
+    sudo apt install python3-apt python3-regex -y
+
+    ### Download the script
+    wget https://github.com/davidfoerster/aptsources-cleanup/releases/download/v0.1.7.5.2/aptsources-cleanup.pyz
+
+    ### Make it executable
+    chmod +x aptsources-cleanup.pyz
+
+    ### Run the script
+    sudo bash -c "echo all | ./aptsources-cleanup.pyz --yes"
+
+    ### Remove the script after use
+    rm aptsources-cleanup.pyz
+
+    echo ""
+    echo "${BOLD}### APT SOURCE REPOS ARE NOW CLEAN ###${NORMAL}"
+    echo ""
+
     apt install ca-certificates curl git -y
     install -m 0755 -d /etc/apt/keyrings
     chmod a+r /etc/apt/keyrings/docker.asc
@@ -174,6 +179,35 @@ if [ "$RASPBIAN" -gt 0 ]; then
 elif [ "$DEBIAN" -gt 0 ]; then
     for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do apt remove $pkg; done
     apt update -y
+
+    ### Adding capabilities of bold fonts ###
+    BOLD=$(tput bold)
+    NORMAL=$(tput sgr0)
+
+    echo ""
+    echo "${BOLD}### CLEANING UP APT SOURCE REPOS ###${NORMAL}"
+    echo ""
+
+    ### Cleanup apt repo deduplicates
+    ### Install dependencies (if not already present)
+    sudo apt install python3-apt python3-regex -y
+
+    ### Download the script
+    wget https://github.com/davidfoerster/aptsources-cleanup/releases/download/v0.1.7.5.2/aptsources-cleanup.pyz
+
+    ### Make it executable
+    chmod +x aptsources-cleanup.pyz
+
+    ### Run the script
+    sudo bash -c "echo all | ./aptsources-cleanup.pyz --yes"
+
+    ### Remove the script after use
+    rm aptsources-cleanup.pyz
+
+    echo ""
+    echo "${BOLD}### APT SOURCE REPOS ARE NOW CLEAN ###${NORMAL}"
+    echo ""
+
     apt install ca-certificates curl -y
     install -m 0755 -d /etc/apt/keyrings
     curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
@@ -193,6 +227,35 @@ elif [ "$DEBIAN" -gt 0 ]; then
 elif [ "$UBUNTU" -gt 0 ]; then
     for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do apt remove $pkg; done
     apt update -y
+
+    ### Adding capabilities of bold fonts ###
+    BOLD=$(tput bold)
+    NORMAL=$(tput sgr0)
+
+    echo ""
+    echo "${BOLD}### CLEANING UP APT SOURCE REPOS ###${NORMAL}"
+    echo ""
+
+    ### Cleanup apt repo deduplicates
+    ### Install dependencies (if not already present)
+    sudo apt install python3-apt python3-regex -y
+
+    ### Download the script
+    wget https://github.com/davidfoerster/aptsources-cleanup/releases/download/v0.1.7.5.2/aptsources-cleanup.pyz
+
+    ### Make it executable
+    chmod +x aptsources-cleanup.pyz
+
+    ### Run the script
+    sudo bash -c "echo all | ./aptsources-cleanup.pyz --yes"
+
+    ### Remove the script after use
+    rm aptsources-cleanup.pyz
+
+    echo ""
+    echo "${BOLD}### APT SOURCE REPOS ARE NOW CLEAN ###${NORMAL}"
+    echo ""
+
     apt install ca-certificates curl -y
     install -m 0755 -d /etc/apt/keyrings
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
