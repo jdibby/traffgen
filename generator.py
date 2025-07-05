@@ -306,7 +306,7 @@ def ping_random():
             print (Style.RESET_ALL)
             subprocess.call(cmd, shell=True)
             
-### SNMP Test
+### SNMP test
 def snmp_random():
     if ARGS.size == 'S':
         target_ips = 1
@@ -375,7 +375,7 @@ def speedtest_fast():
     subprocess.call(cmd, shell=True)
     pass
 
-### NMAP Test
+### NMAP Test (1024 ports)
 def nmap_1024os():
     random.shuffle(nmap_endpoints)
     for ip in nmap_endpoints:
@@ -388,7 +388,8 @@ def nmap_1024os():
         print (Back.GREEN + "##############################################################")
         print (Style.RESET_ALL)
         subprocess.call(cmd, shell=True)
-        
+
+### NMAP Test (CVE)        
 def nmap_cve():
     random.shuffle(nmap_endpoints)
     for ip in nmap_endpoints:

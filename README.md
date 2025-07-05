@@ -19,6 +19,7 @@ This document outlines the various network connectivity, web protocol, security,
 |---|---|---|---|
 | **DNS Lookup** | `dig_random` | `dns` |Performs **DNS A record resolution** for a set of pseudo-random selected domains using multiple pre-configured **DNS recursive resolvers**. This assesses **DNS service availability** and **name resolution latency**. |
 | **ICMP Ping** | `ping_random` | `icmp`  |Executes **ICMP Echo Request/Reply transactions** to a range of pre-defined IP addresses. This verifies fundamental **network layer reachability** and measures **round-trip time (RTT)** and **packet loss**. |
+| **SNMP Polling** | `snmp_random` | `snmp` | Executes SNMP GET requests (snmpwalk) against a list of predefined IP addresses using randomized SNMP community strings. This test verifies SNMP agent availability. |
 | **Traceroute** | `traceroute_random` | `icmp` | Initiates **network path discovery** using **ICMP or UDP-based traceroute** to diverse targets. This maps the **network hops** and identifies potential **routing anomalies** or **latency bottlenecks**. |
 | **SSH Access** | `ssh_random` | `ssh` | Attempts **Secure Shell (SSH) protocol connections** to various remote endpoints. This validates **SSH service availability**, **TCP port 22 accessibility**, and basic **authentication mechanism functionality**. |
 | **NTP Sync** | `ntp_random` | `ntp` | Verifies **Network Time Protocol (NTP) synchronization** status and offset against public NTP stratum 1 servers via the `netcat`. This ensures **accurate system clock synchronization**. |
@@ -120,6 +121,7 @@ nmap_cve
 ntp_random
 ping_random
 speedtest_fast
+snmp_random
 ssh_random
 traceroute_random
 virus_sim_http
