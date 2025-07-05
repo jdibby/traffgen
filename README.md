@@ -21,7 +21,7 @@ This document outlines the various network connectivity, web protocol, security,
 | **ICMP Ping** | `ping_random` | `icmp`  |Executes **ICMP Echo Request/Reply transactions** to a range of pre-defined IP addresses. This verifies fundamental **network layer reachability** and measures **round-trip time (RTT)** and **packet loss**. |
 | **Traceroute** | `traceroute_random` | `icmp` | Initiates **network path discovery** using **ICMP or UDP-based traceroute** to diverse targets. This maps the **network hops** and identifies potential **routing anomalies** or **latency bottlenecks**. |
 | **SSH Access** | `ssh_random` | `ssh` | Attempts **Secure Shell (SSH) protocol connections** to various remote endpoints. This validates **SSH service availability**, **TCP port 22 accessibility**, and basic **authentication mechanism functionality**. |
-| **NTP Sync** | `ntp_random` | `ntp` | Verifies **Network Time Protocol (NTP) synchronization** status and offset against public NTP stratum 1 servers via the `chronyd` daemon. This ensures **accurate system clock synchronization**. |
+| **NTP Sync** | `ntp_random` | `ntp` | Verifies **Network Time Protocol (NTP) synchronization** status and offset against public NTP stratum 1 servers via the `netcat`. This ensures **accurate system clock synchronization**. |
 
 ---
 
@@ -152,9 +152,9 @@ sudo bash < <(curl -s https://raw.githubusercontent.com/jdibby/traffgen/refs/hea
 
 | Image Tag              | Description                                |
 |------------------------|--------------------------------------------|
-| `jdibby/traffgen`      | For ARMv7 (e.g., Raspberry Pi 4)           |
-| `jdibby/traffgen`      | For ARM64 (e.g., Raspberry Pi 5)           |
-| `jdibby/traffgen`      | For x86_64 and other 64-bit platforms      |
+| `jdibby/traffgen:latest`      | For ARMv7 (e.g., Raspberry Pi 4)           |
+| `jdibby/traffgen:latest`      | For ARM64 (e.g., Raspberry Pi 5)           |
+| `jdibby/traffgen:latest`      | For x86_64 and other 64-bit platforms      |
 
 ---
 
@@ -162,7 +162,7 @@ sudo bash < <(curl -s https://raw.githubusercontent.com/jdibby/traffgen/refs/hea
 
 A pre-built containerized version is available on Docker Hub:
 
-🔗 [Docker Hub: jdibby/traffgen](https://hub.docker.com/r/jdibby/traffgen)
+🔗 [Docker Hub: jdibby/traffgen:latest](https://hub.docker.com/r/jdibby/traffgen)
 
 ### View Help Menu
 
