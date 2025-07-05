@@ -377,28 +377,28 @@ def nmap_cve():
         print (Style.RESET_ALL)
         subprocess.call(cmd, shell=True)
 
-### NTP Test
+### NTP Test                                   
 def ntp_random():
     if ARGS.size == 'S':
         target_urls = 1
     elif ARGS.size == 'M':
         target_urls = 2
     elif ARGS.size == 'L':
-        target_urls = 5
+        target_urls = 5   
     elif ARGS.size == 'XL':
         target_urls = len(ntp_endpoints)
     random.shuffle(ntp_endpoints)
     for count_urls, url in enumerate(ntp_endpoints):
         if count_urls < target_urls:
-            cmd = "chronyd -q 'server %s iburst'" % (url)
-            print (Fore.BLACK)
+            cmd = f"(printf '\\x1b'; head -c 47 < /dev/zero) | nc -u -w1 {url} 123"
+            print (Fore.BLACK)         
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
             print ("Testing NTP: Update time against %s" %(url))
-            print (Fore.BLACK)
+            print (Fore.BLACK)            
             print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            subprocess.call(cmd, shell=True)
+            print (Style.RESET_ALL) 
+            subprocess.call(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 ### SSH Test
 def ssh_random():
