@@ -305,6 +305,31 @@ def ping_random():
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
             subprocess.call(cmd, shell=True)
+            
+### SNMP Test
+def snmp_random():
+    if ARGS.size == 'S':
+        target_ips = 1
+    elif ARGS.size == 'M':
+        target_ips = 2
+    elif ARGS.size == 'L':
+        target_ips = 5
+    elif ARGS.size == 'XL':
+        target_ips = len(snmp_endpoints)
+    random.shuffle(snmp_endpoints)
+    random.shuffle(snmp_strings)
+    for count_ips, ip in enumerate(snmp_endpoints):
+        if count_ips < target_ips:
+            community = snmp_strings[count_ips % len(snmp_strings)]
+            cmd = f"snmpwalk -v2c -t1 -r1 -c {community} {ip}"
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
+            print(f"SNMP Polling ({count_ips+1} of {target_ips}): Polling {ip} with community '{community}'")
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
+            subprocess.call(cmd, shell=True)
 
 ### Traceroute test
 def traceroute_random():
@@ -856,7 +881,7 @@ performance analysis, or security simulations.
             'all', 'ads', 'ai', 'bigfile', 'crawl', 'dlp', 'dns', 'ftp',
             'domain-check', 'http', 'https', 'icmp', 'ips', 'netflix',
             'malware-agents', 'malware-download', 'nmap', 'ntp',
-            'pornography', 'ssh', 'url-response', 'virus-sim-http',
+            'pornography', 'snmp', 'ssh', 'url-response', 'virus-sim-http',
             'virus-sim-https',
         ]
         size_choices = ['S', 'M', 'L', 'XL']
@@ -1017,6 +1042,10 @@ performance analysis, or security simulations.
             testsuite = [
                 ping_random,
                 traceroute_random,
+            ]
+        elif ARGS.suite == 'snmp':
+            testsuite = [
+                snmp_random,
             ]
         elif ARGS.suite == 'ips':
             testsuite = [

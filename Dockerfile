@@ -26,7 +26,8 @@ RUN apk update && apk add --no-cache \
     busybox-extras \
     ca-certificates \
     git \
-    net-snmp
+    net-snmp \
+    net-snmp-tools
 
 ### Install appropriate python packages as root
 RUN pip3 install fastcli requests colorama beautifulsoup4 tqdm --break-system-packages
