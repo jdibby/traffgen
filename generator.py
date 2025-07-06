@@ -33,7 +33,6 @@ gobgpd_proc = subprocess.Popen([
 ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 print("Started gobgpd")
 
-
 ### Wait for gobgpd API to come up
 def gobgp_wait_api(host, port, timeout=10):
     start = time.time()
@@ -66,9 +65,11 @@ for neighbor_ip in bgp_neighbors:
         print(f"Error adding neighbor {neighbor_ip}:\n{result.stderr.decode().strip()}")
     else:
         print(f"Successfully added neighbor {neighbor_ip}")
+        
 print (Fore.BLACK)
 print (Back.GREEN + "##############################################################")
 print (Style.RESET_ALL)
+
 ### Continue with the rest of the generator
 while True:
     def bigfile():
