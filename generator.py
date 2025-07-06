@@ -13,7 +13,7 @@ from endpoints import *
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 ### Wait for port function to be called in process check
-def wait_for_port(host, port, timeout=20):
+def gobgp_wait_api(host, port, timeout=20):
     start = time.time()
     while time.time() - start < timeout:
         try:
@@ -24,23 +24,29 @@ def wait_for_port(host, port, timeout=20):
     return False
 
 ### Start gobgpd in the background
-gobgpd_proc = subprocess.Popen([
-    "gobgpd", "--api-hosts", "127.0.0.1:50051"
-], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-print("Started gobgpd")
+print("Starting gobgpd...")
+os.system("gobgpd --api-hosts 127.0.0.1:50051 &")
+time.sleep(1)  # give gobgpd time to fork to background
 
 ### Check to make sure API is up and running
-if not wait_for_port('127.0.0.1', 50051, timeout=30):
+if not gobgp_wait_api('127.0.0.1', 50051, timeout=30):
     print("ERROR: gobgpd API did not start in time")
-    gobgpd_proc.terminate()
-    sys.exit(1)
 
-### Add neighbors using gobgp CLI
+### Add neighbors using gobgp CLI + retry logic
 for neighbor_ip in bgp_neighbors:
     print(f"Adding BGP neighbor: {neighbor_ip}")
-    subprocess.run([
-        "gobgp", "-u", "127.0.0.1", "-p", "50051", "neighbor", "add", neighbor_ip, "as", "65555"
-    ])
+    success = False
+    for attempt in range(1, 11):
+        exit_code = os.system(f"gobgp -u 127.0.0.1 -p 50051 neighbor add {neighbor_ip} as 65555")
+        if exit_code == 0:
+            print(f"Neighbor {neighbor_ip} added successfully.")
+            success = True
+            break
+        else:
+            print(f"Failed to add neighbor {neighbor_ip} (attempt {attempt}), retrying...")
+            time.sleep(1)
+    if not success:
+        print(f"Giving up on neighbor {neighbor_ip} after 10 attempts.")
 
 # Continue with the rest of the generator
 while True:
