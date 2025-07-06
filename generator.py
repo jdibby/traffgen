@@ -13,28 +13,15 @@ from endpoints import *
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 ### Wait for port function to be called in process check
-def gobgp_ready(max_wait=30):
+def gobgp_wait_api(host, port, timeout=20):
     start = time.time()
-    while time.time() - start < max_wait:
+    while time.time() - start < timeout:
         try:
-            result = subprocess.run(
-                ["gobgp", "-u", "127.0.0.1", "-p", "50051", "global"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
-            if result.returncode == 0:
+            with socket.create_connection((host, port), timeout=1):
                 return True
-        except Exception:
-            pass
-        time.sleep(0.5)
+        except OSError:
+            time.sleep(0.5)
     return False
-
-print("Waiting for gobgp API to become fully ready...")
-if not gobgp_ready():
-    print("ERROR: gobgpd is running but API isn't ready in time")
-    gobgpd_proc.terminate()
-    sys.exit(1)
-print("gobgpd API is ready.")
 
 ### Start gobgpd in the background
 gobgpd_proc = subprocess.Popen([
