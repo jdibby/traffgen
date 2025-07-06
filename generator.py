@@ -28,7 +28,7 @@ def get_container_ip():
         return "127.0.0.1"
 
 ### Continue with the rest of the generator (always runs even if BGP initialization fails)
-def bgp_peering()
+def bgp_peering():
     print(Fore.BLACK)
     print(Back.GREEN + "##############################################################")
     print(Style.RESET_ALL)
