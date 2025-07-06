@@ -12,6 +12,17 @@ from endpoints import *
 ### Disable SSL warning for self-signed certs
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+### Wait for port function to be called in process check
+def wait_for_port(host, port, timeout=20):
+    start = time.time()
+    while time.time() - start < timeout:
+        try:
+            with socket.create_connection((host, port), timeout=1):
+                return True
+        except OSError:
+            time.sleep(0.5)
+    return False
+
 ### Start gobgpd in the background
 gobgpd_proc = subprocess.Popen([
     "gobgpd", "--api-hosts", "127.0.0.1:50051"
