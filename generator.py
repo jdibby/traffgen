@@ -18,8 +18,11 @@ gobgpd_proc = subprocess.Popen([
 ])
 print("Started gobgpd")
 
-### Give gobgpd time to initialize
-time.sleep(2)
+### Check to make sure API is up and running
+if not wait_for_port('127.0.0.1', 50051, timeout=30):
+    print("ERROR: gobgpd API did not start in time")
+    gobgpd_proc.terminate()
+    sys.exit(1)
 
 ### Add neighbors using gobgp CLI
 for neighbor_ip in bgp_neighbors:
