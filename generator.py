@@ -12,26 +12,34 @@ from endpoints import *
 ### Disable SSL warning for self-signed certs
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-### Grab containers IP address
+### Grab container IP address
 def get_container_ip():
-    result = subprocess.run(
-        ["ip", "route", "get", "1"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=True
-    )
-    output = result.stdout.decode()
-    return output.split("src")[1].split()[0]
+    try:
+        result = subprocess.run(
+            ["ip", "route", "get", "1"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True
+        )
+        output = result.stdout.decode()
+        return output.split("src")[1].split()[0]
+    except Exception as e:
+        print(f"Failed to determine container IP: {e}")
+        return "127.0.0.1"
 
-print (Fore.BLACK)
-print (Back.GREEN + "##############################################################")
-print (Style.RESET_ALL)
+print(Fore.BLACK)
+print(Back.GREEN + "##############################################################")
+print(Style.RESET_ALL)
 
 ### Start gobgpd in the background
-gobgpd_proc = subprocess.Popen([
-    "gobgpd", "--api-hosts", "127.0.0.1:50051"
-], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-print("Started gobgpd")
+try:
+    gobgpd_proc = subprocess.Popen([
+        "gobgpd", "--api-hosts", "127.0.0.1:50051"
+    ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    print("Started gobgpd")
+except Exception as e:
+    print(f"Failed to start gobgpd: {e}")
+    gobgpd_proc = None  # Let the rest of the script continue
 
 ### Wait for gobgpd API to come up
 def gobgp_wait_api(host, port, timeout=10):
@@ -43,34 +51,41 @@ def gobgp_wait_api(host, port, timeout=10):
         except OSError:
             time.sleep(0.5)
     return False
-    
-### Initialize BGP global config
-print("Configuring global BGP instance...")
-router_id = get_container_ip()
-print(f"Using container IP {router_id} as BGP router-id")
-subprocess.run([
-    "gobgp", "-u", "127.0.0.1", "-p", "50051",
-    "global", "as", "65555", "router-id", router_id
-], check=True)
 
-### Add neighbors using gobgp CLI
-for neighbor_ip in bgp_neighbors:
-    print(f"Adding BGP neighbor: {neighbor_ip}")
-    result = subprocess.run([
-        "gobgp", "-u", "127.0.0.1", "-p", "50051",
-        "neighbor", "add", neighbor_ip, "as", "65555"
-    ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+### Configure BGP (optional, non-blocking)
+if gobgpd_proc and gobgp_wait_api("127.0.0.1", 50051, timeout=15):
+    try:
+        print("Configuring global BGP instance...")
+        router_id = get_container_ip()
+        print(f"Using container IP {router_id} as BGP router-id")
+        subprocess.run([
+            "gobgp", "-u", "127.0.0.1", "-p", "50051",
+            "global", "as", "65555", "router-id", router_id
+        ], check=True)
 
-    if result.returncode != 0:
-        print(f"Error adding neighbor {neighbor_ip}:\n{result.stderr.decode().strip()}")
-    else:
-        print(f"Successfully added neighbor {neighbor_ip}")
-        
-print (Fore.BLACK)
-print (Back.GREEN + "##############################################################")
-print (Style.RESET_ALL)
+        ### Add neighbors using gobgp CLI
+        for neighbor_ip in bgp_neighbors:
+            print(f"Adding BGP neighbor: {neighbor_ip}")
+            result = subprocess.run([
+                "gobgp", "-u", "127.0.0.1", "-p", "50051",
+                "neighbor", "add", neighbor_ip, "as", "65555"
+            ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-### Continue with the rest of the generator
+            if result.returncode != 0:
+                print(f"Error adding neighbor {neighbor_ip}:\n{result.stderr.decode().strip()}")
+            else:
+                print(f"Successfully added neighbor {neighbor_ip}")
+
+    except Exception as e:
+        print(f"BGP configuration failed: {e}")
+else:
+    print("WARNING: gobgpd not ready — skipping BGP setup")
+
+print(Fore.BLACK)
+print(Back.GREEN + "################# Generator Loop Starting ####################")
+print(Style.RESET_ALL)
+
+### Continue with the rest of the generator (always runs even if BGP initialization fails)
 while True:
     def bigfile():
         url = 'http://ipv4.download.thinkbroadband.com/5GB.zip'
