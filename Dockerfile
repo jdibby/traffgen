@@ -57,8 +57,6 @@ RUN git clone https://github.com/osrg/gobgp.git /tmp/gobgp-src \
 ### Scripts used within the container
 ADD generator.py ./
 ADD endpoints.py ./
-COPY gobgp_setup.sh ./
-RUN chmod +x /gobgp_setup.sh
 
 ### Set the generator script as the entrypoint of the container
 ENTRYPOINT ["python3", "-u", "generator.py"]
