@@ -12,8 +12,25 @@ from endpoints import *
 ### Disable SSL warning for self-signed certs
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-### Wait for port function to be called in process check
-def gobgp_wait_api(host, port, timeout=20):
+### Grab containers IP address
+def get_container_ip():
+    result = subprocess.run(
+        ["ip", "route", "get", "1"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=True
+    )
+    output = result.stdout.decode()
+    return output.split("src")[1].split()[0]
+
+### Start gobgpd in the background
+gobgpd_proc = subprocess.Popen([
+    "gobgpd", "--api-hosts", "127.0.0.1:50051"
+], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+print("Started gobgpd")
+
+### Wait for gobgpd API to come up
+def gobgp_wait_api(host, port, timeout=10):
     start = time.time()
     while time.time() - start < timeout:
         try:
@@ -22,25 +39,28 @@ def gobgp_wait_api(host, port, timeout=20):
         except OSError:
             time.sleep(0.5)
     return False
-
-### Start gobgpd in the background
-gobgpd_proc = subprocess.Popen([
-    "gobgpd", "--api-hosts", "127.0.0.1:50051"
-], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-print("Started gobgpd")
-
-### Check to make sure API is up and running
-if not gobgp_wait_api('127.0.0.1', 50051, timeout=30):
-    print("ERROR: gobgpd API did not start in time")
-    gobgpd_proc.terminate()
-    sys.exit(1)
+    
+### Initialize BGP global config
+print("Configuring global BGP instance...")
+router_id = get_container_ip()
+print(f"Using container IP {router_id} as BGP router-id")
+subprocess.run([
+    "gobgp", "-u", "127.0.0.1", "-p", "50051",
+    "global", "as", "65555", "router-id", router_id
+], check=True)
 
 ### Add neighbors using gobgp CLI
 for neighbor_ip in bgp_neighbors:
     print(f"Adding BGP neighbor: {neighbor_ip}")
-    subprocess.run([
-        "gobgp", "-u", "127.0.0.1", "-p", "50051", "neighbor", "add", neighbor_ip, "as", "65555"
-    ])
+    result = subprocess.run([
+        "gobgp", "-u", "127.0.0.1", "-p", "50051",
+        "neighbor", "add", neighbor_ip, "as", "65555"
+    ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    if result.returncode != 0:
+        print(f"Error adding neighbor {neighbor_ip}:\n{result.stderr.decode().strip()}")
+    else:
+        print(f"Successfully added neighbor {neighbor_ip}")
 
 # Continue with the rest of the generator
 while True:
