@@ -951,7 +951,7 @@ performance analysis, or security simulations.
 
         ### Define common choices to avoid repetition
         suite_choices = [
-            'all', 'ads', 'ai', 'bigfile', 'crawl', 'dlp', 'dns', 'ftp',
+            'all', 'ads', 'ai', 'bigfile', 'bgp', 'crawl', 'dlp', 'dns', 'ftp',
             'domain-check', 'http', 'https', 'icmp', 'ips', 'netflix',
             'malware-agents', 'malware-download', 'nmap', 'ntp',
             'pornography', 'snmp', 'ssh', 'url-response', 'virus-sim-http',
