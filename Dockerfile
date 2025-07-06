@@ -59,7 +59,7 @@ ADD generator.py ./
 ADD endpoints.py ./
 
 ### Set the generator script as the entrypoint of the container
-ENTRYPOINT ["python3", "generator.py"]
+ENTRYPOINT ["python3", "-u", "generator.py"]
 
 ### Variables to set for the generator
 CMD ["--suite=all", "--size=S", "--max-wait-secs=20", "--loop"]
