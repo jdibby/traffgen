@@ -27,75 +27,76 @@ def get_container_ip():
         print(f"Failed to determine container IP: {e}")
         return "127.0.0.1"
 
-print(Fore.BLACK)
-print(Back.GREEN + "##############################################################")
-print(Style.RESET_ALL)
-
-### Start gobgpd in the background
-try:
-    gobgpd_proc = subprocess.Popen([
-        "gobgpd", "--api-hosts", "127.0.0.1:50051"
-    ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    print("Started gobgpd")
-except Exception as e:
-    print(f"Failed to start gobgpd: {e}")
-    gobgpd_proc = None  # Let the rest of the script continue
-
-### Wait for gobgpd API to come up
-def gobgp_wait_api(host, port, timeout=10):
-    start = time.time()
-    while time.time() - start < timeout:
-        try:
-            with socket.create_connection((host, port), timeout=1):
-                return True
-        except OSError:
-            time.sleep(0.5)
-    return False
-
-### Configure BGP (optional, non-blocking)
-if gobgpd_proc and gobgp_wait_api("127.0.0.1", 50051, timeout=15):
-    try:
-        print("Configuring global BGP instance...")
-        router_id = get_container_ip()
-        print(f"Using container IP {router_id} as BGP router-id")
-        subprocess.run([
-            "gobgp", "-u", "127.0.0.1", "-p", "50051",
-            "global", "as", "65555", "router-id", router_id
-        ], check=True)
-
-        ### Add neighbors using gobgp CLI
-        for neighbor_ip in bgp_neighbors:
-            print(f"Adding BGP neighbor: {neighbor_ip}")
-            result = subprocess.run([
-                "gobgp", "-u", "127.0.0.1", "-p", "50051",
-                "neighbor", "add", neighbor_ip, "as", "65555"
-            ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-            if result.returncode != 0:
-                print(f"Error adding neighbor {neighbor_ip}:\n{result.stderr.decode().strip()}")
-            else:
-                print(f"Successfully added neighbor {neighbor_ip}")
-
-    except Exception as e:
-        print(f"BGP configuration failed: {e}")
-else:
-    print("WARNING: gobgpd not ready — skipping BGP setup")
-
 ### Continue with the rest of the generator (always runs even if BGP initialization fails)
 while True:
+    def bgp_peering()
+        print(Fore.BLACK)
+        print(Back.GREEN + "##############################################################")
+        print(Style.RESET_ALL)
+
+        ### Start gobgpd in the background
+        try:
+            gobgpd_proc = subprocess.Popen([
+                "gobgpd", "--api-hosts", "127.0.0.1:50051"
+            ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            print("Started gobgpd")
+        except Exception as e:
+            print(f"Failed to start gobgpd: {e}")
+            gobgpd_proc = None  # Let the rest of the script keep on trucking
+
+        ### Wait for gobgpd API to come up
+        def gobgp_wait_api(host, port, timeout=10):
+            start = time.time()
+            while time.time() - start < timeout:
+                try:
+                    with socket.create_connection((host, port), timeout=1):
+                        return True
+                except OSError:
+                    time.sleep(0.5)
+            return False
+
+        ### Configure BGP
+        if gobgpd_proc and gobgp_wait_api("127.0.0.1", 50051, timeout=15):
+            try:
+                print("Configuring global BGP instance...")
+                router_id = get_container_ip()
+                print(f"Using container IP {router_id} as BGP router-id")
+                subprocess.run([
+                    "gobgp", "-u", "127.0.0.1", "-p", "50051",
+                    "global", "as", "65555", "router-id", router_id
+                ], check=True)
+
+                ### Add neighbors using gobgp CLI
+                for neighbor_ip in bgp_neighbors:
+                    print(f"Adding BGP neighbor: {neighbor_ip}")
+                    result = subprocess.run([
+                        "gobgp", "-u", "127.0.0.1", "-p", "50051",
+                        "neighbor", "add", neighbor_ip, "as", "65555"
+                    ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+                    if result.returncode != 0:
+                        print(f"Error adding neighbor {neighbor_ip}:\n{result.stderr.decode().strip()}")
+                    else:
+                        print(f"Successfully added neighbor {neighbor_ip}")
+            except Exception as e:
+                print(f"BGP configuration failed: {e}")
+        else:
+            print("WARNING: gobgpd not ready — skipping BGP setup")
+    
+    ### Bigfile download via http
     def bigfile():
         url = 'http://ipv4.download.thinkbroadband.com/5GB.zip'
         response = requests.get(url, stream=True)
         total_size = int(response.headers.get('content-length', 0))
 
-        # Display progress information
+        ### Display progress information
         print(Fore.BLACK + Back.GREEN + "##############################################################")
         print(Style.RESET_ALL)
         print("Testing Bigfile: Downloading 5GB ZIP File")
         print(Fore.BLACK + Back.GREEN + "##############################################################")
         print(Style.RESET_ALL)
 
-        # Progress bar
+        ### Progress bar
         with tqdm(total=total_size, unit='B', unit_scale=True, desc='Downloading', ascii=True) as progress_bar:
             for chunk in response.iter_content(chunk_size=1024):
                 if chunk:  # Filter out keep-alive new chunks
@@ -1048,6 +1049,7 @@ while True:
             if ARGS.suite == 'all':
                 testsuite = [
                     dig_random,
+                    bgp_peering,
                     ftp_random,
                     http_download_targz,
                     http_download_zip,
@@ -1083,6 +1085,10 @@ while True:
             elif ARGS.suite == 'dns':
                 testsuite = [
                     dig_random,
+                ]
+            elif ARGS.suite == 'bgp':
+                testsuite = [
+                    bgp_peering,
                 ]
             elif ARGS.suite == 'ftp':
                 testsuite = [
