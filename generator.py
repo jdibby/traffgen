@@ -23,11 +23,16 @@ def get_container_ip():
     output = result.stdout.decode()
     return output.split("src")[1].split()[0]
 
+print (Fore.BLACK)
+print (Back.GREEN + "##############################################################")
+print (Style.RESET_ALL)
+
 ### Start gobgpd in the background
 gobgpd_proc = subprocess.Popen([
     "gobgpd", "--api-hosts", "127.0.0.1:50051"
 ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 print("Started gobgpd")
+
 
 ### Wait for gobgpd API to come up
 def gobgp_wait_api(host, port, timeout=10):
@@ -61,8 +66,10 @@ for neighbor_ip in bgp_neighbors:
         print(f"Error adding neighbor {neighbor_ip}:\n{result.stderr.decode().strip()}")
     else:
         print(f"Successfully added neighbor {neighbor_ip}")
-
-# Continue with the rest of the generator
+print (Fore.BLACK)
+print (Back.GREEN + "##############################################################")
+print (Style.RESET_ALL)
+### Continue with the rest of the generator
 while True:
     def bigfile():
         url = 'http://ipv4.download.thinkbroadband.com/5GB.zip'
