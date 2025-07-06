@@ -42,8 +42,8 @@ for neighbor_ip in bgp_neighbors:
         for attempt in range(retries):
             print(f"Configuring BGP neighbor: {neighbor_ip} (attempt {attempt+1})")
             result = subprocess.run(
-                ["gobgp -u 127.0.0.1 -p 50051 global as 65555 router-id 172.30.0.2"],
-#                ["gobgp -u 127.0.0.1 -p 50051 neighbor add", neighbor_ip, "as 65555"],
+#["gobgp -u 127.0.0.1 -p 50051 global as 65555 router-id 172.30.0.2"],
+#["/usr/local/bin/gobgp -u 127.0.0.1 -p 50051 neighbor add", neighbor_ip, "as 65555"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT
             )
