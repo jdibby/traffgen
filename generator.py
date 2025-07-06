@@ -81,10 +81,6 @@ if gobgpd_proc and gobgp_wait_api("127.0.0.1", 50051, timeout=15):
 else:
     print("WARNING: gobgpd not ready — skipping BGP setup")
 
-print(Fore.BLACK)
-print(Back.GREEN + "################# Generator Loop Starting ####################")
-print(Style.RESET_ALL)
-
 ### Continue with the rest of the generator (always runs even if BGP initialization fails)
 while True:
     def bigfile():
