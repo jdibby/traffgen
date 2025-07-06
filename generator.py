@@ -1,7 +1,7 @@
 #!/usr/local/bin python3
 
 ### Import of required modules
-import time, os, sys, subprocess, argparse, socket, random, signal, urllib.request, urllib3, ssl, requests
+import time, os, sys, subprocess, argparse, socket, random, threading, signal, urllib.request, urllib3, ssl, requests
 from bs4 import BeautifulSoup
 from time import sleep
 from urllib.parse import urljoin
@@ -23,11 +23,18 @@ def wait_for_port(host, port, timeout=20):
             time.sleep(0.5)
     return False
 
+def drain_pipe(pipe):
+    for line in iter(pipe.readline, b''):
+        print(f"[gobgpd] {line.decode().rstrip()}")
+
 ### Start gobgpd in the background
 gobgpd_proc = subprocess.Popen([
     "gobgpd", "--api-hosts", "127.0.0.1:50051"
-])
+], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 print("Started gobgpd")
+
+threading.Thread(target=drain_pipe, args=(gobgpd_proc.stdout,), daemon=True).start()
+threading.Thread(target=drain_pipe, args=(gobgpd_proc.stderr,), daemon=True).start()
 
 ### Check to make sure API is up and running
 if not wait_for_port('127.0.0.1', 50051, timeout=30):
