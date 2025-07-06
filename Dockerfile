@@ -27,7 +27,9 @@ RUN apk update && apk add --no-cache \
     ca-certificates \
     git \
     net-snmp \
-    net-snmp-tools
+    net-snmp-tools \
+    go \
+    build-base
 
 ### Install appropriate python packages as root
 RUN pip3 install fastcli requests colorama beautifulsoup4 tqdm --break-system-packages
@@ -42,11 +44,21 @@ RUN git clone https://github.com/nmap/nmap.git /nmap-src \
 ### Set NMAP directory environment
 ENV NMAPDIR=/usr/share/nmap
 
+### Build and install GoBGP v3.37.0 from source
+RUN git clone https://github.com/osrg/gobgp.git /tmp/gobgp-src \
+ && cd /tmp/gobgp-src \
+ && git checkout v3.37.0 \
+ && go build -o gobgp ./cmd/gobgp \
+ && go build -o gobgpd ./cmd/gobgpd \
+ && mv gobgp gobgpd /usr/local/bin/ \
+ && cd / \
+ && rm -rf /tmp/gobgp-src
+
 ### Scripts used within the container
 ADD generator.py ./
 ADD endpoints.py ./
 
-### Set the generatory script as the entrypoint of the container
+### Set the generator script as the entrypoint of the container
 ENTRYPOINT ["python3", "generator.py"]
 
 ### Variables to set for the generator

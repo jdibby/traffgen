@@ -1806,3 +1806,10 @@ malware_files = [
     "https://raw.githubusercontent.com/Cryakl/Ultimate-RAT-Collection/main/NjRat/Ziku/CRONOS_Rat/CRONOS_Rat.7z",
     "https://raw.githubusercontent.com/Cryakl/Ultimate-RAT-Collection/main/NjRat/Ziku/NJRat_0.7d_Ziku/NJRat_0.7d_Ziku.7z",
 ]
+
+bgp_neighbors = [
+    "192.168.1.1",
+    "10.0.0.1",
+    "172.16.0.1",
+    "12.12.12.12",
+]

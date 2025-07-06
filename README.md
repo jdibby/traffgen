@@ -23,6 +23,7 @@ This document outlines the various network connectivity, web protocol, security,
 | **Traceroute** | `traceroute_random` | `icmp` | Initiates **network path discovery** using **ICMP or UDP-based traceroute** to diverse targets. This maps the **network hops** and identifies potential **routing anomalies** or **latency bottlenecks**. |
 | **SSH Access** | `ssh_random` | `ssh` | Attempts **Secure Shell (SSH) protocol connections** to various remote endpoints. This validates **SSH service availability**, **TCP port 22 accessibility**, and basic **authentication mechanism functionality**. |
 | **NTP Sync** | `ntp_random` | `ntp` | Verifies **Network Time Protocol (NTP) synchronization** status and offset against public NTP stratum 1 servers via the `netcat`. This ensures **accurate system clock synchronization**. |
+| **BGP Peering** | `N/A` | `N/A` | Establishes BGP peering using the [GoBGP](https://github.com/osrg/gobgp) project with ASN **65555**. Attempts connections with a predefined list of neighbors to validate BGP sessions. |
 
 ---
 
