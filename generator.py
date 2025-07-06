@@ -82,6 +82,18 @@ def bgp_peering():
     else:
         print("WARNING: gobgpd not ready — skipping BGP setup")
 
+    ### Waiting 10 seconds before killing gobgpd
+    print("Waiting 10 seconds before terminating gobgpd...")
+    time.sleep(10)
+
+    ### Silently killing gobgpd
+    if gobgpd_proc:
+        gobgpd_proc.terminate()
+        try:
+            gobgpd_proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            gobgpd_proc.kill()
+
 ### Bigfile download via http
 def bigfile():
     url = 'http://ipv4.download.thinkbroadband.com/5GB.zip'
