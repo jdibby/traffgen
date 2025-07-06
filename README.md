@@ -23,7 +23,7 @@ This document outlines the various network connectivity, web protocol, security,
 | **Traceroute** | `traceroute_random` | `icmp` | Initiates **network path discovery** using **ICMP or UDP-based traceroute** to diverse targets. This maps the **network hops** and identifies potential **routing anomalies** or **latency bottlenecks**. |
 | **SSH Access** | `ssh_random` | `ssh` | Attempts **Secure Shell (SSH) protocol connections** to various remote endpoints. This validates **SSH service availability**, **TCP port 22 accessibility**, and basic **authentication mechanism functionality**. |
 | **NTP Sync** | `ntp_random` | `ntp` | Verifies **Network Time Protocol (NTP) synchronization** status and offset against public NTP stratum 1 servers via the `netcat`. This ensures **accurate system clock synchronization**. |
-| **BGP Peering** | `N/A` | `N/A` | Establishes BGP peering using the [GoBGP](https://github.com/osrg/gobgp) project with ASN **65555**. Attempts connections with a predefined list of neighbors to validate BGP sessions. |
+| **BGP Peering** | `bgp_peering` | `bgp` | Establishes BGP peering using the [GoBGP](https://github.com/osrg/gobgp) project with ASN **65555**. Attempts connections with a predefined list of neighbors to validate BGP sessions. |
 
 ---
 
@@ -88,7 +88,7 @@ This document outlines the various network connectivity, web protocol, security,
 
 | Flag | Description |
 |---|---|
-| `--suite` | Specifies the **test suite(s)** to execute. Accepted arguments include predefined categories such as `all` (all available tests), `http`, `dns`, `nmap`, or custom groupings. This allows for focused testing. |
+| `--suite` | Specifies the **test suite(s)** to execute. Accepted arguments include predefined categories such as `all` (all available tests), `http`, `dns`, `nmap`. This allows for focused testing. |
 | `--size` | Defines the **scale or intensity of the test execution**. Options include `S` (Small), `M` (Medium), `L` (Large), and `XL` (Extra Large), which typically correlate to the number of iterations, concurrency, or data volume. |
 | `--loop` | Activates **continuous test execution**, causing the selected test suite to run indefinitely in an infinite loop until manually terminated. Ideal for long-duration network monitoring. |
 | `--max-wait-secs` | Sets the **maximum randomized delay** (in seconds) that will be introduced between successive iterations when the `--loop` flag is active. This helps simulate more realistic traffic patterns and prevent overwhelming target systems. |
@@ -113,6 +113,7 @@ malware_random
 malware_download
 pornography_crawl
 ips
+bgp
 dlp_sim_https
 ads_random
 ai_https_random
