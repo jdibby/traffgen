@@ -38,8 +38,29 @@ if not gobgp_wait_api('127.0.0.1', 50051, timeout=30):
 ### Add neighbors using gobgp CLI
 for neighbor_ip in bgp_neighbors:
     print(f"Adding BGP neighbor: {neighbor_ip}")
-    subprocess.run(["/gobgp_setup.sh", neighbor_ip])
+    def run_gobgp_setup(neighbor_ip, retries=5, delay=2):
+        for attempt in range(retries):
+            print(f"Configuring BGP neighbor: {neighbor_ip} (attempt {attempt+1})")
+            result = subprocess.run(
+                ["/gobgp_setup.sh", neighbor_ip],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT
+            )
+            output = result.stdout.decode()
 
+            if "rpc error" not in output:
+                print(output.strip())
+                return True
+
+            print("Still waiting for BGP server to be ready...")
+            time.sleep(delay)
+
+        print(f"ERROR: Failed to add neighbor {neighbor_ip} after {retries} retries.")
+        return False
+
+# Use it in your loop
+for neighbor_ip in bgp_neighbors:
+    run_gobgp_setup(neighbor_ip)
 
 # Continue with the rest of the generator
 while True:
