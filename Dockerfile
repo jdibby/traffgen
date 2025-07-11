@@ -48,7 +48,7 @@ RUN git -c http.sslVerify=false clone https://github.com/nmap/nmap.git /nmap-src
 ENV NMAPDIR=/usr/share/nmap
 
 ### Build and install GoBGP v3.37.0 from source
-RUN git clone https://github.com/osrg/gobgp.git /tmp/gobgp-src \
+RUN git -c http.sslVerify=false clone https://github.com/osrg/gobgp.git /tmp/gobgp-src \
  && cd /tmp/gobgp-src \
  && git checkout v3.37.0 \
  && go build -o gobgp ./cmd/gobgp \
