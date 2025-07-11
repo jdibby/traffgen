@@ -35,7 +35,7 @@ RUN apk update && apk add --no-cache \
 RUN pip3 install fastcli requests colorama beautifulsoup4 tqdm --break-system-packages
 
 ### Pull down all nmap scripts and nse libraries for security scanning
-RUN git clone https://github.com/nmap/nmap.git /nmap-src \
+RUN git clone https://github.com/nmap /nmap-src \
  && mkdir -p /usr/share/nmap \
  && cp /nmap-src/nse_main.lua /usr/share/nmap/ \
  && cp -r /nmap-src/scripts /usr/share/nmap/ \
