@@ -1,7 +1,7 @@
 #!/usr/local/bin python3
 
 ### Import of required modules
-import time, os, sys, subprocess, argparse, socket, random, threading, signal, urllib.request, urllib3, ssl, requests
+import time, os, sys, subprocess, argparse, socket, random, threading, signal, urllib.request, urllib3, ssl, requests, runpy
 from bs4 import BeautifulSoup
 from time import sleep
 from urllib.parse import urljoin
@@ -11,6 +11,7 @@ from endpoints import *
 
 ### Disable SSL warning for self-signed certs
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+ssl._create_default_https_context = ssl._create_unverified_context
 
 ### Grab container IP address
 def get_container_ip():
