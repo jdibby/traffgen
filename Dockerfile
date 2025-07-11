@@ -38,11 +38,11 @@ RUN pip3 install fastcli requests colorama beautifulsoup4 tqdm --break-system-pa
 RUN update-ca-certificates
 
 ### Pull down all nmap scripts and nse libraries for security scanning
-RUN git clone https://github.com/nmap /nmap-src \
- && mkdir -p /usr/share/nmap \
- && cp /nmap-src/nse_main.lua /usr/share/nmap/ \
- && cp -r /nmap-src/scripts /usr/share/nmap/ \
- && cp -r /nmap-src/nselib /usr/share/nmap/
+RUN git -c http.sslVerify=false clone https://github.com/nmap /nmap-src \
+    && mkdir -p /usr/share/nmap \
+    && cp /nmap-src/nse_main.lua /usr/share/nmap/ \
+    && cp -r /nmap-src/scripts /usr/share/nmap/ \
+    && cp -r /nmap-src/nselib /usr/share/nmap/
 
 ### Set NMAP directory environment
 ENV NMAPDIR=/usr/share/nmap
