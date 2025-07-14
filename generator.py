@@ -464,7 +464,7 @@ def speedtest_fast():
 def nmap_1024os():
     random.shuffle(nmap_endpoints)
     for ip in nmap_endpoints:
-        cmd = 'nmap -Pn -p 1-1024 %s -T3 --randomize-hosts --script-timeout 1m --script-args http.useragent "Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko" -debug' % ip
+        cmd = 'nmap -Pn -p 1-1024 %s -T3 --max-parallelism 10 --randomize-hosts --host-timeout 1m --script-timeout 1m --script-args http.useragent "Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko" -debug' % ip
         print (Fore.BLACK)
         print (Back.GREEN + "##############################################################")
         print (Style.RESET_ALL)
@@ -478,7 +478,7 @@ def nmap_1024os():
 def nmap_cve():
     random.shuffle(nmap_endpoints)
     for ip in nmap_endpoints:
-        cmd = 'nmap -sV --script=ALL %s -T3 --randomize-hosts --script-timeout 1m --script-args http.useragent "Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko" -debug' % ip
+        cmd = 'nmap -sV --script=ALL %s -T3 --max-parallelism 10 --randomize-hosts --host-timeout 1m --script-timeout 1m --script-args http.useragent "Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko" -debug' % ip
         print (Fore.BLACK)
         print (Back.GREEN + "##############################################################")
         print (Style.RESET_ALL)
