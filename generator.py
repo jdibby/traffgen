@@ -462,9 +462,17 @@ def speedtest_fast():
 
 ### NMAP Test (1024 ports)
 def nmap_1024os():
+    if ARGS.size == 'S':
+        target_ips = 1
+    elif ARGS.size == 'M':
+        target_ips = 2
+    elif ARGS.size == 'L':
+        target_ips = 5
+    elif ARGS.size == 'XL':
+        target_ips = len(nmap_endpoints)
     random.shuffle(nmap_endpoints)
     for ip in nmap_endpoints:
-        cmd = 'nmap -Pn -p 1-1024 %s -T3 --max-retries 0 --max-parallelism 10 --randomize-hosts --host-timeout 1m --script-timeout 1m --script-args http.useragent "Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko" -debug' % ip
+        cmd = 'nmap -Pn -p 1-1024 %s -T3 --max-retries 0 --max-parallelism 2 --randomize-hosts --host-timeout 1m --script-timeout 1m --script-args http.useragent "Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko" -debug' % ip
         print (Fore.BLACK)
         print (Back.GREEN + "##############################################################")
         print (Style.RESET_ALL)
@@ -476,9 +484,17 @@ def nmap_1024os():
 
 ### NMAP Test (CVE)        
 def nmap_cve():
+    if ARGS.size == 'S':
+        target_ips = 1
+    elif ARGS.size == 'M':
+        target_ips = 2
+    elif ARGS.size == 'L':
+        target_ips = 5
+    elif ARGS.size == 'XL':
+        target_ips = len(nmap_endpoints)
     random.shuffle(nmap_endpoints)
     for ip in nmap_endpoints:
-        cmd = 'nmap -sV --script=ALL %s -T3 --max-retries 0 --max-parallelism 10 --randomize-hosts --host-timeout 1m --script-timeout 1m --script-args http.useragent "Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko" -debug' % ip
+        cmd = 'nmap -sV --script=ALL %s -T3 --max-retries 0 --max-parallelism 2 --randomize-hosts --host-timeout 1m --script-timeout 1m --script-args http.useragent "Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko" -debug' % ip
         print (Fore.BLACK)
         print (Back.GREEN + "##############################################################")
         print (Style.RESET_ALL)
