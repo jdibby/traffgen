@@ -471,16 +471,18 @@ def nmap_1024os():
     elif ARGS.size == 'XL':
         target_ips = len(nmap_endpoints)
     random.shuffle(nmap_endpoints)
-    for ip in nmap_endpoints:
-        cmd = 'nmap -Pn -p 1-1024 %s -T3 --max-retries 0 --max-parallelism 2 --randomize-hosts --host-timeout 1m --script-timeout 1m --script-args http.useragent "Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko" -debug' % ip
-        print (Fore.BLACK)
-        print (Back.GREEN + "##############################################################")
-        print (Style.RESET_ALL)
-        print ("Testing NMAP: NMAP Scan First 1024 Ports of %s" %(ip))
-        print (Fore.BLACK)
-        print (Back.GREEN + "##############################################################")
-        print (Style.RESET_ALL)
-        subprocess.call(cmd, shell=True)
+    for count_ips, ip in enumerate(nmap_endpoints):
+        if count_ips < target_ips:
+            cmd = 'nmap -Pn -p 1-1024 %s -T3 --max-retries 0 --max-parallelism 2 --randomize-hosts --host-timeout 1m --script-timeout 1m --script-args http.useragent "Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko" -debug' % ip
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
+            print ("Testing NMAP: NMAP Scan First 1024 Ports of %s" %(ip))
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
+            subprocess.call(cmd, shell=True)
+
 
 ### NMAP Test (CVE)        
 def nmap_cve():
@@ -493,16 +495,17 @@ def nmap_cve():
     elif ARGS.size == 'XL':
         target_ips = len(nmap_endpoints)
     random.shuffle(nmap_endpoints)
-    for ip in nmap_endpoints:
-        cmd = 'nmap -sV --script=ALL %s -T3 --max-retries 0 --max-parallelism 2 --randomize-hosts --host-timeout 1m --script-timeout 1m --script-args http.useragent "Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko" -debug' % ip
-        print (Fore.BLACK)
-        print (Back.GREEN + "##############################################################")
-        print (Style.RESET_ALL)
-        print ("Testing NMAP: NMAP CVE Scan of %s" %(ip))
-        print (Fore.BLACK)
-        print (Back.GREEN + "##############################################################")
-        print (Style.RESET_ALL)
-        subprocess.call(cmd, shell=True)
+    for count_ips, ip in enumerate(nmap_endpoints):
+        if count_ips < target_ips:
+            cmd = 'nmap -sV --script=ALL %s -T3 --max-retries 0 --max-parallelism 2 --randomize-hosts --host-timeout 1m --script-timeout 1m --script-args http.useragent "Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko" -debug' % ip
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
+            print ("Testing NMAP: NMAP Scan First 1024 Ports of %s" %(ip))
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
+            subprocess.call(cmd, shell=True)
 
 ### NTP Test                                   
 def ntp_random():
