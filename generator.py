@@ -501,7 +501,7 @@ def nmap_cve():
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
-            print ("Testing NMAP: NMAP Scan First 1024 Ports of %s" %(ip))
+            print ("Testing NMAP: NMAP CVE Scan of %s" %(ip))
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
