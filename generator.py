@@ -316,7 +316,7 @@ def https_crawl():
 ### Pornography crawl through URLs
 def pornography_crawl():
     if ARGS.size == 'S':
-        target_urls = 10
+        target_urls = 10 
         iterations = 1
     elif ARGS.size == 'M':
         target_urls = 20
@@ -894,18 +894,17 @@ def replace_all_endpoints(url):
 
 ### Grab random links from website
 def scrape_single_link(url):
-    # Randomize user agent and time between requets
+    # Randomize user agent and time between requests
     sleep(random.uniform(0.2, 2))
     random.shuffle(user_agents)
 
-    ### Get site contents
     try:
         response = requests.request(
             method="GET",
             url=url,
             timeout=2,
             allow_redirects=True,
-            headers = {
+            headers={
                 'User-Agent': user_agents[0],
             }
         )
@@ -926,33 +925,35 @@ def scrape_single_link(url):
         print(f"Error: General failure for {url}")
         return None
 
-    ### Parse HTML
-    soup = BeautifulSoup(response.content, 'html.parser')
+    # Handle encoding
+    response.encoding = response.apparent_encoding or 'utf-8'
+    html = response.text
 
-    ### Print page URL and title
+    # Parse HTML
+    soup = BeautifulSoup(html, 'html.parser')
+
+    # Print page URL and title
     try:
         print(f"{url} - {soup.title.string.encode('unicode_escape').decode('utf-8')}")
     except:
         print(f"{url} - no title")
 
-    ### Find and randomize all links on page
+    # Find and randomize all links on page
     all_links = soup.find_all("a")
     random.shuffle(all_links)
 
-    ### Pick one, format it, and return it
     for link in all_links:
-        if link.has_attr('href'):
-            if '#' in link['href']:
-                continue
-            if link['href'].startswith("/") or link['href'].startswith("//"):
-                return urljoin(url, link['href'])
-            if link['href'].startswith("http"):
-                return link['href']
-            else:
-                continue
+        href = link.get('href')
+        if not href or '#' in href:
+            continue
+        if href.startswith("//") or href.startswith("/"):
+            return urljoin(url, href)
+        elif href.startswith("http"):
+            return href
         else:
             continue
-    print("Dead end.")
+
+    print("DEAD END")
     return None
 
 ### Loop over scraped links
@@ -1206,7 +1207,6 @@ performance analysis, or security simulations.
             testsuite = [
                 malware_download,
             ]
-        ### Import targets from endpoints.py from endpoints import *
 
         ### SEND IT!
         run_test(testsuite)
