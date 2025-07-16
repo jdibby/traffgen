@@ -17,12 +17,12 @@ This document outlines the various network connectivity, web protocol, security,
 
 | ✅ Test | 🧩 Function | 🧩 Suite Flag |🔍 Description |
 |---|---|---|---|
-| **DNS Lookup** | `dig_random` | `dns` |Performs **DNS A record resolution** for a set of pseudo-random selected domains using multiple pre-configured **DNS recursive resolvers**. This assesses **DNS service availability** and **name resolution latency**. |
-| **ICMP Ping** | `ping_random` | `icmp`  |Executes **ICMP Echo Request/Reply transactions** to a range of pre-defined IP addresses. This verifies fundamental **network layer reachability** and measures **round-trip time (RTT)** and **packet loss**. |
+| **DNS Lookup** | `dig_random` | `dns` | Performs **DNS A record resolution** for a set of randomly selected domains using multiple pre-configured **DNS recursive resolvers**. This assesses **DNS service availability** and **name resolution latency**. |
+| **ICMP Ping** | `ping_random` | `icmp`  | Executes **ICMP Echo Request/Reply transactions** to a range of pre-defined IP addresses. This verifies fundamental **network layer reachability** and measures **round-trip time (RTT)** and **packet loss**. |
 | **SNMP Polling** | `snmp_random` | `snmp` | Executes SNMP GET requests (snmpwalk) against a list of predefined IP addresses using randomized SNMP community strings. This test verifies SNMP agent availability. |
-| **Traceroute** | `traceroute_random` | `icmp` | Initiates **network path discovery** using **ICMP or UDP-based traceroute** to diverse targets. This maps the **network hops** and identifies potential **routing anomalies** or **latency bottlenecks**. |
-| **SSH Access** | `ssh_random` | `ssh` | Attempts **Secure Shell (SSH) protocol connections** to various remote endpoints. This validates **SSH service availability**, **TCP port 22 accessibility**, and basic **authentication mechanism functionality**. |
-| **NTP Sync** | `ntp_random` | `ntp` | Verifies **Network Time Protocol (NTP) synchronization** status and offset against public NTP stratum 1 servers via the `netcat`. This ensures **accurate system clock synchronization**. |
+| **Traceroute** | `traceroute_random` | `icmp` | Initiates **network path discovery** using **ICMP or UDP-based traceroute** to remote targets. This maps the **network hops** and identifies potential **routing anomalies** or **latency bottlenecks**. |
+| **SSH Access** | `ssh_random` | `ssh` | Attempts **Secure Shell (SSH) protocol connections** to various remote endpoints. This validates **SSH service availability** and **TCP port 22 accessibility**. |
+| **NTP Sync** | `ntp_random` | `ntp` | Verifies **Network Time Protocol (NTP) synchronization** status and offset against public NTP stratum 1 servers via the `netcat` tool. |
 | **BGP Peering** | `bgp_peering` | `bgp` | Establishes BGP peering using the [GoBGP](https://github.com/osrg/gobgp) project with ASN **65555**. Attempts connections with a predefined list of neighbors to validate BGP sessions. |
 
 ---
@@ -31,9 +31,9 @@ This document outlines the various network connectivity, web protocol, security,
 
 | ✅ Test | 🧩 Function | 🧩 Suite Flag |🔍 Description |
 |---|---|---|---|
-| **HTTP Requests** | `http_random` | `http` | Queries with **HTTP/1.1 GET requests** to a variety of web servers, dynamically generating diverse `User-Agent` headers to simulate various client types. This assesses **unencrypted web service availability** and **HTTP response codes**. |
+| **HTTP Requests** | `http_random` | `http` | Queries with **HTTP/1.1 GET requests** to a variety of web servers, using diverse `User-Agent` headers to simulate various client types. This assesses **unencrypted web service availability** and **HTTP response codes**. |
 | **ZIP File Download** | `http_download_zip` | `http` | Initiates **HTTP downloads of `.zip` archives** across multiple predefined file sizes (e.g., 1MB, 10MB, 100MB). This evaluates **data throughput**, **file integrity**, and **HTTP range request support**. |
-| **TAR.GZ Download** | `http_download_targz` | `http` | Downloads the latest stable release of the **WordPress core `.tar.gz` archive** via HTTP. This specifically tests retrieval of a common, large, compressed software distribution. |
+| **TAR.GZ Download** | `http_download_targz` | `http` | Downloads the latest stable release of the **WordPress core `.tar.gz` archive** via HTTP. This specifically tests retrieval of a common compressed software distribution. |
 | **HTTPS Requests** | `https_random` | `https` | Transmits **HTTPS/TLS GET requests** to secure web servers, utilizing randomized `User-Agent` strings. This validates **TLS handshake completion**, **certificate chain validation**, and **secure web content retrieval**. |
 | **URL Response Timing** | `urlresponse_random` | `url-response` | Measures the **end-to-end response time** for both HTTP and HTTPS requests to a diverse set of URLs. This provides metrics on **web server latency** and **network performance** for web traffic. |
 | **HTTPS Crawler** | `https_crawl` | `crawl` | Recursively traverses hyperlinks within **HTTPS-secured web pages** from a specified starting URL. This simulates legitimate web browsing and tests the ability to navigate secure sites. |
@@ -53,7 +53,7 @@ This document outlines the various network connectivity, web protocol, security,
 | **NMAP Port Scan** | `nmap_1024os` | `nmap` | Executes a **TCP SYN port scan (stealth scan)** using Nmap against target hosts, focusing on the first 1024 well-known ports. This identifies **open ports** and potential **service enumeration**.
 | **NMAP Port Scan** | `nmap_cve` | `nmap` | Executes a **vulnerability scan** using Nmap's scripting engine (`NSE`) modules specifically targeting **Common Vulnerabilities and Exposures (CVEs)**. This identifies systems with known security weaknesses. |
 | **Pornography Crawl** | `pornography_crawl` | `pornography` | Initiates a web crawl targeting publicly available web pages categorized as **pornographic**. This evaluates the effectiveness of **URL filtering mechanisms**. |
-| **Domain Filtering Checks** | `github_domain_check` | `domain-check` | This check executes **domain resolution and reachability test** against a verified list of filtered domains. This list is maintained as a **publicly accessible data stream** via GitHub. The process is designed to test security controls preventing access to known undesirable domains, encompassing categories such as **adware distribution, malicious software propagation, host-based viral infections, deceptive content delivery, and various forms of online fraud and social engineering schemes**. |
+| **Domain Filtering Checks** | `github_domain_check` | `domain-check` | This check executes **domain resolution and reachability test** against a verified list of unsecure and unsafe domains. This list is maintained as a **publicly accessible data stream** via GitHub. The process is designed to test security controls preventing access to known undesirable domains, encompassing categories such as **adware distribution, malicious software propagation, host-based viral infections, deceptive content delivery, and various forms of online fraud and social engineering schemes**. |
 | **Phishing Domain Filtering Checks** | `github_phishing_domain_check` | `phishing` | This check executes **phishing domain resolution and reachability test** against a verified list of known phishing domains used for typosquatting, bitsquatting, subdomain squatting, etc . This list is maintained as a **publicly accessible data stream** via GitHub. The process is designed to test security controls preventing access to these known undesirable domains. |
 
 ---
@@ -63,7 +63,7 @@ This document outlines the various network connectivity, web protocol, security,
 | ✅ Test | 🧩 Function | 🧩 Suite Flag |🔍 Description |
 |---|---|---|---|
 | **FTP Downloads** | `ftp_random` | `ftp` | Retrieves a series of **sample files** from an FTP server using the **File Transfer Protocol (FTP)**. This assesses **FTP service availability**, **data integrity**, and **firewall egress rules** for port 21/20. |
-| **Large File Download** | `bigfile` | `bigfile` | Downloads a **5 Gigabyte (GB) test file** from a designated HTTP endpoint. This is specifically designed to assess **sustained network bandwidth**, **throughput limitations**, and **network stability** over prolonged transfers. |
+| **Large File Download** | `bigfile` | `bigfile` | Downloads a **5 Gigabyte (GB) test file** from a designated HTTP endpoint. This is specifically designed to assess **network bandwidth**, **throughput limitations**, and **network stability** over prolonged transfers. |
 
 ---
 
