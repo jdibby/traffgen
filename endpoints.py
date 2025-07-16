@@ -1401,11 +1401,15 @@ malware_user_agents = [
     'zgrab',
 ]
 
-eicar_http_endpoints = [
+virus_endpoints = [
     "http://2016.eicar.org/download/eicar.com",
     "http://2016.eicar.org/download/eicar.com.txt",
     "http://2016.eicar.org/download/eicar_com.zip",
     "http://2016.eicar.org/download/eicarcom2.zip",
+    "https://secure.eicar.org/eicar.com",
+    "https://secure.eicar.org/eicar.com.txt",
+    "https://secure.eicar.org/eicar_com.zip",
+    "https://secure.eicar.org/eicarcom2.zip",
 ]
 
 pornography_endpoints = [
@@ -1569,13 +1573,6 @@ pornography_endpoints = [
     "freevideo.cz",
     "mofos.com",
     "theync.com",
-]
-
-eicar_https_endpoints = [
-    "https://secure.eicar.org/eicar.com",
-    "https://secure.eicar.org/eicar.com.txt",
-    "https://secure.eicar.org/eicar_com.zip",
-    "https://secure.eicar.org/eicarcom2.zip",
 ]
 
 snmp_strings = [
