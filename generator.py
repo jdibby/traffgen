@@ -449,15 +449,43 @@ def speedtest_fast():
         duration = 5
     elif ARGS.size == 'XL':
         duration = 10
-    cmd = 'for i in `seq 1 %i`; do python3 -m fastcli; done' % (duration)
-    print (Fore.BLACK)
-    print (Back.GREEN + "##############################################################")
-    print (Style.RESET_ALL)
-    print ("Testing Netflix: Fast.com Speedtest")
-    print (Fore.BLACK)
-    print (Back.GREEN + "##############################################################")
-    print (Style.RESET_ALL)
-    subprocess.call(cmd, shell=True)
+
+    print(Fore.BLACK)
+    print(Back.GREEN + "##############################################################")
+    print(Style.RESET_ALL)
+    print("Testing Netflix: Fast.com Speedtest")
+    print(Fore.BLACK)
+    print(Back.GREEN + "##############################################################")
+    print(Style.RESET_ALL)
+
+    timeout_per_test = 20
+
+    for i in range(1, duration + 1):
+        print(f"Starting Fast.com test {i} of {duration} (timeout: {timeout_per_test}s)...")
+        try:
+            result = subprocess.run(
+                'python3 -m fastcli',
+                shell=True,
+                check=True,
+                timeout=timeout_per_test,
+                capture_output=True,
+                text=True
+            )
+            print(f"Test {i} completed successfully.")
+            if result.stdout:
+                print(f"Output:\n{result.stdout}")
+            if result.stderr:
+                print(f"Error Output:\n{result.stderr}")
+        except subprocess.TimeoutExpired:
+            print(f"Test {i} timed out after {timeout_per_test} seconds. Moving to the next test.")
+        except subprocess.CalledProcessError as e:
+            print(f"Test {i} failed with error: {e}")
+            print(f"Command output (stdout):\n{e.stdout}")
+            print(f"Command error (stderr):\n{e.stderr}")
+        except Exception as e:
+            print(f"An unexpected error occurred during test {i}: {e}")
+
+    print("All Speedtest Tests Attempted.")
     pass
 
 ### NMAP Test (1024 ports)
