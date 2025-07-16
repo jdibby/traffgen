@@ -45,8 +45,7 @@ This document outlines the various network connectivity, web protocol, security,
 
 | ✅ Test | 🧩 Function | 🧩 Suite Flag |🔍 Description |
 |---|---|---|---|
-| **EICAR Test (HTTP)** | `virus_sim_http` | `virus-sim-http` | Attempts to download the **EICAR (European Institute for Computer Antivirus Research) test file** over HTTP. This is designed to trigger **antivirus and malware detection mechanisms** without causing actual harm. |
-| **EICAR Test (HTTPS)** | `virus_sim_https` | `virus-sim-https` | Attempts to download the **EICAR test file** over HTTPS. This validates whether **TLS decryption security solutions** can detect the EICAR signature within encrypted traffic. |
+| **EICAR Test (HTTP and HTTPS)** | `virus_sim` | `virus` | Attempts to download the **EICAR (European Institute for Computer Antivirus Research) test file** over HTTP(s). This is designed to trigger **antivirus and malware detection mechanisms** without causing actual harm. |
 | **IPS Detection** | `ips` | `ips` | Sends HTTP requests containing **known malicious `User-Agent` strings** or **HTTP request patterns** designed to trigger an IPS**. This verifies signature-based IPS rules. |
 | **DLP Simulation** | `dlp_sim_https` | `dlp` | Initiates downloads of files containing **simulated Personally Identifiable Information (PII)** and **Payment Card Industry (PCI) data patterns**. This evaluates the detection capabilities of **Data Loss Prevention (DLP) systems**. |
 | **Malware User-Agents** | `malware_random` | `malware-agents` | Transmits HTTP requests with **`User-Agent` headers associated with known malware, botnets, or malicious scanners**. This aims to provoke responses from **web application firewalls (WAFs)** or **threat intelligence feeds**. |
@@ -128,8 +127,7 @@ speedtest_fast
 snmp_random
 ssh_random
 traceroute_random
-virus_sim_http
-virus_sim_https
+virus_sim
 ```
 
 ---
