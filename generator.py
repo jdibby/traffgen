@@ -684,6 +684,29 @@ def malware_download():
             print (Style.RESET_ALL)
             subprocess.call(cmd, shell=True)
 
+### Squatting Tests            
+def squatting_domains():
+    if ARGS.size == 'S':
+        target_domains = 1
+    elif ARGS.size == 'M':
+        target_domains = 1
+    elif ARGS.size == 'L':
+        target_domains  = 1
+    elif ARGS.size == 'XL':
+        target_domains  = len(squatting_endpoints)
+    random.shuffle(squatting_endpoints)
+    for count_urls, url in enumerate(squatting_endpoints):
+        if count_urls < target_domains :
+            cmd = "dnstwist --registered %s" % url
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
+            print ("Malware File Download (HTTPS): Download %s" %(url))
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
+            subprocess.call(cmd, shell=True)
+
 ### Web Crawl
 def webcrawl():
     if ARGS.size == 'S':
@@ -1069,8 +1092,8 @@ performance analysis, or security simulations.
         suite_choices = [
             'all', 'ads', 'ai', 'bigfile', 'bgp', 'crawl', 'dlp', 'dns', 'ftp',
             'domain-check', 'http', 'https', 'icmp', 'ips', 'netflix',
-            'malware-agents', 'malware-download', 'nmap', 'ntp', 'phishing',
-            'pornography', 'snmp', 'ssh', 'url-response', 'virus',
+            'malware-agents', 'malware-download', 'nmap', 'ntp', 'phishing-domains',
+            'pornography', 'snmp', 'ssh', 'squatting', 'url-response', 'virus',
         ]
         size_choices = ['S', 'M', 'L', 'XL']
 
@@ -1179,6 +1202,7 @@ performance analysis, or security simulations.
                 ai_https_random,
                 github_domain_check,
                 github_phishing_domain_check,
+                squatting_domains,
                 nmap_1024os,
                 nmap_cve,
                 ntp_random,
@@ -1252,9 +1276,13 @@ performance analysis, or security simulations.
             testsuite = [
                 github_domain_check,
             ]       
-        elif ARGS.suite == 'phishing':
+        elif ARGS.suite == 'phishing-domains':
             testsuite = [
                 github_phishing_domain_check,
+            ]          
+        elif ARGS.suite == 'squatting':
+            testsuite = [
+                squatting_domains,
             ]           
         elif ARGS.suite == 'netflix':
             testsuite = [

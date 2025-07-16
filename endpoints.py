@@ -1412,6 +1412,14 @@ virus_endpoints = [
     "https://secure.eicar.org/eicarcom2.zip",
 ]
 
+squatting_endpoints = [
+    "google.com",
+    "cnn.com",
+    "github.com",
+    "testmyids.com",
+    "microsoft.com",
+]
+
 pornography_endpoints = [
     "livejasmin.com",
     "pornhub.com",
