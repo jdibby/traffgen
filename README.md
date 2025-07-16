@@ -54,7 +54,8 @@ This document outlines the various network connectivity, web protocol, security,
 | **NMAP Port Scan** | `nmap_cve` | `nmap` | Executes a **vulnerability scan** using Nmap's scripting engine (`NSE`) modules specifically targeting **Common Vulnerabilities and Exposures (CVEs)**. This identifies systems with known security weaknesses. |
 | **Pornography Crawl** | `pornography_crawl` | `pornography` | Initiates a web crawl targeting publicly available web pages categorized as **pornographic**. This evaluates the effectiveness of **URL filtering mechanisms**. |
 | **Domain Filtering Checks** | `github_domain_check` | `domain-check` | This check executes **domain resolution and reachability test** against a verified list of unsecure and unsafe domains. This list is maintained as a **publicly accessible data stream** via GitHub. The process is designed to test security controls preventing access to known undesirable domains, encompassing categories such as **adware distribution, malicious software propagation, host-based viral infections, deceptive content delivery, and various forms of online fraud and social engineering schemes**. |
-| **Phishing Domain Filtering Checks** | `github_phishing_domain_check` | `phishing` | This check executes **phishing domain resolution and reachability test** against a verified list of known phishing domains used for typosquatting, bitsquatting, subdomain squatting, etc . This list is maintained as a **publicly accessible data stream** via GitHub. The process is designed to test security controls preventing access to these known undesirable domains. |
+| **Phishing Domain Filtering Checks** | `github_phishing_domain_check` | `phishing-domains` | This check executes **phishing domain resolution and reachability test** against a verified list of known phishing domains. This list is maintained as a **publicly accessible data stream** via GitHub. The process is designed to test security controls preventing access to these known undesirable domains. |
+| **Squatting Domain Filtering Checks** | `squatting-domains` | `squatting` | This check uses [`dnstwist`](https://github.com/elceef/dnstwist) to **generate and verify the real registration status of squatting domains**, employing various techniques such as **typosquatting**, **bitsquatting**, and **homograph attacks**. These variations are derived from a static list of real domains in endpoints.py. The goal is to test security controls that prevent access to these undesirable lookalike domains. |
 
 ---
 
@@ -119,6 +120,7 @@ ads_random
 ai_https_random
 github_domain_check
 github_phishing_domain_check
+squatting_domains
 nmap_1024os
 nmap_cve
 ntp_random
