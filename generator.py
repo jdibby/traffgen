@@ -689,11 +689,11 @@ def squatting_domains():
     if ARGS.size == 'S':
         target_domains = 1
     elif ARGS.size == 'M':
-        target_domains = 1
+        target_domains = 2
     elif ARGS.size == 'L':
-        target_domains  = 1
+        target_domains  = 3
     elif ARGS.size == 'XL':
-        target_domains  = len(squatting_endpoints)
+        target_domains  = 4
     random.shuffle(squatting_endpoints)
     for count_urls, url in enumerate(squatting_endpoints):
         if count_urls < target_domains :
@@ -701,7 +701,7 @@ def squatting_domains():
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
-            print ("Malware File Download (HTTPS): Download %s" %(url))
+            print ("Generating Squatting Domains Based On %s" %(url))
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
