@@ -615,8 +615,8 @@ def urlresponse_random():
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
 
-### EICAR Virus Simulation
-def virus_sim_http():
+### Virus Simulation
+def virus_sim():
     if ARGS.size == 'S':
         target_urls = 1
     elif ARGS.size == 'M':
@@ -624,15 +624,15 @@ def virus_sim_http():
     elif ARGS.size == 'L':
         target_urls = 3
     elif ARGS.size == 'XL':
-        target_urls = len(eicar_http_endpoints)
-    random.shuffle(eicar_http_endpoints)
-    for count_urls, url in enumerate(eicar_http_endpoints):
+        target_urls = len(virus_endpoints)
+    random.shuffle(virus_endpoints)
+    for count_urls, url in enumerate(virus_endpoints):
         if count_urls < target_urls:
             cmd = "curl --limit-rate 3M -k --show-error --connect-timeout 4 -o /dev/null %s" % url
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
-            print ("Testing EICAR Virus Simulation (HTTP): Download %s" %(url))
+            print ("Testing Virus Simulation: Download %s" %(url))
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
@@ -679,29 +679,6 @@ def malware_download():
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
             print ("Malware File Download (HTTPS): Download %s" %(url))
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            subprocess.call(cmd, shell=True)
-
-### Virus Download (EICAR)
-def virus_sim_https():
-    if ARGS.size == 'S':
-        target_urls = 1
-    elif ARGS.size == 'M':
-        target_urls = 2
-    elif ARGS.size == 'L':
-        target_urls = 3
-    elif ARGS.size == 'XL':
-        target_urls = len(eicar_https_endpoints)
-    random.shuffle(eicar_https_endpoints)
-    for count_urls, url in enumerate(eicar_https_endpoints):
-        if count_urls < target_urls:
-            cmd = "curl --limit-rate 3M -k --show-error --connect-timeout 4 -o /dev/null %s" % url
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            print ("Testing EICAR Virus Simulation (HTTPS): Download %s" %(url))
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
@@ -1093,8 +1070,7 @@ performance analysis, or security simulations.
             'all', 'ads', 'ai', 'bigfile', 'bgp', 'crawl', 'dlp', 'dns', 'ftp',
             'domain-check', 'http', 'https', 'icmp', 'ips', 'netflix',
             'malware-agents', 'malware-download', 'nmap', 'ntp', 'phishing',
-            'pornography', 'snmp', 'ssh', 'url-response', 'virus-sim-http',
-            'virus-sim-https',
+            'pornography', 'snmp', 'ssh', 'url-response', 'virus',
         ]
         size_choices = ['S', 'M', 'L', 'XL']
 
@@ -1210,8 +1186,7 @@ performance analysis, or security simulations.
                 speedtest_fast,
                 ssh_random,
                 traceroute_random,
-                virus_sim_http,
-                virus_sim_https,
+                virus_sim,
                 ]
         if ARGS.suite == 'bigfile':
             testsuite = [
@@ -1302,13 +1277,9 @@ performance analysis, or security simulations.
             testsuite = [
                 urlresponse_random,
             ]
-        elif ARGS.suite == 'virus-sim-http':
+        elif ARGS.suite == 'virus':
             testsuite = [
-                virus_sim_http,
-            ]
-        elif ARGS.suite == 'virus-sim-https':
-            testsuite = [
-                virus_sim_https,
+                virus_sim,
             ]
         elif ARGS.suite == 'dlp':
             testsuite = [
