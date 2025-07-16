@@ -36,7 +36,7 @@ This document outlines the various network connectivity, web protocol, security,
 | **TAR.GZ Download** | `http_download_targz` | `http` | Downloads the latest stable release of the **WordPress core `.tar.gz` archive** via HTTP. This specifically tests retrieval of a common, large, compressed software distribution. |
 | **HTTPS Requests** | `https_random` | `https` | Transmits **HTTPS/TLS GET requests** to secure web servers, utilizing randomized `User-Agent` strings. This validates **TLS handshake completion**, **certificate chain validation**, and **secure web content retrieval**. |
 | **URL Response Timing** | `urlresponse_random` | `url-response` | Measures the **end-to-end response time** for both HTTP and HTTPS requests to a diverse set of URLs. This provides metrics on **web server latency** and **network performance** for web traffic. |
-| **HTTPS Crawler** | `https_crawl` | `ping_random` | Recursively traverses hyperlinks within **HTTPS-secured web pages** from a specified starting URL. This simulates legitimate web browsing and tests the ability to navigate secure sites. |
+| **HTTPS Crawler** | `https_crawl` | `crawl` | Recursively traverses hyperlinks within **HTTPS-secured web pages** from a specified starting URL. This simulates legitimate web browsing and tests the ability to navigate secure sites. |
 | **HTTP Crawler** | `webcrawl` | `crawl` | Recursively traverses hyperlinks within **HTTP-unsecured web pages** from a specified starting URL. This simulates legitimate web browsing. |
 
 ---
