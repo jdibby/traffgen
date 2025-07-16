@@ -88,12 +88,12 @@ This document outlines the various network connectivity, web protocol, security,
 
 | Flag | Description |
 |---|---|
-| `--suite` | Specifies the **test suite(s)** to execute. Accepted arguments include predefined categories such as `all` (all available tests), `http`, `dns`, `nmap`. This allows for focused testing. |
+| `--suite` | Specifies the **test suite(s)** to execute. Accepted arguments include predefined categories such as `all` (all available tests), `http`, `dns`, `nmap`. This allows for more focused testing. |
 | `--size` | Defines the **scale or intensity of the test execution**. Options include `S` (Small), `M` (Medium), `L` (Large), and `XL` (Extra Large), which typically correlate to the number of iterations, concurrency, or data volume. |
-| `--loop` | Activates **continuous test execution**, causing the selected test suite to run indefinitely in an infinite loop until manually terminated. Ideal for long-duration network monitoring. |
-| `--max-wait-secs` | Sets the **maximum randomized delay** (in seconds) that will be introduced between successive iterations when the `--loop` flag is active. This helps simulate more realistic traffic patterns and prevent overwhelming target systems. |
-| `--nowait` | Disables all **randomized delays** between individual test executions. This provides the fastest possible execution of tests, suitable for rapid diagnostics or performance benchmarking. |
-| `--crawl-start` | Designates the **initial URL** from which the HTTP (`webcrawl`) or HTTPS (`https_crawl`) web crawlers will commence their recursive link traversal. Must be a valid and accessible URL. |
+| `--loop` | Activates **continuous test execution**, causing the selected test suite to run in an infinite loop until manually terminated. Ideal for long-duration network monitoring. |
+| `--max-wait-secs` | Sets the **maximum randomized delay** (in seconds) that will be introduced between successive iterations when the `--loop` flag is active. This helps simulate more realistic traffic patterns and prevent overwhelming remote systems. |
+| `--nowait` | Disables all **randomized delays** between individual test executions. This provides the fastest possible execution of tests, suitable for faster reporting on remote systems and stress testing of networks. |
+| `--crawl-start` | Designates the **initial URL** from which the HTTP (`webcrawl`) or HTTPS (`https_crawl`) web crawlers will start their recursive link traversal. |
 
 ---
 
