@@ -821,7 +821,7 @@ def github_domain_check():
 
     github_domain_check_read_file(local_domains_filename, num_random_domains=10)
 
-### GITHUB Bad Domains Testing
+### GITHUB Phishing Domains Testing
 def github_phishing_domain_check_download_file(url, local_filename):
     print(f"Attempting to download '{url}' to '{local_filename}'...")
     try:
