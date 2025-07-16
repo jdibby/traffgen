@@ -1418,6 +1418,9 @@ squatting_endpoints = [
     "github.com",
     "testmyids.com",
     "microsoft.com",
+    "catonetworks.com",
+    "wikipedia.com",
+    "slashdot.org",
 ]
 
 pornography_endpoints = [
