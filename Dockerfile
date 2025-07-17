@@ -81,7 +81,7 @@ RUN apk add --no-cache \
     tzdata
 
 ### Clone Metasploit Framework
-RUN git clone https://github.com/rapid7/metasploit-framework.git /opt/metasploit-framework
+RUN git -c http.sslVerify=false clone https://github.com/rapid7/metasploit-framework.git /opt/metasploit-framework
 
 ### Set the working directory
 WORKDIR /opt/metasploit-framework
