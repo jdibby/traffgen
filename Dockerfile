@@ -58,7 +58,6 @@ RUN git -c http.sslVerify=false clone https://github.com/osrg/gobgp.git /tmp/gob
  && cd / \
  && rm -rf /tmp/gobgp-src
 
-
 ### Scripts used within the container
 ADD generator.py ./
 ADD endpoints.py ./
