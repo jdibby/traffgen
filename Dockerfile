@@ -47,62 +47,7 @@ RUN git -c http.sslVerify=false clone https://github.com/nmap/nmap.git /nmap-src
 ### Set NMAP directory environment
 ENV NMAPDIR=/usr/share/nmap
 
-### Build and install GoBGP v3.37.0 from source
-RUN git -c http.sslVerify=false clone https://github.com/osrg/gobgp.git /tmp/gobgp-src \
- && cd /tmp/gobgp-src \
- && git checkout v3.37.0 \
- && go build -o gobgp ./cmd/gobgp \
- && go build -o gobgpd ./cmd/gobgpd \
- && mv gobgp gobgpd /usr/local/bin/ \
- && cd / \
- && rm -rf /tmp/gobgp-src
 
- ### Build support for Metasploit
-RUN apk add --no-cache \
-    ruby \
-    ruby-dev \
-    ruby-bundler \
-    libffi-dev \
-    libpcap-dev \
-    postgresql-dev \
-    readline-dev \
-    openssl-dev \
-    libxml2-dev \
-    libxslt-dev \
-    zlib-dev \
-    yaml-dev \
-    sqlite-dev \
-    linux-headers \
-    gcompat \
-    cmake \
-    make \
-    autoconf \
-    automake \
-    ncurses \
-    tzdata
-
-### Clone Metasploit Framework
-RUN git -c http.sslVerify=false clone https://github.com/rapid7/metasploit-framework.git /opt/metasploit-framework
-
-### Configure Bundler and Install Gems (patch Alpine incompatibilities)
-RUN bundle config set --local without "development test" && \
-    bundle config set force_ruby_platform true && \
-    bundle install || true && \
-    gem install nokogiri --platform=ruby -- --use-system-libraries || true && \
-    gem install pg -- --with-pg-config=/usr/bin/pg_config || true && \
-    bundle install
-
-### Add Nikto Support
-RUN apk update && apk add --no-cache \
-    perl \
-    perl-net-ssleay \
-    perl-lwp-protocol-https \
-    git \
-    openssl
-
-RUN git -c http.sslVerify=false clone https://github.com/sullo/nikto.git /opt/nikto \
-    && ln -s /opt/nikto/nikto.pl /usr/local/bin/nikto \
-    && chmod +x /opt/nikto/nikto.pl
 
 ### Scripts used within the container
 ADD generator.py ./
