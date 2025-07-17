@@ -231,6 +231,18 @@ def http_download_targz():
     print (Back.GREEN + "##############################################################")
     print (Style.RESET_ALL)
     subprocess.call(cmd, shell=True)
+    
+### Nikto Scans
+def web_scanner():
+    cmd = 'nikto -h testmyids.com'
+    print (Fore.BLACK)
+    print (Back.GREEN + "##############################################################")
+    print (Style.RESET_ALL)
+    print ("Nikto Scanning: testmyids.com")
+    print (Fore.BLACK)
+    print (Back.GREEN + "##############################################################")
+    print (Style.RESET_ALL)
+    subprocess.call(cmd, shell=True)
 
 ### HTTPS Test suites
 def https_random():
@@ -1093,7 +1105,7 @@ performance analysis, or security simulations.
             'all', 'ads', 'ai', 'bigfile', 'bgp', 'crawl', 'dlp', 'dns', 'ftp',
             'domain-check', 'http', 'https', 'icmp', 'ips', 'netflix',
             'malware-agents', 'malware-download', 'nmap', 'ntp', 'phishing-domains',
-            'pornography', 'snmp', 'ssh', 'squatting', 'url-response', 'virus',
+            'pornography', 'snmp', 'ssh', 'squatting', 'url-response', 'virus', 'web-scanner',
         ]
         size_choices = ['S', 'M', 'L', 'XL']
 
@@ -1288,6 +1300,10 @@ performance analysis, or security simulations.
             testsuite = [
                 speedtest_fast,
             ]
+        elif ARGS.suite == 'web-scanner':
+            testsuite = [
+                web_scanner,
+            ]
         elif ARGS.suite == 'nmap':
             testsuite = [
                 nmap_1024os,
@@ -1333,6 +1349,6 @@ performance analysis, or security simulations.
     except Exception as e:
         print(f"An error occurred: {e}")
 
-    ### Keyboard Ctrl-C Interupt
+    ### Keyboard Ctrl-C Interrupt
     except KeyboardInterrupt:
         sys.exit(0)
