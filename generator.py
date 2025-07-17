@@ -242,18 +242,20 @@ def web_scanner():
         timeout = 120
     elif ARGS.size == 'XL':
         timeout = 180
+        
     random.shuffle(webscan_endpoints)
-    for count_urls, url in enumerate(webscan_endpoints):
-        if count_urls < target_urls:
-            cmd = f"nikto.pl -h testmyids.com -maxtime '{timeout}' -timeout 1"
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            print ("Nikto Scanning: testmyids.com")
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            subprocess.call(cmd, shell=True)
+    url = webscan_endpoints[0]
+    
+    cmd = f"nikto.pl -h '{url}' -maxtime '{timeout}' -timeout 1"
+    
+    print (Fore.BLACK)
+    print (Back.GREEN + "##############################################################")
+    print (Style.RESET_ALL)
+    print ("Nikto Scanning: testmyids.com")
+    print (Fore.BLACK)
+    print (Back.GREEN + "##############################################################")
+    print (Style.RESET_ALL)
+    subprocess.call(cmd, shell=True)
 
 ### HTTPS Test suites
 def https_random():
