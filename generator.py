@@ -1062,7 +1062,7 @@ def scrape_single_link(url):
                 print(f"Found: {href}")
                 return href
 
-        print("→ No Links Found")
+        print("No Links Found")
 
     except Exception:
         print("Failed")
