@@ -7,6 +7,7 @@ from time import sleep
 from urllib.parse import urljoin
 from tqdm import tqdm
 from colorama import Fore, Back, Style
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from endpoints import *
 
 ### Disable SSL warning for self-signed certs
