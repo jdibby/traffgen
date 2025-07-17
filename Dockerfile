@@ -71,4 +71,4 @@ ADD endpoints.py ./
 ENTRYPOINT ["python3", "-u", "generator.py"]
 
 ### Variables to set for the generator
-CMD ["--suite=all", "--size=S", "--max-wait-secs=20", "--loop"]
+CMD ["--suite=all", "--size=M", "--max-wait-secs=15", "--loop"]
