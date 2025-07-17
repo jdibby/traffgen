@@ -235,21 +235,25 @@ def http_download_targz():
 ### Nikto Scans
 def web_scanner():
     if ARGS.size == 'S':
-        cmd = 'nikto.pl -h testmyids.com -maxtime 30 -timeout 1'
+        timeout = 30
     elif ARGS.size == 'M':
-        cmd = 'nikto.pl -h testmyids.com -maxtime 60 -timeout 1'
+        timeout = 60
     elif ARGS.size == 'L':
-        cmd = 'nikto.pl -h testmyids.com -maxtime 120 -timeout 1'
+        timeout = 120
     elif ARGS.size == 'XL':
-        cmd = 'nikto.pl -h testmyids.com -maxtime 180 -timeout 1'
-    print (Fore.BLACK)
-    print (Back.GREEN + "##############################################################")
-    print (Style.RESET_ALL)
-    print ("Nikto Scanning: testmyids.com")
-    print (Fore.BLACK)
-    print (Back.GREEN + "##############################################################")
-    print (Style.RESET_ALL)
-    subprocess.call(cmd, shell=True)
+        timeout = 180
+    random.shuffle(webscan_endpoints)
+    for count_urls, url in enumerate(webscan_endpoints):
+        if count_urls < target_urls:
+            cmd = 'nikto.pl -h testmyids.com -maxtime '{timeout}'' -timeout 1'
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
+            print ("Nikto Scanning: testmyids.com")
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
+            subprocess.call(cmd, shell=True)
 
 ### HTTPS Test suites
 def https_random():
