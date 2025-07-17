@@ -572,6 +572,8 @@ malware_endpoints = [
     "https://http-evader.semantic-gap.de/messagerfc822",
     "https://http-evader.semantic-gap.de/range",
     "https://noxxi.de/research/http-evader-testsite.html",
+    "http://http-evader.semantic-gap.de",
+    "https://http-evader.semantic-gap.de",
 ]
 
 ai_endpoints = [
