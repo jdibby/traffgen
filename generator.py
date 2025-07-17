@@ -366,6 +366,7 @@ def pornography_crawl():
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
+            subprocess.call(cmd, shell=True)
             scrape_iterative(url, iterations)
 
 ### Malware Test suites
