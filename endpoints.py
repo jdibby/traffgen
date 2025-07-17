@@ -189,6 +189,12 @@ http_endpoints = [
     "httpforever.com",
     ]
 
+webscan_endpoints = [
+    "www.testmyids.com",
+    "scanme.nmap.org",
+    "httpforever.com",
+    ]
+
 ad_endpoints = [
     "adtago.s3.amazonaws.com",
     "advice-ads.s3.amazonaws.com",
