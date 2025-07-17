@@ -1040,6 +1040,7 @@ def scrape_single_link(url):
             }
         )
         response.raise_for_status()
+        print(response.text)
     except requests.exceptions.HTTPError as http_error:
         if http_error.response.status_code == 404:
             pass
@@ -1055,6 +1056,9 @@ def scrape_single_link(url):
     except requests.exceptions.RequestException:
         print(f"Error: General failure for {url}")
         return None
+    except requests.exceptions.RequestException as e:
+        print(f"Error: General failure for {url}. Details: {e}")
+
 
     # Handle encoding
     response.encoding = response.apparent_encoding or 'utf-8'
