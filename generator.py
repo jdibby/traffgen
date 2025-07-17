@@ -388,7 +388,7 @@ def malware_random():
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
-            print ("Testing HTTPS (%d of %d): %s" %((count_urls+1), target_urls, url))
+            print ("Testing Malware Site: (%d of %d): %s" %((count_urls+1), target_urls, url))
             print (f"Agent: {malware_user_agent}")
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
