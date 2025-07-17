@@ -1172,7 +1172,7 @@ performance analysis, or security simulations.
             type=int,
             action="store",
             required=False,
-            default=40,
+            default=20,
             help='Maximum possible time (in seconds) for random intervals between tests or loops. Default: 40 seconds.\n\n'
         )
         timing_group.add_argument(
