@@ -246,7 +246,7 @@ def web_scanner():
     random.shuffle(webscan_endpoints)
     url = webscan_endpoints[0]
     
-    cmd = f"nikto.pl -h '{url}' -maxtime '{timeout}' -timeout 1"
+    cmd = f"nikto.pl -h '{url}' -maxtime '{timeout}' -timeout 1 -nointeractive"
     
     print (Fore.BLACK)
     print (Back.GREEN + "##############################################################")
