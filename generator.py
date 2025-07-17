@@ -235,13 +235,13 @@ def http_download_targz():
 ### Nikto Scans
 def web_scanner():
     if ARGS.size == 'S':
-        cmd = 'nikto -h testmyids.com -maxtime 30 -timeout 1'
+        cmd = 'nikto.pl -h testmyids.com -maxtime 30 -timeout 1'
     elif ARGS.size == 'M':
-        cmd = 'nikto -h testmyids.com -maxtime 60 -timeout 1'
+        cmd = 'nikto.pl -h testmyids.com -maxtime 60 -timeout 1'
     elif ARGS.size == 'L':
-        cmd = 'nikto -h testmyids.com -maxtime 120 -timeout 1'
+        cmd = 'nikto.pl -h testmyids.com -maxtime 120 -timeout 1'
     elif ARGS.size == 'XL':
-        cmd = 'nikto -h testmyids.com -maxtime 180 -timeout 1'
+        cmd = 'nikto.pl -h testmyids.com -maxtime 180 -timeout 1'
     print (Fore.BLACK)
     print (Back.GREEN + "##############################################################")
     print (Style.RESET_ALL)
