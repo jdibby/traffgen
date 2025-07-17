@@ -1039,6 +1039,7 @@ def scrape_single_link(url):
             headers={
                 'User-Agent': user_agents[0],
             }
+            verify=Fasle
         )
         response.raise_for_status()
         print(response.text)
