@@ -1026,6 +1026,7 @@ def replace_all_endpoints(url):
 
 ### Grab random links from website
 def scrape_single_link(url):
+    # Randomize user agent and time between requests
     sleep(random.uniform(0.2, 2))
     random.shuffle(user_agents)
 
@@ -1037,31 +1038,25 @@ def scrape_single_link(url):
             allow_redirects=True,
             headers={
                 'User-Agent': user_agents[0],
-            },
+            }
             verify=False
         )
         response.raise_for_status()
-
-        response.encoding = response.apparent_encoding or 'utf-8'
-        soup = BeautifulSoup(response.text, 'html.parser')
-
-        all_links = soup.find_all("a")
-        random.shuffle(all_links)
-
-        for link in all_links:
-            href = link.get('href')
-            if not href or '#' in href:
-                continue
-            if href.startswith("//") or href.startswith("/"):
-                return urljoin(url, href)
-            elif href.startswith("http"):
-                return href
-
-    except Exception:
-        pass  # Fail silently and continue
-
-    return None  # No valid links or request failed
-
+        print(response.text)
+    except requests.exceptions.HTTPError as http_error:
+        if http_error.response.status_code == 404:
+            pass
+        else:
+            print(http_error)
+            return None
+    except requests.exceptions.Timeout:
+        print(f"Error: Timeout for {url}")
+        return None
+    except requests.exceptions.TooManyRedirects:
+        print(f"Error: Too many redirects for {url}")
+        return None
+    except requests.exceptions.RequestException as e:
+        print(f"Error: General failure for {url}. Details: {e}")
 
     # Handle encoding
     response.encoding = response.apparent_encoding or 'utf-8'
