@@ -245,7 +245,7 @@ def web_scanner():
     random.shuffle(webscan_endpoints)
     for count_urls, url in enumerate(webscan_endpoints):
         if count_urls < target_urls:
-            cmd = 'nikto.pl -h testmyids.com -maxtime '{timeout}'' -timeout 1'
+            cmd = 'nikto.pl -h testmyids.com -maxtime '{timeout}' -timeout 1'
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
