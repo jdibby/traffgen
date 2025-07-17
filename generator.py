@@ -1026,10 +1026,21 @@ def replace_all_endpoints(url):
 
 ### Grab random links from website
 def scrape_single_link(url):
+    import random
+    from time import sleep
+    from urllib.parse import urljoin
+    import requests
+    from bs4 import BeautifulSoup
+
+    user_agents = [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+    ]
+
     sleep(random.uniform(0.2, 2))
     random.shuffle(user_agents)
 
-    print(f"Visiting: {url}")  # Minimal output to show progress
+    print(f"Visiting: {url}")
 
     try:
         response = requests.request(
@@ -1037,46 +1048,52 @@ def scrape_single_link(url):
             url=url,
             timeout=2,
             allow_redirects=True,
-            headers={
-                'User-Agent': user_agents[0],
-            },
-            verify=False
+            headers={'User-Agent': user_agents[0]},
+            verify=False  # Disable SSL cert verification
         )
         response.raise_for_status()
 
         response.encoding = response.apparent_encoding or 'utf-8'
-        soup = BeautifulSoup(response.text, 'html.parser')
+        html = response.text
 
-        all_links = soup.find_all("a")
-        random.shuffle(all_links)
+    except requests.exceptions.HTTPError as e:
+        if e.response and e.response.status_code == 404:
+            return None  # Not found, just skip
+        print(f"HTTP error for {url}: {e}")
+        return None
+    except requests.exceptions.SSLError as e:
+        print(f"SSL error for {url}: {e}")
+        return None
+    except requests.exceptions.Timeout:
+        print(f"Timeout for {url}")
+        return None
+    except requests.exceptions.TooManyRedirects:
+        print(f"Too many redirects for {url}")
+        return None
+    except requests.exceptions.RequestException as e:
+        print(f"General failure for {url}: {e}")
+        return None
 
-        for link in all_links:
-            href = link.get('href')
-            if not href or '#' in href:
-                continue
-            if href.startswith("//") or href.startswith("/"):
-                resolved = urljoin(url, href)
-                print(f"Found: {resolved}")
-                return resolved
-            elif href.startswith("http"):
-                print(f"Found: {href}")
-                return href
+    # Parse HTML only if request was successful
+    soup = BeautifulSoup(html, 'html.parser')
 
-        print("No Links Found")
+    all_links = soup.find_all("a")
+    random.shuffle(all_links)
 
-    except Exception:
-        print("Failed")
+    for link in all_links:
+        href = link.get('href')
+        if not href or '#' in href:
+            continue
+        if href.startswith("//") or href.startswith("/"):
+            resolved = urljoin(url, href)
+            print(f"Found: {resolved}")
+            return resolved
+        elif href.startswith("http"):
+            print(f"Found: {href}")
+            return href
 
+    print("No Links Found")
     return None
-
-### Loop over scraped links
-def scrape_iterative(base_url, iterations=3):
-    next_link = scrape_single_link(base_url)
-    for i in range(iterations):
-        if next_link and next_link is not None:
-            next_link = scrape_single_link(next_link)
-        else:
-            break
 
 ### Menus
 if __name__ == "__main__":
