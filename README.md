@@ -56,6 +56,8 @@ This document outlines the various network connectivity, web protocol, security,
 | **Domain Filtering Checks** | `github_domain_check` | `domain-check` | This check executes **domain resolution and reachability test** against a verified list of unsecure and unsafe domains. This list is maintained as a **publicly accessible data stream** via GitHub. The process is designed to test security controls preventing access to known undesirable domains, encompassing categories such as **adware distribution, malicious software propagation, host-based viral infections, deceptive content delivery, and various forms of online fraud and social engineering schemes**. |
 | **Phishing Domain Filtering Checks** | `github_phishing_domain_check` | `phishing-domains` | This check executes **phishing domain resolution and reachability test** against a verified list of known phishing domains. This list is maintained as a **publicly accessible data stream** via GitHub. The process is designed to test security controls preventing access to these known undesirable domains. |
 | **Squatting Domain Filtering Checks** | `squatting-domains` | `squatting` | This check uses [`dnstwist`](https://github.com/elceef/dnstwist) to **generate and verify the real registration status of squatting domains**, employing various techniques such as **typosquatting**, **bitsquatting**, and **homograph attacks**. These variations are derived from a static list of real domains in endpoints.py. The goal is to test security controls that prevent access to these undesirable lookalike domains. |
+| **Nikto Scans** | `web_scanner` | `web-scanner` | Launches a Nikto web vulnerability scan against `testmyids.com`, emulating attacker reconnaissance behavior. Scan intensity is configurable via the `--size` argument (`S`, `M`, `L`, `XL`), which adjusts the `-maxtime` value (30–180 seconds). All scans use a forced 1-second request timeout to simulate aggressive probing. Commonly used to validate web-based IDS detection of high-noise application-layer scans. |
+
 
 ---
 
@@ -130,6 +132,7 @@ snmp_random
 ssh_random
 traceroute_random
 virus_sim
+web-scanner
 ```
 
 ---
