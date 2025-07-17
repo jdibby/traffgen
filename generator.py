@@ -1029,6 +1029,8 @@ def scrape_single_link(url):
     sleep(random.uniform(0.2, 2))
     random.shuffle(user_agents)
 
+    print(f"Visiting: {url}")  # Minimal output to show progress
+
     try:
         response = requests.request(
             method="GET",
@@ -1038,13 +1040,12 @@ def scrape_single_link(url):
             headers={
                 'User-Agent': user_agents[0],
             },
-            verify=False  # Fix typo here
+            verify=False
         )
         response.raise_for_status()
 
         response.encoding = response.apparent_encoding or 'utf-8'
-        html = response.text
-        soup = BeautifulSoup(html, 'html.parser')
+        soup = BeautifulSoup(response.text, 'html.parser')
 
         all_links = soup.find_all("a")
         random.shuffle(all_links)
@@ -1054,12 +1055,17 @@ def scrape_single_link(url):
             if not href or '#' in href:
                 continue
             if href.startswith("//") or href.startswith("/"):
-                return urljoin(url, href)
+                resolved = urljoin(url, href)
+                print(f"Found: {resolved}")
+                return resolved
             elif href.startswith("http"):
+                print(f"Found: {href}")
                 return href
 
+        print("→ No Links Found")
+
     except Exception:
-        pass
+        print("Failed")
 
     return None
 
