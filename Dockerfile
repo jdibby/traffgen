@@ -32,7 +32,7 @@ RUN apk update && apk add --no-cache \
     build-base
 
 ### Install appropriate python packages as root
-RUN pip3 install fastcli requests colorama beautifulsoup4 tqdm dnstwist --break-system-packages
+RUN pip3 install fastcli requests colorama beautifulsoup4 tqdm dnspython dnstwist --break-system-packages
 
 ### Update certs
 RUN update-ca-certificates
