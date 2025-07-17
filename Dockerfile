@@ -78,6 +78,7 @@ RUN apk add --no-cache \
     make \
     autoconf \
     automake \
+    ncurses \
     tzdata
 
 ### Clone Metasploit Framework
