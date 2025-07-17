@@ -560,6 +560,18 @@ malware_endpoints = [
     "https://www.testmyids.com",
     "http://scanme.nmap.org",
     "https://scanme.nmap.org",
+    "https://http-evader.semantic-gap.de/-ECABSGAABwMOAAAAAAAAAKpBdDwPL2ZvYi9ub3ZpcnXZDnUwFA==",
+    "https://http-evader.semantic-gap.de/-ECABSGAABwMOAAAAAAAAAKpBdDwPanQsb2xsL3NldF_ZVWIrBXN0LWRz",
+    "https://http-evader.semantic-gap.de/-ECABSGAABwMOAAAAAAAAAKpBdDwPaWpkIWFsbC9vay7aTmY=",
+    "https://http-evader.semantic-gap.de/-ECABSGAABwMOAAAAAAAAAKpBdDwPaHNuYi9hbGwvcGHYRW88P3Nid1FzdWNjZXNzhEh1JQw=",
+    "https://http-evader.semantic-gap.de/chunked",
+    "https://http-evader.semantic-gap.de/compressed",
+    "https://http-evader.semantic-gap.de/clen",
+    "https://http-evader.semantic-gap.de/broken",
+    "https://http-evader.semantic-gap.de/mime",
+    "https://http-evader.semantic-gap.de/messagerfc822",
+    "https://http-evader.semantic-gap.de/range",
+    "https://noxxi.de/research/http-evader-testsite.html",
 ]
 
 ai_endpoints = [
