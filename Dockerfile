@@ -38,7 +38,7 @@ RUN pip3 install fastcli requests colorama beautifulsoup4 tqdm dnspython dnstwis
 ### Update certs
 RUN update-ca-certificates
 
-### Pull down all nmap scripts and nse libraries for security scanning
+### Pull down all nmap scripts and NSE libraries for security scanning
 RUN git -c http.sslVerify=false clone https://github.com/nmap/nmap.git /nmap-src \
     && mkdir -p /usr/share/nmap \
     && cp /nmap-src/nse_main.lua /usr/share/nmap/ \
@@ -58,40 +58,6 @@ RUN git -c http.sslVerify=false clone https://github.com/osrg/gobgp.git /tmp/gob
  && cd / \
  && rm -rf /tmp/gobgp-src
 
- ### Build support for Metasploit
-RUN apk add --no-cache \
-    ruby \
-    ruby-dev \
-    ruby-bundler \
-    libffi-dev \
-    libpcap-dev \
-    postgresql-dev \
-    readline-dev \
-    openssl-dev \
-    libxml2-dev \
-    libxslt-dev \
-    zlib-dev \
-    yaml-dev \
-    sqlite-dev \
-    linux-headers \
-    gcompat \
-    cmake \
-    make \
-    autoconf \
-    automake \
-    ncurses \
-    tzdata
-
-### Clone Metasploit Framework
-RUN git -c http.sslVerify=false clone https://github.com/rapid7/metasploit-framework.git /opt/metasploit-framework
-
-### Configure Bundler and Install Gems (patch Alpine incompatibilities)
-RUN bundle config set --local without "development test" && \
-    bundle config set force_ruby_platform true && \
-    bundle install || true && \
-    gem install nokogiri --platform=ruby -- --use-system-libraries || true && \
-    gem install pg -- --with-pg-config=/usr/bin/pg_config || true && \
-    bundle install
 
 ### Scripts used within the container
 ADD generator.py ./
