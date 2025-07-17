@@ -29,6 +29,7 @@ RUN apk update && apk add --no-cache \
     net-snmp \
     net-snmp-tools \
     go \
+    nikto \
     build-base
 
 ### Install appropriate python packages as root
