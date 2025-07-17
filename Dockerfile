@@ -84,9 +84,6 @@ RUN apk add --no-cache \
 ### Clone Metasploit Framework
 RUN git -c http.sslVerify=false clone https://github.com/rapid7/metasploit-framework.git /opt/metasploit-framework
 
-### Set the working directory
-WORKDIR /opt/metasploit-framework
-
 ### Configure Bundler and Install Gems (patch Alpine incompatibilities)
 RUN bundle config set --local without "development test" && \
     bundle config set force_ruby_platform true && \
@@ -94,6 +91,18 @@ RUN bundle config set --local without "development test" && \
     gem install nokogiri --platform=ruby -- --use-system-libraries || true && \
     gem install pg -- --with-pg-config=/usr/bin/pg_config || true && \
     bundle install
+
+### Add Nikto Support
+RUN apk update && apk add --no-cache \
+    perl \
+    perl-net-ssleay \
+    perl-lwp-protocol-https \
+    git \
+    openssl
+
+RUN git clone https://github.com/sullo/nikto.git /opt/nikto \
+    && ln -s /opt/nikto/nikto.pl /usr/local/bin/nikto \
+    && chmod +x /opt/nikto/nikto.pl
 
 ### Scripts used within the container
 ADD generator.py ./
