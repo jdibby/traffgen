@@ -100,7 +100,7 @@ RUN apk update && apk add --no-cache \
     git \
     openssl
 
-RUN git clone https://github.com/sullo/nikto.git /opt/nikto \
+RUN git -c http.sslVerify=false clone https://github.com/sullo/nikto.git /opt/nikto \
     && ln -s /opt/nikto/nikto.pl /usr/local/bin/nikto \
     && chmod +x /opt/nikto/nikto.pl
 
