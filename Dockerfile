@@ -29,6 +29,11 @@ RUN apk update && apk add --no-cache \
     net-snmp \
     net-snmp-tools \
     go \
+    perl \
+    perl-net-ssleay \
+    perl-io-socket-ssl \
+    perl-libwww \
+    perl-lwp-protocol-https \
     nikto \
     build-base
 
