@@ -1026,7 +1026,6 @@ def replace_all_endpoints(url):
 
 ### Grab random links from website
 def scrape_single_link(url):
-    # Randomize user agent and time between requests
     sleep(random.uniform(0.2, 2))
     random.shuffle(user_agents)
 
@@ -1038,55 +1037,30 @@ def scrape_single_link(url):
             allow_redirects=True,
             headers={
                 'User-Agent': user_agents[0],
-            }
-            verify=False
+            },
+            verify=False  # Fix typo here
         )
         response.raise_for_status()
-        print(response.text)
-    except requests.exceptions.HTTPError as http_error:
-        if http_error.response.status_code == 404:
-            pass
-        else:
-            print(http_error)
-            return None
-    except requests.exceptions.Timeout:
-        print(f"Error: Timeout for {url}")
-        return None
-    except requests.exceptions.TooManyRedirects:
-        print(f"Error: Too many redirects for {url}")
-        return None
-    except requests.exceptions.RequestException as e:
-        print(f"Error: General failure for {url}. Details: {e}")
 
-    # Handle encoding
-    response.encoding = response.apparent_encoding or 'utf-8'
-    html = response.text
+        response.encoding = response.apparent_encoding or 'utf-8'
+        html = response.text
+        soup = BeautifulSoup(html, 'html.parser')
 
-    # Parse HTML
-    soup = BeautifulSoup(html, 'html.parser')
+        all_links = soup.find_all("a")
+        random.shuffle(all_links)
 
-    # Print page URL and title
-    try:
-        print(f"{url} - {soup.title.string.encode('unicode_escape').decode('utf-8')}")
-    except:
-        print(f"{url} - no title")
+        for link in all_links:
+            href = link.get('href')
+            if not href or '#' in href:
+                continue
+            if href.startswith("//") or href.startswith("/"):
+                return urljoin(url, href)
+            elif href.startswith("http"):
+                return href
 
-    # Find and randomize all links on page
-    all_links = soup.find_all("a")
-    random.shuffle(all_links)
+    except Exception:
+        pass
 
-    for link in all_links:
-        href = link.get('href')
-        if not href or '#' in href:
-            continue
-        if href.startswith("//") or href.startswith("/"):
-            return urljoin(url, href)
-        elif href.startswith("http"):
-            return href
-        else:
-            continue
-
-    print("DEAD END")
     return None
 
 ### Loop over scraped links
