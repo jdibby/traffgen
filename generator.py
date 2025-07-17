@@ -235,13 +235,13 @@ def http_download_targz():
 ### Nikto Scans
 def web_scanner():
     if ARGS.size == 'S':
-        timeout = 30
-    elif ARGS.size == 'M':
         timeout = 60
-    elif ARGS.size == 'L':
+    elif ARGS.size == 'M':
         timeout = 120
-    elif ARGS.size == 'XL':
+    elif ARGS.size == 'L':
         timeout = 180
+    elif ARGS.size == 'XL':
+        timeout = 240
         
     random.shuffle(webscan_endpoints)
     url = webscan_endpoints[0]
