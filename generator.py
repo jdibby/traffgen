@@ -357,6 +357,7 @@ def pornography_crawl():
         if count_urls < target_urls:
             random.shuffle(user_agents)
             user_agent = user_agents[0]
+            cmd = f"curl -k -s --show-error --connect-timeout 5 -I -o /dev/null --max-time 5 -A '{user_agent}' {url}"
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
