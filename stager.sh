@@ -304,7 +304,7 @@ docker images | awk '{print $3}' | xargs docker rmi -f &> /dev/null
 echo ""
 echo "${BOLD}### TRAFFGEN CONTAINER BEING STARTED ###${NORMAL}"
 ### Run the traffgen docker image (this command is universal across architectures and operating systems) 
-docker run --detach --restart unless-stopped jdibby/traffgen:latest
+docker run --pull=always --detach --restart unless-stopped jdibby/traffgen:latest
 
 echo ""
 echo "${BOLD}### TRAFFGEN INSTALL COMPLETE ###${NORMAL}"
