@@ -179,10 +179,17 @@ A pre-built containerized version is available on Docker Hub:
 docker run -it jdibby/traffgen:<version> --help
 ```
 
-### Run Full Suite in Loop Mode with Minimal Delay
+### Run Full Suite in Loop Mode with Minimal Delay in the Backgroud
 
 ```bash
-docker run -it jdibby/traffgen:<version> --suite=all --size=S --loop --max-wait-secs=20
+docker run --deteach --restart unless-stopped -it jdibby/traffgen:<version> --suite=all --size=S --loop --max-wait-secs=20
+```
+---
+
+### Run Full Suite in Loop Mode with Minimal Delay in the Foreground
+
+```bash
+docker run --deteach --restart unless-stopped -it jdibby/traffgen:<version> --suite=all --size=S --loop --max-wait-secs=20
 ```
 
 ---
