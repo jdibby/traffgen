@@ -176,7 +176,7 @@ A pre-built containerized version is available on Docker Hub:
 ### View Help Menu
 
 ```bash
-docker run -it jdibby/traffgen:latest --help
+docker run --pull=always -it jdibby/traffgen:latest --help
 ```
 
 ### Run Full Suite in Loop Mode with 20s Delay in the **Backgroud**
