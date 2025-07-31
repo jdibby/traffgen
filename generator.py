@@ -1095,6 +1095,15 @@ def scrape_single_link(url):
     print("No Links Found")
     return None
 
+### Loop over scraped links
+def scrape_iterative(base_url, iterations=3):
+    next_link = scrape_single_link(base_url)
+    for i in range(iterations):
+        if next_link and next_link is not None:
+            next_link = scrape_single_link(next_link)
+        else:
+            break
+
 ### Menus
 if __name__ == "__main__":
     try:
