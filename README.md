@@ -182,14 +182,14 @@ docker run -it jdibby/traffgen:latest --help
 ### Run Full Suite in Loop Mode with 20s Delay in the **Backgroud**
 
 ```bash
-docker run --pull=always --detach --restart unless-stopped -it jdibby/traffgen:latest --suite=all --size=S --loop --max-wait-secs=20
+docker run --pull=always --detach --restart unless-stopped jdibby/traffgen:latest --suite=all --size=S --loop --max-wait-secs=20
 ```
 ---
 
 ### Run Full Suite in Loop Mode with 20s Delay in the **Foreground**
 
 ```bash
-docker run --pull=always--restart unless-stopped -it jdibby/traffgen:latest --suite=all --size=S --loop --max-wait-secs=20
+docker run --pull=always --restart unless-stopped -it jdibby/traffgen:latest --suite=all --size=S --loop --max-wait-secs=20
 ```
 
 ---
