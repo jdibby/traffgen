@@ -176,20 +176,20 @@ A pre-built containerized version is available on Docker Hub:
 ### View Help Menu
 
 ```bash
-docker run -it jdibby/traffgen:<version> --help
+docker run -it jdibby/traffgen:latest --help
 ```
 
 ### Run Full Suite in Loop Mode with 20s Delay in the **Backgroud**
 
 ```bash
-docker run --deteach --restart unless-stopped -it jdibby/traffgen:<version> --suite=all --size=S --loop --max-wait-secs=20
+docker run --pull=always --detach --restart unless-stopped -it jdibby/traffgen:latest --suite=all --size=S --loop --max-wait-secs=20
 ```
 ---
 
 ### Run Full Suite in Loop Mode with 20s Delay in the **Foreground**
 
 ```bash
-docker run --deteach --restart unless-stopped -it jdibby/traffgen:<version> --suite=all --size=S --loop --max-wait-secs=20
+docker run --pull=always --detach --restart unless-stopped -it jdibby/traffgen:latest --suite=all --size=S --loop --max-wait-secs=20
 ```
 
 ---
