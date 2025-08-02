@@ -417,6 +417,33 @@ def ping_random():
             print (Style.RESET_ALL)
             subprocess.call(cmd, shell=True)
             
+### Metasploit Checks
+def metasploit_checks():
+    if ARGS.size == 'S':
+        ms_checks = 1
+    elif ARGS.size == 'M':
+        ms_checks = 3
+    elif ARGS.size == 'L':
+        ms_checks = 5
+    elif ARGS.size == 'XL':
+        ms_checks = 7
+
+    rc_dir = './metasploit/ms_checks'
+    rc_files = [f for f in os.listdir(rc_dir) if f.endswith('.rc')]
+    random.shuffle(rc_files)
+
+    for count_ms, rc_file in enumerate(rc_files):
+        if count_ms < ms_checks:
+            cmd = "/opt/metasploit-framework/msfconsole -q -r '%s'" % os.path.join(rc_dir, rc_file)
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
+            print ("Running Metasploit Check (%d of %d): %s" %((count_ms+1), ms_checks, rc_file))
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
+            subprocess.call(cmd, shell=True)
+            
 ### SNMP test
 def snmp_random():
     if ARGS.size == 'S':
@@ -1124,8 +1151,8 @@ performance analysis, or security simulations.
         ### Define common choices to avoid repetition
         suite_choices = [
             'all', 'ads', 'ai', 'bigfile', 'bgp', 'crawl', 'dlp', 'dns', 'ftp',
-            'domain-check', 'http', 'https', 'icmp', 'ips', 'netflix',
-            'malware-agents', 'malware-download', 'nmap', 'ntp', 'phishing-domains',
+            'domain-check', 'http', 'https', 'icmp', 'ips', 'malware-agents', 'malware-download',
+            'metasploit-checks', 'netflix', 'nmap', 'ntp', 'phishing-domains',
             'pornography', 'snmp', 'ssh', 'squatting', 'url-response', 'virus', 'web-scanner',
         ]
         size_choices = ['S', 'M', 'L', 'XL']
@@ -1231,6 +1258,7 @@ performance analysis, or security simulations.
                 ips,
                 dlp_sim_https,
                 malware_download,
+                metasploit_checks,
                 ads_random,
                 ai_https_random,
                 github_domain_check,
@@ -1279,6 +1307,10 @@ performance analysis, or security simulations.
         elif ARGS.suite == 'pornography':
             testsuite = [
                 pornography_crawl,
+            ]
+        elif ARGS.suite == 'metasploit-checks':
+            testsuite = [
+                metasploit_checks,
             ]
         elif ARGS.suite == 'malware-agents':
             testsuite = [
