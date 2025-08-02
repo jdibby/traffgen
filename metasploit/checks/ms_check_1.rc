@@ -1,0 +1,70 @@
+# Automated vulnerability verification script.
+# This script will check for the presence of multiple vulnerabilities on multiple hosts.
+# WARNING: This file should only be used in a legal, controlled lab environment.
+
+# Set the target IP addresses from the targets.list file
+set RHOSTS file:targets.list
+
+#
+
+# Exploit: Oracle Access Manager unauthenticated Remote Code Execution
+#
+use exploit/multi/http/oracle_access_manager_rce_cve_2021_35587
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: SPIP BigUp Plugin Unauthenticated RCE
+#
+use exploit/multi/http/spip_bigup_unauth_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Atlassian Confluence Namespace OGNL Injection
+#
+use exploit/multi/http/atlassian_confluence_namespace_ognl_injection
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Softing Secure Integration Server v1.22 Remote Code Execution
+#
+use exploit/windows/http/softing_sis_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Cacti RCE via SQLi in pollers.php
+#
+use exploit/multi/http/cacti_pollers_sqli_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Microsoft Exchange Server ChainedSerializationBinder RCE
+#
+use exploit/windows/http/exchange_chainedserializationbinder_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+exit

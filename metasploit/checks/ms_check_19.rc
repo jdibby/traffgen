@@ -1,0 +1,92 @@
+# Automated vulnerability verification script.
+# This script will check for the presence of multiple vulnerabilities on multiple hosts.
+# WARNING: This file should only be used in a legal, controlled lab environment.
+
+# Set the target IP addresses from the targets.list file
+set RHOSTS file:targets.list
+
+#
+
+# Exploit: mySCADA MyPRO Authenticated Command Injection (CVE-2023-28384)
+#
+use exploit/windows/scada/mypro_cmdexe
+set THREADS 1
+set USERNAME fake_user
+set PASSWORD fake_password
+check
+back
+sleep 2
+
+#
+
+# Exploit: WP User Registration and Membership Unauthenticated Privilege Escalation (CVE-2025-2563)
+#
+use exploit/multi/http/wp_user_registration_membership_escalation
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Sitecore Experience Platform (XP) PreAuth Deserialization RCE
+#
+use exploit/windows/http/sitecore_xp_cve_2021_42237
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Pentaho Business Server Auth Bypass and Server Side Template Injection RCE
+#
+use exploit/multi/http/pentaho_business_server_authbypass_and_ssti
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: AjaxPro Deserialization Remote Code Execution
+#
+use exploit/windows/http/ajaxpro_deserialization_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Rejetto HTTP File Server (HFS) Unauthenticated Remote Code Execution
+#
+use exploit/windows/http/rejetto_hfs_rce_cve_2024_23692
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: WordPress wp-automatic Plugin SQLi Admin Creation
+#
+use exploit/multi/http/wp_automatic_sqli_to_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: UniFi Network Application Unauthenticated JNDI Injection RCE (via Log4Shell)
+#
+use exploit/multi/http/ubiquiti_unifi_log4shell
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+exit

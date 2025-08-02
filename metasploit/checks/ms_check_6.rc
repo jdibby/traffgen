@@ -1,0 +1,90 @@
+# Automated vulnerability verification script.
+# This script will check for the presence of multiple vulnerabilities on multiple hosts.
+# WARNING: This file should only be used in a legal, controlled lab environment.
+
+# Set the target IP addresses from the targets.list file
+set RHOSTS file:targets.list
+
+#
+
+# Exploit: Tomcat Partial PUT Java Deserialization
+#
+use exploit/multi/http/tomcat_partial_put_deserialization
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Ivanti Avalanche FileStoreConfig File Upload
+#
+use exploit/windows/http/ivanti_avalanche_filestoreconfig_upload
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Sitecore CVE-2025-27218 BinaryFormatter Deserialization Exploit
+#
+use exploit/windows/http/sitecore_xp_cve_2025_27218
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Microsoft Exchange ProxyNotShell RCE
+#
+use exploit/windows/http/exchange_proxynotshell_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: WordPress SureTriggers (aka OttoKit) Combined Auth Bypass
+#
+use exploit/multi/http/wp_suretriggers_auth_bypass
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: VMware vCenter Server Unauthenticated JNDI Injection RCE (via Log4Shell)
+#
+use exploit/multi/http/vmware_vcenter_log4shell
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Cayin xPost wayfinder_seqid SQLi to RCE
+#
+use exploit/windows/http/cayin_xpost_sql_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: pgAdmin Binary Path API RCE
+#
+use exploit/windows/http/pgadmin_binary_path_api
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+exit

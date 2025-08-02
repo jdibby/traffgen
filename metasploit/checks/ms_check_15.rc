@@ -1,0 +1,50 @@
+# Automated vulnerability verification script.
+# This script will check for the presence of multiple vulnerabilities on multiple hosts.
+# WARNING: This file should only be used in a legal, controlled lab environment.
+
+# Set the target IP addresses from the targets.list file
+set RHOSTS file:targets.list
+
+#
+
+# Exploit: Monitorr unauthenticated Remote Code Execution (RCE)
+#
+use exploit/multi/http/monitorr_webshell_rce_cve_2020_28871
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: NorthStar C2 XSS to Agent RCE
+#
+use exploit/windows/http/northstar_c2_xss_to_agent_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Rockwell FactoryTalk View SE SCADA Unauthenticated Remote Code Execution
+#
+use exploit/windows/scada/rockwell_factorytalk_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Microsoft SharePoint Unsafe Control and ViewState RCE
+#
+use exploit/windows/http/sharepoint_unsafe_control
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+exit

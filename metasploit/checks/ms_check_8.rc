@@ -1,0 +1,50 @@
+# Automated vulnerability verification script.
+# This script will check for the presence of multiple vulnerabilities on multiple hosts.
+# WARNING: This file should only be used in a legal, controlled lab environment.
+
+# Set the target IP addresses from the targets.list file
+set RHOSTS file:targets.list
+
+#
+
+# Exploit: Atlassian Confluence SSTI Injection
+#
+use exploit/multi/http/atlassian_confluence_rce_cve_2023_22527
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Fortra GoAnywhere MFT Unauthenticated Remote Code Execution
+#
+use exploit/multi/http/fortra_goanywhere_mft_rce_cve_2024_0204
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: MOVEit SQL Injection vulnerability
+#
+use exploit/windows/http/moveit_cve_2023_34362
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Apache Couchdb Erlang RCE
+#
+use exploit/multi/http/apache_couchdb_erlang_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+exit

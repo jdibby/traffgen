@@ -1,0 +1,72 @@
+# Automated vulnerability verification script.
+# This script will check for the presence of multiple vulnerabilities on multiple hosts.
+# WARNING: This file should only be used in a legal, controlled lab environment.
+
+# Set the target IP addresses from the targets.list file
+set RHOSTS file:targets.list
+
+#
+
+# Exploit: FortiNet FortiClient Endpoint Management Server FCTID SQLi to RCE
+#
+use exploit/windows/http/forticlient_ems_fctid_sqli
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Telerik Report Server Auth Bypass and Deserialization RCE
+#
+use exploit/windows/http/telerik_report_server_deserialization
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: JetBrains TeamCity Unauthenticated Remote Code Execution
+#
+use exploit/multi/http/jetbrains_teamcity_rce_cve_2023_42793
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Delta Electronics InfraSuite Device Master Deserialization
+#
+use exploit/windows/misc/delta_electronics_infrasuite_deserialization
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: ManageEngine ADManager Plus ChangePasswordAction Authenticated Command Injection
+#
+use exploit/windows/http/manageengine_admanager_plus_cve_2023_29084_auth_cmd_injection
+set THREADS 1
+set USERNAME fake_user
+set PASSWORD fake_password
+check
+back
+sleep 2
+
+#
+
+# Exploit: HorizontCMS Arbitrary PHP File Upload
+#
+use exploit/multi/http/horizontcms_upload_exec
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+exit

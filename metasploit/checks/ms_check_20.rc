@@ -1,0 +1,60 @@
+# Automated vulnerability verification script.
+# This script will check for the presence of multiple vulnerabilities on multiple hosts.
+# WARNING: This file should only be used in a legal, controlled lab environment.
+
+# Set the target IP addresses from the targets.list file
+set RHOSTS file:targets.list
+
+#
+
+# Exploit: Log4Shell HTTP Header Injection
+#
+use exploit/multi/http/log4shell_header_injection
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: ManageEngine ADSelfService Plus Unauthenticated SAML RCE
+#
+use exploit/multi/http/manageengine_adselfservice_plus_saml_rce_cve_2022_47966
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: ManageEngine ServiceDesk Plus Unauthenticated SAML RCE
+#
+use exploit/multi/http/manageengine_servicedesk_plus_saml_rce_cve_2022_47966
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: ManageEngine OpManager SumPDU Java Deserialization
+#
+use exploit/multi/http/opmanager_sumpdu_deserialization
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Sonicwall
+#
+use exploit/multi/http/sonicwall_shell_injection_cve_2023_34124
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+exit

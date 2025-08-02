@@ -1,0 +1,81 @@
+# Automated vulnerability verification script.
+# This script will check for the presence of multiple vulnerabilities on multiple hosts.
+# WARNING: This file should only be used in a legal, controlled lab environment.
+
+# Set the target IP addresses from the targets.list file
+set RHOSTS file:targets.list
+
+#
+
+# Exploit: Apache Commons Text RCE
+#
+use exploit/multi/http/apache_commons_text4shell
+set THREADS 1
+set PARAM q
+check
+back
+sleep 2
+
+#
+
+# Exploit: Gitea Git Hooks Remote Code Execution
+#
+use exploit/multi/http/gitea_git_hooks_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: FlexDotnetCMS Arbitrary ASP File Upload
+#
+use exploit/windows/http/flexdotnetcms_upload_exec
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: WordPress Really Simple SSL Plugin Authentication Bypass to RCE
+#
+use exploit/multi/http/wp_reallysimplessl_2fa_bypass_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: ManageEngine ADSelfService Plus Custom Script Execution
+#
+use exploit/windows/http/manageengine_adselfservice_plus_cve_2022_28810
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Progress Software WS_FTP Unauthenticated Remote Code Execution
+#
+use exploit/windows/http/ws_ftp_rce_cve_2023_40044
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Microsoft SharePoint Server-Side Include and ViewState RCE
+#
+use exploit/windows/http/sharepoint_ssi_viewstate
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+exit

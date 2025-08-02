@@ -1,0 +1,52 @@
+# Automated vulnerability verification script.
+# This script will check for the presence of multiple vulnerabilities on multiple hosts.
+# WARNING: This file should only be used in a legal, controlled lab environment.
+
+# Set the target IP addresses from the targets.list file
+set RHOSTS file:targets.list
+
+#
+
+# Exploit: PRTG CVE-2023-32781 Authenticated RCE
+#
+use exploit/windows/http/prtg_authenticated_rce_cve_2023_32781
+set THREADS 1
+set USERNAME fake_user
+set PASSWORD fake_password
+check
+back
+sleep 2
+
+#
+
+# Exploit: WordPress Royal Elementor Addons RCE
+#
+use exploit/multi/http/wp_royal_elementor_addons_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: mySCADA myPRO Manager Unauthenticated Command Injection (CVE-2024-47407)
+#
+use exploit/windows/scada/mypro_mgr_cmd
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Zoho Password Manager Pro XML-RPC Java Deserialization
+#
+use exploit/windows/http/zoho_password_manager_pro_xml_rpc_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+exit

@@ -1,0 +1,80 @@
+# Automated vulnerability verification script.
+# This script will check for the presence of multiple vulnerabilities on multiple hosts.
+# WARNING: This file should only be used in a legal, controlled lab environment.
+
+# Set the target IP addresses from the targets.list file
+set RHOSTS file:targets.list
+
+#
+
+# Exploit: HPE Systems Insight Manager AMF Deserialization RCE
+#
+use exploit/windows/http/hpe_sim_76_amf_deserialization
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Mirth Connect Deserialization RCE
+#
+use exploit/multi/http/mirth_connect_cve_2023_43208
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Adobe ColdFusion Unauthenticated Remote Code Execution
+#
+use exploit/multi/http/adobe_coldfusion_rce_cve_2023_26360
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Inductive Automation Ignition Remote Code Execution
+#
+use exploit/multi/scada/inductive_ignition_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: LG Simple Editor Command Injection (CVE-2023-40504)
+#
+use exploit/windows/http/lg_simple_editor_rce_uploadvideo
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Cacti Import Packages RCE
+#
+use exploit/multi/http/cacti_package_import_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: vBulletin 5.x /ajax/render/widget_tabbedcontainer_tab_panel PHP remote code execution
+#
+use exploit/multi/http/vbulletin_widget_template_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+exit

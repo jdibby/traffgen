@@ -1,0 +1,83 @@
+# Automated vulnerability verification script.
+# This script will check for the presence of multiple vulnerabilities on multiple hosts.
+# WARNING: This file should only be used in a legal, controlled lab environment.
+
+# Set the target IP addresses from the targets.list file
+set RHOSTS file:targets.list
+
+#
+
+# Exploit: DotCMS RCE via Arbitrary File Upload
+#
+use exploit/multi/http/dotcms_file_upload_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Gladinet CentreStack/Triofox ASP.NET ViewState Deserialization
+#
+use exploit/windows/http/gladinet_viewstate_deserialization_cve_2025_30406
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: WordPress Hash Form Plugin RCE
+#
+use exploit/multi/http/wp_hash_form_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: ConnectWise ScreenConnect Unauthenticated Remote Code Execution
+#
+use exploit/multi/http/connectwise_screenconnect_rce_cve_2024_1709
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Exchange Control Panel ViewState Deserialization
+#
+use exploit/windows/http/exchange_ecp_viewstate
+set THREADS 1
+set USERNAME fake_user
+set PASSWORD fake_password
+check
+back
+sleep 2
+
+#
+
+# Exploit: vBulletin replaceAdTemplate Remote Code Execution
+#
+use exploit/multi/http/vbulletin_replace_ad_template_rce
+set THREADS 1
+check
+back
+sleep 2
+
+# End of script
+exit}
+
+# Exploit: Acronis Cyber Protect/Backup remote code execution
+#
+use exploit/multi/http/acronis_cyber_protect_unauth_rce_cve_2022_3405
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+exit

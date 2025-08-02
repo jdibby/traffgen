@@ -1,0 +1,70 @@
+# Automated vulnerability verification script.
+# This script will check for the presence of multiple vulnerabilities on multiple hosts.
+# WARNING: This file should only be used in a legal, controlled lab environment.
+
+# Set the target IP addresses from the targets.list file
+set RHOSTS file:targets.list
+
+#
+
+# Exploit: AVideo WWBNIndex Plugin Unauthenticated RCE
+#
+use exploit/multi/http/avideo_wwbnindex_unauth_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Unauthenticated remote code execution in Ignition
+#
+use exploit/multi/php/ignition_laravel_debug_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: WordPress Backup Migration Plugin PHP Filter Chain RCE
+#
+use exploit/multi/http/wp_backup_migration_php_filter
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: ManageEngine ServiceDesk Plus CVE-2021-44077
+#
+use exploit/windows/http/manageengine_servicedesk_plus_cve_2021_44077
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Samsung MagicINFO 9 Server Remote Code Execution (CVE-2024-7399)
+#
+use exploit/windows/http/magicinfo_traversal
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: WordPress WP Time Capsule Arbitrary File Upload to RCE
+#
+use exploit/multi/http/wp_time_capsule_file_upload_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+exit

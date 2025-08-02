@@ -1,0 +1,35 @@
+# Automated vulnerability verification script.
+# This script will check for the presence of multiple vulnerabilities on multiple hosts.
+# WARNING: This file should only be used in a legal, controlled lab environment.
+
+# Set the target IP addresses from the targets.list file
+set RHOSTS file:targets.list
+
+#
+# Exploit: HTTP Form Field Fuzzer
+#
+use auxiliary/fuzzers/http/http_form_field
+set THREADS 1
+run
+back
+sleep 2
+
+#
+# Exploit: SMB Version Scanner
+#
+use auxiliary/scanner/smb/smb_version
+set THREADS 1
+run
+back
+sleep 2
+
+#
+# Exploit: SSH Version Scanner
+#
+use auxiliary/scanner/ssh/ssh_version
+set THREADS 1
+run
+back
+sleep 2
+
+exit

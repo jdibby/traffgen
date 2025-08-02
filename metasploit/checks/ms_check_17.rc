@@ -1,0 +1,92 @@
+# Automated vulnerability verification script.
+# This script will check for the presence of multiple vulnerabilities on multiple hosts.
+# WARNING: This file should only be used in a legal, controlled lab environment.
+
+# Set the target IP addresses from the targets.list file
+set RHOSTS file:targets.list
+
+#
+
+# Exploit: CrushFTP Unauthenticated RCE
+#
+use exploit/multi/http/crushftp_rce_cve_2023_43177
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: DIAEnergie SQL Injection (CVE-2024-4548)
+#
+use exploit/windows/scada/diaenergie_sqli
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: CA Unified Infrastructure Management Nimsoft 7.80 - Remote Buffer Overflow
+#
+use exploit/windows/nimsoft/nimcontroller_bof
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Calibre Python Code Injection (CVE-2024-6782)
+#
+use exploit/multi/misc/calibre_exec
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Gitea Git Fetch Remote Code Execution
+#
+use exploit/multi/http/gitea_git_fetch_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Wordpress LiteSpeed Cache plugin cookie theft
+#
+use exploit/multi/http/wp_litespeed_cookie_theft
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: qdPM 9.1 Authenticated Arbitrary PHP File Upload (RCE)
+#
+use exploit/multi/http/qdpm_authenticated_rce
+set THREADS 1
+set USERNAME fake_user
+set PASSWORD fake_password
+check
+back
+sleep 2
+
+#
+
+# Exploit: SharePoint DataSet / DataTable Deserialization
+#
+use exploit/windows/http/sharepoint_data_deserialization
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+exit

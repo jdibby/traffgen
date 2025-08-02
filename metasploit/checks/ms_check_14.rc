@@ -1,0 +1,92 @@
+# Automated vulnerability verification script.
+# This script will check for the presence of multiple vulnerabilities on multiple hosts.
+# WARNING: This file should only be used in a legal, controlled lab environment.
+
+# Set the target IP addresses from the targets.list file
+set RHOSTS file:targets.list
+
+#
+
+# Exploit: JetBrains TeamCity Unauthenticated Remote Code Execution
+#
+use exploit/multi/http/jetbrains_teamcity_rce_cve_2024_27198
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Advantech iView Unauthenticated Remote Code Execution
+#
+use exploit/windows/http/advantech_iview_unauth_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: SharePoint Workflows XOML Injection
+#
+use exploit/windows/http/sharepoint_workflows_xoml
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: NetMotion Mobility Server MvcUtil Java Deserialization
+#
+use exploit/windows/http/netmotion_mobility_mvcutil_deserialization
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Apache Druid JNDI Injection RCE
+#
+use exploit/multi/http/apache_druid_cve_2023_25194
+set THREADS 1
+# The SRVHOST option must be set to the IP address of the machine running the exploit.
+set SRVHOST 192.168.1.10
+check
+back
+sleep 2
+
+#
+
+# Exploit: Ivanti Avalanche MDM Buffer Overflow
+#
+use exploit/windows/misc/ivanti_avalanche_mdm_bof
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: VSCode ipynb Remote Development RCE
+#
+use exploit/multi/misc/vscode_ipynb_remote_dev_exec
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: SPIP form PHP Injection
+#
+use exploit/multi/http/spip_rce_form
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+exit

@@ -1,0 +1,82 @@
+# Automated vulnerability verification script.
+# This script will check for the presence of multiple vulnerabilities on multiple hosts.
+# WARNING: This file should only be used in a legal, controlled lab environment.
+
+# Set the target IP addresses from the targets.list file
+set RHOSTS file:targets.list
+
+#
+
+# Exploit: GiveWP Unauthenticated Donation Process Exploit
+#
+use exploit/multi/http/wp_givewp_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Wordpress File Manager Advanced Shortcode 2.3.2 - Unauthenticated Remote Code Execution through shortcode
+#
+use exploit/multi/http/wp_plugin_fma_shortcode_unauth_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Geoserver unauthenticated Remote Code Execution
+#
+use exploit/multi/http/geoserver_unauth_rce_cve_2024_36401
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Oracle WebLogic Server Administration Console Handle RCE
+#
+use exploit/multi/http/weblogic_admin_handle_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Atlassian Confluence Administrator Code Macro Remote Code Execution
+#
+use exploit/multi/http/atlassian_confluence_rce_cve_2024_21683
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: ManageEngine ADAudit Plus Authenticated File Write RCE
+#
+use exploit/windows/http/manageengine_adaudit_plus_authenticated_rce
+set THREADS 1
+set USERNAME fake_user
+set PASSWORD fake_password
+check
+back
+sleep 2
+
+#
+
+# Exploit: Cleo LexiCom, VLTrader, and Harmony Unauthenticated Remote Code Execution
+#
+use exploit/multi/http/cleo_rce_cve_2024_55956
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+exit

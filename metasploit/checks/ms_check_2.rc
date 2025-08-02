@@ -1,0 +1,92 @@
+# Automated vulnerability verification script.
+# This script will check for the presence of multiple vulnerabilities on multiple hosts.
+# WARNING: This file should only be used in a legal, controlled lab environment.
+
+# Set the target IP addresses from the targets.list file
+set RHOSTS file:targets.list
+
+#
+
+# Exploit: ManageEngine ADAudit Plus CVE-2022-28219
+#
+use exploit/windows/http/manageengine_adaudit_plus_cve_2022_28219
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: SPIP Unauthenticated RCE via porte_plume Plugin
+#
+use exploit/multi/http/spip_porte_plume_previsu_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Plesk/myLittleAdmin ViewState .NET Deserialization
+#
+use exploit/windows/http/plesk_mylittleadmin_viewstate
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Advantech iView NetworkServlet Command Injection
+#
+use exploit/windows/http/advantech_iview_networkservlet_cmd_inject
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Apache ActiveMQ Unauthenticated Remote Code Execution
+#
+use exploit/multi/misc/apache_activemq_rce_cve_2023_46604
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Gibbon School Platform Authenticated PHP Deserialization Vulnerability
+#
+use exploit/multi/http/gibbon_auth_rce_cve_2024_24725
+set THREADS 1
+set USERNAME fake_user
+set PASSWORD fake_password
+check
+back
+sleep 2
+
+#
+
+# Exploit: Ivanti EPM Agent Portal Command Execution
+#
+use exploit/windows/misc/ivanti_agent_portal_cmdexec
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Microsoft Exchange ProxyShell RCE
+#
+use exploit/windows/http/exchange_proxyshell_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+exit

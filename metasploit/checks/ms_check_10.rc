@@ -1,0 +1,62 @@
+# Automated vulnerability verification script.
+# This script will check for the presence of multiple vulnerabilities on multiple hosts.
+# WARNING: This file should only be used in a legal, controlled lab environment.
+
+# Set the target IP addresses from the targets.list file
+set RHOSTS file:targets.list
+
+#
+
+# Exploit: ZenTao Pro 8.8.2 Remote Code Execution
+#
+use exploit/windows/http/zentao_pro_rce
+set THREADS 1
+set USERNAME fake_user
+set PASSWORD fake_password
+check
+back
+sleep 2
+
+#
+
+# Exploit: LG Simple Editor Remote Code Execution
+#
+use exploit/windows/http/lg_simple_editor_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: ManageEngine Endpoint Central Unauthenticated SAML RCE
+#
+use exploit/windows/http/manageengine_endpoint_central_saml_rce_cve_2022_47966
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: SQL Server Reporting Services (SSRS) ViewState Deserialization
+#
+use exploit/windows/http/ssrs_navcorrector_viewstate
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Gogs Git Hooks Remote Code Execution
+#
+use exploit/multi/http/gogs_git_hooks_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+exit

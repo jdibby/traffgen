@@ -1,0 +1,50 @@
+# Automated vulnerability verification script.
+# This script will check for the presence of multiple vulnerabilities on multiple hosts.
+# WARNING: This file should only be used in a legal, controlled lab environment.
+
+# Set the target IP addresses from the targets.list file
+set RHOSTS file:targets.list
+
+#
+
+# Exploit: MaraCMS Arbitrary PHP File Upload
+#
+use exploit/multi/http/maracms_upload_exec
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Unauthenticated RCE in Bricks Builder Theme
+#
+use exploit/multi/http/wp_bricks_builder_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Sharepoint Dynamic Proxy Generator Unauth RCE
+#
+use exploit/windows/http/sharepoint_dynamic_proxy_generator_auth_bypass_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: MyBB Admin Control Code Injection RCE
+#
+use exploit/multi/http/mybb_rce_cve_2022_24734
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+exit

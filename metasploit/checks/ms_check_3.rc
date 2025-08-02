@@ -1,0 +1,50 @@
+# Automated vulnerability verification script.
+# This script will check for the presence of multiple vulnerabilities on multiple hosts.
+# WARNING: This file should only be used in a legal, controlled lab environment.
+
+# Set the target IP addresses from the targets.list file
+set RHOSTS file:targets.list
+
+#
+
+# Exploit: Wing FTP Server NULL-byte Authentication Bypass (CVE-2025-47812)
+#
+use exploit/multi/http/wingftp_null_byte_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: PHP CGI Argument Injection Remote Code Execution
+#
+use exploit/windows/http/php_cgi_arg_injection_rce_cve_2024_4577
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Veritas Backup Exec Agent Remote Code Execution
+#
+use exploit/multi/veritas/beagent_sha_auth_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: NETGEAR ProSafe Network Management System 300 Arbitrary File Upload
+#
+use exploit/windows/http/netgear_nms_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+exit

@@ -1,0 +1,92 @@
+# Automated vulnerability verification script.
+# This script will check for the presence of multiple vulnerabilities on multiple hosts.
+# WARNING: This file should only be used in a legal, controlled lab environment.
+
+# Set the target IP addresses from the targets.list file
+set RHOSTS file:targets.list
+
+#
+
+# Exploit: Micro Focus UCMDB Java Deserialization Unauthenticated Remote Code Execution
+#
+use exploit/multi/http/microfocus_ucmdb_unauth_deser
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Apache OFBiz forgotPassword/ProgramExport RCE
+#
+use exploit/multi/http/apache_ofbiz_forgot_password_directory_traversal
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Atlassian Confluence WebWork OGNL Injection
+#
+use exploit/multi/http/atlassian_confluence_webwork_ognl_injection
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Splunk "edit_user" Capability Privilege Escalation
+#
+use exploit/multi/http/splunk_privilege_escalation_cve_2023_32707
+set THREADS 1
+set USERNAME fake_user
+set PASSWORD fake_password
+check
+back
+sleep 2
+
+#
+
+# Exploit: Microsoft Exchange ProxyLogon RCE
+#
+use exploit/windows/http/exchange_proxylogon_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Invision Community 5.0.6 customCss RCE
+#
+use exploit/multi/http/invision_customcss_rce
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: BoidCMS Command Injection
+#
+use exploit/multi/http/cve_2023_38836_boidcms
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+# Exploit: Microsoft Exchange Server DlpUtils AddTenantDlpPolicy RCE
+#
+use exploit/windows/http/exchange_ecp_dlp_policy
+set THREADS 1
+check
+back
+sleep 2
+
+#
+
+exit
