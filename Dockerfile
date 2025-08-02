@@ -32,6 +32,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxml2-dev \
     libxslt1-dev \
     libyaml-dev \
+    libpq-dev \
     ruby-full \
     sqlite3 \
     make \
