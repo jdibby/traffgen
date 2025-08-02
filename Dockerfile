@@ -3,9 +3,6 @@ FROM ubuntu:latest
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=America/Denver
 
-# Set timezone
-RUN ln -fs /usr/share/zoneinfo/$TZ /etc/localtime && dpkg-reconfigure --frontend noninteractive tzdata
-
 # Set timezone and install core dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tzdata \
@@ -42,6 +39,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     bash \
     nikto && \
     rm -rf /var/lib/apt/lists/*
+
+# Set timezone
+RUN ln -fs /usr/share/zoneinfo/$TZ /etc/localtime && dpkg-reconfigure --frontend noninteractive tzdata
 
 # Install Python packages
 RUN pip3 install --break-system-packages fastcli requests colorama beautifulsoup4 tqdm dnspython dnstwist
