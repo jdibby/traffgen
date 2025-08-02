@@ -1258,7 +1258,7 @@ performance analysis, or security simulations.
                 ips,
                 dlp_sim_https,
                 malware_download,
-                metasploit_checks,
+                metasploit_check,
                 ads_random,
                 ai_https_random,
                 github_domain_check,
