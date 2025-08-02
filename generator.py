@@ -428,7 +428,7 @@ def metasploit_check():
     elif ARGS.size == 'XL':
         ms_checks = 7
 
-    rc_dir = '/opt/metasploit-framework/ms_checks'
+    rc_dir = '/opt/metasploit-framework/ms_checks/checks'
     rc_files = [f for f in os.listdir(rc_dir) if f.endswith('.rc')]
     random.shuffle(rc_files)
 
