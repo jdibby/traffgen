@@ -72,6 +72,8 @@ RUN git -c http.sslVerify=false clone https://github.com/rapid7/metasploit-frame
 
 ENV PATH="/opt/metasploit-framework:$PATH"
 
+COPY metasploit /opt/metasploit-framework/metasploit-checks/
+
 # Add your scripts
 ADD generator.py ./
 ADD endpoints.py ./

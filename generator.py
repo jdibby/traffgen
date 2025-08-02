@@ -418,7 +418,7 @@ def ping_random():
             subprocess.call(cmd, shell=True)
             
 ### Metasploit Checks
-def metasploit_checks():
+def metasploit_check():
     if ARGS.size == 'S':
         ms_checks = 1
     elif ARGS.size == 'M':
@@ -428,13 +428,13 @@ def metasploit_checks():
     elif ARGS.size == 'XL':
         ms_checks = 7
 
-    rc_dir = './metasploit/ms_checks'
+    rc_dir = '/opt/metasploit-framework/ms_checks'
     rc_files = [f for f in os.listdir(rc_dir) if f.endswith('.rc')]
     random.shuffle(rc_files)
 
     for count_ms, rc_file in enumerate(rc_files):
         if count_ms < ms_checks:
-            cmd = "/opt/metasploit-framework/msfconsole -q -r '%s'" % os.path.join(rc_dir, rc_file)
+            cmd = "msfconsole -q -r '%s'" % os.path.join(rc_dir, rc_file)
             print (Fore.BLACK)
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
@@ -1152,7 +1152,7 @@ performance analysis, or security simulations.
         suite_choices = [
             'all', 'ads', 'ai', 'bigfile', 'bgp', 'crawl', 'dlp', 'dns', 'ftp',
             'domain-check', 'http', 'https', 'icmp', 'ips', 'malware-agents', 'malware-download',
-            'metasploit-checks', 'netflix', 'nmap', 'ntp', 'phishing-domains',
+            'metasploit-check', 'netflix', 'nmap', 'ntp', 'phishing-domains',
             'pornography', 'snmp', 'ssh', 'squatting', 'url-response', 'virus', 'web-scanner',
         ]
         size_choices = ['S', 'M', 'L', 'XL']
@@ -1308,9 +1308,9 @@ performance analysis, or security simulations.
             testsuite = [
                 pornography_crawl,
             ]
-        elif ARGS.suite == 'metasploit-checks':
+        elif ARGS.suite == 'metasploit-check':
             testsuite = [
-                metasploit_checks,
+                metasploit_check,
             ]
         elif ARGS.suite == 'malware-agents':
             testsuite = [
