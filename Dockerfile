@@ -46,7 +46,7 @@ RUN ln -fs /usr/share/zoneinfo/$TZ /etc/localtime && dpkg-reconfigure --frontend
 RUN pip3 install --break-system-packages fastcli requests colorama beautifulsoup4 tqdm dnspython dnstwist
 
 # Pull latest Nmap NSE scripts
-RUN git clone https://github.com/nmap/nmap.git /nmap-src && \
+RUN git -c http.sslVerify=false clone https://github.com/nmap/nmap.git /nmap-src && \
     mkdir -p /usr/share/nmap && \
     cp /nmap-src/nse_main.lua /usr/share/nmap/ && \
     cp -r /nmap-src/scripts /usr/share/nmap/ && \
@@ -54,7 +54,7 @@ RUN git clone https://github.com/nmap/nmap.git /nmap-src && \
 ENV NMAPDIR=/usr/share/nmap
 
 # Build and install GoBGP
-RUN git clone https://github.com/osrg/gobgp.git /tmp/gobgp-src && \
+RUN git -c http.sslVerify=false clone https://github.com/osrg/gobgp.git /tmp/gobgp-src && \
     cd /tmp/gobgp-src && \
     git checkout v3.37.0 && \
     go build -o gobgp ./cmd/gobgp && \
@@ -63,7 +63,7 @@ RUN git clone https://github.com/osrg/gobgp.git /tmp/gobgp-src && \
     cd / && rm -rf /tmp/gobgp-src
 
 # Install Metasploit Framework
-RUN git clone https://github.com/rapid7/metasploit-framework.git /opt/metasploit-framework && \
+RUN git -c http.sslVerify=false clone https://github.com/rapid7/metasploit-framework.git /opt/metasploit-framework && \
     cd /opt/metasploit-framework && \
     gem install bundler -v 2.3.26 && \
     bundle config set --local without 'development test' && \
