@@ -57,7 +57,7 @@ This document outlines the various network connectivity, web protocol, security,
 | **Phishing Domain Filtering Checks** | `github_phishing_domain_check` | `phishing-domains` | This check executes **phishing domain resolution and reachability test** against a verified list of known phishing domains. This list is maintained as a **publicly accessible data stream** via GitHub. The process is designed to test security controls preventing access to these known undesirable domains. |
 | **Squatting Domain Filtering Checks** | `squatting-domains` | `squatting` | This check uses [`dnstwist`](https://github.com/elceef/dnstwist) to **generate and verify the real registration status of squatting domains**, employing various techniques such as **typosquatting**, **bitsquatting**, and **homograph attacks**. These variations are derived from a static list of real domains in endpoints.py. The goal is to test security controls that prevent access to these undesirable lookalike domains. |
 | **Nikto Scans** | `web_scanner` | `web-scanner` | Launches a Nikto web vulnerability scan against `testmyids.com`, emulating attacker reconnaissance behavior. Scan intensity is configurable via the `--size` argument (`S`, `M`, `L`, `XL`), which adjusts the `-maxtime` value (60–240 seconds). All scans use a forced 1-second request timeout to simulate aggressive probing. Commonly used to validate web-based IDS detection of high-noise application-layer scans. |
-
+| **Metasploit Checks** | `metasploit_checks` | `metasploit` | Runs randomized **Metasploit `.rc` scripts** in `check` mode against targets listed in `targets.list`. Each script includes 2–5 modules from categories like **web**, **SSH**, **SMB**, and **fuzzing**. All modules use `check` only (no exploitation), include `THREADS 1`, and inject a `sleep 2` delay between checks to simulate slow scans. This activity is designed to **trigger IDS/IPS alerts** for lab validation and blue team exercises without causing system compromise. |
 
 ---
 
@@ -123,6 +123,7 @@ ai_https_random
 github_domain_check
 github_phishing_domain_check
 squatting_domains
+metasploit_checks
 nmap_1024os
 nmap_cve
 ntp_random
