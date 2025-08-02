@@ -3,6 +3,9 @@ FROM ubuntu:latest
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=America/Denver
 
+# Set timezone
+RUN ln -fs /usr/share/zoneinfo/$TZ /etc/localtime && dpkg-reconfigure --frontend noninteractive tzdata
+
 # Set timezone and install core dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tzdata \
@@ -40,19 +43,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     nikto && \
     rm -rf /var/lib/apt/lists/*
 
-# Set timezone
-RUN ln -fs /usr/share/zoneinfo/$TZ /etc/localtime && dpkg-reconfigure --frontend noninteractive tzdata
-
 # Install Python packages
 RUN pip3 install --break-system-packages fastcli requests colorama beautifulsoup4 tqdm dnspython dnstwist
 
 # Pull latest Nmap NSE scripts
-RUN git -c http.sslVerify=false clone https://github.com/nmap/nmap.git /nmap-src && \
-    mkdir -p /usr/share/nmap && \
-    cp /nmap-src/nse_main.lua /usr/share/nmap/ && \
-    cp -r /nmap-src/scripts /usr/share/nmap/ && \
-    cp -r /nmap-src/nselib /usr/share/nmap/
-ENV NMAPDIR=/usr/share/nmap
+#RUN git -c http.sslVerify=false clone https://github.com/nmap/nmap.git /nmap-src && \
+#    mkdir -p /usr/share/nmap && \
+#    cp /nmap-src/nse_main.lua /usr/share/nmap/ && \
+#    cp -r /nmap-src/scripts /usr/share/nmap/ && \
+#    cp -r /nmap-src/nselib /usr/share/nmap/
+# ENV NMAPDIR=/usr/share/nmap
 
 # Build and install GoBGP
 RUN git -c http.sslVerify=false clone https://github.com/osrg/gobgp.git /tmp/gobgp-src && \
