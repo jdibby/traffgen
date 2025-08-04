@@ -309,6 +309,32 @@ def ai_https_random():
             print (Back.GREEN + "##############################################################")
             print (Style.RESET_ALL)
             subprocess.call(cmd, shell=True)
+            
+### Test ad filtering
+def ads_random():
+    if ARGS.size == 'S':
+        target_urls = 10
+    elif ARGS.size == 'M':
+        target_urls = 20
+    elif ARGS.size == 'L':
+        target_urls = 50
+    elif ARGS.size == 'XL':
+        target_urls = len(ad_endpoints)
+    random.shuffle(ad_endpoints)
+    for count_urls, url in enumerate(ad_endpoints):
+        if count_urls < target_urls:
+            random.shuffle(user_agents)
+            user_agent = user_agents[0]
+            cmd = f"curl -k -s --show-error --connect-timeout 3 -I -o /dev/null --max-time 5 -A '{user_agent}' {url}"
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
+            print ("Testing AI URLs (%d of %d): %s" %((count_urls+1), target_urls, url))
+            print (f"Agent: {user_agent}")
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
+            subprocess.call(cmd, shell=True)
 
 ### HTTPS crawl through URLs
 def https_crawl():
@@ -795,29 +821,6 @@ def ips():
     print (Back.GREEN + "##############################################################")
     print (Style.RESET_ALL)
     subprocess.call(cmd, shell=True)
-
-### Test ad filtering
-def ads_random():
-    if ARGS.size == 'S':
-        target_urls = 10
-    elif ARGS.size == 'M':
-        target_urls = 20
-    elif ARGS.size == 'L':
-        target_urls = 50
-    elif ARGS.size == 'XL':
-        target_urls = len(ad_endpoints)
-    random.shuffle(ad_endpoints)
-    for count_urls, url in enumerate(ad_endpoints):
-        if count_urls < target_urls:
-            cmd = "curl -k -s --show-error --connect-timeout 5 -I --max-time 5 %s" % url
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            print ("Testing Ad Sites (%d of %d): %s" %((count_urls+1), target_urls, url))
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            subprocess.call(cmd, shell=True)
 
 ### GITHUB Bad Domains Testing
 def github_domain_check_download_file(url, local_filename):

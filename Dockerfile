@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     git \
+    iproute2 \
     ca-certificates \
     build-essential \
     python3 \
