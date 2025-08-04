@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     git \
     iproute2 \
+    traceroute \
     ca-certificates \
     build-essential \
     python3 \
