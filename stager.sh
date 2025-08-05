@@ -78,20 +78,20 @@ if [ "$RASPBIAN" -gt 0 ]; then
         echo "#######################################################################"
     fi
     echo ""
-    apt update -y && apt upgrade -y
+    apt update -y && apt upgrade -y && apt autoremove -y && apt clean -y
 ### Pure Debian detection
 elif [ "$DEBIAN" -gt 0 ]; then
     echo "#######################################################################"
     echo "###################${BOLD} System detected as Pure Debian Linux ${NORMAL}################"
     echo "#######################################################################"
     echo ""
-    apt update -y && apt upgrade -y
+    apt update -y && apt upgrade -y && apt autoremove -y && apt clean -y
 elif [ "$UBUNTU" -gt 0 ]; then
     echo "#######################################################################"
     echo "##################${BOLD} System detected as Ubuntu Linux ${NORMAL}####################"
     echo "#######################################################################"
     echo ""
-    apt update -y && apt upgrade -y
+    apt update -y && apt upgrade -y && apt autoremove -y && apt clean -y
 elif [ "$ROCKY" -gt 0 ]; then
     echo "#######################################################################"
     echo "###################${BOLD} System detected as Rocky Linux ${NORMAL}####################"
@@ -304,7 +304,7 @@ docker images | awk '{print $3}' | xargs docker rmi -f &> /dev/null
 echo ""
 echo "${BOLD}### TRAFFGEN CONTAINER BEING STARTED ###${NORMAL}"
 ### Run the traffgen docker image (this command is universal across architectures and operating systems) 
-docker run --pull=always --detach --restart unless-stopped jdibby/traffgen:latest
+docker run --pull=always --detach --restart unless-stopped jdibby/traffgen:latest --suite=all --size=M --max-wait-secs=10
 
 echo ""
 echo "${BOLD}### TRAFFGEN INSTALL COMPLETE ###${NORMAL}"
