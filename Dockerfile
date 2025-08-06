@@ -82,18 +82,20 @@ RUN apt-get purge -y \
 # Set Metasploit in PATH
 ENV PATH="/opt/metasploit-framework:$PATH"
 
-# Copy custom Metasploit RC scripts
+# Set working directory
+WORKDIR /traffgen
+
+# Copy project files into /traffgen
+COPY generator.py endpoints.py healthcheck.sh ./
+
+# Copy Metasploit RC scripts
 COPY metasploit /opt/metasploit-framework/ms_checks/
 RUN ls -la /opt/metasploit-framework/ms_checks/
 
-# Add scripts
-COPY generator.py ./
-COPY endpoints.py ./
-
-# Container health check
-COPY healthcheck.sh ./
-HEALTHCHECK --interval=10s --timeout=3s --retries=2 CMD /healthcheck.sh
+# Set container health check
+RUN chmod +x /traffgen/healthcheck.sh
+HEALTHCHECK --interval=10s --timeout=3s --retries=2 CMD /traffgen/healthcheck.sh
 
 # Set Python generator as entrypoint
-ENTRYPOINT ["python3", "-u", "generator.py"]
+ENTRYPOINT ["python3", "-u", "/traffgen/generator.py"]
 CMD ["--suite=all", "--size=M", "--max-wait-secs=15", "--loop"]
