@@ -541,11 +541,11 @@ def speedtest_fast():
     if ARGS.size == 'S':
         duration = 1
     elif ARGS.size == 'M':
-        duration = 3
+        duration = 2
     elif ARGS.size == 'L':
-        duration = 5
+        duration = 3
     elif ARGS.size == 'XL':
-        duration = 10
+        duration = 4
 
     print(Fore.BLACK)
     print(Back.GREEN + "##############################################################")
