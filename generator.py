@@ -14,6 +14,24 @@ from endpoints import *
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 ssl._create_default_https_context = ssl._create_unverified_context
 
+### Watchdog used for restarting container if no activity is detected
+class Watchdog:
+    def __init__(self, timeout_seconds):
+        self.timeout = timeout_seconds
+        self.last_kick = time.time()
+        self.thread = threading.Thread(target=self._watch, daemon=True)
+        self.thread.start()
+
+    def kick(self):
+        self.last_kick = time.time()
+
+    def _watch(self):
+        while True:
+            if time.time() - self.last_kick > self.timeout:
+                print("[WATCHDOG] No activity detected. Exiting to force container restart...")
+                os._exit(1)
+            time.sleep(1)
+
 ### Grab container IP address
 def get_container_ip():
     try:
@@ -1019,12 +1037,14 @@ def run_test(list):
             ### For looping, choose a test at random from the list for each iteration
             func = random.choice(list)
             func()
+            WATCHDOG.kick()
             finish_test()
     else:
         ### For single runs, run tests in random order
         random.shuffle(list)
         for func in list:
             func()
+            WATCHDOG.kick()
             finish_test()
 
 ### Randomize a wait time between 2 and max seconds
@@ -1231,6 +1251,8 @@ performance analysis, or security simulations.
         )
 
         ARGS = parser.parse_args()
+        
+        WATCHDOG = Watchdog(timeout_seconds=600)
 
         # Output Summary
         print(Fore.BLACK + Back.GREEN + "##############################################################")
