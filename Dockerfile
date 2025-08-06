@@ -86,9 +86,13 @@ ENV PATH="/opt/metasploit-framework:$PATH"
 COPY metasploit /opt/metasploit-framework/ms_checks/
 RUN ls -la /opt/metasploit-framework/ms_checks/
 
-# Add your scripts
+# Add scripts
 COPY generator.py ./
 COPY endpoints.py ./
+
+# Container health check
+COPY healthcheck.sh ./
+HEALTHCHECK --interval=10s --timeout=3s --retries=2 CMD /healthcheck.sh
 
 # Set Python generator as entrypoint
 ENTRYPOINT ["python3", "-u", "generator.py"]
