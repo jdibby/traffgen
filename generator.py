@@ -15,7 +15,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 ssl._create_default_https_context = ssl._create_unverified_context
 
 ### Watchdog used for restarting container if no activity is detected
-class Watchdog:
+class watchdog:
     def __init__(self, timeout_seconds):
         self.timeout = timeout_seconds
         self.last_kick = time.time()
@@ -1252,7 +1252,7 @@ performance analysis, or security simulations.
 
         ARGS = parser.parse_args()
         
-        WATCHDOG = Watchdog(timeout_seconds=600)
+        WATCHDOG = watchdog(timeout_seconds=600)
 
         # Output Summary
         print(Fore.BLACK + Back.GREEN + "##############################################################")
