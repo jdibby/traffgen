@@ -146,9 +146,10 @@ The following functions are executed when running the complete suite:
 - 🔀 Randomized test execution order
 - ⏱️ Optional randomized delays between test runs
 - 🔁 Infinite loop mode for long-term testing or stress testing
-- 🌍 Dynamic endpoint retrieval via `endpoints.py`
+- 🌍 Endpoints determined via `endpoints.py`
 - 🎨 Colorized terminal output using `colorama`
 - 📈 Download progress indicators via `tqdm`
+- 🖥️ Watchdog and healthchecks for self-healing and self-restarting
 
 ---
 
