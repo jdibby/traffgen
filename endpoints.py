@@ -1430,6 +1430,11 @@ virus_endpoints = [
     "https://secure.eicar.org/eicar.com.txt",
     "https://secure.eicar.org/eicar_com.zip",
     "https://secure.eicar.org/eicarcom2.zip",
+    "https://www.ikarussecurity.com/wp-content/downloads/eicar_com.zip",
+    "https://wildfire.paloaltonetworks.com/publicapi/test/apk",
+    "https://wildfire.paloaltonetworks.com/publicapi/test/macos",
+    "http://wildfire.paloaltonetworks.com/publicapi/test/apk",
+    "http://wildfire.paloaltonetworks.com/publicapi/test/macos",
 ]
 
 squatting_endpoints = [
