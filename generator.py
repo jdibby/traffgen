@@ -1239,8 +1239,8 @@ performance analysis, or security simulations.
             '--crawl-start',
             action="store",
             required=False,
-            default='https://data.commoncrawl.org',
-            help='For the "crawl" suite: Specifies the initial URL to start web crawling from. Default: https://data.commoncrawl.org'
+            default='https://urlhaus.abuse.ch',
+            help='For the "crawl" suite: Specifies the initial URL to start web crawling from. Default: https://urlhaus.abuse.ch'
         )
 
         ARGS = parser.parse_args()
