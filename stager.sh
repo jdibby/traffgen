@@ -11,13 +11,13 @@ fi
 
 # Check for interactive terminal
 if [ ! -t 0 ]; then
-    echo "This script must be run in an interactive terminal (e.g., not via redirected input)."
-    echo "Try running with: curl -s https://... | sudo bash -i"
+    echo "This script must be run in an interactive terminal (not via redirected input)"
+    echo "Run with: curl -s https://<url here>... | sudo bash -i"
     exit 1
 fi
 
 # Confirm
-read -p "Are you sure you want to update, remove, and install packages and turn your system into a traffic generator? [y/N] " response
+read -p "Are you sure you want to update, remove, and install packages then turn your system into a traffic generator? [y/N] " response
 if [[ ! "$response" =~ ^[Yy]$ ]]; then
     echo "EXITING STAGER WITHOUT CHANGES"
     exit 1
