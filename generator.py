@@ -1077,7 +1077,9 @@ def replace_all_endpoints(url):
 ### Grab random links from website
 def scrape_single_link(url):
     sleep(random.uniform(0.2, 2))
+
     random.shuffle(user_agents)
+    user_agent = user_agents[0]
 
     print(f"Visiting: {url}")
     print (f"Agent: {user_agent}")
