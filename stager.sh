@@ -153,7 +153,12 @@ else
     apt update -y
     apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
     systemctl restart docker
-fi
+    docker system prune -f
+    docker image prune -f
+    docker volume prune -f
+    docker network prune -f
+    docker container prune -f
+fi  
 
 echo ""
 echo "${BOLD}### DOCKER INSTALLATION COMPLETE ###${NORMAL}"
