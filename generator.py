@@ -1080,6 +1080,8 @@ def scrape_single_link(url):
     random.shuffle(user_agents)
 
     print(f"Visiting: {url}")
+    print (f"Agent: {user_agent}")
+    print ("")
 
     try:
         response = requests.request(
