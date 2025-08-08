@@ -1076,12 +1076,6 @@ def replace_all_endpoints(url):
 
 ### Grab random links from website
 def scrape_single_link(url):
-    import random
-    from time import sleep
-    from urllib.parse import urljoin
-    import requests
-    from bs4 import BeautifulSoup
-
     user_agents = [
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
