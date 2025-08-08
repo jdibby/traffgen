@@ -122,7 +122,7 @@ else
     echo ""
     echo "${BOLD}### APT SOURCE REPOS ARE NOW CLEAN ###${NORMAL}"
     echo ""
-    
+
     apt install -y ca-certificates curl gnupg lsb-release
     install -m 0755 -d /etc/apt/keyrings
 
@@ -160,7 +160,7 @@ echo "${BOLD}### DOCKER INSTALLATION COMPLETE ###${NORMAL}"
 echo ""
 
 echo "${BOLD}### STARTING TRAFFGEN CONTAINER ###${NORMAL}"
-docker run --pull=always --detach --restart unless-stopped jdibby/traffgen:latest --suite=all --size=M --max-wait-secs=10
+docker run --pull=always --detach --restart unless-stopped jdibby/traffgen:latest --suite=all --size=M --max-wait-secs=30
 
 echo ""
 echo "${BOLD}### TRAFFGEN INSTALL COMPLETE ###${NORMAL}"
