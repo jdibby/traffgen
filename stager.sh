@@ -1,19 +1,11 @@
 #!/bin/bash
 
 ### VALIDATE ROOT PRIVILEGES ###
+echo "Checking for root privileges..."
 WHOAREYOU=$(whoami)
 if [ "$WHOAREYOU" != "root" ]; then
     echo "#######################################################################"
     echo "############## YOU MUST BE ROOT OR ELSE SUDO THIS SCRIPT ##############"
-    echo "#######################################################################"
-    exit 1
-fi
-
-### VALIDATE INTERACTIVE TERMINAL ###
-if [ ! -t 0 ]; then
-    echo "#######################################################################"
-    echo "############# THIS SCRIPT MUST BE RUN IN AN INTERACTIVE SHELL #########"
-    echo "##### Try running with: curl -s https://... | sudo bash -i ###########"
     echo "#######################################################################"
     exit 1
 fi
@@ -23,7 +15,7 @@ BOLD=$(tput bold)
 NORMAL=$(tput sgr0)
 echo ""
 echo "${BOLD}### DETECTING OPERATING SYSTEM ###${NORMAL}"
-echo ""
+echo "Detecting OS type..."
 
 ### OS DETECTION LOGIC ###
 RPIVER=""
@@ -31,7 +23,7 @@ if [ -f /proc/device-tree/model ]; then
     RPIVER=$(grep -a "Raspberry" /proc/device-tree/model | awk '{print $3}')
 fi
 
-### ZERO OUT OS VARIABLES ###
+### RESET OS VARIABLES ###
 UBUNTU=0
 ROCKY=0
 RASPBIAN=0
