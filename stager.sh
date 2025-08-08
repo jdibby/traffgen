@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Check for root
+### VALIDATE ROOT PRIVILEGES ###
 WHOAREYOU=$(whoami)
 if [ "$WHOAREYOU" != "root" ]; then
     echo "#######################################################################"
@@ -9,19 +9,29 @@ if [ "$WHOAREYOU" != "root" ]; then
     exit 1
 fi
 
+### VALIDATE INTERACTIVE TERMINAL ###
+if [ ! -t 0 ]; then
+    echo "#######################################################################"
+    echo "############# THIS SCRIPT MUST BE RUN IN AN INTERACTIVE SHELL #########"
+    echo "##### Try running with: curl -s https://... | sudo bash -i ###########"
+    echo "#######################################################################"
+    exit 1
+fi
+
+### INITIALIZE FORMATTING ###
 BOLD=$(tput bold)
 NORMAL=$(tput sgr0)
 echo ""
 echo "${BOLD}### DETECTING OPERATING SYSTEM ###${NORMAL}"
 echo ""
 
-# OS detection
+### OS DETECTION LOGIC ###
 RPIVER=""
 if [ -f /proc/device-tree/model ]; then
     RPIVER=$(grep -a "Raspberry" /proc/device-tree/model | awk '{print $3}')
 fi
 
-# Reset OS variables
+### ZERO OUT OS VARIABLES ###
 UBUNTU=0
 ROCKY=0
 RASPBIAN=0
@@ -33,39 +43,52 @@ if [ -f /etc/os-release ]; then
     RASPBIAN=$(grep 'ID=raspbian' /etc/os-release | wc -l)
     DEBIAN=$(grep '^ID=debian$' /etc/os-release | wc -l)
     if [ "$DEBIAN" -gt 0 ] && [ "$RASPBIAN" -gt 0 ]; then
-        DEBIAN=0  # Raspbian is not pure Debian
+        DEBIAN=0
     fi
 fi
 
-# OS Message and Initial Update/Upgrade
+### DISPLAY OS AND PERFORM GLOBAL UPDATE ###
 if [ "$RASPBIAN" -gt 0 ]; then
-    echo "${BOLD}System detected: Raspbian${NORMAL}"
+    echo "#######################################################################"
+    echo "##########${BOLD} System detected as Raspbian ${NORMAL}###########################"
+    echo "#######################################################################"
 elif [ "$DEBIAN" -gt 0 ]; then
-    echo "${BOLD}System detected: Pure Debian${NORMAL}"
+    echo "#######################################################################"
+    echo "##########${BOLD} System detected as Pure Debian ${NORMAL}######################"
+    echo "#######################################################################"
 elif [ "$UBUNTU" -gt 0 ]; then
-    echo "${BOLD}System detected: Ubuntu${NORMAL}"
+    echo "#######################################################################"
+    echo "##########${BOLD} System detected as Ubuntu Linux ${NORMAL}#####################"
+    echo "#######################################################################"
 elif [ "$ROCKY" -gt 0 ]; then
-    echo "${BOLD}System detected: Rocky Linux${NORMAL}"
+    echo "#######################################################################"
+    echo "##########${BOLD} System detected as Rocky Linux ${NORMAL}#####################"
+    echo "#######################################################################"
 else
-    echo "Unsupported OS. Exiting."
+    echo "#######################################################################"
+    echo "#################### UNSUPPORTED OPERATING SYSTEM #####################"
+    echo "#######################################################################"
     exit 1
 fi
 
 echo ""
-echo "${BOLD}### PERFORMING SYSTEM UPDATE ###${NORMAL}"
+echo "${BOLD}### UPDATING SYSTEM PACKAGES ###${NORMAL}"
 if [ "$ROCKY" -gt 0 ]; then
     dnf update -y && dnf upgrade -y
 else
     apt update -y && apt upgrade -y && apt autoremove -y && apt clean -y
 fi
 
+### CLEANUP EXISTING CONTAINERS ###
 echo ""
-echo "${BOLD}### CLEANING UP OLD CONTAINERS ###${NORMAL}"
+echo "${BOLD}### CLEANING UP DOCKER CONTAINERS AND IMAGES ###${NORMAL}"
 docker stop $(docker ps -aq) &>/dev/null
 docker rm $(docker ps -aq) &>/dev/null
 docker images | awk '{print $3}' | xargs docker rmi -f &>/dev/null
 
-# Docker removal
+### REMOVE OLD DOCKER INSTALLATIONS ###
+echo ""
+echo "${BOLD}### REMOVING OLD DOCKER INSTALLATIONS ###${NORMAL}"
 if [ "$ROCKY" -gt 0 ]; then
     dnf remove -y docker-ce docker-ce-cli containerd.io
     rm -rf /var/lib/docker /var/lib/containerd
@@ -75,10 +98,9 @@ else
     done
 fi
 
-# Docker repo & install
+### CONFIGURE DOCKER REPOSITORY ###
 echo ""
 echo "${BOLD}### CONFIGURING DOCKER REPOSITORY ###${NORMAL}"
-
 if [ "$ROCKY" -gt 0 ]; then
     dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
     dnf update -y
@@ -121,9 +143,9 @@ echo ""
 echo "${BOLD}### DOCKER INSTALLATION COMPLETE ###${NORMAL}"
 echo ""
 
-# Start Traffgen
 echo "${BOLD}### STARTING TRAFFGEN CONTAINER ###${NORMAL}"
 docker run --pull=always --detach --restart unless-stopped jdibby/traffgen:latest --suite=all --size=M --max-wait-secs=10
+
 echo ""
 echo "${BOLD}### TRAFFGEN INSTALL COMPLETE ###${NORMAL}"
 echo ""
