@@ -9,9 +9,9 @@ if [ "$WHOAREYOU" != "root" ]; then
     exit 1
 fi
 
-#read -p "Are you sure you want to update, remove, and install packages and turn your system into a traffic generator? [y/N] " response
+read -p "Are you sure you want to update, remove, and install packages and turn your system into a traffic generator? [y/N] " response
 
-#if [[ "$response" =~ ^[Yy]$ ]]; then
+if [[ "$response" =~ ^[Yy]$ ]]; then
 
     ### Adding capabilities of bold fonts ###
     BOLD=$(tput bold)
@@ -315,7 +315,7 @@ fi
     echo ""
     docker ps -a --format "table {{.ID}} -- {{.Image}} -- {{.Names}} -- {{.Status}}"
     echo ""
-#else
-#    echo "EXITING STAGER WITHOUT CHANGES"
-#    exit 1
-#fi
+else
+    echo "EXITING STAGER WITHOUT CHANGES"
+    exit 1
+fi
