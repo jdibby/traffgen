@@ -15,6 +15,7 @@ BOLD=$(tput bold)
 NORMAL=$(tput sgr0)
 echo ""
 echo "${BOLD}### DETECTING OPERATING SYSTEM ###${NORMAL}"
+echo ""
 
 ### OS DETECTION LOGIC ###
 RPIVER=""
@@ -98,6 +99,30 @@ if [ "$ROCKY" -gt 0 ]; then
     dnf install docker-ce docker-ce-cli containerd.io docker-compose-plugin -y
     systemctl enable --now docker
 else
+    echo ""
+    echo "${BOLD}### CLEANING UP APT SOURCE REPOS ###${NORMAL}"
+    echo ""
+
+    ### Cleanup apt repo deduplicates
+    ### Install dependencies (if not already present)
+    sudo apt install python3-apt python3-regex -y
+
+    ### Download the script
+    wget https://github.com/davidfoerster/aptsources-cleanup/releases/download/v0.1.7.5.2/aptsources-cleanup.pyz
+
+    ### Make it executable
+    chmod +x aptsources-cleanup.pyz
+
+    ### Run the script
+    sudo bash -c "echo all | ./aptsources-cleanup.pyz --yes"
+
+    ### Remove the script after use
+    rm aptsources-cleanup.pyz
+
+    echo ""
+    echo "${BOLD}### APT SOURCE REPOS ARE NOW CLEAN ###${NORMAL}"
+    echo ""
+    
     apt install -y ca-certificates curl gnupg lsb-release
     install -m 0755 -d /etc/apt/keyrings
 
