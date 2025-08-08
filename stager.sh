@@ -15,7 +15,6 @@ BOLD=$(tput bold)
 NORMAL=$(tput sgr0)
 echo ""
 echo "${BOLD}### DETECTING OPERATING SYSTEM ###${NORMAL}"
-echo "Detecting OS type..."
 
 ### OS DETECTION LOGIC ###
 RPIVER=""
