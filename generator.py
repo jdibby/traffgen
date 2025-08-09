@@ -1295,120 +1295,62 @@ performance analysis, or security simulations.
                 virus_sim,
                 dlp_sim_https,
                 malware_download,
-                ]
-        if ARGS.suite == 'bigfile':
-            testsuite = [
-                bigfile,
             ]
+            random.shuffle(testsuite)  # Shuffle the entire suite for random execution
+        elif ARGS.suite == 'bigfile':
+            testsuite = [bigfile]
         elif ARGS.suite == 'crawl':
-            testsuite = [
-                webcrawl,
-            ]
+            testsuite = [webcrawl}
         elif ARGS.suite == 'dns':
-            testsuite = [
-                dig_random,
-            ]
+            testsuite = [dig_random]
         elif ARGS.suite == 'bgp':
-            testsuite = [
-                bgp_peering,
-            ]
+            testsuite = [bgp_peering]
         elif ARGS.suite == 'ftp':
-            testsuite = [
-                ftp_random,
-            ]
+            testsuite = [ftp_random]
         elif ARGS.suite == 'http':
-            testsuite = [
-                http_download_targz,
-                http_download_zip,
-                http_random,
-            ]
+            testsuite = [http_download_targz, http_download_zip, http_random]
         elif ARGS.suite == 'https':
-            testsuite = [
-                https_random,
-                https_crawl,
-            ]
+            testsuite = [https_random, https_crawl]
         elif ARGS.suite == 'pornography':
-            testsuite = [
-                pornography_crawl,
-            ]
+            testsuite = [pornography_crawl]
         elif ARGS.suite == 'metasploit-check':
-            testsuite = [
-                metasploit_check,
-            ]
+            testsuite = [metasploit_check]
         elif ARGS.suite == 'malware-agents':
-            testsuite = [
-                malware_random,
-            ]
+            testsuite = [malware_random]
         elif ARGS.suite == 'ai':
-            testsuite = [
-                ai_https_random,
-            ]
+            testsuite = [ai_https_random]
         elif ARGS.suite == 'icmp':
-            testsuite = [
-                ping_random,
-                traceroute_random,
-            ]
+            testsuite = [ping_random, traceroute_random]
         elif ARGS.suite == 'snmp':
-            testsuite = [
-                snmp_random,
-            ]
+            testsuite = [snmp_random]
         elif ARGS.suite == 'ips':
-            testsuite = [
-                ips,
-            ]
+            testsuite = [ips]
         elif ARGS.suite == 'ads':
-            testsuite = [
-                ads_random,
-            ]            
+            testsuite = [ads_random]            
         elif ARGS.suite == 'domain-check':
-            testsuite = [
-                github_domain_check,
-            ]       
+            testsuite = [github_domain_check]       
         elif ARGS.suite == 'phishing-domains':
-            testsuite = [
-                github_phishing_domain_check,
-            ]          
+            testsuite = [github_phishing_domain_check]          
         elif ARGS.suite == 'squatting':
-            testsuite = [
-                squatting_domains,
-            ]           
+            testsuite = [squatting_domains]           
         elif ARGS.suite == 'netflix':
-            testsuite = [
-                speedtest_fast,
-            ]
+            testsuite = [speedtest_fast]
         elif ARGS.suite == 'web-scanner':
-            testsuite = [
-                web_scanner,
-            ]
+            testsuite = [web_scanner]
         elif ARGS.suite == 'nmap':
-            testsuite = [
-                nmap_1024os,
-                nmap_cve,
-            ]
+            testsuite = [nmap_1024os, nmap_cve]
         elif ARGS.suite == 'ntp':
-            testsuite = [
-                ntp_random,
-            ]
+            testsuite = [ntp_random]
         elif ARGS.suite == 'ssh':
-            testsuite = [
-                ssh_random,
-            ]
+            testsuite = [ssh_random]
         elif ARGS.suite == 'url-response':
-            testsuite = [
-                urlresponse_random,
-            ]
+            testsuite = [urlresponse_random]
         elif ARGS.suite == 'virus':
-            testsuite = [
-                virus_sim,
-            ]
+            testsuite = [virus_sim]
         elif ARGS.suite == 'dlp':
-            testsuite = [
-                dlp_sim_https,
-            ]
+            testsuite = [dlp_sim_https]
         elif ARGS.suite == 'malware-download':
-            testsuite = [
-                malware_download,
-            ]
+            testsuite = [malware_download]
 
         ### SEND IT!
         run_test(testsuite)
