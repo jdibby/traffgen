@@ -1206,7 +1206,7 @@ performance analysis, or security simulations.
                 '  S (Small): Minimal traffic generation.\n'
                 '  M (Medium): Moderate traffic (default).\n'
                 '  L (Large): Significant traffic volume.\n'
-                '  XL (Extra Large): High-intensity traffic.\n\n'
+                '  XL (Extra Large): High-intensity traffic. Use carefully!\n\n'
             )
         )
 
@@ -1294,13 +1294,13 @@ performance analysis, or security simulations.
                 urlresponse_random,
                 virus_sim,
                 dlp_sim_https,
-                malware_download,
+                malware_download
             ]
             random.shuffle(testsuite)  # Shuffle the entire suite for random execution
         elif ARGS.suite == 'bigfile':
             testsuite = [bigfile]
         elif ARGS.suite == 'crawl':
-            testsuite = [webcrawl}
+            testsuite = [webcrawl]
         elif ARGS.suite == 'dns':
             testsuite = [dig_random]
         elif ARGS.suite == 'bgp':
