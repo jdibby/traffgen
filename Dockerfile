@@ -35,15 +35,19 @@ RUN git -c http.sslVerify=false clone https://github.com/osrg/gobgp.git /tmp/gob
     cd / && rm -rf /tmp/gobgp-src
 
 # --- Metasploit (isolated + quiet) ---
-RUN git -c http.sslVerify=false clone https://github.com/rapid7/metasploit-framework.git /opt/metasploit-framework && \
-    cd /opt/metasploit-framework && \
+RUN git -c http.sslVerify=false clone https://github.com/rapid7/metasploit-framework.git /opt/metasploit-framework
+
+WORKDIR /opt/metasploit-framework
+RUN set -euo pipefail; \
     gem install bundler && \
     bundle config set --local without 'development test' && \
     bundle config set --local path 'vendor/bundle' && \
-    # Make sure Gemfile pins the version msf expects
-    (grep -q "^gem 'stringio'," Gemfile && \
-     sed -i "s/^gem 'stringio'.*/gem 'stringio', '3.1.1'/" Gemfile || \
-     echo "gem 'stringio', '3.1.1'" >> Gemfile) && \
+    # Normalize/force stringio pin to 3.1.1 exactly once
+    if grep -Eq "^\s*gem ['\"]stringio['\"]" Gemfile; then \
+      sed -E -i "s|^\s*gem ['\"]stringio['\"].*|gem 'stringio', '3.1.1'|" Gemfile; \
+    else \
+      echo "gem 'stringio', '3.1.1'" >> Gemfile; \
+    fi && \
     NOKOGIRI_USE_SYSTEM_LIBRARIES=1 bundle install --jobs 4 --retry 3 && \
     bundle clean --force && \
     rm -rf ~/.gem ~/.bundle /root/.bundle vendor/bundle/ruby/*/cache tmp/cache && \
@@ -53,9 +57,10 @@ RUN git -c http.sslVerify=false clone https://github.com/rapid7/metasploit-frame
     printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec ./msfconsole "$@"\n' > /usr/local/bin/msfconsole && \
     chmod +x /usr/local/bin/msfconsole && \
     printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec ./msfvenom "$@"\n' > /usr/local/bin/msfvenom && \
-    chmod +x /usr/local/bin/msfvenom && \
-    # Build-time smoke test (fail image early if msf is broken)
-    /usr/local/bin/msfconsole -q -x 'version; exit'
+    chmod +x /usr/local/bin/msfvenom
+
+# Build-time smoke test (separate layer so failures show clearly)
+RUN /usr/local/bin/msfconsole -q -x 'version; exit'
 
 # Copy your Metasploit RC scripts (once)
 COPY metasploit /opt/metasploit-framework/ms_checks/
