@@ -34,20 +34,28 @@ RUN git -c http.sslVerify=false clone https://github.com/osrg/gobgp.git /tmp/gob
     mv gobgp gobgpd /usr/local/bin/ && \
     cd / && rm -rf /tmp/gobgp-src
 
-# Install Metasploit Framework (isolated bundle)
+# --- Metasploit (isolated + quiet) ---
 RUN git -c http.sslVerify=false clone https://github.com/rapid7/metasploit-framework.git /opt/metasploit-framework && \
     cd /opt/metasploit-framework && \
     gem install bundler && \
     bundle config set --local without 'development test' && \
     bundle config set --local path 'vendor/bundle' && \
+    # Make sure Gemfile pins the version msf expects
+    (grep -q "^gem 'stringio'," Gemfile && \
+     sed -i "s/^gem 'stringio'.*/gem 'stringio', '3.1.1'/" Gemfile || \
+     echo "gem 'stringio', '3.1.1'" >> Gemfile) && \
     NOKOGIRI_USE_SYSTEM_LIBRARIES=1 bundle install --jobs 4 --retry 3 && \
-    rm -rf ~/.gem ~/.bundle /root/.bundle vendor/bundle/ruby/*/cache tmp/cache
-
-# Wrappers so msf always runs under bundler
-RUN printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec ./msfconsole "$@"\n' > /usr/local/bin/msfconsole && \
+    bundle clean --force && \
+    rm -rf ~/.gem ~/.bundle /root/.bundle vendor/bundle/ruby/*/cache tmp/cache && \
+    # Remove Ruby's default stringio gemspec to avoid duplicate-version warnings
+    rm -f /usr/lib/ruby/gems/3.2.0/specifications/default/stringio-3.0.4.gemspec || true && \
+    # Wrappers to always run under bundler
+    printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec ./msfconsole "$@"\n' > /usr/local/bin/msfconsole && \
     chmod +x /usr/local/bin/msfconsole && \
     printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec ./msfvenom "$@"\n' > /usr/local/bin/msfvenom && \
-    chmod +x /usr/local/bin/msfvenom
+    chmod +x /usr/local/bin/msfvenom && \
+    # Build-time smoke test (fail image early if msf is broken)
+    /usr/local/bin/msfconsole -q -x 'version; exit'
 
 # Copy your Metasploit RC scripts (once)
 COPY metasploit /opt/metasploit-framework/ms_checks/
