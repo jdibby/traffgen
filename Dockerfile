@@ -55,45 +55,13 @@ RUN git -c http.sslVerify=false clone https://github.com/osrg/gobgp.git /tmp/gob
     mv gobgp gobgpd /usr/local/bin/ && \
     cd / && rm -rf /tmp/gobgp-src
 
-# ---------- Metasploit: deterministic vendor bundle + sandboxed wrappers ----------
-ENV BUNDLE_WITHOUT="development test" \
-    BUNDLE_JOBS="4" \
-    DISABLE_BOOTSNAP="1"
-
+# Install Metasploit Framework (check mode only)
 RUN git -c http.sslVerify=false clone https://github.com/rapid7/metasploit-framework.git /opt/metasploit-framework && \
     cd /opt/metasploit-framework && \
-    gem install bundler -v "~>2.5" --no-document && \
-    bundle config set --local path "/opt/metasploit-framework/vendor/bundle" && \
-    bundle config set --local without "$BUNDLE_WITHOUT" && \
-    bundle config set --local force_ruby_platform true && \
-    bundle config set --local deployment true && \
-    bundle lock --add-platform x86_64-linux && \
-    bundle install --retry=3 && \
-    gem cleanup stringio || true
-
-# Wrapper scripts that isolate gems to vendor/bundle and force bundle exec
-RUN cat > /usr/local/bin/msfconsole <<'EOF' && \
-chmod +x /usr/local/bin/msfconsole && \
-cat > /usr/local/bin/msfvenom <<'EOF' && \
-chmod +x /usr/local/bin/msfvenom
-#!/usr/bin/env bash
-set -euo pipefail
-cd /opt/metasploit-framework
-export DISABLE_BOOTSNAP=1
-ruby_ver="$(ruby -e 'print RbConfig::CONFIG["ruby_version"]')"
-export GEM_HOME="/opt/metasploit-framework/vendor/bundle/ruby/${ruby_ver}"
-export GEM_PATH="$GEM_HOME"
-exec bundle exec ./msfconsole "$@"
-EOF
-#!/usr/bin/env bash
-set -euo pipefail
-cd /opt/metasploit-framework
-export DISABLE_BOOTSNAP=1
-ruby_ver="$(ruby -e 'print RbConfig::CONFIG["ruby_version"]')"
-export GEM_HOME="/opt/metasploit-framework/vendor/bundle/ruby/${ruby_ver}"
-export GEM_PATH="$GEM_HOME"
-exec bundle exec ./msfvenom "$@"
-EOF
+    gem install bundler -v 2.3.26 && \
+    bundle config set --local without 'development test' && \
+    bundle install && \
+    rm -rf ~/.gem ~/.bundle /root/.bundle /opt/metasploit-framework/vendor/bundle/ruby/*/cache
 
 # Clean up build-time dependencies and cache
 RUN apt-get purge -y \
@@ -109,6 +77,13 @@ RUN apt-get purge -y \
     apt-get autoremove -y && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Set Metasploit in PATH
+ENV PATH="/opt/metasploit-framework:$PATH"
+
+# Copy custom Metasploit RC scripts
+COPY metasploit /opt/metasploit-framework/ms_checks/
+RUN ls -la /opt/metasploit-framework/ms_checks/
 
 # Workdir and files
 WORKDIR /traffgen
