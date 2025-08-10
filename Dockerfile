@@ -55,9 +55,13 @@ RUN gem install bundler && \
       echo "gem 'parallel'" >> Gemfile; \
     fi && \
     NOKOGIRI_USE_SYSTEM_LIBRARIES=1 bundle install --jobs 4 --retry 3 && \
+    # sanity: make sure the gem is actually present
+    bundle exec ruby -e 'require "parallel"' && \
     bundle clean --force && \
     rm -rf ~/.gem ~/.bundle /root/.bundle vendor/bundle/ruby/*/cache tmp/cache && \
+    # Remove Ruby's default stringio gemspec to avoid duplicate-version warnings
     rm -f /usr/lib/ruby/gems/3.2.0/specifications/default/stringio-3.0.4.gemspec || true && \
+    # Wrappers to always run under bundler
     printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec ./msfconsole "$@"\n' > /usr/local/bin/msfconsole && \
     chmod +x /usr/local/bin/msfconsole && \
     printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec ./msfvenom "$@"\n' > /usr/local/bin/msfvenom && \
