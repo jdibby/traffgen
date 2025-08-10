@@ -1,7 +1,7 @@
 #!/usr/local/bin python3
 
 ### Import of required modules
-import time, os, sys, argparse, random, threading, signal, urllib.request, urllib3, requests, runpy, socket, ssl, subprocess, ftplib, traceback, dns.exception, requests
+import time, os, sys, argparse, random, threading, signal, urllib.request, urllib3, requests, runpy, socket, ssl, subprocess, traceback, requests
 from bs4 import BeautifulSoup
 from time import sleep
 from urllib.parse import urljoin
@@ -178,12 +178,20 @@ def dig_random():
                         print (Style.RESET_ALL)
                         subprocess.call(cmd, shell=True)
                         time.sleep(0.25) # Rate limit to prevent tripping alarms
-    except (dns.exception.DNSException, socket.error) as e:
-        print(f"[dig_random] DNS exception error: {e}")
-    except (subprocess.SubprocessError, FileNotFoundError, TimeoutError) as e:
-        print(f"[dig_random] subprocess exception error: {e}")
+    except subprocess.CalledProcessError as e:
+        print(f"[dig_random] dig exit {e.returncode}: {e.stderr or e.stdout or e}")
+    except subprocess.TimeoutExpired as e:
+        print(f"[dig_random] dig timed out: {e}")
+    except (FileNotFoundError, PermissionError) as e:
+        print(f"[dig_random] dig not runnable: {e}")
+    except (socket.timeout, socket.gaierror, OSError) as e:
+        print(f"[dig_random] network/os error: {e}")
+    except UnicodeDecodeError as e:
+        print(f"[dig_random] decode error: {e}")
+    except ValueError as e:
+        print(f"[dig_random] parse error: {e}")
     except Exception as e:
-        print(f"[dig_random] unexpected exception error: {e}")
+        print(f"[dig_random] unexpected error: {e}")
 
 ### FTP Test suites
 def ftp_random():
@@ -205,12 +213,21 @@ def ftp_random():
         print (Back.GREEN + "##############################################################")
         print (Style.RESET_ALL)
         subprocess.call(cmd, shell=True)
-    except ftplib.all_errors as e:
-        print(f"[ftp_random] FTP exception error: {e}")
-    except (socket.error, ssl.SSLError) as e:
-        print(f"[ftp_random] socket/ssl exception error: {e}")
+    except subprocess.CalledProcessError as e:
+        msg = e.stderr or e.stdout or str(e)
+        print(f"[ftp_random] curl exit {e.returncode}: {msg}")
+    except subprocess.TimeoutExpired as e:
+        print(f"[ftp_random] curl timed out: {e}")
+    except (FileNotFoundError, PermissionError) as e:
+        print(f"[ftp_random] curl not runnable: {e}")
+    except (socket.timeout, socket.gaierror, OSError) as e:
+        print(f"[ftp_random] network/os error: {e}")
+    except UnicodeDecodeError as e:
+        print(f"[ftp_random] decode error: {e}")
+    except ValueError as e:
+        print(f"[ftp_random] parse error: {e}")
     except Exception as e:
-        print(f"[ftp_random] unexpected exception error: {e}")
+        print(f"[ftp_random] unexpected error: {e}")
 
 ### HTTP Test suites
 def http_random():
