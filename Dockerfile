@@ -110,9 +110,6 @@ RUN apt-get purge -y \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# IMPORTANT: do NOT prepend /opt/metasploit-framework to PATH (we use wrappers)
-/* no ENV PATH line here on purpose */
-
 # Workdir and files
 WORKDIR /traffgen
 COPY generator.py endpoints.py healthcheck.sh ./
