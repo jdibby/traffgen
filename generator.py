@@ -753,198 +753,252 @@ def nmap_1024os():
 
 ### NMAP Test (CVE)        
 def nmap_cve():
-    if ARGS.size == 'S':
-        target_ips = 1
-    elif ARGS.size == 'M':
-        target_ips = 2
-    elif ARGS.size == 'L':
-        target_ips = 5
-    elif ARGS.size == 'XL':
-        target_ips = len(nmap_endpoints)
-    random.shuffle(nmap_endpoints)
-    for count_ips, ip in enumerate(nmap_endpoints):
-        if count_ips < target_ips:
-            cmd = 'nmap -sV --script=ALL %s -T4 --max-retries 0 --max-parallelism 2 --randomize-hosts --host-timeout 1m --script-timeout 1m --script-args http.useragent "Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko" -debug' % ip
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            print ("Testing NMAP: NMAP CVE Scan of %s" %(ip))
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            subprocess.call(cmd, shell=True)
+    try:
+        if ARGS.size == 'S':
+            target_ips = 1
+        elif ARGS.size == 'M':
+            target_ips = 2
+        elif ARGS.size == 'L':
+            target_ips = 5
+        elif ARGS.size == 'XL':
+            target_ips = len(nmap_endpoints)
+        random.shuffle(nmap_endpoints)
+        for count_ips, ip in enumerate(nmap_endpoints):
+            if count_ips < target_ips:
+                cmd = 'nmap -sV --script=ALL %s -T4 --max-retries 0 --max-parallelism 2 --randomize-hosts --host-timeout 1m --script-timeout 1m --script-args http.useragent "Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko" -debug' % ip
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                print ("Testing NMAP: NMAP CVE Scan of %s" %(ip))
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                subprocess.call(cmd, shell=True)
+    except (subprocess.SubprocessError, FileNotFoundError, TimeoutError) as e:
+        print(f"[nmap_cve] subprocess error: {e}")
+    except Exception as e:
+        print(f"[nmap_cve] unexpected error: {e}")
 
 ### NTP Test                                   
 def ntp_random():
-    if ARGS.size == 'S':
-        target_urls = 1
-    elif ARGS.size == 'M':
-        target_urls = 2
-    elif ARGS.size == 'L':
-        target_urls = 5   
-    elif ARGS.size == 'XL':
-        target_urls = len(ntp_endpoints)
-    random.shuffle(ntp_endpoints)
-    for count_urls, url in enumerate(ntp_endpoints):
-        if count_urls < target_urls:
-            cmd = f"(printf '\\x1b'; head -c 47 < /dev/zero) | nc -u -w1 {url} 123"
-            print (Fore.BLACK)         
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            print ("Testing NTP: Update time against %s" %(url))
-            print (Fore.BLACK)            
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL) 
-            subprocess.call(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        if ARGS.size == 'S':
+            target_urls = 1
+        elif ARGS.size == 'M':
+            target_urls = 2
+        elif ARGS.size == 'L':
+            target_urls = 5   
+        elif ARGS.size == 'XL':
+            target_urls = len(ntp_endpoints)
+        random.shuffle(ntp_endpoints)
+        for count_urls, url in enumerate(ntp_endpoints):
+            if count_urls < target_urls:
+                cmd = f"(printf '\\x1b'; head -c 47 < /dev/zero) | nc -u -w1 {url} 123"
+                print (Fore.BLACK)         
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                print ("Testing NTP: Update time against %s" %(url))
+                print (Fore.BLACK)            
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL) 
+                subprocess.call(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except getattr(ntplib, "NTPException", Exception) as e:
+        print(f"[ntp_random] NTP error: {e}")
+    except (socket.error,) as e:
+        print(f"[ntp_random] socket error: {e}")
+    except Exception as e:
+        print(f"[ntp_random] unexpected error: {e}")
 
 ### SSH Test
 def ssh_random():
-    if ARGS.size == 'S':
-        target_ips = 1
-    elif ARGS.size == 'M':
-        target_ips = 2
-    elif ARGS.size == 'L':
-        target_ips = 5
-    elif ARGS.size == 'XL':
-        target_ips = len(ssh_endpoints)
-    random.shuffle(ssh_endpoints)
-    for count_ips, ip in enumerate(ssh_endpoints):
-        if count_ips < target_ips:
-            cmd = "ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=1 %s" % (ip)
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            print ("Testing SSH (%d of %d): SSH to %s" %((count_ips+1), target_ips, ip))
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            subprocess.call(cmd, shell=True)
+    try:
+        if ARGS.size == 'S':
+            target_ips = 1
+        elif ARGS.size == 'M':
+            target_ips = 2
+        elif ARGS.size == 'L':
+            target_ips = 5
+        elif ARGS.size == 'XL':
+            target_ips = len(ssh_endpoints)
+        random.shuffle(ssh_endpoints)
+        for count_ips, ip in enumerate(ssh_endpoints):
+            if count_ips < target_ips:
+                cmd = "ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=1 %s" % (ip)
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                print ("Testing SSH (%d of %d): SSH to %s" %((count_ips+1), target_ips, ip))
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                subprocess.call(cmd, shell=True)
+    except subprocess.CalledProcessError as e:
+        print(f"[ssh_random] ssh exit {e.returncode}: {e.stderr or e.stdout or e}")
+    except subprocess.TimeoutExpired as e:
+        print(f"[ssh_random] ssh timed out: {e}")
+    except (FileNotFoundError, PermissionError) as e:
+        print(f"[ssh_random] ssh not runnable: {e}")
+    except (socket.error, ssl.SSLError) as e:
+        print(f"[ssh_random] network/ssl error: {e}")
+    except OSError as e:
+        print(f"[ssh_random] OS error: {e}")
+    except Exception as e:
+        print(f"[ssh_random] unexpected error: {e}")
 
 ### URL Reponse Time Test
 def urlresponse_random():
-    if ARGS.size == 'S':
-        target_urls = 10
-    elif ARGS.size == 'M':
-        target_urls = 20
-    elif ARGS.size == 'L':
-        target_urls = 50
-    elif ARGS.size == 'XL':
-        target_urls = len(https_endpoints)
-    random.shuffle(https_endpoints)
-    for count_urls, url in enumerate(https_endpoints):
-        if count_urls < target_urls:
-            try:
-                time = requests.get(url, timeout=3).elapsed.total_seconds()
-            except requests.ConnectionError as e:
-                continue
-            except requests.ReadTimeout as e:
-                continue
-            except requests.ChunkedEncodingError as e:
-                continue
-            except urllib3.ProtocolError as e:
-                continue
-            except:
-                pass
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            print ("Testing HTTPS (%d of %d): %s" %((count_urls+1), target_urls, url))
-            print ("Total Transaction Time -- ", time)
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
+    try:
+        if ARGS.size == 'S':
+            target_urls = 10
+        elif ARGS.size == 'M':
+            target_urls = 20
+        elif ARGS.size == 'L':
+            target_urls = 50
+        elif ARGS.size == 'XL':
+            target_urls = len(https_endpoints)
+        random.shuffle(https_endpoints)
+        for count_urls, url in enumerate(https_endpoints):
+            if count_urls < target_urls:
+                try:
+                    time = requests.get(url, timeout=3).elapsed.total_seconds()
+                except requests.ConnectionError as e:
+                    continue
+                except requests.ReadTimeout as e:
+                    continue
+                except requests.ChunkedEncodingError as e:
+                    continue
+                except urllib3.ProtocolError as e:
+                    continue
+                except:
+                    pass
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                print ("Testing HTTPS (%d of %d): %s" %((count_urls+1), target_urls, url))
+                print ("Total Transaction Time -- ", time)
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+    except (requests.exceptions.RequestException, ssl.SSLError, socket.error) as e:
+        print(f"[urlresponse_random] http error: {e}")
+    except Exception as e:
+        print(f"[urlresponse_random] unexpected error: {e}")
 
 ### Virus Simulation
 def virus_sim():
-    if ARGS.size == 'S':
-        target_urls = 1
-    elif ARGS.size == 'M':
-        target_urls = 2
-    elif ARGS.size == 'L':
-        target_urls = 3
-    elif ARGS.size == 'XL':
-        target_urls = len(virus_endpoints)
-    random.shuffle(virus_endpoints)
-    for count_urls, url in enumerate(virus_endpoints):
-        if count_urls < target_urls:
-            cmd = "curl --limit-rate 3M -k --show-error --connect-timeout 4 -o /dev/null %s" % url
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            print ("Testing Virus Simulation: Download %s" %(url))
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            subprocess.call(cmd, shell=True)
+    try:
+        if ARGS.size == 'S':
+            target_urls = 1
+        elif ARGS.size == 'M':
+            target_urls = 2
+        elif ARGS.size == 'L':
+            target_urls = 3
+        elif ARGS.size == 'XL':
+            target_urls = len(virus_endpoints)
+        random.shuffle(virus_endpoints)
+        for count_urls, url in enumerate(virus_endpoints):
+            if count_urls < target_urls:
+                cmd = "curl --limit-rate 3M -k --show-error --connect-timeout 4 -o /dev/null %s" % url
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                print ("Testing Virus Simulation: Download %s" %(url))
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                subprocess.call(cmd, shell=True)
+    except (requests.exceptions.RequestException, ssl.SSLError, socket.error) as e:
+        print(f"[virus_sim] http error: {e}")
+    except (OSError, IOError) as e:
+        print(f"[virus_sim] file I/O error: {e}")
+    except Exception as e:
+        print(f"[virus_sim] unexpected error: {e}")
 
 ### DLP Tests            
 def dlp_sim_https():
-    if ARGS.size == 'S':
-        target_urls = 1
-    elif ARGS.size == 'M':
-        target_urls = 2
-    elif ARGS.size == 'L':
-        target_urls = 3
-    elif ARGS.size == 'XL':
-        target_urls = len(dlp_https_endpoints)
-    random.shuffle(dlp_https_endpoints)
-    for count_urls, url in enumerate(dlp_https_endpoints):
-        if count_urls < target_urls:
-            cmd = "curl --limit-rate 3M -k --show-error --connect-timeout 4 -o /dev/null %s" % url
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            print ("DLP Simulation (HTTPS): Download %s" %(url))
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            subprocess.call(cmd, shell=True)
+    try:
+        if ARGS.size == 'S':
+            target_urls = 1
+        elif ARGS.size == 'M':
+            target_urls = 2
+        elif ARGS.size == 'L':
+            target_urls = 3
+        elif ARGS.size == 'XL':
+            target_urls = len(dlp_https_endpoints)
+        random.shuffle(dlp_https_endpoints)
+        for count_urls, url in enumerate(dlp_https_endpoints):
+            if count_urls < target_urls:
+                cmd = "curl --limit-rate 3M -k --show-error --connect-timeout 4 -o /dev/null %s" % url
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                print ("DLP Simulation (HTTPS): Download %s" %(url))
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                subprocess.call(cmd, shell=True)
+    except (requests.exceptions.RequestException, ssl.SSLError, socket.error) as e:
+        print(f"[dlp_sim_https] https error: {e}")
+    except Exception as e:
+        print(f"[dlp_sim_https] unexpected error: {e}")
 
 ### Malware Tests            
 def malware_download():
-    if ARGS.size == 'S':
-        target_urls = 1
-    elif ARGS.size == 'M':
-        target_urls = 2
-    elif ARGS.size == 'L':
-        target_urls = 3
-    elif ARGS.size == 'XL':
-        target_urls = len(malware_files)
-    random.shuffle(malware_files)
-    for count_urls, url in enumerate(malware_files):
-        if count_urls < target_urls:
-            cmd = "curl --limit-rate 3M -k --show-error --connect-timeout 4 -o /dev/null %s" % url
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            print ("Malware File Download (HTTPS): Download %s" %(url))
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            subprocess.call(cmd, shell=True)
+    try:
+        if ARGS.size == 'S':
+            target_urls = 1
+        elif ARGS.size == 'M':
+            target_urls = 2
+        elif ARGS.size == 'L':
+            target_urls = 3
+        elif ARGS.size == 'XL':
+            target_urls = len(malware_files)
+        random.shuffle(malware_files)
+        for count_urls, url in enumerate(malware_files):
+            if count_urls < target_urls:
+                cmd = "curl --limit-rate 3M -k --show-error --connect-timeout 4 -o /dev/null %s" % url
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                print ("Malware File Download (HTTPS): Download %s" %(url))
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                subprocess.call(cmd, shell=True)
+    except (requests.exceptions.RequestException, ssl.SSLError, socket.error) as e:
+        print(f"[malware_download] http error: {e}")
+    except (OSError, IOError) as e:
+        print(f"[malware_download] file I/O error: {e}")
+    except Exception as e:
+        print(f"[malware_download] unexpected error: {e}")
 
 ### Squatting Tests            
 def squatting_domains():
-    if ARGS.size == 'S':
-        target_domains = 1
-    elif ARGS.size == 'M':
-        target_domains = 2
-    elif ARGS.size == 'L':
-        target_domains  = 3
-    elif ARGS.size == 'XL':
-        target_domains  = 4
-    random.shuffle(squatting_endpoints)
-    for count_urls, url in enumerate(squatting_endpoints):
-        if count_urls < target_domains :
-            cmd = "dnstwist --registered %s" % url
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            print ("Generating Squatting Domains Based On %s" %(url))
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            subprocess.call(cmd, shell=True)
+    try:
+        if ARGS.size == 'S':
+            target_domains = 1
+        elif ARGS.size == 'M':
+            target_domains = 2
+        elif ARGS.size == 'L':
+            target_domains  = 3
+        elif ARGS.size == 'XL':
+            target_domains  = 4
+        random.shuffle(squatting_endpoints)
+        for count_urls, url in enumerate(squatting_endpoints):
+            if count_urls < target_domains :
+                cmd = "dnstwist --registered %s" % url
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                print ("Generating Squatting Domains Based On %s" %(url))
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                subprocess.call(cmd, shell=True)
+    except (requests.exceptions.RequestException, socket.error, ssl.SSLError) as e:
+        print(f"[squatting_domains] http error: {e}")
+    except Exception as e:
+        print(f"[squatting_domains] unexpected error: {e}")
 
 ### Web Crawl
 def webcrawl():
