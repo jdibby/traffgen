@@ -35,6 +35,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxslt1-dev \
     libyaml-dev \
     libpq-dev \
+    libsqlite3-dev \
+    pkg-config \
     ruby-full \
     sqlite3 \
     make \
@@ -44,7 +46,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Set timezone
 RUN ln -fs /usr/share/zoneinfo/$TZ /etc/localtime && dpkg-reconfigure --frontend noninteractive tzdata
 
-# Install Python packages
+# Python packages
 RUN pip3 install --break-system-packages fastcli requests colorama beautifulsoup4 tqdm dnspython dnstwist
 
 # Build and install GoBGP
@@ -56,15 +58,27 @@ RUN git -c http.sslVerify=false clone https://github.com/osrg/gobgp.git /tmp/gob
     mv gobgp gobgpd /usr/local/bin/ && \
     cd / && rm -rf /tmp/gobgp-src
 
-# Install Metasploit Framework (check mode only)
+# --- Metasploit (vendor-bundled, isolated) ---
+# Keep Bundler + gems local to /opt/metasploit-framework/vendor/bundle and force Ruby platform to avoid musl/native mismatch.
+ENV BUNDLE_WITHOUT="development test" \
+    BUNDLE_PATH="/opt/metasploit-framework/vendor/bundle" \
+    BUNDLE_JOBS="4" \
+    DISABLE_BOOTSNAP="1"
+
 RUN git -c http.sslVerify=false clone https://github.com/rapid7/metasploit-framework.git /opt/metasploit-framework && \
     cd /opt/metasploit-framework && \
-    gem install bundler -v 2.3.26 && \
-    bundle config set --local without 'development test' && \
-    bundle install && \
-    rm -rf ~/.gem ~/.bundle /root/.bundle /opt/metasploit-framework/vendor/bundle/ruby/*/cache
+    gem install bundler -v "~>2.5" --no-document && \
+    bundle config set --local path "$BUNDLE_PATH" && \
+    bundle config set --local without "$BUNDLE_WITHOUT" && \
+    bundle config set --local force_ruby_platform true && \
+    bundle install --retry=3
 
-# Clean up build-time dependencies and cache
+# Wrapper scripts to guarantee bundle exec is used
+RUN printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec ./msfconsole "$@"\n' > /usr/local/bin/msfconsole && \
+    printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec ./msfvenom "$@"\n'   > /usr/local/bin/msfvenom   && \
+    chmod +x /usr/local/bin/msfconsole /usr/local/bin/msfvenom
+
+# Clean up build-time dependencies and cache (keep runtime libs and vendor/bundle)
 RUN apt-get purge -y \
     build-essential \
     libssl-dev \
@@ -74,13 +88,10 @@ RUN apt-get purge -y \
     zlib1g-dev \
     libxml2-dev \
     libxslt1-dev \
-    libyaml-dev && \
-    apt-get autoremove -y && \
-    apt-get clean && \
+    libyaml-dev \
+    pkg-config && \
+    apt-get autoremove -y && apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-# Set Metasploit in PATH
-ENV PATH="/opt/metasploit-framework:$PATH"
 
 # Set working directory
 WORKDIR /traffgen
@@ -92,10 +103,10 @@ COPY generator.py endpoints.py healthcheck.sh ./
 COPY metasploit /opt/metasploit-framework/ms_checks/
 RUN ls -la /opt/metasploit-framework/ms_checks/
 
-# Set container health check
+# Healthcheck
 RUN chmod +x /traffgen/healthcheck.sh
 HEALTHCHECK --interval=10s --timeout=3s --retries=2 CMD /traffgen/healthcheck.sh
 
-# Set Python generator as entrypoint
+# Entrypoint
 ENTRYPOINT ["python3", "-u", "/traffgen/generator.py"]
 CMD ["--suite=all", "--size=M", "--max-wait-secs=15", "--loop"]
