@@ -128,11 +128,11 @@ def bgp_peering():
         else:
             print("WARNING: gobgpd not ready — skipping BGP setup")
     except (subprocess.SubprocessError, FileNotFoundError, TimeoutError) as e:
-        print(f"[bgp_peering] subprocess error: {e}")
+        print(f"[bgp_peering] subprocess exception detected: {e}")
     except (socket.error, OSError) as e:
-        print(f"[bgp_peering] socket/os error: {e}")
+        print(f"[bgp_peering] socket/os exception detected: {e}")
     except Exception as e:
-        print(f"[bgp_peering] unexpected error: {e}")
+        print(f"[bgp_peering] unexpected exception detected: {e}")
 
     ### Waiting 10 seconds before killing gobgpd
     print("Waiting 10 seconds before terminating gobgpd...")
@@ -166,9 +166,9 @@ def bigfile():
                 if chunk:  # Filter out keep-alive new chunks
                     progress_bar.update(len(chunk))
     except (requests.exceptions.RequestException, socket.error, ssl.SSLError, OSError) as e:
-        print(f"[bigfile] network/file error: {e}")
+        print(f"[bigfile] network/file exception detected: {e}")
     except Exception as e:
-        print(f"[bigfile] unexpected error: {e}")    
+        print(f"[bigfile] unexpected exception detected: {e}")    
 
 ### DNS Test suites
 def dig_random():
@@ -204,11 +204,11 @@ def dig_random():
                         subprocess.call(cmd, shell=True)
                         time.sleep(0.25) # Rate limit to prevent tripping alarms
     except (dns.exception.DNSException, socket.error) as e:
-        print(f"[dig_random] DNS error: {e}")
+        print(f"[dig_random] DNS exception detected: {e}")
     except (subprocess.SubprocessError, FileNotFoundError, TimeoutError) as e:
-        print(f"[dig_random] subprocess error: {e}")
+        print(f"[dig_random] subprocess exception detected: {e}")
     except Exception as e:
-        print(f"[dig_random] unexpected error: {e}")
+        print(f"[dig_random] unexpected exception detected: {e}")
 
 ### FTP Test suites
 def ftp_random():
@@ -231,11 +231,11 @@ def ftp_random():
         print (Style.RESET_ALL)
         subprocess.call(cmd, shell=True)
     except ftplib.all_errors as e:
-        print(f"[ftp_random] FTP error: {e}")
+        print(f"[ftp_random] FTP exception detected: {e}")
     except (socket.error, ssl.SSLError) as e:
-        print(f"[ftp_random] socket/ssl error: {e}")
+        print(f"[ftp_random] socket/ssl exception detected: {e}")
     except Exception as e:
-        print(f"[ftp_random] unexpected error: {e}")
+        print(f"[ftp_random] unexpected exception detected: {e}")
 
 ### HTTP Test suites
 def http_random():
@@ -265,9 +265,9 @@ def http_random():
                 print (Style.RESET_ALL)
                 subprocess.call(cmd, shell=True)
     except (requests.exceptions.RequestException, socket.error, ssl.SSLError) as e:
-        print(f"[http_random] http error: {e}")
+        print(f"[http_random] http exception detected: {e}")
     except Exception as e:
-        print(f"[http_random] unexpected error: {e}")
+        print(f"[http_random] unexpected exception detected: {e}")
 
 ### HTTP downloads
 def http_download_zip():
@@ -296,11 +296,11 @@ def http_download_zip():
         print (Style.RESET_ALL)
         subprocess.call(cmd, shell=True)
     except (requests.exceptions.RequestException, socket.error, ssl.SSLError) as e:
-        print(f"[http_download_zip] http error: {e}")
+        print(f"[http_download_zip] http exception detected: {e}")
     except (OSError, IOError) as e:
-        print(f"[http_download_zip] file I/O error: {e}")
+        print(f"[http_download_zip] file I/O exception detected: {e}")
     except Exception as e:
-        print(f"[http_download_zip] unexpected error: {e}")
+        print(f"[http_download_zip] unexpected exception detected: {e}")
 
 ### HTTP downloads of targz files
 def http_download_targz():
@@ -315,11 +315,11 @@ def http_download_targz():
         print (Style.RESET_ALL)
         subprocess.call(cmd, shell=True)
     except (requests.exceptions.RequestException, socket.error, ssl.SSLError) as e:
-        print(f"[http_download_targz] http error: {e}")
+        print(f"[http_download_targz] http exception detected: {e}")
     except (OSError, IOError) as e:
-        print(f"[http_download_targz] file I/O error: {e}")
+        print(f"[http_download_targz] file I/O exception detected: {e}")
     except Exception as e:
-        print(f"[http_download_targz] unexpected error: {e}")
+        print(f"[http_download_targz] unexpected exception detected: {e}")
     
 ### Nikto Scans
 def web_scanner():
@@ -347,9 +347,9 @@ def web_scanner():
         print (Style.RESET_ALL)
         subprocess.call(cmd, shell=True)
     except (subprocess.SubprocessError, FileNotFoundError, TimeoutError) as e:
-        print(f"[web_scanner] subprocess error: {e}")
+        print(f"[web_scanner] subprocess exception detected: {e}")
     except Exception as e:
-        print(f"[web_scanner] unexpected error: {e}")
+        print(f"[web_scanner] unexpected exception detected: {e}")
 
 ### HTTPS Test suites
 def https_random():
@@ -378,9 +378,9 @@ def https_random():
                 print (Style.RESET_ALL)
                 subprocess.call(cmd, shell=True)
     except (requests.exceptions.RequestException, ssl.SSLError, socket.error) as e:
-        print(f"[https_random] https error: {e}")
+        print(f"[https_random] https exception detected: {e}")
     except Exception as e:
-        print(f"[https_random] unexpected error: {e}")
+        print(f"[https_random] unexpected exception detected: {e}")
 
 ### AI Test suite
 def ai_https_random():
@@ -409,9 +409,9 @@ def ai_https_random():
                 print (Style.RESET_ALL)
                 subprocess.call(cmd, shell=True)
     except (requests.exceptions.RequestException, ssl.SSLError, socket.error) as e:
-        print(f"[ai_https_random] https error: {e}")
+        print(f"[ai_https_random] https exception detected: {e}")
     except Exception as e:
-        print(f"[ai_https_random] unexpected error: {e}")
+        print(f"[ai_https_random] unexpected exception detected: {e}")
             
 ### Test ad filtering
 def ads_random():
@@ -440,9 +440,9 @@ def ads_random():
                 print (Style.RESET_ALL)
                 subprocess.call(cmd, shell=True)
     except (requests.exceptions.RequestException, socket.error, ssl.SSLError) as e:
-        print(f"[ads_random] http error: {e}")
+        print(f"[ads_random] http exception detected: {e}")
     except Exception as e:
-        print(f"[ads_random] unexpected error: {e}")
+        print(f"[ads_random] unexpected exception detected: {e}")
 
 ### HTTPS crawl through URLs
 def https_crawl():
@@ -474,11 +474,11 @@ def https_crawl():
                 print (Style.RESET_ALL)
                 scrape_iterative(url, iterations)
     except (requests.exceptions.RequestException, ssl.SSLError, socket.error) as e:
-        print(f"[https_crawl] https error: {e}")
+        print(f"[https_crawl] https exception detected: {e}")
     except (ValueError,) as e:
-        print(f"[https_crawl] parse error: {e}")
+        print(f"[https_crawl] parse exception detected: {e}")
     except Exception as e:
-        print(f"[https_crawl] unexpected error: {e}")
+        print(f"[https_crawl] unexpected exception detected: {e}")
 
 ### Pornography crawl through URLs
 def pornography_crawl():
@@ -510,11 +510,11 @@ def pornography_crawl():
                 print (Style.RESET_ALL)
                 scrape_iterative(url, iterations)
     except (requests.exceptions.RequestException, ssl.SSLError, socket.error) as e:
-        print(f"[pornography_crawl] http error: {e}")
+        print(f"[pornography_crawl] http exception detected: {e}")
     except ValueError as e:
-        print(f"[pornography_crawl] parse error: {e}")
+        print(f"[pornography_crawl] parse exception detected: {e}")
     except Exception as e:
-        print(f"[pornography_crawl] unexpected error: {e}")
+        print(f"[pornography_crawl] unexpected exception detected: {e}")
 
 ### Malware Test suites
 def malware_random():
@@ -543,9 +543,9 @@ def malware_random():
                 print (Style.RESET_ALL)
                 subprocess.call(cmd, shell=True)
     except (requests.exceptions.RequestException, ssl.SSLError, socket.error) as e:
-        print(f"[malware_random] http error: {e}")
+        print(f"[malware_random] http exception detected: {e}")
     except Exception as e:
-        print(f"[malware_random] unexpected error: {e}")
+        print(f"[malware_random] unexpected exception detected: {e}")
 
 ### ICMP Test
 def ping_random():
@@ -571,9 +571,9 @@ def ping_random():
                 print (Style.RESET_ALL)
                 subprocess.call(cmd, shell=True)
     except (subprocess.SubprocessError, FileNotFoundError, TimeoutError) as e:
-        print(f"[ping_random] subprocess error: {e}")
+        print(f"[ping_random] subprocess exception detected: {e}")
     except Exception as e:
-        print(f"[ping_random] unexpected error: {e}")                
+        print(f"[ping_random] unexpected exception detected: {e}")                
             
 ### Metasploit Checks
 def metasploit_check():
@@ -603,9 +603,9 @@ def metasploit_check():
                 print (Style.RESET_ALL)
                 subprocess.call(cmd, shell=True)
     except (subprocess.SubprocessError, FileNotFoundError, TimeoutError) as e:
-        print(f"[metasploit_check] subprocess error: {e}")
+        print(f"[metasploit_check] subprocess exception detected: {e}")
     except Exception as e:
-        print(f"[metasploit_check] unexpected error: {e}")
+        print(f"[metasploit_check] unexpected exception detected: {e}")
             
 ### SNMP test
 def snmp_random():
@@ -633,13 +633,13 @@ def snmp_random():
                 print (Style.RESET_ALL)
                 subprocess.call(cmd, shell=True)
     except getattr(pysnmp, "PySnmpError", Exception) as e:
-        print(f"[snmp_random] pysnmp error: {e}")
+        print(f"[snmp_random] pysnmp exception detected: {e}")
     except (subprocess.SubprocessError, FileNotFoundError, TimeoutError) as e:
-        print(f"[snmp_random] subprocess error: {e}")
+        print(f"[snmp_random] subprocess exception detected: {e}")
     except (socket.error,) as e:
-        print(f"[snmp_random] socket error: {e}")
+        print(f"[snmp_random] socket exception detected: {e}")
     except Exception as e:
-        print(f"[snmp_random] unexpected error: {e}")
+        print(f"[snmp_random] unexpected exception detected: {e}")
 
 ### Traceroute test
 def traceroute_random():
@@ -665,9 +665,9 @@ def traceroute_random():
                 print (Style.RESET_ALL)
                 subprocess.call(cmd, shell=True)
     except (subprocess.SubprocessError, FileNotFoundError, TimeoutError) as e:
-        print(f"[traceroute_random] subprocess error: {e}")
+        print(f"[traceroute_random] subprocess exception detected: {e}")
     except Exception as e:
-        print(f"[traceroute_random] unexpected error: {e}")
+        print(f"[traceroute_random] unexpected exception detected: {e}")
 
 ### Netflix Test
 def speedtest_fast():
@@ -710,7 +710,7 @@ def speedtest_fast():
             except subprocess.TimeoutExpired:
                 print(f"Test {i} timed out after {timeout_per_test} seconds. Moving to the next test.")
             except subprocess.CalledProcessError as e:
-                print(f"Test {i} failed with error: {e}")
+                print(f"Test {i} failed with exception detected: {e}")
                 print(f"Command output (stdout):\n{e.stdout}")
                 print(f"Command error (stderr):\n{e.stderr}")
             except Exception as e:
@@ -719,9 +719,9 @@ def speedtest_fast():
         print("All Speedtest Tests Attempted.")
         pass
     except (ssl.SSLError, socket.error) as e:
-        print(f"[speedtest_fast] network/ssl error: {e}")
+        print(f"[speedtest_fast] network/ssl exception detected: {e}")
     except Exception as e:
-        print(f"[speedtest_fast] unexpected error: {e}")
+        print(f"[speedtest_fast] unexpected exception detected: {e}")
 
 ### NMAP Test (1024 ports)
 def nmap_1024os():
@@ -747,9 +747,9 @@ def nmap_1024os():
                 print (Style.RESET_ALL)
                 subprocess.call(cmd, shell=True)
     except (subprocess.SubprocessError, FileNotFoundError, TimeoutError) as e:
-        print(f"[nmap_1024os] subprocess error: {e}")
+        print(f"[nmap_1024os] subprocess exception detected: {e}")
     except Exception as e:
-        print(f"[nmap_1024os] unexpected error: {e}")
+        print(f"[nmap_1024os] unexpected exception detected: {e}")
 
 ### NMAP Test (CVE)        
 def nmap_cve():
@@ -775,9 +775,9 @@ def nmap_cve():
                 print (Style.RESET_ALL)
                 subprocess.call(cmd, shell=True)
     except (subprocess.SubprocessError, FileNotFoundError, TimeoutError) as e:
-        print(f"[nmap_cve] subprocess error: {e}")
+        print(f"[nmap_cve] subprocess exception detected: {e}")
     except Exception as e:
-        print(f"[nmap_cve] unexpected error: {e}")
+        print(f"[nmap_cve] unexpected exception detected: {e}")
 
 ### NTP Test                                   
 def ntp_random():
@@ -803,11 +803,11 @@ def ntp_random():
                 print (Style.RESET_ALL) 
                 subprocess.call(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except getattr(ntplib, "NTPException", Exception) as e:
-        print(f"[ntp_random] NTP error: {e}")
+        print(f"[ntp_random] NTP exception detected: {e}")
     except (socket.error,) as e:
-        print(f"[ntp_random] socket error: {e}")
+        print(f"[ntp_random] socket exception detected: {e}")
     except Exception as e:
-        print(f"[ntp_random] unexpected error: {e}")
+        print(f"[ntp_random] unexpected exception detected: {e}")
 
 ### SSH Test
 def ssh_random():
@@ -839,11 +839,11 @@ def ssh_random():
     except (FileNotFoundError, PermissionError) as e:
         print(f"[ssh_random] ssh not runnable: {e}")
     except (socket.error, ssl.SSLError) as e:
-        print(f"[ssh_random] network/ssl error: {e}")
+        print(f"[ssh_random] network/ssl exception detected: {e}")
     except OSError as e:
-        print(f"[ssh_random] OS error: {e}")
+        print(f"[ssh_random] OS exception detected: {e}")
     except Exception as e:
-        print(f"[ssh_random] unexpected error: {e}")
+        print(f"[ssh_random] unexpected exception detected: {e}")
 
 ### URL Reponse Time Test
 def urlresponse_random():
@@ -880,9 +880,9 @@ def urlresponse_random():
                 print (Back.GREEN + "##############################################################")
                 print (Style.RESET_ALL)
     except (requests.exceptions.RequestException, ssl.SSLError, socket.error) as e:
-        print(f"[urlresponse_random] http error: {e}")
+        print(f"[urlresponse_random] http exception detected: {e}")
     except Exception as e:
-        print(f"[urlresponse_random] unexpected error: {e}")
+        print(f"[urlresponse_random] unexpected exception detected: {e}")
 
 ### Virus Simulation
 def virus_sim():
@@ -908,11 +908,11 @@ def virus_sim():
                 print (Style.RESET_ALL)
                 subprocess.call(cmd, shell=True)
     except (requests.exceptions.RequestException, ssl.SSLError, socket.error) as e:
-        print(f"[virus_sim] http error: {e}")
+        print(f"[virus_sim] http exception detected: {e}")
     except (OSError, IOError) as e:
-        print(f"[virus_sim] file I/O error: {e}")
+        print(f"[virus_sim] file I/O exception detected: {e}")
     except Exception as e:
-        print(f"[virus_sim] unexpected error: {e}")
+        print(f"[virus_sim] unexpected exception detected: {e}")
 
 ### DLP Tests            
 def dlp_sim_https():
@@ -938,9 +938,9 @@ def dlp_sim_https():
                 print (Style.RESET_ALL)
                 subprocess.call(cmd, shell=True)
     except (requests.exceptions.RequestException, ssl.SSLError, socket.error) as e:
-        print(f"[dlp_sim_https] https error: {e}")
+        print(f"[dlp_sim_https] https exception detected: {e}")
     except Exception as e:
-        print(f"[dlp_sim_https] unexpected error: {e}")
+        print(f"[dlp_sim_https] unexpected exception detected: {e}")
 
 ### Malware Tests            
 def malware_download():
@@ -966,11 +966,11 @@ def malware_download():
                 print (Style.RESET_ALL)
                 subprocess.call(cmd, shell=True)
     except (requests.exceptions.RequestException, ssl.SSLError, socket.error) as e:
-        print(f"[malware_download] http error: {e}")
+        print(f"[malware_download] http exception detected: {e}")
     except (OSError, IOError) as e:
-        print(f"[malware_download] file I/O error: {e}")
+        print(f"[malware_download] file I/O exception detected: {e}")
     except Exception as e:
-        print(f"[malware_download] unexpected error: {e}")
+        print(f"[malware_download] unexpected exception detected: {e}")
 
 ### Squatting Tests            
 def squatting_domains():
@@ -996,9 +996,9 @@ def squatting_domains():
                 print (Style.RESET_ALL)
                 subprocess.call(cmd, shell=True)
     except (requests.exceptions.RequestException, socket.error, ssl.SSLError) as e:
-        print(f"[squatting_domains] http error: {e}")
+        print(f"[squatting_domains] http exception detected: {e}")
     except Exception as e:
-        print(f"[squatting_domains] unexpected error: {e}")
+        print(f"[squatting_domains] unexpected exception detected: {e}")
 
 ### Web Crawl
 def webcrawl():
@@ -1025,9 +1025,9 @@ def webcrawl():
             print (Style.RESET_ALL)
             scrape_iterative(ARGS.crawl_start, iterations)
     except (requests.exceptions.RequestException, socket.error, ssl.SSLError, ValueError) as e:
-        print(f"[webcrawl] http/parse error: {e}")
+        print(f"[webcrawl] http/parse exception detected: {e}")
     except Exception as e:
-        print(f"[webcrawl] unexpected error: {e}")
+        print(f"[webcrawl] unexpected exception detected: {e}")
 
 ### Trigger an IPS system
 def ips():
@@ -1042,11 +1042,11 @@ def ips():
         print (Style.RESET_ALL)
         subprocess.call(cmd, shell=True)
     except (subprocess.SubprocessError, FileNotFoundError, TimeoutError) as e:
-        print(f"[ips] subprocess error: {e}")
+        print(f"[ips] subprocess exception detected: {e}")
     except (requests.exceptions.RequestException, socket.error, ssl.SSLError) as e:
-        print(f"[ips] http/socket error: {e}")
+        print(f"[ips] http/socket exception detected: {e}")
     except Exception as e:
-        print(f"[ips] unexpected error: {e}")
+        print(f"[ips] unexpected exception detected: {e}")
 
 ### GITHUB Bad Domains Testing
 def github_domain_check_download_file(url, local_filename):
@@ -1127,9 +1127,9 @@ def github_domain_check():
 
         github_domain_check_read_file(local_domains_filename, num_random_domains=10)
     except (requests.exceptions.RequestException, socket.error, ssl.SSLError) as e:
-        print(f"[github_domain_check] http error: {e}")
+        print(f"[github_domain_check] http exception detected: {e}")
     except Exception as e:
-        print(f"[github_domain_check] unexpected error: {e}")
+        print(f"[github_domain_check] unexpected exception detected: {e}")
 
 ### GITHUB Phishing Domains Testing
 def github_phishing_domain_check_download_file(url, local_filename):
@@ -1210,9 +1210,9 @@ def github_phishing_domain_check():
 
         github_domain_check_read_file(local_domains_filename, num_random_domains=10)
     except (requests.exceptions.RequestException, socket.error, ssl.SSLError) as e:
-        print(f"[github_phishing_domain_check] http error: {e}")
+        print(f"[github_phishing_domain_check] http exception detected: {e}")
     except Exception as e:
-        print(f"[github_phishing_domain_check] unexpected error: {e}")
+        print(f"[github_phishing_domain_check] unexpected exception detected: {e}")
 
 ### Wait timer progress bar
 def progressbar(it, prefix="", size=60, file=sys.stdout):
