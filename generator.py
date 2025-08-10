@@ -1,7 +1,7 @@
 #!/usr/local/bin python3
 
 ### Import of required modules
-import time, os, sys, argparse, random, threading, signal, urllib.request, urllib3, requests, runpy, socket, ssl, subprocess, ftplib, traceback, pysnmp.error, dns.exception, ntplib, requests
+import time, os, sys, argparse, random, threading, signal, urllib.request, urllib3, requests, runpy, socket, ssl, subprocess, ftplib, traceback, dns.exception, ntplib, requests
 from bs4 import BeautifulSoup
 from time import sleep
 from urllib.parse import urljoin
@@ -607,14 +607,20 @@ def snmp_random():
                 print (Back.GREEN + "##############################################################")
                 print (Style.RESET_ALL)
                 subprocess.call(cmd, shell=True)
-    except getattr(pysnmp, "PySnmpError", Exception) as e:
-        print(f"[snmp_random] pysnmp exception detected: {e}")
-    except (subprocess.SubprocessError, FileNotFoundError, TimeoutError) as e:
-        print(f"[snmp_random] subprocess exception detected: {e}")
-    except (socket.error,) as e:
-        print(f"[snmp_random] socket exception detected: {e}")
+    except subprocess.CalledProcessError as e:
+        print(f"[snmp_random] snmp tool exit {e.returncode}: {e.stderr or e.stdout or e}")
+    except subprocess.TimeoutExpired as e:
+        print(f"[snmp_random] snmp tool timed out: {e}")
+    except (FileNotFoundError, PermissionError) as e:
+        print(f"[snmp_random] snmp tool not runnable: {e}")
+    except (socket.timeout, socket.gaierror, OSError) as e:
+        print(f"[snmp_random] network/os error: {e}")
+    except UnicodeDecodeError as e:
+        print(f"[snmp_random] decode error: {e}")
+    except ValueError as e:
+        print(f"[snmp_random] parse error: {e}")
     except Exception as e:
-        print(f"[snmp_random] unexpected exception detected: {e}")
+        print(f"[snmp_random] unexpected error: {e}")
 
 ### Traceroute test
 def traceroute_random():
