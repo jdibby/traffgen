@@ -74,58 +74,65 @@ def get_container_ip():
 
 ### Continue with the rest of the generator (always runs even if BGP initialization fails)
 def bgp_peering():
-    print(Fore.BLACK)
-    print(Back.GREEN + "##############################################################")
-    print(Style.RESET_ALL)
-
-    ### Start gobgpd in the background
     try:
-        gobgpd_proc = subprocess.Popen([
-            "gobgpd", "--api-hosts", "127.0.0.1:50051"
-        ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        print("Started gobgpd")
-    except Exception as e:
-        print(f"Failed to start gobgpd: {e}")
-        gobgpd_proc = None  # Let the rest of the script keep on trucking
+        print(Fore.BLACK)
+        print(Back.GREEN + "##############################################################")
+        print(Style.RESET_ALL)
 
-    ### Wait for gobgpd API to come up
-    def gobgp_wait_api(host, port, timeout=10):
-        start = time.time()
-        while time.time() - start < timeout:
-            try:
-                with socket.create_connection((host, port), timeout=1):
-                    return True
-            except OSError:
-                time.sleep(0.5)
-        return False
-
-    ### Configure BGP
-    if gobgpd_proc and gobgp_wait_api("127.0.0.1", 50051, timeout=15):
+        ### Start gobgpd in the background
         try:
-            print("Configuring global BGP instance...")
-            router_id = get_container_ip()
-            print(f"Using container IP {router_id} as BGP router-id")
-            subprocess.run([
-                "gobgp", "-u", "127.0.0.1", "-p", "50051",
-                "global", "as", "65555", "router-id", router_id
-            ], check=True)
-
-            ### Add neighbors using gobgp CLI
-            for neighbor_ip in bgp_neighbors:
-                print(f"Adding BGP neighbor: {neighbor_ip}")
-                result = subprocess.run([
-                    "gobgp", "-u", "127.0.0.1", "-p", "50051",
-                    "neighbor", "add", neighbor_ip, "as", "65555"
-                ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-                if result.returncode != 0:
-                    print(f"Error adding neighbor {neighbor_ip}:\n{result.stderr.decode().strip()}")
-                else:
-                    print(f"Successfully added neighbor {neighbor_ip}")
+            gobgpd_proc = subprocess.Popen([
+                "gobgpd", "--api-hosts", "127.0.0.1:50051"
+            ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            print("Started gobgpd")
         except Exception as e:
-            print(f"BGP configuration failed: {e}")
-    else:
-        print("WARNING: gobgpd not ready — skipping BGP setup")
+            print(f"Failed to start gobgpd: {e}")
+            gobgpd_proc = None  # Let the rest of the script keep on trucking
+
+        ### Wait for gobgpd API to come up
+        def gobgp_wait_api(host, port, timeout=10):
+            start = time.time()
+            while time.time() - start < timeout:
+                try:
+                    with socket.create_connection((host, port), timeout=1):
+                        return True
+                except OSError:
+                    time.sleep(0.5)
+            return False
+
+        ### Configure BGP
+        if gobgpd_proc and gobgp_wait_api("127.0.0.1", 50051, timeout=15):
+            try:
+                print("Configuring global BGP instance...")
+                router_id = get_container_ip()
+                print(f"Using container IP {router_id} as BGP router-id")
+                subprocess.run([
+                    "gobgp", "-u", "127.0.0.1", "-p", "50051",
+                    "global", "as", "65555", "router-id", router_id
+                ], check=True)
+
+                ### Add neighbors using gobgp CLI
+                for neighbor_ip in bgp_neighbors:
+                    print(f"Adding BGP neighbor: {neighbor_ip}")
+                    result = subprocess.run([
+                        "gobgp", "-u", "127.0.0.1", "-p", "50051",
+                        "neighbor", "add", neighbor_ip, "as", "65555"
+                    ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+                    if result.returncode != 0:
+                        print(f"Error adding neighbor {neighbor_ip}:\n{result.stderr.decode().strip()}")
+                    else:
+                        print(f"Successfully added neighbor {neighbor_ip}")
+            except Exception as e:
+                print(f"BGP configuration failed: {e}")
+        else:
+            print("WARNING: gobgpd not ready — skipping BGP setup")
+    except (subprocess.SubprocessError, FileNotFoundError, TimeoutError) as e:
+        print(f"[bgp_peering] subprocess error: {e}")
+    except (socket.error, OSError) as e:
+        print(f"[bgp_peering] socket/os error: {e}")
+    except Exception as e:
+        print(f"[bgp_peering] unexpected error: {e}")
 
     ### Waiting 10 seconds before killing gobgpd
     print("Waiting 10 seconds before terminating gobgpd...")
@@ -165,36 +172,43 @@ def bigfile():
 
 ### DNS Test suites
 def dig_random():
-    if ARGS.size == 'S':
-        target_ips = 1
-        target_urls = 10
-    elif ARGS.size == 'M':
-        target_ips = 2
-        target_urls = 20
-    elif ARGS.size == 'L':
-        target_ips = 4
-        target_urls = 50
-    elif ARGS.size == 'XL':
-        target_ips = len(dns_endpoints)
-        target_urls = len(dns_urls)
-    random.shuffle(dns_endpoints)
-    for count_ips, ip in enumerate(dns_endpoints):
-        # Size limit of DNS servers to hit
-        if count_ips < target_ips:
-            random.shuffle(dns_urls)
-            for count_urls, url in enumerate(dns_urls):
-                # Size limit of URLs to lookup
-                if count_urls < target_urls:
-                    cmd = "dig %s @%s +time=1" % (url, ip)
-                    print (Fore.BLACK)
-                    print (Back.GREEN + "##############################################################")
-                    print (Style.RESET_ALL)
-                    print ("Testing DNS: Query %s (%d of %d) against %s (%d of %d)" %(url, (count_urls+1), target_urls, ip, (count_ips+1), target_ips))
-                    print (Fore.BLACK)
-                    print (Back.GREEN + "##############################################################")
-                    print (Style.RESET_ALL)
-                    subprocess.call(cmd, shell=True)
-                    time.sleep(0.25) # Rate limit to prevent tripping alarms
+    try:
+        if ARGS.size == 'S':
+            target_ips = 1
+            target_urls = 10
+        elif ARGS.size == 'M':
+            target_ips = 2
+            target_urls = 20
+        elif ARGS.size == 'L':
+            target_ips = 4
+            target_urls = 50
+        elif ARGS.size == 'XL':
+            target_ips = len(dns_endpoints)
+            target_urls = len(dns_urls)
+        random.shuffle(dns_endpoints)
+        for count_ips, ip in enumerate(dns_endpoints):
+            # Size limit of DNS servers to hit
+            if count_ips < target_ips:
+                random.shuffle(dns_urls)
+                for count_urls, url in enumerate(dns_urls):
+                    # Size limit of URLs to lookup
+                    if count_urls < target_urls:
+                        cmd = "dig %s @%s +time=1" % (url, ip)
+                        print (Fore.BLACK)
+                        print (Back.GREEN + "##############################################################")
+                        print (Style.RESET_ALL)
+                        print ("Testing DNS: Query %s (%d of %d) against %s (%d of %d)" %(url, (count_urls+1), target_urls, ip, (count_ips+1), target_ips))
+                        print (Fore.BLACK)
+                        print (Back.GREEN + "##############################################################")
+                        print (Style.RESET_ALL)
+                        subprocess.call(cmd, shell=True)
+                        time.sleep(0.25) # Rate limit to prevent tripping alarms
+    except (dns.exception.DNSException, socket.error) as e:
+        print(f"[dig_random] DNS error: {e}")
+    except (subprocess.SubprocessError, FileNotFoundError, TimeoutError) as e:
+        print(f"[dig_random] subprocess error: {e}")
+    except Exception as e:
+        print(f"[dig_random] unexpected error: {e}")
 
 ### FTP Test suites
 def ftp_random():
@@ -836,27 +850,32 @@ def squatting_domains():
 
 ### Web Crawl
 def webcrawl():
-    if ARGS.size == 'S':
-        iterations = 10
-        attempts = 1
-    elif ARGS.size == 'M':
-        iterations = 20
-        attempts = 3
-    elif ARGS.size == 'L':
-        iterations = 50
-        attempts = 5
-    elif ARGS.size == 'XL':
-        iterations = 100
-        attempts = 10
-    for count, attempt in enumerate(range(attempts)):
-        print (Fore.BLACK)
-        print (Back.GREEN + "##############################################################")
-        print (Style.RESET_ALL)
-        print ("Crawling from %s (%d deep, attempt %d of %d)" %(ARGS.crawl_start, iterations, count+1, attempts))
-        print (Fore.BLACK)
-        print (Back.GREEN + "##############################################################")
-        print (Style.RESET_ALL)
-        scrape_iterative(ARGS.crawl_start, iterations)
+    try:
+        if ARGS.size == 'S':
+            iterations = 10
+            attempts = 1
+        elif ARGS.size == 'M':
+            iterations = 20
+            attempts = 3
+        elif ARGS.size == 'L':
+            iterations = 50
+            attempts = 5
+        elif ARGS.size == 'XL':
+            iterations = 100
+            attempts = 10
+        for count, attempt in enumerate(range(attempts)):
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
+            print ("Crawling from %s (%d deep, attempt %d of %d)" %(ARGS.crawl_start, iterations, count+1, attempts))
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
+            scrape_iterative(ARGS.crawl_start, iterations)
+    except (requests.exceptions.RequestException, socket.error, ssl.SSLError, ValueError) as e:
+        print(f"[webcrawl] http/parse error: {e}")
+    except Exception as e:
+        print(f"[webcrawl] unexpected error: {e}")
 
 ### Trigger an IPS system
 def ips():
