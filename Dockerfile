@@ -35,16 +35,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxslt1-dev \
     libyaml-dev \
     libpq-dev \
-    libsqlite3-dev \
-    pkg-config \
     ruby-full \
     sqlite3 \
     make \
     bash \
-    nikto
-
-# Set timezone
-RUN ln -fs /usr/share/zoneinfo/$TZ /etc/localtime && dpkg-reconfigure --frontend noninteractive tzdata
+    nikto && \
+    ln -fs /usr/share/zoneinfo/$TZ /etc/localtime && \
+    dpkg-reconfigure --frontend noninteractive tzdata
 
 # Python packages
 RUN pip3 install --break-system-packages fastcli requests colorama beautifulsoup4 tqdm dnspython dnstwist
@@ -58,27 +55,50 @@ RUN git -c http.sslVerify=false clone https://github.com/osrg/gobgp.git /tmp/gob
     mv gobgp gobgpd /usr/local/bin/ && \
     cd / && rm -rf /tmp/gobgp-src
 
-# --- Metasploit (vendor-bundled, isolated) ---
-# Keep Bundler + gems local to /opt/metasploit-framework/vendor/bundle and force Ruby platform to avoid musl/native mismatch.
+# ---------- Metasploit: deterministic vendor bundle + sandboxed wrappers ----------
 ENV BUNDLE_WITHOUT="development test" \
-    BUNDLE_PATH="/opt/metasploit-framework/vendor/bundle" \
     BUNDLE_JOBS="4" \
     DISABLE_BOOTSNAP="1"
 
 RUN git -c http.sslVerify=false clone https://github.com/rapid7/metasploit-framework.git /opt/metasploit-framework && \
     cd /opt/metasploit-framework && \
     gem install bundler -v "~>2.5" --no-document && \
-    bundle config set --local path "$BUNDLE_PATH" && \
+    bundle config set --local path "/opt/metasploit-framework/vendor/bundle" && \
     bundle config set --local without "$BUNDLE_WITHOUT" && \
     bundle config set --local force_ruby_platform true && \
-    bundle install --retry=3
+    bundle config set --local deployment true && \
+    bundle lock --add-platform x86_64-linux && \
+    bundle install --retry=3 && \
+    # (Optional) silence the stringio warning globally; harmless to skip
+    gem cleanup stringio || true
 
-# Wrapper scripts to guarantee bundle exec is used
-RUN printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec ./msfconsole "$@"\n' > /usr/local/bin/msfconsole && \
-    printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec ./msfvenom "$@"\n'   > /usr/local/bin/msfvenom   && \
-    chmod +x /usr/local/bin/msfconsole /usr/local/bin/msfvenom
+# Wrapper scripts that isolate gems to vendor/bundle and force bundle exec
+RUN bash -lc 'cat > /usr/local/bin/msfconsole << "EOF"\n\
+#!/usr/bin/env bash\n\
+set -euo pipefail\n\
+cd /opt/metasploit-framework\n\
+export DISABLE_BOOTSNAP=1\n\
+ruby_ver="$(ruby -e '\''print RbConfig::CONFIG[\"ruby_version\"]'\'')"\n\
+export GEM_HOME="/opt/metasploit-framework/vendor/bundle/ruby/${ruby_ver}"\n\
+export GEM_PATH="$GEM_HOME"\n\
+exec bundle exec ./msfconsole "$@"\n\
+EOF\n\
+chmod +x /usr/local/bin/msfconsole\n\
+cat > /usr/local/bin/msfvenom << "EOF"\n\
+#!/usr/bin/env bash\n\
+set -euo pipefail\n\
+cd /opt/metasploit-framework\n\
+export DISABLE_BOOTSNAP=1\n\
+ruby_ver="$(ruby -e '\''print RbConfig::CONFIG[\"ruby_version\"]'\'')"\n\
+export GEM_HOME="/opt/metasploit-framework/vendor/bundle/ruby/${ruby_ver}"\n\
+export GEM_PATH="$GEM_HOME"\n\
+exec bundle exec ./msfvenom "$@"\n\
+EOF\n\
+chmod +x /usr/local/bin/msfvenom'
 
-# Clean up build-time dependencies and cache (keep runtime libs and vendor/bundle)
+# ---------- End Metasploit block ----------
+
+# Clean up build-time dependencies and cache
 RUN apt-get purge -y \
     build-essential \
     libssl-dev \
@@ -88,18 +108,19 @@ RUN apt-get purge -y \
     zlib1g-dev \
     libxml2-dev \
     libxslt1-dev \
-    libyaml-dev \
-    pkg-config && \
-    apt-get autoremove -y && apt-get clean && \
+    libyaml-dev && \
+    apt-get autoremove -y && \
+    apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# Set working directory
-WORKDIR /traffgen
+# IMPORTANT: do NOT prepend /opt/metasploit-framework to PATH (we use wrappers)
+/* no ENV PATH line here on purpose */
 
-# Copy project files into /traffgen
+# Workdir and files
+WORKDIR /traffgen
 COPY generator.py endpoints.py healthcheck.sh ./
 
-# Copy Metasploit RC scripts
+# Metasploit RC scripts
 COPY metasploit /opt/metasploit-framework/ms_checks/
 RUN ls -la /opt/metasploit-framework/ms_checks/
 
