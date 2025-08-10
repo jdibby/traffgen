@@ -69,7 +69,6 @@ RUN git -c http.sslVerify=false clone https://github.com/rapid7/metasploit-frame
     bundle config set --local deployment true && \
     bundle lock --add-platform x86_64-linux && \
     bundle install --retry=3 && \
-    # (Optional) silence the stringio warning globally; harmless to skip
     gem cleanup stringio || true
 
 # Wrapper scripts that isolate gems to vendor/bundle and force bundle exec
@@ -95,8 +94,6 @@ export GEM_PATH="$GEM_HOME"\n\
 exec bundle exec ./msfvenom "$@"\n\
 EOF\n\
 chmod +x /usr/local/bin/msfvenom'
-
-# ---------- End Metasploit block ----------
 
 # Clean up build-time dependencies and cache
 RUN apt-get purge -y \
