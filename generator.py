@@ -569,35 +569,30 @@ def ping_random():
             
 ### Metasploit Checks
 def metasploit_check():
-    try:
-        if ARGS.size == 'S':
-            ms_checks = 1
-        elif ARGS.size == 'M':
-            ms_checks = 3
-        elif ARGS.size == 'L':
-            ms_checks = 5
-        elif ARGS.size == 'XL':
-            ms_checks = 7
+    if ARGS.size == 'S':
+        ms_checks = 1
+    elif ARGS.size == 'M':
+        ms_checks = 3
+    elif ARGS.size == 'L':
+        ms_checks = 5
+    elif ARGS.size == 'XL':
+        ms_checks = 7
 
-        rc_dir = '/opt/metasploit-framework/ms_checks/checks'
-        rc_files = [f for f in os.listdir(rc_dir) if f.endswith('.rc')]
-        random.shuffle(rc_files)
+    rc_dir = '/opt/metasploit-framework/ms_checks/checks'
+    rc_files = [f for f in os.listdir(rc_dir) if f.endswith('.rc')]
+    random.shuffle(rc_files)
 
-        for count_ms, rc_file in enumerate(rc_files):
-            if count_ms < ms_checks:
-                cmd = "msfconsole -q -r '%s'" % os.path.join(rc_dir, rc_file)
-                print (Fore.BLACK)
-                print (Back.GREEN + "##############################################################")
-                print (Style.RESET_ALL)
-                print ("Running Metasploit Check (%d of %d): %s" %((count_ms+1), ms_checks, rc_file))
-                print (Fore.BLACK)
-                print (Back.GREEN + "##############################################################")
-                print (Style.RESET_ALL)
-                subprocess.call(cmd, shell=True)
-    except (subprocess.SubprocessError, FileNotFoundError, TimeoutError) as e:
-        print(f"[metasploit_check] subprocess exception error: {e}")
-    except Exception as e:
-        print(f"[metasploit_check] unexpected exception error: {e}")
+    for count_ms, rc_file in enumerate(rc_files):
+        if count_ms < ms_checks:
+            cmd = "msfconsole -q -r '%s'" % os.path.join(rc_dir, rc_file)
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
+            print ("Running Metasploit Check (%d of %d): %s" %((count_ms+1), ms_checks, rc_file))
+            print (Fore.BLACK)
+            print (Back.GREEN + "##############################################################")
+            print (Style.RESET_ALL)
+            subprocess.call(cmd, shell=True)
             
 ### SNMP test
 def snmp_random():
