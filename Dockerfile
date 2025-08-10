@@ -72,28 +72,28 @@ RUN git -c http.sslVerify=false clone https://github.com/rapid7/metasploit-frame
     gem cleanup stringio || true
 
 # Wrapper scripts that isolate gems to vendor/bundle and force bundle exec
-RUN bash -lc 'cat > /usr/local/bin/msfconsole << "EOF"\n\
-#!/usr/bin/env bash\n\
-set -euo pipefail\n\
-cd /opt/metasploit-framework\n\
-export DISABLE_BOOTSNAP=1\n\
-ruby_ver="$(ruby -e '\''print RbConfig::CONFIG[\"ruby_version\"]'\'')"\n\
-export GEM_HOME="/opt/metasploit-framework/vendor/bundle/ruby/${ruby_ver}"\n\
-export GEM_PATH="$GEM_HOME"\n\
-exec bundle exec ./msfconsole "$@"\n\
-EOF\n\
-chmod +x /usr/local/bin/msfconsole\n\
-cat > /usr/local/bin/msfvenom << "EOF"\n\
-#!/usr/bin/env bash\n\
-set -euo pipefail\n\
-cd /opt/metasploit-framework\n\
-export DISABLE_BOOTSNAP=1\n\
-ruby_ver="$(ruby -e '\''print RbConfig::CONFIG[\"ruby_version\"]'\'')"\n\
-export GEM_HOME="/opt/metasploit-framework/vendor/bundle/ruby/${ruby_ver}"\n\
-export GEM_PATH="$GEM_HOME"\n\
-exec bundle exec ./msfvenom "$@"\n\
-EOF\n\
-chmod +x /usr/local/bin/msfvenom'
+RUN cat > /usr/local/bin/msfconsole <<'EOF' && \
+chmod +x /usr/local/bin/msfconsole && \
+cat > /usr/local/bin/msfvenom <<'EOF' && \
+chmod +x /usr/local/bin/msfvenom
+#!/usr/bin/env bash
+set -euo pipefail
+cd /opt/metasploit-framework
+export DISABLE_BOOTSNAP=1
+ruby_ver="$(ruby -e 'print RbConfig::CONFIG["ruby_version"]')"
+export GEM_HOME="/opt/metasploit-framework/vendor/bundle/ruby/${ruby_ver}"
+export GEM_PATH="$GEM_HOME"
+exec bundle exec ./msfconsole "$@"
+EOF
+#!/usr/bin/env bash
+set -euo pipefail
+cd /opt/metasploit-framework
+export DISABLE_BOOTSNAP=1
+ruby_ver="$(ruby -e 'print RbConfig::CONFIG["ruby_version"]')"
+export GEM_HOME="/opt/metasploit-framework/vendor/bundle/ruby/${ruby_ver}"
+export GEM_PATH="$GEM_HOME"
+exec bundle exec ./msfvenom "$@"
+EOF
 
 # Clean up build-time dependencies and cache
 RUN apt-get purge -y \
