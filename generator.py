@@ -1,7 +1,7 @@
 #!/usr/local/bin python3
 
 ### Import of required modules
-import time, os, sys, argparse, random, threading, signal, urllib.request, urllib3, requests, runpy, socket, ssl, subprocess, ftplib, traceback, requiests, pysnmp.error, dns.exception, ntplib, requests
+import time, os, sys, argparse, random, threading, signal, urllib.request, urllib3, requests, runpy, socket, ssl, subprocess, ftplib, traceback, pysnmp.error, dns.exception, ntplib, requests
 from bs4 import BeautifulSoup
 from time import sleep
 from urllib.parse import urljoin
