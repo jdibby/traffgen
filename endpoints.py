@@ -333,7 +333,7 @@ https_endpoints = [
     "https://urlhaus.abuse.ch",
     "https://urlhaus.abuse.ch/browse",
     "https://commoncrawl.org",
-    "https://dmoztools.net,",
+    "https://dmoztools.net",
     "http://crawler-test.com",
     "https://abcnews.go.com",
     "https://aboutads.info",
