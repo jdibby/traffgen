@@ -1,7 +1,7 @@
 #!/usr/local/bin python3
 
 ### Import of required modules
-import time, os, sys, subprocess, argparse, socket, random, threading, signal, urllib.request, urllib3, ssl, requests, runpy
+import time, os, sys, argparse, random, threading, signal, urllib.request, urllib3, requests, runpy, socket, ssl, subprocess, ftplib, traceback
 from bs4 import BeautifulSoup
 from time import sleep
 from urllib.parse import urljoin
@@ -9,6 +9,31 @@ from tqdm import tqdm
 from colorama import Fore, Back, Style
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from endpoints import *
+
+try:
+    import requests
+except Exception:
+    requests = None
+try:
+    import paramiko
+except Exception:
+    class _P: class SSHException(Exception): pass
+    paramiko = _P()
+try:
+    import dns.exception
+except Exception:
+    class _D: class DNSException(Exception): pass
+    dns = _D()
+try:
+    import pysnmp.error
+except Exception:
+    class _S: class PySnmpError(Exception): pass
+    pysnmp = _S()
+try:
+    import ntplib
+except Exception:
+    class _N: class NTPException(Exception): pass
+    ntplib = _N()
 
 ### Disable SSL warning for self-signed certs
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -116,22 +141,27 @@ def bgp_peering():
 
 ### Bigfile download via http
 def bigfile():
-    url = 'http://ipv4.download.thinkbroadband.com/5GB.zip'
-    response = requests.get(url, stream=True)
-    total_size = int(response.headers.get('content-length', 0))
+    try:
+        url = 'http://ipv4.download.thinkbroadband.com/5GB.zip'
+        response = requests.get(url, stream=True)
+        total_size = int(response.headers.get('content-length', 0))
 
-    ### Display progress information
-    print(Fore.BLACK + Back.GREEN + "##############################################################")
-    print(Style.RESET_ALL)
-    print("Testing Bigfile: Downloading 5GB ZIP File")
-    print(Fore.BLACK + Back.GREEN + "##############################################################")
-    print(Style.RESET_ALL)
+        ### Display progress information
+        print(Fore.BLACK + Back.GREEN + "##############################################################")
+        print(Style.RESET_ALL)
+        print("Testing Bigfile: Downloading 5GB ZIP File")
+        print(Fore.BLACK + Back.GREEN + "##############################################################")
+        print(Style.RESET_ALL)
 
-    ### Progress bar
-    with tqdm(total=total_size, unit='B', unit_scale=True, desc='Downloading', ascii=True) as progress_bar:
-        for chunk in response.iter_content(chunk_size=1024):
-            if chunk:  # Filter out keep-alive new chunks
-                progress_bar.update(len(chunk))
+        ### Progress bar
+        with tqdm(total=total_size, unit='B', unit_scale=True, desc='Downloading', ascii=True) as progress_bar:
+            for chunk in response.iter_content(chunk_size=1024):
+                if chunk:  # Filter out keep-alive new chunks
+                    progress_bar.update(len(chunk))
+    except (requests.exceptions.RequestException, socket.error, ssl.SSLError, OSError) as e:
+        print(f"[bigfile] network/file error: {e}")
+    except Exception as e:
+        print(f"[bigfile] unexpected error: {e}")    
 
 ### DNS Test suites
 def dig_random():
