@@ -212,446 +212,544 @@ def dig_random():
 
 ### FTP Test suites
 def ftp_random():
-    if ARGS.size == 'S':
-        target = '1MB'
-    elif ARGS.size == 'M':
-        target = '10MB'
-    elif ARGS.size == 'L':
-        target = '100MB'
-    elif ARGS.size == 'XL':
-        target = '1GB'
-    cmd = 'curl --limit-rate 3M -k --show-error --connect-timeout 5 -o /dev/null ftp://speedtest:speedtest@ftp.otenet.gr/test' + target + '.db'
-    print (Fore.BLACK)
-    print (Back.GREEN + "##############################################################")
-    print (Style.RESET_ALL)
-    print ("Testing FTP: Download %s DB File" %(target))
-    print (Fore.BLACK)
-    print (Back.GREEN + "##############################################################")
-    print (Style.RESET_ALL)
-    subprocess.call(cmd, shell=True)
+    try:
+        if ARGS.size == 'S':
+            target = '1MB'
+        elif ARGS.size == 'M':
+            target = '10MB'
+        elif ARGS.size == 'L':
+            target = '100MB'
+        elif ARGS.size == 'XL':
+            target = '1GB'
+        cmd = 'curl --limit-rate 3M -k --show-error --connect-timeout 5 -o /dev/null ftp://speedtest:speedtest@ftp.otenet.gr/test' + target + '.db'
+        print (Fore.BLACK)
+        print (Back.GREEN + "##############################################################")
+        print (Style.RESET_ALL)
+        print ("Testing FTP: Download %s DB File" %(target))
+        print (Fore.BLACK)
+        print (Back.GREEN + "##############################################################")
+        print (Style.RESET_ALL)
+        subprocess.call(cmd, shell=True)
+    except ftplib.all_errors as e:
+        print(f"[ftp_random] FTP error: {e}")
+    except (socket.error, ssl.SSLError) as e:
+        print(f"[ftp_random] socket/ssl error: {e}")
+    except Exception as e:
+        print(f"[ftp_random] unexpected error: {e}")
 
 ### HTTP Test suites
 def http_random():
-    if ARGS.size == 'S':
-        target_urls = 10
-    elif ARGS.size == 'M':
-        target_urls = 20
-    elif ARGS.size == 'L':
-        target_urls = 50
-    elif ARGS.size == 'XL':
-        target_urls = len(http_endpoints + dns_urls)
-    random.shuffle(http_endpoints)
-    random.shuffle(dns_urls)
-    for count_urls, url in enumerate(http_endpoints + dns_urls):
-        if count_urls < target_urls:
-            random.shuffle(user_agents)
-            user_agent = user_agents[0]
-            cmd = f"curl -k -s --show-error --connect-timeout 5 -I -L -o /dev/null --max-time 5 -A '{user_agent}' {url}"
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            print ("Testing HTTP: (%d of %d): %s" %((count_urls+1), target_urls, url))
-            print (f"Agent: {user_agent}")
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            subprocess.call(cmd, shell=True)
+    try:
+        if ARGS.size == 'S':
+            target_urls = 10
+        elif ARGS.size == 'M':
+            target_urls = 20
+        elif ARGS.size == 'L':
+            target_urls = 50
+        elif ARGS.size == 'XL':
+            target_urls = len(http_endpoints + dns_urls)
+        random.shuffle(http_endpoints)
+        random.shuffle(dns_urls)
+        for count_urls, url in enumerate(http_endpoints + dns_urls):
+            if count_urls < target_urls:
+                random.shuffle(user_agents)
+                user_agent = user_agents[0]
+                cmd = f"curl -k -s --show-error --connect-timeout 5 -I -L -o /dev/null --max-time 5 -A '{user_agent}' {url}"
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                print ("Testing HTTP: (%d of %d): %s" %((count_urls+1), target_urls, url))
+                print (f"Agent: {user_agent}")
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                subprocess.call(cmd, shell=True)
+    except (requests.exceptions.RequestException, socket.error, ssl.SSLError) as e:
+        print(f"[http_random] http error: {e}")
+    except Exception as e:
+        print(f"[http_random] unexpected error: {e}")
 
 ### HTTP downloads
 def http_download_zip():
-    random.shuffle(user_agents)
-    user_agent = user_agents[0]
-    if ARGS.size == 'S':
-        target = '15MB'
-        cmd = f"curl --limit-rate 3M -k  --show-error --connect-timeout 5 -L -o /dev/null -A '{user_agent}' https://link.testfile.org/{target}"
-    elif ARGS.size == 'M':
-        target = '30MB'
-        cmd = f"curl --limit-rate 3M -k  --show-error --connect-timeout 5 -L -o /dev/null-A '{user_agent}' https://link.testfile.org/{target}"
-    elif ARGS.size == 'L':
-        target = '100MB'
-        cmd = f"curl --limit-rate 3M -k  --show-error --connect-timeout 5 -L -o /dev/null -A '{user_agent}' https://link.testfile.org/{target}"
-    elif ARGS.size == 'XL':
-        target = '1GB'
-        cmd = f"curl --limit-rate 3M -k  --show-error --connect-timeout 5 -L -o /dev/null -A '{user_agent}' https://link.testfile.org/{target}"
-    print (Fore.BLACK)
-    print (Back.GREEN + "##############################################################")
-    print (Style.RESET_ALL)
-    print ("Testing HTTP: Download %s ZIP File" %(target))
-    print (f"Agent: {user_agent}")
-    print (Fore.BLACK)
-    print (Back.GREEN + "##############################################################")
-    print (Style.RESET_ALL)
-    subprocess.call(cmd, shell=True)
+    try:
+        random.shuffle(user_agents)
+        user_agent = user_agents[0]
+        if ARGS.size == 'S':
+            target = '15MB'
+            cmd = f"curl --limit-rate 3M -k  --show-error --connect-timeout 5 -L -o /dev/null -A '{user_agent}' https://link.testfile.org/{target}"
+        elif ARGS.size == 'M':
+            target = '30MB'
+            cmd = f"curl --limit-rate 3M -k  --show-error --connect-timeout 5 -L -o /dev/null-A '{user_agent}' https://link.testfile.org/{target}"
+        elif ARGS.size == 'L':
+            target = '100MB'
+            cmd = f"curl --limit-rate 3M -k  --show-error --connect-timeout 5 -L -o /dev/null -A '{user_agent}' https://link.testfile.org/{target}"
+        elif ARGS.size == 'XL':
+            target = '1GB'
+            cmd = f"curl --limit-rate 3M -k  --show-error --connect-timeout 5 -L -o /dev/null -A '{user_agent}' https://link.testfile.org/{target}"
+        print (Fore.BLACK)
+        print (Back.GREEN + "##############################################################")
+        print (Style.RESET_ALL)
+        print ("Testing HTTP: Download %s ZIP File" %(target))
+        print (f"Agent: {user_agent}")
+        print (Fore.BLACK)
+        print (Back.GREEN + "##############################################################")
+        print (Style.RESET_ALL)
+        subprocess.call(cmd, shell=True)
+    except (requests.exceptions.RequestException, socket.error, ssl.SSLError) as e:
+        print(f"[http_download_zip] http error: {e}")
+    except (OSError, IOError) as e:
+        print(f"[http_download_zip] file I/O error: {e}")
+    except Exception as e:
+        print(f"[http_download_zip] unexpected error: {e}")
 
 ### HTTP downloads of targz files
 def http_download_targz():
-    cmd = 'curl --limit-rate 3M -k  --show-error --connect-timeout 5 -o /dev/null http://wordpress.org/latest.tar.gz'
-    print (Fore.BLACK)
-    print (Back.GREEN + "##############################################################")
-    print (Style.RESET_ALL)
-    print ("Testing HTTP: Download Wordpress File")
-    print (Fore.BLACK)
-    print (Back.GREEN + "##############################################################")
-    print (Style.RESET_ALL)
-    subprocess.call(cmd, shell=True)
+    try:
+        cmd = 'curl --limit-rate 3M -k  --show-error --connect-timeout 5 -o /dev/null http://wordpress.org/latest.tar.gz'
+        print (Fore.BLACK)
+        print (Back.GREEN + "##############################################################")
+        print (Style.RESET_ALL)
+        print ("Testing HTTP: Download Wordpress File")
+        print (Fore.BLACK)
+        print (Back.GREEN + "##############################################################")
+        print (Style.RESET_ALL)
+        subprocess.call(cmd, shell=True)
+    except (requests.exceptions.RequestException, socket.error, ssl.SSLError) as e:
+        print(f"[http_download_targz] http error: {e}")
+    except (OSError, IOError) as e:
+        print(f"[http_download_targz] file I/O error: {e}")
+    except Exception as e:
+        print(f"[http_download_targz] unexpected error: {e}")
     
 ### Nikto Scans
 def web_scanner():
-    if ARGS.size == 'S':
-        timeout = 60
-    elif ARGS.size == 'M':
-        timeout = 120
-    elif ARGS.size == 'L':
-        timeout = 180
-    elif ARGS.size == 'XL':
-        timeout = 240
+    try:
+        if ARGS.size == 'S':
+            timeout = 60
+        elif ARGS.size == 'M':
+            timeout = 120
+        elif ARGS.size == 'L':
+            timeout = 180
+        elif ARGS.size == 'XL':
+            timeout = 240
+            
+        random.shuffle(webscan_endpoints)
+        url = webscan_endpoints[0]
         
-    random.shuffle(webscan_endpoints)
-    url = webscan_endpoints[0]
-    
-    cmd = f"echo y | nikto -h '{url}' -maxtime '{timeout}' -timeout 1 -nointeractive"
-    
-    print (Fore.BLACK)
-    print (Back.GREEN + "##############################################################")
-    print (Style.RESET_ALL)
-    print ("Nikto Scanning: testmyids.com")
-    print (Fore.BLACK)
-    print (Back.GREEN + "##############################################################")
-    print (Style.RESET_ALL)
-    subprocess.call(cmd, shell=True)
+        cmd = f"echo y | nikto -h '{url}' -maxtime '{timeout}' -timeout 1 -nointeractive"
+        
+        print (Fore.BLACK)
+        print (Back.GREEN + "##############################################################")
+        print (Style.RESET_ALL)
+        print ("Nikto Scanning: testmyids.com")
+        print (Fore.BLACK)
+        print (Back.GREEN + "##############################################################")
+        print (Style.RESET_ALL)
+        subprocess.call(cmd, shell=True)
+    except (subprocess.SubprocessError, FileNotFoundError, TimeoutError) as e:
+        print(f"[web_scanner] subprocess error: {e}")
+    except Exception as e:
+        print(f"[web_scanner] unexpected error: {e}")
 
 ### HTTPS Test suites
 def https_random():
-    if ARGS.size == 'S':
-        target_urls = 10
-    elif ARGS.size == 'M':
-        target_urls = 20
-    elif ARGS.size == 'L':
-        target_urls = 50
-    elif ARGS.size == 'XL':
-        target_urls = len(https_endpoints)
-    random.shuffle(https_endpoints)
-    for count_urls, url in enumerate(https_endpoints):
-        if count_urls < target_urls:
-            random.shuffle(user_agents)
-            user_agent = user_agents[0]
-            cmd = f"curl -k -s --show-error --connect-timeout 5 -I -o /dev/null --max-time 5 -A '{user_agent}' {url}"
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            print ("Testing HTTPS (%d of %d): %s" %((count_urls+1), target_urls, url))
-            print (f"Agent: {user_agent}")
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            subprocess.call(cmd, shell=True)
+    try:
+        if ARGS.size == 'S':
+            target_urls = 10
+        elif ARGS.size == 'M':
+            target_urls = 20
+        elif ARGS.size == 'L':
+            target_urls = 50
+        elif ARGS.size == 'XL':
+            target_urls = len(https_endpoints)
+        random.shuffle(https_endpoints)
+        for count_urls, url in enumerate(https_endpoints):
+            if count_urls < target_urls:
+                random.shuffle(user_agents)
+                user_agent = user_agents[0]
+                cmd = f"curl -k -s --show-error --connect-timeout 5 -I -o /dev/null --max-time 5 -A '{user_agent}' {url}"
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                print ("Testing HTTPS (%d of %d): %s" %((count_urls+1), target_urls, url))
+                print (f"Agent: {user_agent}")
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                subprocess.call(cmd, shell=True)
+    except (requests.exceptions.RequestException, ssl.SSLError, socket.error) as e:
+        print(f"[https_random] https error: {e}")
+    except Exception as e:
+        print(f"[https_random] unexpected error: {e}")
 
 ### AI Test suite
 def ai_https_random():
-    if ARGS.size == 'S':
-        target_urls = 10
-    elif ARGS.size == 'M':
-        target_urls = 20
-    elif ARGS.size == 'L':
-        target_urls = 50
-    elif ARGS.size == 'XL':
-        target_urls = len(ai_endpoints)
-    random.shuffle(ai_endpoints)
-    for count_urls, url in enumerate(ai_endpoints):
-        if count_urls < target_urls:
-            random.shuffle(user_agents)
-            user_agent = user_agents[0]
-            cmd = f"curl -k -s --show-error --connect-timeout 3 -I -o /dev/null --max-time 5 -A '{user_agent}' {url}"
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            print ("Testing AI URLs (%d of %d): %s" %((count_urls+1), target_urls, url))
-            print (f"Agent: {user_agent}")
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            subprocess.call(cmd, shell=True)
+    try:
+        if ARGS.size == 'S':
+            target_urls = 10
+        elif ARGS.size == 'M':
+            target_urls = 20
+        elif ARGS.size == 'L':
+            target_urls = 50
+        elif ARGS.size == 'XL':
+            target_urls = len(ai_endpoints)
+        random.shuffle(ai_endpoints)
+        for count_urls, url in enumerate(ai_endpoints):
+            if count_urls < target_urls:
+                random.shuffle(user_agents)
+                user_agent = user_agents[0]
+                cmd = f"curl -k -s --show-error --connect-timeout 3 -I -o /dev/null --max-time 5 -A '{user_agent}' {url}"
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                print ("Testing AI URLs (%d of %d): %s" %((count_urls+1), target_urls, url))
+                print (f"Agent: {user_agent}")
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                subprocess.call(cmd, shell=True)
+    except (requests.exceptions.RequestException, ssl.SSLError, socket.error) as e:
+        print(f"[ai_https_random] https error: {e}")
+    except Exception as e:
+        print(f"[ai_https_random] unexpected error: {e}")
             
 ### Test ad filtering
 def ads_random():
-    if ARGS.size == 'S':
-        target_urls = 10
-    elif ARGS.size == 'M':
-        target_urls = 20
-    elif ARGS.size == 'L':
-        target_urls = 50
-    elif ARGS.size == 'XL':
-        target_urls = len(ad_endpoints)
-    random.shuffle(ad_endpoints)
-    for count_urls, url in enumerate(ad_endpoints):
-        if count_urls < target_urls:
-            random.shuffle(user_agents)
-            user_agent = user_agents[0]
-            cmd = f"curl -k -s --show-error --connect-timeout 3 -I -o /dev/null --max-time 5 -A '{user_agent}' {url}"
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            print ("Testing AI URLs (%d of %d): %s" %((count_urls+1), target_urls, url))
-            print (f"Agent: {user_agent}")
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            subprocess.call(cmd, shell=True)
+    try:
+        if ARGS.size == 'S':
+            target_urls = 10
+        elif ARGS.size == 'M':
+            target_urls = 20
+        elif ARGS.size == 'L':
+            target_urls = 50
+        elif ARGS.size == 'XL':
+            target_urls = len(ad_endpoints)
+        random.shuffle(ad_endpoints)
+        for count_urls, url in enumerate(ad_endpoints):
+            if count_urls < target_urls:
+                random.shuffle(user_agents)
+                user_agent = user_agents[0]
+                cmd = f"curl -k -s --show-error --connect-timeout 3 -I -o /dev/null --max-time 5 -A '{user_agent}' {url}"
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                print ("Testing AI URLs (%d of %d): %s" %((count_urls+1), target_urls, url))
+                print (f"Agent: {user_agent}")
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                subprocess.call(cmd, shell=True)
+    except (requests.exceptions.RequestException, socket.error, ssl.SSLError) as e:
+        print(f"[ads_random] http error: {e}")
+    except Exception as e:
+        print(f"[ads_random] unexpected error: {e}")
 
 ### HTTPS crawl through URLs
 def https_crawl():
-    if ARGS.size == 'S':
-        target_urls = 10
-        iterations = 1
-    elif ARGS.size == 'M':
-        target_urls = 20
-        iterations = 3
-    elif ARGS.size == 'L':
-        target_urls = 50
-        iterations = 5
-    elif ARGS.size == 'XL':
-        target_urls = len(https_endpoints)
-        iterations = 10
-    random.shuffle(https_endpoints)
-    for count_urls, url in enumerate(https_endpoints):
-        if count_urls < target_urls:
-            random.shuffle(user_agents)
-            user_agent = user_agents[0]
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            print ("Crawling HTTPS (%d deep, site %d of %d) starting from %s" %(iterations, (count_urls+1), target_urls, url))
-            print (f"Agent: {user_agent}")
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            scrape_iterative(url, iterations)
+    try:
+        if ARGS.size == 'S':
+            target_urls = 10
+            iterations = 1
+        elif ARGS.size == 'M':
+            target_urls = 20
+            iterations = 3
+        elif ARGS.size == 'L':
+            target_urls = 50
+            iterations = 5
+        elif ARGS.size == 'XL':
+            target_urls = len(https_endpoints)
+            iterations = 10
+        random.shuffle(https_endpoints)
+        for count_urls, url in enumerate(https_endpoints):
+            if count_urls < target_urls:
+                random.shuffle(user_agents)
+                user_agent = user_agents[0]
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                print ("Crawling HTTPS (%d deep, site %d of %d) starting from %s" %(iterations, (count_urls+1), target_urls, url))
+                print (f"Agent: {user_agent}")
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                scrape_iterative(url, iterations)
+    except (requests.exceptions.RequestException, ssl.SSLError, socket.error) as e:
+        print(f"[https_crawl] https error: {e}")
+    except (ValueError,) as e:
+        print(f"[https_crawl] parse error: {e}")
+    except Exception as e:
+        print(f"[https_crawl] unexpected error: {e}")
 
 ### Pornography crawl through URLs
 def pornography_crawl():
-    if ARGS.size == 'S':
-        target_urls = 10 
-        iterations = 1
-    elif ARGS.size == 'M':
-        target_urls = 20
-        iterations = 3
-    elif ARGS.size == 'L':
-        target_urls = 50
-        iterations = 5
-    elif ARGS.size == 'XL':
-        target_urls = len(pornography_endpoints)
-        iterations = 10
-    random.shuffle(pornography_endpoints)
-    for count_urls, url in enumerate(pornography_endpoints):
-        if count_urls < target_urls:
-            random.shuffle(user_agents)
-            user_agent = user_agents[0]
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            print ("Crawling Pornography (%d deep, site %d of %d) starting from %s" %(iterations, (count_urls+1), target_urls, url))
-            print (f"Agent: {user_agent}")
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            scrape_iterative(url, iterations)
+    try:
+        if ARGS.size == 'S':
+            target_urls = 10 
+            iterations = 1
+        elif ARGS.size == 'M':
+            target_urls = 20
+            iterations = 3
+        elif ARGS.size == 'L':
+            target_urls = 50
+            iterations = 5
+        elif ARGS.size == 'XL':
+            target_urls = len(pornography_endpoints)
+            iterations = 10
+        random.shuffle(pornography_endpoints)
+        for count_urls, url in enumerate(pornography_endpoints):
+            if count_urls < target_urls:
+                random.shuffle(user_agents)
+                user_agent = user_agents[0]
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                print ("Crawling Pornography (%d deep, site %d of %d) starting from %s" %(iterations, (count_urls+1), target_urls, url))
+                print (f"Agent: {user_agent}")
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                scrape_iterative(url, iterations)
+    except (requests.exceptions.RequestException, ssl.SSLError, socket.error) as e:
+        print(f"[pornography_crawl] http error: {e}")
+    except ValueError as e:
+        print(f"[pornography_crawl] parse error: {e}")
+    except Exception as e:
+        print(f"[pornography_crawl] unexpected error: {e}")
 
 ### Malware Test suites
 def malware_random():
-    if ARGS.size == 'S':
-        target_urls = 10
-    elif ARGS.size == 'M':
-        target_urls = 20
-    elif ARGS.size == 'L':
-        target_urls = 50
-    elif ARGS.size == 'XL':
-        target_urls = len(malware_endpoints)
-    random.shuffle(malware_endpoints)
-    for count_urls, url in enumerate(malware_endpoints):
-        if count_urls < target_urls:
-            random.shuffle(malware_user_agents)
-            malware_user_agent = malware_user_agents[0]
-            cmd = f"curl -k -s --show-error --connect-timeout 3 -I -o /dev/null --max-time 5 -A '{malware_user_agent}' {url}"
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            print ("Testing Malware Site: (%d of %d): %s" %((count_urls+1), target_urls, url))
-            print (f"Agent: {malware_user_agent}")
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            subprocess.call(cmd, shell=True)
+    try:
+        if ARGS.size == 'S':
+            target_urls = 10
+        elif ARGS.size == 'M':
+            target_urls = 20
+        elif ARGS.size == 'L':
+            target_urls = 50
+        elif ARGS.size == 'XL':
+            target_urls = len(malware_endpoints)
+        random.shuffle(malware_endpoints)
+        for count_urls, url in enumerate(malware_endpoints):
+            if count_urls < target_urls:
+                random.shuffle(malware_user_agents)
+                malware_user_agent = malware_user_agents[0]
+                cmd = f"curl -k -s --show-error --connect-timeout 3 -I -o /dev/null --max-time 5 -A '{malware_user_agent}' {url}"
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                print ("Testing Malware Site: (%d of %d): %s" %((count_urls+1), target_urls, url))
+                print (f"Agent: {malware_user_agent}")
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                subprocess.call(cmd, shell=True)
+    except (requests.exceptions.RequestException, ssl.SSLError, socket.error) as e:
+        print(f"[malware_random] http error: {e}")
+    except Exception as e:
+        print(f"[malware_random] unexpected error: {e}")
 
 ### ICMP Test
 def ping_random():
-    if ARGS.size == 'S':
-        target_ips = 1
-    elif ARGS.size == 'M':
-        target_ips = 2
-    elif ARGS.size == 'L':
-        target_ips = 5
-    elif ARGS.size == 'XL':
-        target_ips = len(icmp_endpoints)
-    random.shuffle(icmp_endpoints)
-    for count_ips, ip in enumerate(icmp_endpoints):
-        if count_ips < target_ips:
-            cmd = "ping -c2 -i1 -s64 -W1 -w2 %s" % ip
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            print ("Testing ICMP (%d of %d): Ping %s" %((count_ips+1), target_ips, ip))
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            subprocess.call(cmd, shell=True)
+    try:
+        if ARGS.size == 'S':
+            target_ips = 1
+        elif ARGS.size == 'M':
+            target_ips = 2
+        elif ARGS.size == 'L':
+            target_ips = 5
+        elif ARGS.size == 'XL':
+            target_ips = len(icmp_endpoints)
+        random.shuffle(icmp_endpoints)
+        for count_ips, ip in enumerate(icmp_endpoints):
+            if count_ips < target_ips:
+                cmd = "ping -c2 -i1 -s64 -W1 -w2 %s" % ip
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                print ("Testing ICMP (%d of %d): Ping %s" %((count_ips+1), target_ips, ip))
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                subprocess.call(cmd, shell=True)
+    except (subprocess.SubprocessError, FileNotFoundError, TimeoutError) as e:
+        print(f"[ping_random] subprocess error: {e}")
+    except Exception as e:
+        print(f"[ping_random] unexpected error: {e}")                
             
 ### Metasploit Checks
 def metasploit_check():
-    if ARGS.size == 'S':
-        ms_checks = 1
-    elif ARGS.size == 'M':
-        ms_checks = 3
-    elif ARGS.size == 'L':
-        ms_checks = 5
-    elif ARGS.size == 'XL':
-        ms_checks = 7
+    try:
+        if ARGS.size == 'S':
+            ms_checks = 1
+        elif ARGS.size == 'M':
+            ms_checks = 3
+        elif ARGS.size == 'L':
+            ms_checks = 5
+        elif ARGS.size == 'XL':
+            ms_checks = 7
 
-    rc_dir = '/opt/metasploit-framework/ms_checks/checks'
-    rc_files = [f for f in os.listdir(rc_dir) if f.endswith('.rc')]
-    random.shuffle(rc_files)
+        rc_dir = '/opt/metasploit-framework/ms_checks/checks'
+        rc_files = [f for f in os.listdir(rc_dir) if f.endswith('.rc')]
+        random.shuffle(rc_files)
 
-    for count_ms, rc_file in enumerate(rc_files):
-        if count_ms < ms_checks:
-            cmd = "msfconsole -q -r '%s'" % os.path.join(rc_dir, rc_file)
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            print ("Running Metasploit Check (%d of %d): %s" %((count_ms+1), ms_checks, rc_file))
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            subprocess.call(cmd, shell=True)
+        for count_ms, rc_file in enumerate(rc_files):
+            if count_ms < ms_checks:
+                cmd = "msfconsole -q -r '%s'" % os.path.join(rc_dir, rc_file)
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                print ("Running Metasploit Check (%d of %d): %s" %((count_ms+1), ms_checks, rc_file))
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                subprocess.call(cmd, shell=True)
+    except (subprocess.SubprocessError, FileNotFoundError, TimeoutError) as e:
+        print(f"[metasploit_check] subprocess error: {e}")
+    except Exception as e:
+        print(f"[metasploit_check] unexpected error: {e}")
             
 ### SNMP test
 def snmp_random():
-    if ARGS.size == 'S':
-        target_ips = 1
-    elif ARGS.size == 'M':
-        target_ips = 2
-    elif ARGS.size == 'L':
-        target_ips = 5
-    elif ARGS.size == 'XL':
-        target_ips = len(snmp_endpoints)
-    random.shuffle(snmp_endpoints)
-    random.shuffle(snmp_strings)
-    for count_ips, ip in enumerate(snmp_endpoints):
-        if count_ips < target_ips:
-            community = snmp_strings[count_ips % len(snmp_strings)]
-            cmd = f"snmpwalk -v2c -t1 -r1 -c {community} {ip}"
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            print(f"SNMP Polling ({count_ips+1} of {target_ips}): Polling {ip} with community '{community}'")
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            subprocess.call(cmd, shell=True)
+    try:
+        if ARGS.size == 'S':
+            target_ips = 1
+        elif ARGS.size == 'M':
+            target_ips = 2
+        elif ARGS.size == 'L':
+            target_ips = 5
+        elif ARGS.size == 'XL':
+            target_ips = len(snmp_endpoints)
+        random.shuffle(snmp_endpoints)
+        random.shuffle(snmp_strings)
+        for count_ips, ip in enumerate(snmp_endpoints):
+            if count_ips < target_ips:
+                community = snmp_strings[count_ips % len(snmp_strings)]
+                cmd = f"snmpwalk -v2c -t1 -r1 -c {community} {ip}"
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                print(f"SNMP Polling ({count_ips+1} of {target_ips}): Polling {ip} with community '{community}'")
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                subprocess.call(cmd, shell=True)
+    except getattr(pysnmp, "PySnmpError", Exception) as e:
+        print(f"[snmp_random] pysnmp error: {e}")
+    except (subprocess.SubprocessError, FileNotFoundError, TimeoutError) as e:
+        print(f"[snmp_random] subprocess error: {e}")
+    except (socket.error,) as e:
+        print(f"[snmp_random] socket error: {e}")
+    except Exception as e:
+        print(f"[snmp_random] unexpected error: {e}")
 
 ### Traceroute test
 def traceroute_random():
-    if ARGS.size == 'S':
-        target_ips = 1
-    elif ARGS.size == 'M':
-        target_ips = 2
-    elif ARGS.size == 'L':
-        target_ips = 5
-    elif ARGS.size == 'XL':
-        target_ips = len(icmp_endpoints)
-    random.shuffle(icmp_endpoints)
-    for count_ips, ip in enumerate(icmp_endpoints):
-        if count_ips < target_ips:
-            cmd = "traceroute %s -w1 -q1 -m5" % (ip)
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            print ("Testing ICMP (%d of %d): Traceroute to %s" %((count_ips+1), target_ips, ip))
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            subprocess.call(cmd, shell=True)
+    try:
+        if ARGS.size == 'S':
+            target_ips = 1
+        elif ARGS.size == 'M':
+            target_ips = 2
+        elif ARGS.size == 'L':
+            target_ips = 5
+        elif ARGS.size == 'XL':
+            target_ips = len(icmp_endpoints)
+        random.shuffle(icmp_endpoints)
+        for count_ips, ip in enumerate(icmp_endpoints):
+            if count_ips < target_ips:
+                cmd = "traceroute %s -w1 -q1 -m5" % (ip)
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                print ("Testing ICMP (%d of %d): Traceroute to %s" %((count_ips+1), target_ips, ip))
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                subprocess.call(cmd, shell=True)
+    except (subprocess.SubprocessError, FileNotFoundError, TimeoutError) as e:
+        print(f"[traceroute_random] subprocess error: {e}")
+    except Exception as e:
+        print(f"[traceroute_random] unexpected error: {e}")
 
 ### Netflix Test
 def speedtest_fast():
-    if ARGS.size == 'S':
-        duration = 1
-    elif ARGS.size == 'M':
-        duration = 2
-    elif ARGS.size == 'L':
-        duration = 3
-    elif ARGS.size == 'XL':
-        duration = 4
+    try:
+        if ARGS.size == 'S':
+            duration = 1
+        elif ARGS.size == 'M':
+            duration = 2
+        elif ARGS.size == 'L':
+            duration = 3
+        elif ARGS.size == 'XL':
+            duration = 4
 
-    print(Fore.BLACK)
-    print(Back.GREEN + "##############################################################")
-    print(Style.RESET_ALL)
-    print("Testing Netflix: Fast.com Speedtest")
-    print(Fore.BLACK)
-    print(Back.GREEN + "##############################################################")
-    print(Style.RESET_ALL)
+        print(Fore.BLACK)
+        print(Back.GREEN + "##############################################################")
+        print(Style.RESET_ALL)
+        print("Testing Netflix: Fast.com Speedtest")
+        print(Fore.BLACK)
+        print(Back.GREEN + "##############################################################")
+        print(Style.RESET_ALL)
 
-    timeout_per_test = 20
+        timeout_per_test = 20
 
-    for i in range(1, duration + 1):
-        print(f"Starting Fast.com test {i} of {duration} (timeout: {timeout_per_test}s)...")
-        try:
-            result = subprocess.run(
-                'python3 -m fastcli',
-                shell=True,
-                check=True,
-                timeout=timeout_per_test,
-                capture_output=True,
-                text=True
-            )
-            print(f"Test {i} completed successfully.")
-            if result.stdout:
-                print(f"Output:\n{result.stdout}")
-            if result.stderr:
-                print(f"Error Output:\n{result.stderr}")
-        except subprocess.TimeoutExpired:
-            print(f"Test {i} timed out after {timeout_per_test} seconds. Moving to the next test.")
-        except subprocess.CalledProcessError as e:
-            print(f"Test {i} failed with error: {e}")
-            print(f"Command output (stdout):\n{e.stdout}")
-            print(f"Command error (stderr):\n{e.stderr}")
-        except Exception as e:
-            print(f"An unexpected error occurred during test {i}: {e}")
+        for i in range(1, duration + 1):
+            print(f"Starting Fast.com test {i} of {duration} (timeout: {timeout_per_test}s)...")
+            try:
+                result = subprocess.run(
+                    'python3 -m fastcli',
+                    shell=True,
+                    check=True,
+                    timeout=timeout_per_test,
+                    capture_output=True,
+                    text=True
+                )
+                print(f"Test {i} completed successfully.")
+                if result.stdout:
+                    print(f"Output:\n{result.stdout}")
+                if result.stderr:
+                    print(f"Error Output:\n{result.stderr}")
+            except subprocess.TimeoutExpired:
+                print(f"Test {i} timed out after {timeout_per_test} seconds. Moving to the next test.")
+            except subprocess.CalledProcessError as e:
+                print(f"Test {i} failed with error: {e}")
+                print(f"Command output (stdout):\n{e.stdout}")
+                print(f"Command error (stderr):\n{e.stderr}")
+            except Exception as e:
+                print(f"An unexpected error occurred during test {i}: {e}")
 
-    print("All Speedtest Tests Attempted.")
-    pass
+        print("All Speedtest Tests Attempted.")
+        pass
+    except (ssl.SSLError, socket.error) as e:
+        print(f"[speedtest_fast] network/ssl error: {e}")
+    except Exception as e:
+        print(f"[speedtest_fast] unexpected error: {e}")
 
 ### NMAP Test (1024 ports)
 def nmap_1024os():
-    if ARGS.size == 'S':
-        target_ips = 1
-    elif ARGS.size == 'M':
-        target_ips = 2
-    elif ARGS.size == 'L':
-        target_ips = 5
-    elif ARGS.size == 'XL':
-        target_ips = len(nmap_endpoints)
-    random.shuffle(nmap_endpoints)
-    for count_ips, ip in enumerate(nmap_endpoints):
-        if count_ips < target_ips:
-            cmd = 'nmap -Pn -p 1-1024 %s -T4 --max-retries 0 --max-parallelism 2 --randomize-hosts --host-timeout 1m --script-timeout 1m --script-args http.useragent "Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko" -debug' % ip
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            print ("Testing NMAP: NMAP Scan First 1024 Ports of %s" %(ip))
-            print (Fore.BLACK)
-            print (Back.GREEN + "##############################################################")
-            print (Style.RESET_ALL)
-            subprocess.call(cmd, shell=True)
-
+    try:
+        if ARGS.size == 'S':
+            target_ips = 1
+        elif ARGS.size == 'M':
+            target_ips = 2
+        elif ARGS.size == 'L':
+            target_ips = 5
+        elif ARGS.size == 'XL':
+            target_ips = len(nmap_endpoints)
+        random.shuffle(nmap_endpoints)
+        for count_ips, ip in enumerate(nmap_endpoints):
+            if count_ips < target_ips:
+                cmd = 'nmap -Pn -p 1-1024 %s -T4 --max-retries 0 --max-parallelism 2 --randomize-hosts --host-timeout 1m --script-timeout 1m --script-args http.useragent "Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko" -debug' % ip
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                print ("Testing NMAP: NMAP Scan First 1024 Ports of %s" %(ip))
+                print (Fore.BLACK)
+                print (Back.GREEN + "##############################################################")
+                print (Style.RESET_ALL)
+                subprocess.call(cmd, shell=True)
+    except (subprocess.SubprocessError, FileNotFoundError, TimeoutError) as e:
+        print(f"[nmap_1024os] subprocess error: {e}")
+    except Exception as e:
+        print(f"[nmap_1024os] unexpected error: {e}")
 
 ### NMAP Test (CVE)        
 def nmap_cve():
@@ -879,15 +977,22 @@ def webcrawl():
 
 ### Trigger an IPS system
 def ips():
-    cmd = 'curl -k -s --show-error --connect-timeout 3 -I --max-time 5 -A BlackSun www.testmyids.com'
-    print (Fore.BLACK)
-    print (Back.GREEN + "##############################################################")
-    print (Style.RESET_ALL)
-    print ("Testing IPS: BlackSun")
-    print (Fore.BLACK)
-    print (Back.GREEN + "##############################################################")
-    print (Style.RESET_ALL)
-    subprocess.call(cmd, shell=True)
+    try:
+        cmd = 'curl -k -s --show-error --connect-timeout 3 -I --max-time 5 -A BlackSun www.testmyids.com'
+        print (Fore.BLACK)
+        print (Back.GREEN + "##############################################################")
+        print (Style.RESET_ALL)
+        print ("Testing IPS: BlackSun")
+        print (Fore.BLACK)
+        print (Back.GREEN + "##############################################################")
+        print (Style.RESET_ALL)
+        subprocess.call(cmd, shell=True)
+    except (subprocess.SubprocessError, FileNotFoundError, TimeoutError) as e:
+        print(f"[ips] subprocess error: {e}")
+    except (requests.exceptions.RequestException, socket.error, ssl.SSLError) as e:
+        print(f"[ips] http/socket error: {e}")
+    except Exception as e:
+        print(f"[ips] unexpected error: {e}")
 
 ### GITHUB Bad Domains Testing
 def github_domain_check_download_file(url, local_filename):
@@ -954,18 +1059,23 @@ def github_domain_check_read_file(local_filename, num_random_domains=10):
     print("\nQuery operations completed for selected domains.")
 
 def github_domain_check():
-    github_domain_list = "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/domains/multi.txt"
-    local_domains_filename = "git-domains-list"
+    try:
+        github_domain_list = "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/domains/multi.txt"
+        local_domains_filename = "git-domains-list"
 
-    if not os.path.exists(local_domains_filename):
-        print("Local domain file not found. Downloading now...")
-        if not github_domain_check_download_file(github_domain_list, local_domains_filename):
-            print("Failed to download the domain list. Exiting.")
-            exit()
-    else:
-        print(f"Local domain file '{local_domains_filename}' already exists. Skipping download.")
+        if not os.path.exists(local_domains_filename):
+            print("Local domain file not found. Downloading now...")
+            if not github_domain_check_download_file(github_domain_list, local_domains_filename):
+                print("Failed to download the domain list. Exiting.")
+                exit()
+        else:
+            print(f"Local domain file '{local_domains_filename}' already exists. Skipping download.")
 
-    github_domain_check_read_file(local_domains_filename, num_random_domains=10)
+        github_domain_check_read_file(local_domains_filename, num_random_domains=10)
+    except (requests.exceptions.RequestException, socket.error, ssl.SSLError) as e:
+        print(f"[github_domain_check] http error: {e}")
+    except Exception as e:
+        print(f"[github_domain_check] unexpected error: {e}")
 
 ### GITHUB Phishing Domains Testing
 def github_phishing_domain_check_download_file(url, local_filename):
@@ -1032,18 +1142,23 @@ def github_phishing_domain_check_read_file(local_filename, num_random_domains=10
     print("\nQuery operations completed for selected domains.")
 
 def github_phishing_domain_check():
-    github_domain_list = "https://raw.githubusercontent.com/Phishing-Database/Phishing.Database/refs/heads/master/phishing-domains-ACTIVE.txt"
-    local_domains_filename = "git-phishing-list"
+    try:
+        github_domain_list = "https://raw.githubusercontent.com/Phishing-Database/Phishing.Database/refs/heads/master/phishing-domains-ACTIVE.txt"
+        local_domains_filename = "git-phishing-list"
 
-    if not os.path.exists(local_domains_filename):
-        print("Local domain file not found. Downloading now...")
-        if not github_domain_check_download_file(github_domain_list, local_domains_filename):
-            print("Failed to download the domain list. Exiting.")
-            exit()
-    else:
-        print(f"Local domain file '{local_domains_filename}' already exists. Skipping download.")
+        if not os.path.exists(local_domains_filename):
+            print("Local domain file not found. Downloading now...")
+            if not github_domain_check_download_file(github_domain_list, local_domains_filename):
+                print("Failed to download the domain list. Exiting.")
+                exit()
+        else:
+            print(f"Local domain file '{local_domains_filename}' already exists. Skipping download.")
 
-    github_domain_check_read_file(local_domains_filename, num_random_domains=10)
+        github_domain_check_read_file(local_domains_filename, num_random_domains=10)
+    except (requests.exceptions.RequestException, socket.error, ssl.SSLError) as e:
+        print(f"[github_phishing_domain_check] http error: {e}")
+    except Exception as e:
+        print(f"[github_phishing_domain_check] unexpected error: {e}")
 
 ### Wait timer progress bar
 def progressbar(it, prefix="", size=60, file=sys.stdout):
