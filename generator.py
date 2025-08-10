@@ -1,7 +1,7 @@
 #!/usr/local/bin python3
 
 ### Import of required modules
-import time, os, sys, argparse, random, threading, signal, urllib.request, urllib3, requests, runpy, socket, ssl, subprocess, ftplib, traceback
+import time, os, sys, argparse, random, threading, signal, urllib.request, urllib3, requests, runpy, socket, ssl, subprocess, ftplib, traceback, requiests, pysnmp.error, dns.exception, ntplib, requests
 from bs4 import BeautifulSoup
 from time import sleep
 from urllib.parse import urljoin
@@ -9,31 +9,6 @@ from tqdm import tqdm
 from colorama import Fore, Back, Style
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from endpoints import *
-
-try:
-    import requests
-except Exception:
-    requests = None
-try:
-    import paramiko
-except Exception:
-    class _P: class SSHException(Exception): pass
-    paramiko = _P()
-try:
-    import dns.exception
-except Exception:
-    class _D: class DNSException(Exception): pass
-    dns = _D()
-try:
-    import pysnmp.error
-except Exception:
-    class _S: class PySnmpError(Exception): pass
-    pysnmp = _S()
-try:
-    import ntplib
-except Exception:
-    class _N: class NTPException(Exception): pass
-    ntplib = _N()
 
 ### Disable SSL warning for self-signed certs
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
