@@ -3,7 +3,7 @@
 # WARNING: This file should only be used in a legal, controlled lab environment.
 
 # Set the target IP addresses from the targets.list file
-set RHOSTS file:targets.list
+setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 
 #
 # Exploit: HTTP Form Field Fuzzer
