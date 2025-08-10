@@ -37,22 +37,16 @@ RUN git -c http.sslVerify=false clone https://github.com/osrg/gobgp.git /tmp/gob
 # Install Metasploit Framework (check mode only)
 RUN git -c http.sslVerify=false clone https://github.com/rapid7/metasploit-framework.git /opt/metasploit-framework && \
     cd /opt/metasploit-framework && \
-    gem install bundler -v 2.3.26 && \
-    bundle config set --local without 'development test' && \
-    bundle install && \
-    rm -rf ~/.gem ~/.bundle /root/.bundle /opt/metasploit-framework/vendor/bundle/ruby/*/cache
-
-# Install Metasploit Framework (check mode only)
-RUN git -c http.sslVerify=false clone https://github.com/rapid7/metasploit-framework.git /opt/metasploit-framework && \
-    cd /opt/metasploit-framework && \
     gem update --system && \
     gem install bundler && \
     bundle config set --local without 'development test' && \
     NOKOGIRI_USE_SYSTEM_LIBRARIES=1 bundle install && \
     rm -rf ~/.gem ~/.bundle /root/.bundle /opt/metasploit-framework/vendor/bundle/ruby/*/cache
 
-# Put msf tools on PATH
-ENV PATH="/opt/metasploit-framework:$PATH"
+RUN printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec ./msfconsole "$@"\n' > /usr/local/bin/msfconsole && \
+    chmod +x /usr/local/bin/msfconsole && \
+    printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec ./msfvenom "$@"\n' > /usr/local/bin/msfvenom && \
+    chmod +x /usr/local/bin/msfvenom
 
 # Copy your Metasploit RC scripts (once)
 COPY metasploit /opt/metasploit-framework/ms_checks/
