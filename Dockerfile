@@ -44,11 +44,15 @@ WORKDIR /opt/metasploit-framework
 RUN gem install bundler && \
     bundle config set --local without 'development test' && \
     bundle config set --local path 'vendor/bundle' && \
-    # Normalize/force stringio pin to 3.1.1 exactly once
+    # Ensure msf pins the right stringio
     if grep -Eq "^\s*gem ['\"]stringio['\"]" Gemfile; then \
       sed -E -i "s|^\s*gem ['\"]stringio['\"].*|gem 'stringio', '3.1.1'|" Gemfile; \
     else \
       echo "gem 'stringio', '3.1.1'" >> Gemfile; \
+    fi && \
+    # Ensure 'parallel' is declared (msf code requires it)
+    if ! grep -Eq "^\s*gem ['\"]parallel['\"]" Gemfile; then \
+      echo "gem 'parallel'" >> Gemfile; \
     fi && \
     NOKOGIRI_USE_SYSTEM_LIBRARIES=1 bundle install --jobs 4 --retry 3 && \
     bundle clean --force && \
