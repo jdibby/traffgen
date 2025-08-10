@@ -2,49 +2,29 @@ FROM ubuntu:latest
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=America/Denver
+ENV NOKOGIRI_USE_SYSTEM_LIBRARIES=1
 
 # Set timezone and install core dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    tzdata \
-    curl \
-    wget \
-    git \
-    iproute2 \
-    traceroute \
-    ca-certificates \
-    build-essential \
-    python3 \
-    python3-pip \
-    python3-dev \
-    iputils-ping \
-    net-tools \
-    netcat-openbsd \
-    dnsutils \
-    openssh-client \
-    nmap \
-    snmp \
-    snmp-mibs-downloader \
+    tzdata curl wget git ca-certificates \
+    iproute2 traceroute iputils-ping net-tools netcat-openbsd dnsutils openssh-client \
+    nmap snmp snmp-mibs-downloader \
     golang \
     perl \
-    libssl-dev \
-    libffi-dev \
-    libpcap-dev \
-    libreadline-dev \
-    zlib1g-dev \
-    libxml2-dev \
-    libxslt1-dev \
-    libyaml-dev \
-    libpq-dev \
+    build-essential pkg-config \
+    python3 python3-pip python3-dev \
+    libssl-dev libffi-dev libpcap-dev libreadline-dev zlib1g-dev \
+    libxml2-dev libxslt1-dev libyaml-dev libpq-dev \
+    sqlite3 libsqlite3-dev \
     ruby-full \
-    sqlite3 \
-    make \
-    bash \
-    nikto && \
-    ln -fs /usr/share/zoneinfo/$TZ /etc/localtime && \
-    dpkg-reconfigure --frontend noninteractive tzdata
+    make bash \
+    nikto \
+ && ln -fs /usr/share/zoneinfo/$TZ /etc/localtime \
+ && dpkg-reconfigure --frontend noninteractive tzdata
 
 # Python packages
-RUN pip3 install --break-system-packages fastcli requests colorama beautifulsoup4 tqdm dnspython dnstwist
+RUN pip3 install --break-system-packages \
+      fastcli requests colorama beautifulsoup4 tqdm dnspython dnstwist
 
 # Build and install GoBGP
 RUN git -c http.sslVerify=false clone https://github.com/osrg/gobgp.git /tmp/gobgp-src && \
@@ -65,18 +45,11 @@ RUN git -c http.sslVerify=false clone https://github.com/rapid7/metasploit-frame
 
 # Clean up build-time dependencies and cache
 RUN apt-get purge -y \
-    build-essential \
-    libssl-dev \
-    libffi-dev \
-    libpq-dev \
-    libreadline-dev \
-    zlib1g-dev \
-    libxml2-dev \
-    libxslt1-dev \
-    libyaml-dev && \
-    apt-get autoremove -y && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+      build-essential libssl-dev libffi-dev libpq-dev libreadline-dev zlib1g-dev \
+      libxml2-dev libxslt1-dev libyaml-dev libsqlite3-dev pkg-config \
+ && apt-get autoremove -y \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Set Metasploit in PATH
 ENV PATH="/opt/metasploit-framework:$PATH"
