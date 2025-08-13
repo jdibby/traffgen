@@ -10,6 +10,10 @@ if [ "$WHOAREYOU" != "root" ]; then
     exit 1
 fi
 
+### SETTING DEBIAN ENV VARIABLES FOR APT ###
+export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_MODE=a
+
 ### INITIALIZE FORMATTING ###
 BOLD=$(tput bold)
 NORMAL=$(tput sgr0)
