@@ -22,6 +22,7 @@ from datetime import datetime
 from rich.console import Console
 console = Console()
 from rich.table import Table
+from rich.panel import Panel
 def _write_summary_files(suite_name: str, started_at: float):
     """Write JSON and Markdown summaries to disk."""
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
