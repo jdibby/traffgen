@@ -193,6 +193,12 @@ webscan_endpoints = [
     "www.testmyids.com",
     "scanme.nmap.org",
     "httpforever.com",
+    "scanme.nmap.org",
+    "testmyids.com",
+    "hackazon.webscantest.com",
+    "zero.webappsecurity.com",
+    "testhtml5.vulnweb.com",
+    "juice-shop.herokuapp.com",
     ]
 
 ad_endpoints = [
