@@ -40,7 +40,9 @@ RUN gem install --no-document bundler && \
     (grep -Eq "^\s*gem ['\"]parallel['\"]" Gemfile || echo "gem 'parallel'" >> Gemfile) && \
     NOKOGIRI_USE_SYSTEM_LIBRARIES=1 bundle install --jobs 4 --retry 3 && \
     bundle clean --force && \
-    rm -rf ~/.gem ~/.bundle /root/.bundle vendor/bundle/ruby/*/cache tmp/cache
+    rm -rf ~/.gem ~/.bundle /root/.bundle vendor/bundle/ruby/*/cache tmp/cache && \
+    # Remove Ruby’s default stringio gemspec to avoid duplicate-version warnings
+    rm -f /usr/lib/ruby/gems/3.2.0/specifications/default/stringio-3.0.4.gemspec || true
 
 # Optional: smoke test here (early failure if Metasploit is broken)
 RUN bundle exec ./msfconsole -q -x 'version; exit' || true
@@ -52,11 +54,11 @@ FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=America/Denver
 
-# Core runtime deps only (no compilers, no golang, no ruby-full)
+# Core runtime deps only (no compilers, no golang, no ruby-full, no MIBs)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tzdata ca-certificates curl wget git \
     iproute2 traceroute iputils-ping net-tools netcat-openbsd dnsutils openssh-client \
-    nmap snmp snmp-mibs-downloader \
+    nmap snmp \
     perl python3 python3-pip \
     sqlite3 ruby make bash nikto && \
     ln -fs /usr/share/zoneinfo/$TZ /etc/localtime && \
@@ -85,7 +87,7 @@ RUN printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec 
 # Workdir and files
 WORKDIR /traffgen
 COPY generator.py endpoints.py healthcheck.sh ./
-COPY metasploit /opt/metasploit-framework/ms_checks/
+COPY metasploit /opt/metasploit-framework/ms_checks/checks/
 
 # Healthcheck
 RUN chmod +x /traffgen/healthcheck.sh
