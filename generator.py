@@ -101,12 +101,9 @@ class TestResult:
 RUN_RESULTS: list[TestResult] = []
 
 
+
 class SuiteUI:
-    """Progress wrapper that plays nicely with printed banners.
-    - Uses indeterminate (pulsing) tasks so we don't fake percentages
-    - Redirects stdout/stderr into the Progress render to prevent row duplication
-    - Explicitly stops & removes each task to avoid lingering rows
-    """
+    """Progress wrapper with deterministic completion and no stdout redirection."""
     def __init__(self):
         self.progress = Progress(
             SpinnerColumn(),
@@ -122,8 +119,8 @@ class SuiteUI:
             TimeRemainingColumn(),
             expand=True,
             transient=False,
-            redirect_stdout=True,   # capture prints during tasks
-            redirect_stderr=True,
+            redirect_stdout=False,  # critical: avoid rendering prints as pseudo-rows
+            redirect_stderr=False,
             refresh_per_second=12,
         )
 
@@ -136,6 +133,39 @@ class SuiteUI:
 
     def run_test_callable(self, func):
         console.line()
+        fname = getattr(func, "__name__", str(func))
+        # Determinate, single-step task so we always finish
+        task_id = self.progress.add_task(f"{fname}", total=1, start=True)
+
+        start = time.time()
+        status = "ok"
+        err_msg = ""
+
+        try:
+            func()
+        except KeyboardInterrupt:
+            raise
+        except Exception as e:
+            status = "error"
+            err_msg = f"{type(e).__name__}: {e}".strip()[:300]
+        finally:
+            end = time.time()
+
+            # Finish the row deterministically and cleanly
+            self.progress.update(task_id, completed=1)
+            self.progress.stop_task(task_id)
+            self.progress.refresh()
+            self.progress.remove_task(task_id)
+
+            RUN_RESULTS.append(TestResult(
+                name=fname,
+                start_ts=start,
+                end_ts=end,
+                duration_s=round(end - start, 3),
+                status=status,
+                error=err_msg
+            ))
+            console.line()
         fname = getattr(func, "__name__", str(func))
         # Indeterminate task (pulsing bar) avoids fake progress math
         task_id = self.progress.add_task(f"{fname}", total=None, start=True)
