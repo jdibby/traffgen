@@ -13,7 +13,6 @@ import time, os, sys, argparse, random, threading, signal, urllib.request, urlli
 from bs4 import BeautifulSoup
 from time import sleep
 from urllib.parse import urljoin
-from tqdm import tqdm
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from endpoints import *
 
@@ -103,6 +102,7 @@ class SuiteUI:
         self.progress.__exit__(exc_type, exc, tb)
 
     def run_test_callable(self, func):
+        console.line()
         fname = getattr(func, "__name__", str(func))
         task_id = self.progress.add_task(f"{fname}", total=100, start=False)
 
@@ -131,6 +131,7 @@ class SuiteUI:
                 status=status,
                 error=err_msg
             ))
+            console.line()
 
 def _write_summary_files(suite_name: str, started_at: float):
     """Write JSON and Markdown summaries to disk."""
@@ -186,7 +187,9 @@ def _print_summary_table(total_runtime_s: float):
         )
 
     console.rule("[bold green]Run Complete")
+    console.line()
     console.print(table)
+    console.line()
     console.print(
         Panel(
             f"[green]OK:[/green] {ok}   [red]ERRORS:[/red] {err}   [yellow]SKIPPED:[/yellow] {skp}   "
@@ -198,7 +201,13 @@ def _print_summary_table(total_runtime_s: float):
     )
 
 def banner(title: str):
+    console.line()
     console.rule(f"[bold]{title}[/]")
+    console.line()
+
+def spacer(n: int = 1):
+    for _ in range(max(1, n)):
+        console.line()
 
 # ------------------------
 # Original test functions
@@ -276,22 +285,54 @@ def bgp_peering():
             gobgpd_proc.kill()
 
 # Bigfile download via http
+
+# Bigfile download via http (Rich progress; no legacy banners)
 def bigfile():
     try:
         url = 'http://ipv4.download.thinkbroadband.com/5GB.zip'
         response = requests.get(url, stream=True, timeout=10)
         total_size = int(response.headers.get('content-length', 0))
 
-        banner("Testing Bigfile: Downloading 5GB ZIP File")
+        console.line()
+        console.rule("[bold cyan]Bigfile Download[/]")
 
-        with tqdm(total=total_size, unit='B', unit_scale=True, desc='Downloading', ascii=True) as progress_bar:
-            for chunk in response.iter_content(chunk_size=1024):
-                if chunk:
-                    progress_bar.update(len(chunk))
+        if total_size > 0:
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[bold]Downloading 5GB.zip[/]"),
+                BarColumn(),
+                TimeElapsedColumn(),
+                TimeRemainingColumn(),
+                transient=False,
+                expand=True
+            ) as prog:
+                task = prog.add_task("download", total=total_size)
+                for chunk in response.iter_content(chunk_size=1024 * 64):
+                    if chunk:
+                        prog.update(task, advance=len(chunk))
+        else:
+            # Unknown size; show spinner and count downloaded bytes
+            downloaded = 0
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[bold]Downloading 5GB.zip (streaming)[/]"),
+                TimeElapsedColumn(),
+                transient=False,
+                expand=True
+            ) as prog:
+                task = prog.add_task("download", total=None)
+                for chunk in response.iter_content(chunk_size=1024 * 64):
+                    if chunk:
+                        downloaded += len(chunk)
+                        # No total to advance against; just keep spinner alive
+                        prog.refresh()
+        console.line()
     except (requests.exceptions.RequestException, socket.error, ssl.SSLError, OSError) as e:
         console.print(f"[red][bigfile] network/file exception error:[/] {e}")
+        console.line()
     except Exception as e:
         console.print(f"[red][bigfile] unexpected exception error:[/] {e}")
+        console.line()
 
 # DNS Test suites
 def dig_random():
@@ -317,6 +358,7 @@ def dig_random():
                         cmd = "dig %s @%s +time=1" % (url, ip)
                         banner(f"DNS: Query {url} ({count_urls+1}/{target_urls}) against {ip} ({count_ips+1}/{target_ips})")
                         subprocess.call(cmd, shell=True)
+        console.line()
                         time.sleep(0.25)
     except subprocess.CalledProcessError as e:
         console.print(f"[red][dig_random] dig exit {e.returncode}:[/] {e.stderr or e.stdout or e}")
@@ -347,6 +389,7 @@ def ftp_random():
         cmd = 'curl --limit-rate 3M -k --show-error --connect-timeout 5 -o /dev/null ftp://speedtest:speedtest@ftp.otenet.gr/test' + target + '.db'
         banner(f"FTP: Download {target} DB File")
         subprocess.call(cmd, shell=True)
+        console.line()
     except subprocess.CalledProcessError as e:
         msg = e.stderr or e.stdout or str(e)
         console.print(f"[red][ftp_random] curl exit {e.returncode}:[/] {msg}")
@@ -383,6 +426,7 @@ def http_random():
                 cmd = f"curl -k -s --show-error --connect-timeout 5 -I -L -o /dev/null --max-time 5 -A '{user_agent}' {url}"
                 banner(f"HTTP ({count_urls+1}/{target_urls}): {url} | Agent: {user_agent}")
                 subprocess.call(cmd, shell=True)
+        console.line()
     except (requests.exceptions.RequestException, socket.error, ssl.SSLError) as e:
         console.print(f"[red][http_random] http exception error:[/] {e}")
     except Exception as e:
@@ -407,6 +451,7 @@ def http_download_zip():
             cmd = f"curl --limit-rate 3M -k  --show-error --connect-timeout 5 -L -o /dev/null -A '{user_agent}' https://link.testfile.org/{target}"
         banner(f"HTTP: Download {target} ZIP File | Agent: {user_agent}")
         subprocess.call(cmd, shell=True)
+        console.line()
     except (requests.exceptions.RequestException, socket.error, ssl.SSLError) as e:
         console.print(f"[red][http_download_zip] http exception error:[/] {e}")
     except (OSError, IOError) as e:
@@ -420,6 +465,7 @@ def http_download_targz():
         cmd = 'curl --limit-rate 3M -k  --show-error --connect-timeout 5 -o /dev/null http://wordpress.org/latest.tar.gz'
         banner("HTTP: Download Wordpress File")
         subprocess.call(cmd, shell=True)
+        console.line()
     except (requests.exceptions.RequestException, socket.error, ssl.SSLError) as e:
         console.print(f"[red][http_download_targz] http exception error:[/] {e}")
     except (OSError, IOError) as e:
@@ -445,6 +491,7 @@ def web_scanner():
         cmd = f"echo y | nikto -h '{url}' -maxtime '{timeout}' -timeout 1 -nointeractive"
         banner(f"Nikto Scanning: {url} (maxtime {timeout}s)")
         subprocess.call(cmd, shell=True)
+        console.line()
     except (subprocess.SubprocessError, FileNotFoundError, TimeoutError) as e:
         console.print(f"[red][web_scanner] subprocess exception error:[/] {e}")
     except Exception as e:
@@ -469,6 +516,7 @@ def https_random():
                 cmd = f"curl -k -s --show-error --connect-timeout 5 -I -o /dev/null --max-time 5 -A '{user_agent}' {url}"
                 banner(f"HTTPS ({count_urls+1}/{target_urls}): {url} | Agent: {user_agent}")
                 subprocess.call(cmd, shell=True)
+        console.line()
     except (requests.exceptions.RequestException, ssl.SSLError, socket.error) as e:
         console.print(f"[red][https_random] https exception error:[/] {e}")
     except Exception as e:
@@ -493,6 +541,7 @@ def ai_https_random():
                 cmd = f"curl -k -s --show-error --connect-timeout 3 -I -o /dev/null --max-time 5 -A '{user_agent}' {url}"
                 banner(f"AI URLs ({count_urls+1}/{target_urls}): {url} | Agent: {user_agent}")
                 subprocess.call(cmd, shell=True)
+        console.line()
     except (requests.exceptions.RequestException, ssl.SSLError, socket.error) as e:
         console.print(f"[red][ai_https_random] https exception error:[/] {e}")
     except Exception as e:
@@ -517,6 +566,7 @@ def ads_random():
                 cmd = f"curl -k -s --show-error --connect-timeout 3 -I -o /dev/null --max-time 5 -A '{user_agent}' {url}"
                 banner(f"Ads URLs ({count_urls+1}/{target_urls}): {url} | Agent: {user_agent}")
                 subprocess.call(cmd, shell=True)
+        console.line()
     except (requests.exceptions.RequestException, socket.error, ssl.SSLError) as e:
         console.print(f"[red][ads_random] http exception error:[/] {e}")
     except Exception as e:
@@ -544,6 +594,7 @@ def https_crawl():
                 user_agent = user_agents[0]
                 banner(f"Crawling HTTPS ({iterations} deep, site {count_urls+1}/{target_urls}) from {url} | Agent: {user_agent}")
                 scrape_iterative(url, iterations)
+        console.line()
     except (requests.exceptions.RequestException, ssl.SSLError, socket.error) as e:
         console.print(f"[red][https_crawl] https exception error:[/] {e}")
     except ValueError as e:
@@ -573,6 +624,7 @@ def pornography_crawl():
                 user_agent = user_agents[0]
                 banner(f"Crawling Pornography ({iterations} deep, site {count_urls+1}/{target_urls}) from {url} | Agent: {user_agent}")
                 scrape_iterative(url, iterations)
+        console.line()
     except (requests.exceptions.RequestException, ssl.SSLError, socket.error) as e:
         console.print(f"[red][pornography_crawl] http exception error:[/] {e}")
     except ValueError as e:
@@ -599,6 +651,7 @@ def malware_random():
                 cmd = f"curl -k -s --show-error --connect-timeout 3 -I -o /dev/null --max-time 5 -A '{malware_user_agent}' {url}"
                 banner(f"Malware Site ({count_urls+1}/{target_urls}): {url} | Agent: {malware_user_agent}")
                 subprocess.call(cmd, shell=True)
+        console.line()
     except (requests.exceptions.RequestException, ssl.SSLError, socket.error) as e:
         console.print(f"[red][malware_random] http exception error:[/] {e}")
     except Exception as e:
@@ -621,6 +674,7 @@ def ping_random():
                 cmd = "ping -c2 -i1 -s64 -W1 -w2 %s" % ip
                 banner(f"ICMP ({count_ips+1}/{target_ips}): Ping {ip}")
                 subprocess.call(cmd, shell=True)
+        console.line()
     except (subprocess.SubprocessError, FileNotFoundError, TimeoutError) as e:
         console.print(f"[red][ping_random] subprocess exception error:[/] {e}")
     except Exception as e:
@@ -647,6 +701,7 @@ def metasploit_check():
                 cmd = "msfconsole -q -r '%s'" % os.path.join(rc_dir, rc_file)
                 banner(f"Metasploit Check ({count_ms+1}/{ms_checks}): {rc_file}")
                 subprocess.call(cmd, shell=True)
+        console.line()
     except Exception as e:
         console.print(f"[red][metasploit_check] unexpected exception error:[/] {e}")
 
@@ -669,6 +724,7 @@ def snmp_random():
                 cmd = f"snmpwalk -v2c -t1 -r1 -c {community} {ip}"
                 banner(f"SNMP ({count_ips+1}/{target_ips}): Poll {ip} (community '{community}')")
                 subprocess.call(cmd, shell=True)
+        console.line()
     except subprocess.CalledProcessError as e:
         console.print(f"[red][snmp_random] snmp tool exit {e.returncode}:[/] {e.stderr or e.stdout or e}")
     except subprocess.TimeoutExpired as e:
@@ -701,6 +757,7 @@ def traceroute_random():
                 cmd = "traceroute %s -w1 -q1 -m5" % (ip)
                 banner(f"Traceroute ({count_ips+1}/{target_ips}): to {ip}")
                 subprocess.call(cmd, shell=True)
+        console.line()
     except (subprocess.SubprocessError, FileNotFoundError, TimeoutError) as e:
         console.print(f"[red][traceroute_random] subprocess exception error:[/] {e}")
     except Exception as e:
@@ -772,6 +829,7 @@ def nmap_1024os():
                 cmd = 'nmap -Pn -p 1-1024 %s -T4 --max-retries 0 --max-parallelism 2 --randomize-hosts --host-timeout 1m --script-timeout 1m --script-args http.useragent "Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko" -debug' % ip
                 banner(f"NMAP (first 1024 ports): {ip}")
                 subprocess.call(cmd, shell=True)
+        console.line()
     except (subprocess.SubprocessError, FileNotFoundError, TimeoutError) as e:
         console.print(f"[red][nmap_1024os] subprocess exception error:[/] {e}")
     except Exception as e:
@@ -794,6 +852,7 @@ def nmap_cve():
                 cmd = 'nmap -sV --script=ALL %s -T4 --max-retries 0 --max-parallelism 2 --randomize-hosts --host-timeout 1m --script-timeout 1m --script-args http.useragent "Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko" -debug' % ip
                 banner(f"NMAP (CVE/scripts): {ip}")
                 subprocess.call(cmd, shell=True)
+        console.line()
     except (subprocess.SubprocessError, FileNotFoundError, TimeoutError) as e:
         console.print(f"[red][nmap_cve] subprocess exception error:[/] {e}")
     except Exception as e:
@@ -816,6 +875,7 @@ def ntp_random():
                 cmd = f"(printf '\\x1b'; head -c 47 < /dev/zero) | nc -u -w1 {url} 123"
                 banner(f"NTP: Update time against {url}")
                 subprocess.call(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        console.line()
     except subprocess.CalledProcessError as e:
         console.print(f"[red][ntp_random] ntp tool exit {e.returncode}:[/] {e.stderr or e.stdout or e}")
     except subprocess.TimeoutExpired as e:
@@ -848,6 +908,7 @@ def ssh_random():
                 cmd = "ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=1 %s" % (ip)
                 banner(f"SSH ({count_ips+1}/{target_ips}): {ip}")
                 subprocess.call(cmd, shell=True)
+        console.line()
     except subprocess.CalledProcessError as e:
         console.print(f"[red][ssh_random] ssh exit {e.returncode}:[/] {e.stderr or e.stdout or e}")
     except subprocess.TimeoutExpired as e:
@@ -911,6 +972,7 @@ def virus_sim():
                 cmd = "curl --limit-rate 3M -k --show-error --connect-timeout 4 -o /dev/null %s" % url
                 banner(f"Virus Simulation: Download {url}")
                 subprocess.call(cmd, shell=True)
+        console.line()
     except (requests.exceptions.RequestException, ssl.SSLError, socket.error) as e:
         console.print(f"[red][virus_sim] http exception error:[/] {e}")
     except (OSError, IOError) as e:
@@ -935,6 +997,7 @@ def dlp_sim_https():
                 cmd = "curl --limit-rate 3M -k --show-error --connect-timeout 4 -o /dev/null %s" % url
                 banner(f"DLP Simulation (HTTPS): Download {url}")
                 subprocess.call(cmd, shell=True)
+        console.line()
     except (requests.exceptions.RequestException, ssl.SSLError, socket.error) as e:
         console.print(f"[red][dlp_sim_https] https exception error:[/] {e}")
     except Exception as e:
@@ -957,6 +1020,7 @@ def malware_download():
                 cmd = "curl --limit-rate 3M -k --show-error --connect-timeout 4 -o /dev/null %s" % url
                 banner(f"Malware File Download (HTTPS): Download {url}")
                 subprocess.call(cmd, shell=True)
+        console.line()
     except (requests.exceptions.RequestException, ssl.SSLError, socket.error) as e:
         console.print(f"[red][malware_download] http exception error:[/] {e}")
     except (OSError, IOError) as e:
@@ -981,6 +1045,7 @@ def squatting_domains():
                 cmd = "dnstwist --registered %s" % url
                 banner(f"Generating Squatting Domains Based On {url}")
                 subprocess.call(cmd, shell=True)
+        console.line()
     except (requests.exceptions.RequestException, socket.error, ssl.SSLError) as e:
         console.print(f"[red][squatting_domains] http exception error:[/] {e}")
     except Exception as e:
@@ -992,8 +1057,8 @@ def scrape_single_link(url):
     random.shuffle(user_agents)
     user_agent = user_agents[0]
 
-    console.print(f"Visiting: {url}")
-    console.print(f"Agent: {user_agent}\n")
+    console.print(f"[bold white]Visiting:[/] [bold]{url}[/]")
+    console.print(f"[dim]Agent: {user_agent}[/]\n")
 
     try:
         response = requests.request(
@@ -1036,13 +1101,14 @@ def scrape_single_link(url):
             continue
         if href.startswith("//") or href.startswith("/"):
             resolved = urljoin(url, href)
-            console.print(f"Found: {resolved}")
+            console.print(f"[bold green]Found:[/] [bold]{resolved}[/]")
             return resolved
         elif href.startswith("http"):
-            console.print(f"Found: {href}")
+            console.print(f"[bold green]Found:[/] [bold]{href}[/]")
             return href
 
     console.print("[dim]No Links Found[/]")
+    console.line()
     return None
 
 def scrape_iterative(base_url, iterations=3):
@@ -1070,6 +1136,7 @@ def webcrawl():
         for count, attempt in enumerate(range(attempts)):
             banner(f"Crawling from {ARGS.crawl_start} ({iterations} deep, attempt {count+1} of {attempts})")
             scrape_iterative(ARGS.crawl_start, iterations)
+        console.line()
     except (requests.exceptions.RequestException, socket.error, ssl.SSLError, ValueError) as e:
         console.print(f"[red][webcrawl] http/parse exception error:[/] {e}")
     except Exception as e:
@@ -1081,6 +1148,7 @@ def ips():
         cmd = 'curl -k -s --show-error --connect-timeout 3 -I --max-time 5 -A BlackSun www.testmyids.com'
         banner("IPS: BlackSun")
         subprocess.call(cmd, shell=True)
+        console.line()
     except (subprocess.SubprocessError, FileNotFoundError, TimeoutError) as e:
         console.print(f"[red][ips] subprocess exception error:[/] {e}")
     except (requests.exceptions.RequestException, socket.error, ssl.SSLError) as e:
@@ -1423,6 +1491,7 @@ performance analysis, or security simulations.
         cfg.add_row("No Wait", str(ARGS.nowait))
         cfg.add_row("Crawl Start", ARGS.crawl_start)
         console.print(cfg)
+        console.line()
 
         # All tests and the functions they call
         if ARGS.suite == 'all':
