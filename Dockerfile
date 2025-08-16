@@ -87,7 +87,7 @@ RUN printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec 
 # Workdir and files
 WORKDIR /traffgen
 COPY generator.py endpoints.py healthcheck.sh ./
-COPY metasploit /opt/metasploit-framework/ms_checks/checks/
+COPY metasploit/checks/ /opt/metasploit-framework/ms_checks/checks/
 
 # Healthcheck
 RUN chmod +x /traffgen/healthcheck.sh
