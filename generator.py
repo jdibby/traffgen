@@ -20,6 +20,7 @@ from endpoints import *
 from dataclasses import dataclass, asdict
 from datetime import datetime
 from rich.console import Console
+console = Console()
 from rich.table import Table
 def _write_summary_files(suite_name: str, started_at: float):
     """Write JSON and Markdown summaries to disk."""
@@ -1400,7 +1401,7 @@ performance analysis, or security simulations.
 
         ARGS = parser.parse_args()
 
-        WATCHDOG = watchdog(timeout_seconds=600)
+        WATCHDOG = time.time() + 600
 
         # Output Summary (concise)
         console.rule("[bold green]Starting Run")
