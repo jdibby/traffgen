@@ -1,104 +1,95 @@
-# ---------- Stage 1: build GoBGP ----------
-FROM ubuntu:24.04 AS gobgp-build
+# --------------------
+# Stage 1: Build GoBGP
+# --------------------
+FROM golang:1.22 AS gobgp-build
 
-ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates git golang build-essential && \
-    rm -rf /var/lib/apt/lists/*
-
-WORKDIR /tmp/gobgp
+WORKDIR /src
 RUN git -c http.sslVerify=false clone https://github.com/osrg/gobgp.git . && \
     git checkout v3.37.0 && \
-    go build -ldflags="-s -w" -o /tmp/gobgp-bin/gobgp ./cmd/gobgp && \
-    go build -ldflags="-s -w" -o /tmp/gobgp-bin/gobgpd ./cmd/gobgpd && \
-    strip /tmp/gobgp-bin/gobgp /tmp/gobgp-bin/gobgpd
+    go build -o gobgp ./cmd/gobgp && \
+    go build -o gobgpd ./cmd/gobgpd
 
-
-# ---------- Stage 2: build Metasploit ----------
-FROM ubuntu:24.04 AS msf-build
-
-ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates git ruby-full build-essential pkg-config \
-    libssl-dev libffi-dev libpcap-dev libreadline-dev zlib1g-dev \
-    libxml2-dev libxslt1-dev libyaml-dev libpq-dev \
-    sqlite3 libsqlite3-dev && \
-    rm -rf /var/lib/apt/lists/*
-
-WORKDIR /opt
-RUN git -c http.sslVerify=false clone https://github.com/rapid7/metasploit-framework.git metasploit-framework
-WORKDIR /opt/metasploit-framework
-
-# Install bundler + gems
-RUN gem install --no-document bundler && \
-    bundle config set --local without 'development test' && \
-    bundle config set --local path 'vendor/bundle' && \
-    # Pin fixes
-    (grep -Eq "^\s*gem ['\"]stringio['\"]" Gemfile && \
-       sed -E -i "s|^\s*gem ['\"]stringio['\"].*|gem 'stringio', '3.1.1'|" Gemfile || \
-       echo "gem 'stringio', '3.1.1'" >> Gemfile) && \
-    (grep -Eq "^\s*gem ['\"]parallel['\"]" Gemfile || echo "gem 'parallel'" >> Gemfile) && \
-    NOKOGIRI_USE_SYSTEM_LIBRARIES=1 bundle install --jobs 4 --retry 3 && \
-    bundle clean --force && \
-    rm -rf ~/.gem ~/.bundle /root/.bundle vendor/bundle/ruby/*/cache tmp/cache && \
-    # Remove Ruby’s default stringio gemspec to avoid duplicate-version warnings
-    find / -name "stringio-3.0.4.gemspec" -delete || true
-
-# Optional: smoke test here (early failure if Metasploit is broken)
-RUN bundle exec ./msfconsole -q -x 'version; exit' || true
-
-
-# ---------- Stage 3: runtime ----------
-FROM ubuntu:24.04
+# ------------------------
+# Stage 2: Main Traffgen + Metasploit
+# ------------------------
+FROM ubuntu:latest
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=America/Denver
 
-# Core runtime deps only (no compilers, no golang, no ruby-full, no MIBs)
+# Core packages (no snmp-mibs-downloader anymore)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    tzdata ca-certificates curl wget git \
+    tzdata curl wget git ca-certificates \
     iproute2 traceroute iputils-ping net-tools netcat-openbsd dnsutils openssh-client \
     nmap snmp \
-    perl python3 python3-pip \
-    sqlite3 ruby make bash nikto && \
-    ln -fs /usr/share/zoneinfo/$TZ /etc/localtime && \
-    dpkg-reconfigure --frontend noninteractive tzdata && \
-    rm -rf /var/lib/apt/lists/*
+    golang \
+    perl \
+    build-essential pkg-config \
+    python3 python3-pip python3-dev \
+    libssl-dev libffi-dev libpcap-dev libreadline-dev zlib1g-dev \
+    libxml2-dev libxslt1-dev libyaml-dev libpq-dev \
+    sqlite3 libsqlite3-dev \
+    ruby-full \
+    make bash \
+    nikto \
+ && rm -rf /var/lib/apt/lists/*
 
-# Install Bundler in runtime so msfconsole wrappers can find `bundle`
-RUN gem install --no-document bundler
+# Set timezone
+RUN ln -fs /usr/share/zoneinfo/$TZ /etc/localtime && dpkg-reconfigure --frontend noninteractive tzdata
 
 # Python packages
-RUN pip3 install --no-cache-dir --break-system-packages \
+RUN pip3 install --break-system-packages \
       fastcli requests colorama beautifulsoup4 tqdm dnspython dnstwist
 
-# Copy stripped GoBGP binaries
-COPY --from=gobgp-build /tmp/gobgp-bin/gobgp /usr/local/bin/gobgp
-COPY --from=gobgp-build /tmp/gobgp-bin/gobgpd /usr/local/bin/gobgpd
+# Copy GoBGP from builder stage
+COPY --from=gobgp-build /src/gobgp /usr/local/bin/gobgp
+COPY --from=gobgp-build /src/gobgpd /usr/local/bin/gobgpd
 
-# Copy Metasploit from builder
-COPY --from=msf-build /opt/metasploit-framework /opt/metasploit-framework
+# --- Metasploit install ---
+RUN git -c http.sslVerify=false clone https://github.com/rapid7/metasploit-framework.git /opt/metasploit-framework
 
-# Wrappers for msfconsole/msfvenom
-RUN printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec ./msfconsole \"$@\"\n' > /usr/local/bin/msfconsole && \
-    printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec ./msfvenom \"$@\"\n' > /usr/local/bin/msfvenom && \
-    chmod +x /usr/local/bin/msfconsole /usr/local/bin/msfvenom
+SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
+
+WORKDIR /opt/metasploit-framework
+RUN gem install bundler && \
+    bundle config set --local without 'development test' && \
+    bundle config set --local path 'vendor/bundle' && \
+    # Fix for stringio duplication
+    if grep -Eq "^\s*gem ['\"]stringio['\"]" Gemfile; then \
+      sed -E -i "s|^\s*gem ['\"]stringio['\"].*|gem 'stringio', '3.1.1'|" Gemfile; \
+    else \
+      echo "gem 'stringio', '3.1.1'" >> Gemfile; \
+    fi && \
+    # Ensure 'parallel' is declared
+    if ! grep -Eq "^\s*gem ['\"]parallel['\"]" Gemfile; then \
+      echo "gem 'parallel'" >> Gemfile; \
+    fi && \
+    NOKOGIRI_USE_SYSTEM_LIBRARIES=1 bundle install --jobs 4 --retry 3 && \
+    bundle exec ruby -e 'require "parallel"' && \
+    bundle clean --force && \
+    rm -rf ~/.gem ~/.bundle /root/.bundle vendor/bundle/ruby/*/cache tmp/cache && \
+    rm -f /usr/lib/ruby/gems/*/specifications/default/stringio-*.gemspec || true && \
+    # Wrappers
+    printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec ./msfconsole "$@"\n' > /usr/local/bin/msfconsole && \
+    chmod +x /usr/local/bin/msfconsole && \
+    printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec ./msfvenom "$@"\n' > /usr/local/bin/msfvenom && \
+    chmod +x /usr/local/bin/msfvenom
+
+# Smoke test
+RUN /usr/local/bin/msfconsole -q -x 'version; exit'
+
+# Copy Metasploit RC scripts + targets
+COPY metasploit/checks /opt/metasploit-framework/ms_checks/checks
+RUN mv /opt/metasploit-framework/ms_checks/checks/targets.list \
+       /opt/metasploit-framework/ms_checks/targets.list
 
 # Workdir and files
 WORKDIR /traffgen
 COPY generator.py endpoints.py healthcheck.sh ./
 
-# Ensure checks dir exists even if empty, then copy RC scripts
-RUN mkdir -p /opt/metasploit-framework/ms_checks/checks
-COPY metasploit/checks/ /opt/metasploit-framework/ms_checks/checks/
-
 # Healthcheck
 RUN chmod +x /traffgen/healthcheck.sh
 HEALTHCHECK --interval=10s --timeout=3s --retries=2 CMD /traffgen/healthcheck.sh
-
-# Final cleanup (docs, manpages, static libs, caches)
-RUN rm -rf /usr/share/doc /usr/share/man /usr/share/man-db /usr/share/locale /var/cache/* /root/.cache && \
-    find / -name '*.a' -o -name '*.la' -o -name '*.o' | xargs -r rm -f
 
 # Entrypoint
 ENTRYPOINT ["python3", "-u", "/traffgen/generator.py"]
