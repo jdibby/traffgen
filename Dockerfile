@@ -1,11 +1,17 @@
-# ---------- Stage 1: build GoBGP (keep Go 1.22) ----------
-FROM golang:1.22 AS gobgp-build
+# ---------- Stage 1: build GoBGP ----------
+FROM ubuntu:24.04 AS gobgp-build
 
-WORKDIR /src
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates git golang build-essential && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /tmp/gobgp
 RUN git -c http.sslVerify=false clone https://github.com/osrg/gobgp.git . && \
-    git checkout v3.36.0 && \
-    go build -ldflags="-s -w" -o gobgp  ./cmd/gobgp  && \
-    go build -ldflags="-s -w" -o gobgpd ./cmd/gobgpd
+    git checkout v3.37.0 && \
+    go build -ldflags="-s -w" -o /tmp/gobgp-bin/gobgp ./cmd/gobgp && \
+    go build -ldflags="-s -w" -o /tmp/gobgp-bin/gobgpd ./cmd/gobgpd && \
+    strip /tmp/gobgp-bin/gobgp /tmp/gobgp-bin/gobgpd
 
 # ---------- Stage 2: build Metasploit (fat builder) ----------
 FROM ubuntu:24.04 AS msf-build
@@ -89,4 +95,10 @@ RUN mv /opt/metasploit-framework/ms_checks/checks/targets.list \
 RUN chmod +x /traffgen/healthcheck.sh
 HEALTHCHECK --interval=10s --timeout=3s --retries=2 CMD /traffgen/healthcheck.sh
 
-# Final cleanup (docs, manpage
+# Final cleanup (docs, manpages, caches, static libs)
+RUN rm -rf /usr/share/doc /usr/share/man /usr/share/man-db /usr/share/locale /var/cache/* /root/.cache && \
+    find / -name '*.a' -o -name '*.la' -o -name '*.o' | xargs -r rm -f
+
+# Entrypoint
+ENTRYPOINT ["python3", "-u", "/traffgen/generator.py"]
+CMD ["--suite=all", "--size=M", "--max-wait-secs=15", "--loop"]
