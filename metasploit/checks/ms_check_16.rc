@@ -2,7 +2,12 @@
 # This script will check for the presence of multiple vulnerabilities on multiple hosts.
 # WARNING: This file should only be used in a legal, controlled lab environment.
 
-# Set the target IP addresses from the targets.list file
+# Logging & session defaults
+setg LogLevel 1
+setg HttpClientTimeout 5
+setg THREADS 4
+
+# Targets (edit this path if needed)
 setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 
 

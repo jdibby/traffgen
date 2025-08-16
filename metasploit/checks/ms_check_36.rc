@@ -1,14 +1,10 @@
-#############################################
-# Metasploit Safe Checks Batch 36
-# Generated: 20250816_210912
-# NOTE: "check" only. No exploitation.
-#############################################
+# Automated vulnerability verification script.
+# This script will check for the presence of multiple vulnerabilities on multiple hosts.
+# WARNING: This file should only be used in a legal, controlled lab environment.
 
 # Logging & session defaults
-spool /opt/metasploit-framework/logs/ms_check_36.log
-setg VERBOSE false
 setg LogLevel 1
-setg HttpClientTimeout 15
+setg HttpClientTimeout 5
 setg THREADS 4
 
 # Targets (edit this path if needed)
