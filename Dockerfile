@@ -42,6 +42,10 @@ RUN gem install --no-document bundler && \
     bundle clean --force && \
     rm -rf ~/.gem ~/.bundle /root/.bundle vendor/bundle/ruby/*/cache tmp/cache
 
+# Optional: smoke test here (early failure if Metasploit is broken)
+RUN bundle exec ./msfconsole -q -x 'version; exit' || true
+
+
 # ---------- Stage 3: runtime ----------
 FROM ubuntu:24.04
 
@@ -59,6 +63,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     dpkg-reconfigure --frontend noninteractive tzdata && \
     rm -rf /var/lib/apt/lists/*
 
+# Install Bundler in runtime so msfconsole wrappers can find `bundle`
+RUN gem install --no-document bundler
+
 # Python packages
 RUN pip3 install --no-cache-dir --break-system-packages \
       fastcli requests colorama beautifulsoup4 tqdm dnspython dnstwist
@@ -71,8 +78,8 @@ COPY --from=gobgp-build /tmp/gobgp-bin/gobgpd /usr/local/bin/gobgpd
 COPY --from=msf-build /opt/metasploit-framework /opt/metasploit-framework
 
 # Wrappers for msfconsole/msfvenom
-RUN printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec ./msfconsole "$@"\n' > /usr/local/bin/msfconsole && \
-    printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec ./msfvenom "$@"\n' > /usr/local/bin/msfvenom && \
+RUN printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec ./msfconsole \"$@\"\n' > /usr/local/bin/msfconsole && \
+    printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec ./msfvenom \"$@\"\n' > /usr/local/bin/msfvenom && \
     chmod +x /usr/local/bin/msfconsole /usr/local/bin/msfvenom
 
 # Workdir and files
@@ -84,5 +91,6 @@ COPY metasploit /opt/metasploit-framework/ms_checks/
 RUN chmod +x /traffgen/healthcheck.sh
 HEALTHCHECK --interval=10s --timeout=3s --retries=2 CMD /traffgen/healthcheck.sh
 
+# Entrypoint
 ENTRYPOINT ["python3", "-u", "/traffgen/generator.py"]
 CMD ["--suite=all", "--size=M", "--max-wait-secs=15", "--loop"]
