@@ -21,126 +21,6 @@ from dataclasses import dataclass, asdict
 from datetime import datetime
 from rich.console import Console
 from rich.table import Table
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn, TimeRemainingColumn
-from rich.panel import Panel
-
-console = Console()
-
-# ---- Quiet subprocess helper ----
-def run_quiet(cmd, timeout=None, check=False):
-    """Run a shell command quietly (no stdout/stderr). Return returncode."""
-    try:
-        res = subprocess.run(
-            cmd,
-            shell=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            timeout=timeout,
-            check=check
-        )
-        return res.returncode
-    except subprocess.TimeoutExpired:
-        return 124  # timeout
-    except Exception:
-        return 1
-
-
-# ---- Disable SSL warning for self-signed certs ----
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-ssl._create_default_https_context = ssl._create_unverified_context
-
-# ---- Colorama shim (no-op) so legacy print lines don't break even if present in functions ----
-class _NoColor:
-    def __getattr__(self, name):
-        return ""
-Fore = Back = Style = _NoColor()
-
-# ---- Watchdog used for restarting container if no activity is detected ----
-class watchdog:
-    def __init__(self, timeout_seconds):
-        self.timeout = timeout_seconds
-        self.last_kick = time.time()
-        self.thread = threading.Thread(target=self._watch, daemon=True)
-        self.thread.start()
-
-    def kick(self):
-        self.last_kick = time.time()
-
-    def _watch(self):
-        while True:
-            if time.time() - self.last_kick > self.timeout:
-                console.print("[bold red][WATCHDOG][/bold red] No activity detected. Exiting to force container restart...")
-                os._exit(1)
-            time.sleep(1)
-
-# ---- Grab container IP address ----
-def get_container_ip():
-    try:
-        result = subprocess.run(
-            ["ip", "route", "get", "1"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=True
-        )
-        output = result.stdout.decode()
-        return output.split("src")[1].split()[0]
-    except Exception as e:
-        console.print(f"[yellow]Failed to determine container IP:[/] {e}")
-        return "127.0.0.1"
-
-# ---- Result model + UI helpers ----
-@dataclass
-class TestResult:
-    name: str
-    start_ts: float
-    end_ts: float
-    duration_s: float
-    status: str          # "ok" | "error" | "skipped"
-    error: str = ""      # short message if error
-
-RUN_RESULTS: list[TestResult] = []
-
-
-class SuiteUI:
-    """Runs each test inside its own transient Progress context so bars finish & clear."""
-    def run_test_callable(self, func):
-        fname = getattr(func, "__name__", str(func))
-        start_ts = time.time()
-        status = "ok"
-        err_msg = ""
-        console.line()
-        from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn, TimeRemainingColumn
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[bold]{task.description}[/]"),
-            BarColumn(),
-            TimeElapsedColumn(),
-            TimeRemainingColumn(),
-            expand=True,
-            transient=True
-        ) as prog:
-            task_id = prog.add_task(f"{fname}", total=100)
-            try:
-                prog.update(task_id, advance=5)
-                func()
-                prog.update(task_id, completed=100)
-            except KeyboardInterrupt:
-                raise
-            except Exception as e:
-                status = "error"
-                err_msg = f"{type(e).__name__}: {e}".strip()[:300]
-                prog.update(task_id, completed=100)
-            finally:
-                end_ts = time.time()
-                RUN_RESULTS.append(TestResult(
-                    name=fname,
-                    start_ts=start_ts,
-                    end_ts=end_ts,
-                    duration_s=round(end_ts - start_ts, 3),
-                    status=status,
-                    error=err_msg
-                ))
-                console.line()
 def _write_summary_files(suite_name: str, started_at: float):
     """Write JSON and Markdown summaries to disk."""
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -1337,7 +1217,9 @@ def progressbar(it, prefix="", size=60, file=sys.stdout):
     file.write("\n")
     file.flush()
 
-# Randomize and run tests (Rich-enabled)
+
+# Randomize and run tests (Rich-enabled, no SuiteUI)
+
 def run_test(func_list):
     size_map = {'S': 'small', 'M': 'medium', 'L': 'large', 'XL': 'extra-large'}
     size = size_map.get(ARGS.size, ARGS.size)
@@ -1351,22 +1233,60 @@ def run_test(func_list):
     ]
     console.print(Panel("\n".join(meta_lines), title="Run Config", border_style="blue", expand=False))
 
-    with SuiteUI() as ui:
-        if ARGS.loop:
-            while True:
-                func = random.choice(func_list)
-                ui.run_test_callable(func)
-                WATCHDOG.kick()
-                finish_test()
-        else:
-            shuffled = func_list[:]
-            random.shuffle(shuffled)
-            for func in shuffled:
-                ui.run_test_callable(func)
-                WATCHDOG.kick()
-                finish_test()
+    def run_one(func):
+        fname = getattr(func, "__name__", str(func))
+        start_ts = time.time()
+        status = "ok"
+        err_msg = ""
+        console.line()
+        from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn, TimeRemainingColumn
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[bold]{task.description}[/]"),
+            BarColumn(),
+            TimeElapsedColumn(),
+            TimeRemainingColumn(),
+            expand=True,
+            transient=True,
+        ) as prog:
+            task = prog.add_task(f"{fname}", total=100)
+            try:
+                prog.update(task, advance=5)
+                func()
+                prog.update(task, completed=100)
+            except KeyboardInterrupt:
+                raise
+            except Exception as e:
+                status = "error"
+                err_msg = f"{type(e).__name__}: {e}".strip()[:300]
+                prog.update(task, completed=100)
+            finally:
+                end_ts = time.time()
+                RUN_RESULTS.append(TestResult(
+                    name=fname,
+                    start_ts=start_ts,
+                    end_ts=end_ts,
+                    duration_s=round(end_ts - start_ts, 3),
+                    status=status,
+                    error=err_msg
+                ))
+                console.line()
 
-# Randomize a wait time between 2 and max seconds
+    if ARGS.loop:
+        while True:
+            func = random.choice(func_list)
+            run_one(func)
+            WATCHDOG.kick()
+            finish_test()
+    else:
+        shuffled = func_list[:]
+        random.shuffle(shuffled)
+        for func in shuffled:
+            run_one(func)
+            WATCHDOG.kick()
+            finish_test()
+
+
 def finish_test():
     if ARGS.loop:
         if not ARGS.nowait:
