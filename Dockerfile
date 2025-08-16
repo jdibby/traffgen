@@ -8,10 +8,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /tmp/gobgp
 RUN git -c http.sslVerify=false clone https://github.com/osrg/gobgp.git . && \
-    git checkout v3.37.0 && \
+    git checkout v3.36.0 && \
     go build -ldflags="-s -w" -o /tmp/gobgp-bin/gobgp ./cmd/gobgp && \
     go build -ldflags="-s -w" -o /tmp/gobgp-bin/gobgpd ./cmd/gobgpd && \
     strip /tmp/gobgp-bin/gobgp /tmp/gobgp-bin/gobgpd
+
 
 # ---------- Stage 2: build Metasploit (fat builder) ----------
 FROM ubuntu:24.04 AS msf-build
@@ -44,6 +45,7 @@ RUN gem install --no-document bundler && \
 # Optional early smoke test (non-fatal)
 RUN bundle exec ./msfconsole -q -x 'version; exit' || true
 
+
 # ---------- Stage 3: runtime (slim) ----------
 FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
@@ -67,13 +69,13 @@ RUN pip3 install --no-cache-dir --break-system-packages \
       fastcli requests colorama beautifulsoup4 tqdm dnspython dnstwist
 
 # Copy stripped GoBGP binaries
-COPY --from=gobgp-build /src/gobgp  /usr/local/bin/gobgp
-COPY --from=gobgp-build /src/gobgpd /usr/local/bin/gobgpd
+COPY --from=gobgp-build /tmp/gobgp-bin/gobgp  /usr/local/bin/gobgp
+COPY --from=gobgp-build /tmp/gobgp-bin/gobgpd /usr/local/bin/gobgpd
 
 # Copy Metasploit framework (with vendor bundle) from builder
 COPY --from=msf-build /opt/metasploit-framework /opt/metasploit-framework
 
-# Kill duplicate default stringio warning in runtime too (path varies across images)
+# Kill duplicate default stringio warning in runtime too (path varies)
 RUN find / -name "stringio-3.0.4.gemspec" -delete || true
 
 # Wrappers for msfconsole/msfvenom under bundler
