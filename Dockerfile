@@ -61,7 +61,7 @@ RUN gem install --no-document bundler
 
 # Python packages (no cache)
 RUN pip3 install --no-cache-dir --break-system-packages \
-      fastcli requests colorama beautifulsoup4 tqdm dnspython dnstwist
+      fastcli requests colorama beautifulsoup4 tqdm dnspython dnstwist rich
 
 # Copy stripped GoBGP binaries
 COPY --from=gobgp-build /tmp/gobgp-bin/gobgp  /usr/local/bin/gobgp
