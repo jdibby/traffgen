@@ -42,7 +42,7 @@ RUN gem install --no-document bundler && \
     bundle clean --force && \
     rm -rf ~/.gem ~/.bundle /root/.bundle vendor/bundle/ruby/*/cache tmp/cache && \
     # Remove Ruby’s default stringio gemspec to avoid duplicate-version warnings
-    rm -f /usr/lib/ruby/gems/3.2.0/specifications/default/stringio-3.0.4.gemspec || true
+    find / -name "stringio-3.0.4.gemspec" -delete || true
 
 # Optional: smoke test here (early failure if Metasploit is broken)
 RUN bundle exec ./msfconsole -q -x 'version; exit' || true
@@ -87,6 +87,9 @@ RUN printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec 
 # Workdir and files
 WORKDIR /traffgen
 COPY generator.py endpoints.py healthcheck.sh ./
+
+# Ensure checks dir exists even if empty, then copy RC scripts
+RUN mkdir -p /opt/metasploit-framework/ms_checks/checks
 COPY metasploit/checks/ /opt/metasploit-framework/ms_checks/checks/
 
 # Healthcheck
