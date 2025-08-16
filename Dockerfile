@@ -1,3 +1,20 @@
+# ---------- Stage 1: build GoBGP ----------
+FROM ubuntu:24.04 AS gobgp-build
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates git golang build-essential && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /tmp/gobgp
+RUN git -c http.sslVerify=false clone https://github.com/osrg/gobgp.git . && \
+    git checkout v3.37.0 && \
+    go build -ldflags="-s -w" -o /tmp/gobgp-bin/gobgp ./cmd/gobgp && \
+    go build -ldflags="-s -w" -o /tmp/gobgp-bin/gobgpd ./cmd/gobgpd && \
+    strip /tmp/gobgp-bin/gobgp /tmp/gobgp-bin/gobgpd
+
+
+# ---------- Stage 2: main container ----------
 FROM ubuntu:latest
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -8,31 +25,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tzdata curl wget git ca-certificates \
     iproute2 traceroute iputils-ping net-tools netcat-openbsd dnsutils openssh-client \
     nmap snmp snmp-mibs-downloader \
-    golang \
     perl \
-    build-essential pkg-config \
     python3 python3-pip python3-dev \
-    libssl-dev libffi-dev libpcap-dev libreadline-dev zlib1g-dev \
-    libxml2-dev libxslt1-dev libyaml-dev libpq-dev \
     sqlite3 libsqlite3-dev \
     ruby-full \
     make bash \
     nikto \
  && ln -fs /usr/share/zoneinfo/$TZ /etc/localtime \
- && dpkg-reconfigure --frontend noninteractive tzdata
+ && dpkg-reconfigure --frontend noninteractive tzdata \
+ && rm -rf /var/lib/apt/lists/*
 
 # Python packages
-RUN pip3 install --break-system-packages \
+RUN pip3 install --no-cache-dir --break-system-packages \
       fastcli requests colorama beautifulsoup4 tqdm dnspython dnstwist
 
-# Build and install GoBGP
-RUN git -c http.sslVerify=false clone https://github.com/osrg/gobgp.git /tmp/gobgp-src && \
-    cd /tmp/gobgp-src && \
-    git checkout v3.37.0 && \
-    go build -o gobgp ./cmd/gobgp && \
-    go build -o gobgpd ./cmd/gobgpd && \
-    mv gobgp gobgpd /usr/local/bin/ && \
-    cd / && rm -rf /tmp/gobgp-src
+# Copy stripped GoBGP binaries from builder
+COPY --from=gobgp-build /tmp/gobgp-bin/gobgp /usr/local/bin/gobgp
+COPY --from=gobgp-build /tmp/gobgp-bin/gobgpd /usr/local/bin/gobgpd
+
 
 # --- Metasploit (isolated + quiet) ---
 RUN git -c http.sslVerify=false clone https://github.com/rapid7/metasploit-framework.git /opt/metasploit-framework
@@ -55,19 +65,16 @@ RUN gem install bundler && \
       echo "gem 'parallel'" >> Gemfile; \
     fi && \
     NOKOGIRI_USE_SYSTEM_LIBRARIES=1 bundle install --jobs 4 --retry 3 && \
-    # sanity: make sure the gem is actually present
     bundle exec ruby -e 'require "parallel"' && \
     bundle clean --force && \
     rm -rf ~/.gem ~/.bundle /root/.bundle vendor/bundle/ruby/*/cache tmp/cache && \
-    # Remove Ruby's default stringio gemspec to avoid duplicate-version warnings
     rm -f /usr/lib/ruby/gems/3.2.0/specifications/default/stringio-3.0.4.gemspec || true && \
-    # Wrappers to always run under bundler
     printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec ./msfconsole "$@"\n' > /usr/local/bin/msfconsole && \
     chmod +x /usr/local/bin/msfconsole && \
     printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec ./msfvenom "$@"\n' > /usr/local/bin/msfvenom && \
     chmod +x /usr/local/bin/msfvenom
 
-# Build-time smoke test (separate layer so failures show clearly)
+# Build-time smoke test
 RUN /usr/local/bin/msfconsole -q -x 'version; exit'
 
 # Copy your Metasploit RC scripts (once)
