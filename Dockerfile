@@ -103,4 +103,4 @@ RUN rm -rf /usr/share/doc /usr/share/man /usr/share/man-db /usr/share/locale /va
 
 # Entrypoint
 ENTRYPOINT ["python3", "-u", "/traffgen/generator.py"]
-CMD ["--suite=all", "--size=M", "--max-wait-secs=15", "--loop"]
+CMD ["--suite=all", "--size=S", "--max-wait-secs=40", "--loop"]
