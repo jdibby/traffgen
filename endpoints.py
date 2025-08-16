@@ -171,6 +171,7 @@ nmap_endpoints = [
     "192.168.2.3",
     "www.testmyids.com",
     "scanme.nmap.org",
+    "https://juice-shop.herokuapp.com",
     ]
 
 http_endpoints = [
