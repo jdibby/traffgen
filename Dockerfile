@@ -13,7 +13,6 @@ RUN git -c http.sslVerify=false clone https://github.com/osrg/gobgp.git . && \
     go build -ldflags="-s -w" -o /tmp/gobgp-bin/gobgpd ./cmd/gobgpd && \
     strip /tmp/gobgp-bin/gobgp /tmp/gobgp-bin/gobgpd
 
-
 # ---------- Stage 2: build Metasploit (fat builder) ----------
 FROM ubuntu:24.04 AS msf-build
 ENV DEBIAN_FRONTEND=noninteractive
@@ -28,7 +27,7 @@ WORKDIR /opt
 RUN git -c http.sslVerify=false clone https://github.com/rapid7/metasploit-framework.git metasploit-framework
 WORKDIR /opt/metasploit-framework
 
-# Install bundler + vendor gems (no dev/test), small pin fixes
+# Install bundler + vendor gems (no dev/test), small fixes
 RUN gem install --no-document bundler && \
     bundle config set --local without 'development test' && \
     bundle config set --local path 'vendor/bundle' && \
@@ -41,10 +40,6 @@ RUN gem install --no-document bundler && \
     rm -rf ~/.gem ~/.bundle /root/.bundle vendor/bundle/ruby/*/cache tmp/cache && \
     # Remove default stringio gemspec in this stage to avoid duplicate warnings
     find / -name "stringio-3.0.4.gemspec" -delete || true
-
-# Optional early smoke test (non-fatal)
-RUN bundle exec ./msfconsole -q -x 'version; exit' || true
-
 
 # ---------- Stage 3: runtime (slim) ----------
 FROM ubuntu:24.04
