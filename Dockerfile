@@ -93,6 +93,10 @@ COPY metasploit /opt/metasploit-framework/ms_checks/checks/
 RUN chmod +x /traffgen/healthcheck.sh
 HEALTHCHECK --interval=10s --timeout=3s --retries=2 CMD /traffgen/healthcheck.sh
 
+# Final cleanup (docs, manpages, static libs, caches)
+RUN rm -rf /usr/share/doc /usr/share/man /usr/share/man-db /usr/share/locale /var/cache/* /root/.cache && \
+    find / -name '*.a' -o -name '*.la' -o -name '*.o' | xargs -r rm -f
+
 # Entrypoint
 ENTRYPOINT ["python3", "-u", "/traffgen/generator.py"]
 CMD ["--suite=all", "--size=M", "--max-wait-secs=15", "--loop"]
