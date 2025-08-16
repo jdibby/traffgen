@@ -1,0 +1,53 @@
+#############################################
+# Metasploit Safe Checks Batch 22
+# Generated: 20250816_210912
+# NOTE: "check" only. No exploitation.
+#############################################
+
+# Logging & session defaults
+spool /opt/metasploit-framework/logs/ms_check_22.log
+setg VERBOSE false
+setg LogLevel 1
+setg HttpClientTimeout 15
+setg THREADS 4
+
+# Targets (edit this path if needed)
+setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
+
+# Optional HTTP defaults (uncomment if needed)
+# setg TARGETURI /
+# setg RPORT 443
+# setg SSL true
+
+# exploit/multi/http/oracle_access_manager_rce_cve_2021_35587
+use exploit/multi/http/oracle_access_manager_rce_cve_2021_35587
+check
+back
+sleep 2
+
+# exploit/multi/http/spip_bigup_unauth_rce
+use exploit/multi/http/spip_bigup_unauth_rce
+check
+back
+sleep 2
+
+# exploit/multi/http/atlassian_confluence_namespace_ognl_injection
+use exploit/multi/http/atlassian_confluence_namespace_ognl_injection
+check
+back
+sleep 2
+
+# exploit/windows/http/softing_sis_rce
+use exploit/windows/http/softing_sis_rce
+check
+back
+sleep 2
+
+# exploit/multi/http/cacti_pollers_sqli_rce
+use exploit/multi/http/cacti_pollers_sqli_rce
+check
+back
+sleep 2
+
+spool off
+exit

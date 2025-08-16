@@ -1,0 +1,53 @@
+#############################################
+# Metasploit Safe Checks Batch 32
+# Generated: 20250816_210912
+# NOTE: "check" only. No exploitation.
+#############################################
+
+# Logging & session defaults
+spool /opt/metasploit-framework/logs/ms_check_32.log
+setg VERBOSE false
+setg LogLevel 1
+setg HttpClientTimeout 15
+setg THREADS 4
+
+# Targets (edit this path if needed)
+setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
+
+# Optional HTTP defaults (uncomment if needed)
+# setg TARGETURI /
+# setg RPORT 443
+# setg SSL true
+
+# exploit/linux/http/nagios_xi_chained_rce
+use exploit/linux/http/nagios_xi_chained_rce
+check
+back
+sleep 2
+
+# exploit/linux/http/opennms_graph_rce
+use exploit/linux/http/opennms_graph_rce
+check
+back
+sleep 2
+
+# exploit/multi/http/glpi_install_rce
+use exploit/multi/http/glpi_install_rce
+check
+back
+sleep 2
+
+# exploit/multi/http/atlassian_bamboo_agent_rce
+use exploit/multi/http/atlassian_bamboo_agent_rce
+check
+back
+sleep 2
+
+# exploit/multi/http/atlassian_crowd_sso_rce
+use exploit/multi/http/atlassian_crowd_sso_rce
+check
+back
+sleep 2
+
+spool off
+exit

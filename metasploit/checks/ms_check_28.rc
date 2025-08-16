@@ -1,0 +1,53 @@
+#############################################
+# Metasploit Safe Checks Batch 28
+# Generated: 20250816_210912
+# NOTE: "check" only. No exploitation.
+#############################################
+
+# Logging & session defaults
+spool /opt/metasploit-framework/logs/ms_check_28.log
+setg VERBOSE false
+setg LogLevel 1
+setg HttpClientTimeout 15
+setg THREADS 4
+
+# Targets (edit this path if needed)
+setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
+
+# Optional HTTP defaults (uncomment if needed)
+# setg TARGETURI /
+# setg RPORT 443
+# setg SSL true
+
+# exploit/multi/http/thinkphp_rce
+use exploit/multi/http/thinkphp_rce
+check
+back
+sleep 2
+
+# exploit/multi/http/php_cgi_arg_injection
+use exploit/multi/http/php_cgi_arg_injection
+check
+back
+sleep 2
+
+# exploit/multi/http/php_fpm_rce
+use exploit/multi/http/php_fpm_rce
+check
+back
+sleep 2
+
+# exploit/multi/http/gitlab_file_read_rce
+use exploit/multi/http/gitlab_file_read_rce
+check
+back
+sleep 2
+
+# exploit/multi/http/gitlab_graphql_user_enum
+use exploit/multi/http/gitlab_graphql_user_enum
+check
+back
+sleep 2
+
+spool off
+exit

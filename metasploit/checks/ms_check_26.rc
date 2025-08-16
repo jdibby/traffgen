@@ -1,0 +1,53 @@
+#############################################
+# Metasploit Safe Checks Batch 26
+# Generated: 20250816_210912
+# NOTE: "check" only. No exploitation.
+#############################################
+
+# Logging & session defaults
+spool /opt/metasploit-framework/logs/ms_check_26.log
+setg VERBOSE false
+setg LogLevel 1
+setg HttpClientTimeout 15
+setg THREADS 4
+
+# Targets (edit this path if needed)
+setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
+
+# Optional HTTP defaults (uncomment if needed)
+# setg TARGETURI /
+# setg RPORT 443
+# setg SSL true
+
+# exploit/multi/http/drupal_drupalgeddon3
+use exploit/multi/http/drupal_drupalgeddon3
+check
+back
+sleep 2
+
+# exploit/multi/http/joomla_http_header_rce
+use exploit/multi/http/joomla_http_header_rce
+check
+back
+sleep 2
+
+# exploit/linux/http/zimbra_xxe
+use exploit/linux/http/zimbra_xxe
+check
+back
+sleep 2
+
+# exploit/linux/http/zimbra_auth_bypass
+use exploit/linux/http/zimbra_auth_bypass
+check
+back
+sleep 2
+
+# exploit/multi/http/tomcat_mgr_upload
+use exploit/multi/http/tomcat_mgr_upload
+check
+back
+sleep 2
+
+spool off
+exit
