@@ -1,101 +1,76 @@
 # Automated vulnerability verification script.
-# This script will check for the presence of multiple vulnerabilities on multiple hosts.
-# WARNING: This file should only be used in a legal, controlled lab environment.
+# WARNING: Use only in a legal, controlled lab environment.
 
-# Logging & session defaults
+# ---- Global Defaults ----
 setg VERBOSE true
 setg LogLevel 1
 setg HttpClientTimeout 8
 setg ConnectTimeout 8
 setg THREADS 4
-setg SRVHOST 127.0.0.1
-setg LHOST 127.0.0.1
 
-# Targets (edit this path if needed)
+# Routable IPs (adjust for Docker/LAN)
+setg SRVHOST 0.0.0.0
+setg LHOST 0.0.0.0
+
+# Targets
 setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 
-#
+# ---- Module Checks ----
 
-# Exploit: ManageEngine ADAudit Plus CVE-2022-28219
-#
+# ManageEngine ADAudit Plus CVE-2022-28219
 use exploit/windows/http/manageengine_adaudit_plus_cve_2022_28219
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: SPIP Unauthenticated RCE via porte_plume Plugin
-#
+# SPIP porte_plume Unauthenticated RCE
 use exploit/multi/http/spip_porte_plume_previsu_rce
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Plesk/myLittleAdmin ViewState .NET Deserialization
-#
+# Plesk/myLittleAdmin ViewState Deserialization
 use exploit/windows/http/plesk_mylittleadmin_viewstate
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Advantech iView NetworkServlet Command Injection
-#
+# Advantech iView NetworkServlet Cmd Injection
 use exploit/windows/http/advantech_iview_networkservlet_cmd_inject
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Apache ActiveMQ Unauthenticated Remote Code Execution
-#
+# Apache ActiveMQ CVE-2023-46604
 use exploit/multi/misc/apache_activemq_rce_cve_2023_46604
-set THREADS 1
+# set SRVPORT 8081   # uncomment if default 8080 is in use
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Gibbon School Platform Authenticated PHP Deserialization Vulnerability
-#
+# Gibbon School Platform CVE-2024-24725
 use exploit/multi/http/gibbon_auth_rce_cve_2024_24725
-set THREADS 1
 set USERNAME fake_user
 set PASSWORD fake_password
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Ivanti EPM Agent Portal Command Execution
-#
+# Ivanti EPM Agent Portal Command Exec
 use exploit/windows/misc/ivanti_agent_portal_cmdexec
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Microsoft Exchange ProxyShell RCE
-#
+# Microsoft Exchange ProxyShell RCE
 use exploit/windows/http/exchange_proxyshell_rce
-set THREADS 1
+# set USERNAME fake_user
+# set PASSWORD fake_password
+# set DOMAIN fake_domain.local
+# set EMAIL fake@example.com
 check
 back
-sleep 2
+sleep 1
 
-#
-
+# ---- End ----
 exit

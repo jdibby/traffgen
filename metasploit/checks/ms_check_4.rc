@@ -1,92 +1,76 @@
 # Automated vulnerability verification script.
-# This script will check for the presence of multiple vulnerabilities on multiple hosts.
-# WARNING: This file should only be used in a legal, controlled lab environment.
+# WARNING: Use only in a legal, controlled lab environment.
 
-# Logging & session defaults
+# ---- Global Defaults ----
 setg VERBOSE true
 setg LogLevel 1
 setg HttpClientTimeout 8
 setg ConnectTimeout 8
 setg THREADS 4
-setg SRVHOST 127.0.0.1
-setg LHOST 127.0.0.1
 
-# Targets (edit this path if needed)
+# Routable IPs
+setg SRVHOST 0.0.0.0
+setg LHOST 0.0.0.0
+
+# Targets
 setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 
-#
+# ---- Module Checks ----
 
-# Exploit: DotCMS RCE via Arbitrary File Upload
-#
+# DotCMS File Upload RCE
 use exploit/multi/http/dotcms_file_upload_rce
-set THREADS 1
+# set TARGETURI /    # add if needed
+# set SSL true       # if HTTPS
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Gladinet CentreStack/Triofox ASP.NET ViewState Deserialization
-#
+# Gladinet CentreStack / Triofox ViewState Deserialization
 use exploit/windows/http/gladinet_viewstate_deserialization_cve_2025_30406
-set THREADS 1
+# set TARGETURI /    # required in some cases
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: WordPress Hash Form Plugin RCE
-#
+# WordPress Hash Form Plugin RCE
 use exploit/multi/http/wp_hash_form_rce
-set THREADS 1
+# set TARGETURI /    # add if check fails
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: ConnectWise ScreenConnect Unauthenticated Remote Code Execution
-#
+# ConnectWise ScreenConnect CVE-2024-1709
 use exploit/multi/http/connectwise_screenconnect_rce_cve_2024_1709
-set THREADS 1
+# set RPORT 8040     # adjust if not default
+# set SSL true       # if HTTPS
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Exchange Control Panel ViewState Deserialization
-#
+# Exchange Control Panel ViewState Deserialization
 use exploit/windows/http/exchange_ecp_viewstate
-set THREADS 1
 set USERNAME fake_user
 set PASSWORD fake_password
+# set DOMAIN fake_domain.local
+# set EMAIL fake@example.com
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: vBulletin replaceAdTemplate Remote Code Execution
-#
+# vBulletin replaceAdTemplate RCE
 use exploit/multi/http/vbulletin_replace_ad_template_rce
-set THREADS 1
+# set TARGETURI /    # add if required
 check
 back
-sleep 2
+sleep 1
 
-# End of script
-exit}
-
-# Exploit: Acronis Cyber Protect/Backup remote code execution
-#
+# Acronis Cyber Protect / Backup CVE-2022-3405
 use exploit/multi/http/acronis_cyber_protect_unauth_rce_cve_2022_3405
-set THREADS 1
+# set RPORT 9877     # default port
+# set SSL true       # if HTTPS
 check
 back
-sleep 2
+sleep 1
 
-#
-
+# ---- End ----
 exit

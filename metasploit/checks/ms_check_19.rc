@@ -2,100 +2,71 @@
 # This script will check for the presence of multiple vulnerabilities on multiple hosts.
 # WARNING: This file should only be used in a legal, controlled lab environment.
 
-# Logging & session defaults
+# ---- Global Defaults ----
 setg VERBOSE true
 setg LogLevel 1
 setg HttpClientTimeout 8
 setg ConnectTimeout 8
 setg THREADS 4
-setg SRVHOST 127.0.0.1
-setg LHOST 127.0.0.1
 
-# Targets (edit this path if needed)
+# Listener defaults (adjust if needed)
+setg SRVHOST 0.0.0.0
+setg LHOST 0.0.0.0
+
+# Targets
 setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 
-#
+# ---- Module Checks ----
 
-# Exploit: mySCADA MyPRO Authenticated Command Injection (CVE-2023-28384)
-#
+# mySCADA MyPRO Authenticated Command Injection (CVE-2023-28384)
 use exploit/windows/scada/mypro_cmdexe
-set THREADS 1
 set USERNAME fake_user
 set PASSWORD fake_password
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: WP User Registration and Membership Unauthenticated Privilege Escalation (CVE-2025-2563)
-#
+# WP User Registration & Membership Unauth Privilege Escalation (CVE-2025-2563)
 use exploit/multi/http/wp_user_registration_membership_escalation
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Sitecore Experience Platform (XP) PreAuth Deserialization RCE
-#
+# Sitecore Experience Platform (XP) PreAuth Deserialization RCE
 use exploit/windows/http/sitecore_xp_cve_2021_42237
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Pentaho Business Server Auth Bypass and Server Side Template Injection RCE
-#
+# Pentaho Business Server Auth Bypass + SSTI RCE
 use exploit/multi/http/pentaho_business_server_authbypass_and_ssti
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: AjaxPro Deserialization Remote Code Execution
-#
+# AjaxPro Deserialization Remote Code Execution
 use exploit/windows/http/ajaxpro_deserialization_rce
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Rejetto HTTP File Server (HFS) Unauthenticated Remote Code Execution
-#
+# Rejetto HTTP File Server (HFS) Unauth RCE (CVE-2024-23692)
 use exploit/windows/http/rejetto_hfs_rce_cve_2024_23692
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: WordPress wp-automatic Plugin SQLi Admin Creation
-#
+# WordPress wp-automatic Plugin SQLi → Admin Creation → RCE
 use exploit/multi/http/wp_automatic_sqli_to_rce
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: UniFi Network Application Unauthenticated JNDI Injection RCE (via Log4Shell)
-#
+# UniFi Network Application Unauth JNDI Injection (Log4Shell)
 use exploit/multi/http/ubiquiti_unifi_log4shell
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
+# ---- End ----
 exit

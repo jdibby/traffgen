@@ -2,16 +2,18 @@
 # This script will check for the presence of multiple vulnerabilities on multiple hosts.
 # WARNING: This file should only be used in a legal, controlled lab environment.
 
-# Logging & session defaults
+# ---- Global Defaults ----
 setg VERBOSE true
 setg LogLevel 1
 setg HttpClientTimeout 8
 setg ConnectTimeout 8
 setg THREADS 4
-setg SRVHOST 127.0.0.1
-setg LHOST 127.0.0.1
 
-# Targets (edit this path if needed)
+# Listener defaults (adjust for your lab environment)
+setg SRVHOST 0.0.0.0
+setg LHOST 0.0.0.0
+
+# Targets
 setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 
 # Optional HTTP defaults (uncomment if needed)
@@ -19,35 +21,37 @@ setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 # setg RPORT 443
 # setg SSL true
 
-# exploit/multi/http/spring_cloud_function_spel_injection
+# ---- Module Checks ----
+
+# Spring Cloud Function SpEL Injection
 use exploit/multi/http/spring_cloud_function_spel_injection
 check
 back
-sleep 2
+sleep 1
 
-# exploit/multi/http/spring_core_rce
+# Spring Core RCE (Spring4Shell)
 use exploit/multi/http/spring_core_rce
 check
 back
-sleep 2
+sleep 1
 
-# exploit/multi/http/jenkins_script_console
+# Jenkins Script Console RCE
 use exploit/multi/http/jenkins_script_console
 check
 back
-sleep 2
+sleep 1
 
-# exploit/multi/http/jenkins_cli_deserialize
+# Jenkins CLI Deserialization RCE
 use exploit/multi/http/jenkins_cli_deserialize
 check
 back
-sleep 2
+sleep 1
 
-# exploit/multi/http/drupal_drupalgeddon2
+# Drupal Drupalgeddon2 RCE
 use exploit/multi/http/drupal_drupalgeddon2
 check
 back
-sleep 2
+sleep 1
 
-spool off
+# ---- End ----
 exit

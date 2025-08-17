@@ -2,90 +2,74 @@
 # This script will check for the presence of multiple vulnerabilities on multiple hosts.
 # WARNING: This file should only be used in a legal, controlled lab environment.
 
-# Logging & session defaults
+# ---- Global Defaults ----
 setg VERBOSE true
 setg LogLevel 1
 setg HttpClientTimeout 8
 setg ConnectTimeout 8
 setg THREADS 4
-setg SRVHOST 127.0.0.1
-setg LHOST 127.0.0.1
 
-# Targets (edit this path if needed)
+# Routable listener settings (Docker bridge IP, LAN IP, or 0.0.0.0 for broad compatibility)
+setg SRVHOST 0.0.0.0
+setg LHOST 0.0.0.0
+
+# Targets
 setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 
-#
+# ---- Module Checks ----
 
-# Exploit: GiveWP Unauthenticated Donation Process Exploit
-#
+# GiveWP Unauthenticated Donation Process Exploit
 use exploit/multi/http/wp_givewp_rce
-set THREADS 1
+# set TARGETURI /    # adjust if needed
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Wordpress File Manager Advanced Shortcode 2.3.2 - Unauthenticated Remote Code Execution through shortcode
-#
+# WordPress File Manager Advanced Shortcode 2.3.2 RCE
 use exploit/multi/http/wp_plugin_fma_shortcode_unauth_rce
-set THREADS 1
+# set TARGETURI /    # adjust if needed
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Geoserver unauthenticated Remote Code Execution
-#
+# Geoserver Unauthenticated RCE (CVE-2024-36401)
 use exploit/multi/http/geoserver_unauth_rce_cve_2024_36401
-set THREADS 1
+# set TARGETURI /geoserver   # adjust if install not at root
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Oracle WebLogic Server Administration Console Handle RCE
-#
+# Oracle WebLogic Admin Console Handle RCE
 use exploit/multi/http/weblogic_admin_handle_rce
-set THREADS 1
+# set RPORT 7001      # WebLogic default port
+# set SSL true        # if HTTPS
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Atlassian Confluence Administrator Code Macro Remote Code Execution
-#
+# Atlassian Confluence Admin Code Macro RCE (CVE-2024-21683)
 use exploit/multi/http/atlassian_confluence_rce_cve_2024_21683
-set THREADS 1
+# set TARGETURI /     # adjust if not root
+# set SSL true        # if HTTPS
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: ManageEngine ADAudit Plus Authenticated File Write RCE
-#
+# ManageEngine ADAudit Plus Authenticated File Write RCE
 use exploit/windows/http/manageengine_adaudit_plus_authenticated_rce
-set THREADS 1
 set USERNAME fake_user
 set PASSWORD fake_password
+# set TARGETURI /     # adjust if needed
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Cleo LexiCom, VLTrader, and Harmony Unauthenticated Remote Code Execution
-#
+# Cleo LexiCom, VLTrader, Harmony Unauthenticated RCE (CVE-2024-55956)
 use exploit/multi/http/cleo_rce_cve_2024_55956
-set THREADS 1
+# set TARGETURI /     # adjust if needed
 check
 back
-sleep 2
+sleep 1
 
-#
-
+# ---- End ----
 exit

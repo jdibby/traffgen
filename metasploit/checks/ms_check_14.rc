@@ -2,100 +2,76 @@
 # This script will check for the presence of multiple vulnerabilities on multiple hosts.
 # WARNING: This file should only be used in a legal, controlled lab environment.
 
-# Logging & session defaults
+# ---- Global Defaults ----
 setg VERBOSE true
 setg LogLevel 1
 setg HttpClientTimeout 8
 setg ConnectTimeout 8
 setg THREADS 4
-setg SRVHOST 127.0.0.1
-setg LHOST 127.0.0.1
 
-# Targets (edit this path if needed)
+# Routable listener defaults (adjust to your env)
+setg SRVHOST 0.0.0.0
+setg LHOST 0.0.0.0
+
+# Targets
 setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 
-#
+# ---- Module Checks ----
 
-# Exploit: JetBrains TeamCity Unauthenticated Remote Code Execution
-#
+# JetBrains TeamCity Unauthenticated RCE (CVE-2024-27198)
 use exploit/multi/http/jetbrains_teamcity_rce_cve_2024_27198
-set THREADS 1
+# set RPORT 8111
+# set SSL true
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Advantech iView Unauthenticated Remote Code Execution
-#
+# Advantech iView Unauthenticated RCE
 use exploit/windows/http/advantech_iview_unauth_rce
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: SharePoint Workflows XOML Injection
-#
+# SharePoint Workflows XOML Injection
 use exploit/windows/http/sharepoint_workflows_xoml
-set THREADS 1
+# set DOMAIN domain.local
+# set USERNAME user
+# set PASSWORD pass
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: NetMotion Mobility Server MvcUtil Java Deserialization
-#
+# NetMotion Mobility Server MvcUtil Deserialization
 use exploit/windows/http/netmotion_mobility_mvcutil_deserialization
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Apache Druid JNDI Injection RCE
-#
+# Apache Druid JNDI Injection RCE (CVE-2023-25194)
 use exploit/multi/http/apache_druid_cve_2023_25194
-set THREADS 1
-# The SRVHOST option must be set to the IP address of the machine running the exploit.
+# IMPORTANT: SRVHOST must be your attacker IP (not 127.0.0.1)
 set SRVHOST 192.168.1.10
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Ivanti Avalanche MDM Buffer Overflow
-#
+# Ivanti Avalanche MDM Buffer Overflow
 use exploit/windows/misc/ivanti_avalanche_mdm_bof
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: VSCode ipynb Remote Development RCE
-#
+# VSCode ipynb Remote Development RCE
 use exploit/multi/misc/vscode_ipynb_remote_dev_exec
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: SPIP form PHP Injection
-#
+# SPIP form PHP Injection
 use exploit/multi/http/spip_rce_form
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
+# ---- End ----
 exit

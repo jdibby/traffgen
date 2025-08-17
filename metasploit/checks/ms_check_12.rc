@@ -2,88 +2,70 @@
 # This script will check for the presence of multiple vulnerabilities on multiple hosts.
 # WARNING: This file should only be used in a legal, controlled lab environment.
 
-# Logging & session defaults
+# ---- Global Defaults ----
 setg VERBOSE true
 setg LogLevel 1
 setg HttpClientTimeout 8
 setg ConnectTimeout 8
 setg THREADS 4
-setg SRVHOST 127.0.0.1
-setg LHOST 127.0.0.1
 
-# Targets (edit this path if needed)
+# Routable listener settings (Docker bridge IP, LAN IP, or 0.0.0.0 for broad compatibility)
+setg SRVHOST 0.0.0.0
+setg LHOST 0.0.0.0
+
+# Targets
 setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 
-#
+# ---- Module Checks ----
 
-# Exploit: HPE Systems Insight Manager AMF Deserialization RCE
-#
+# HPE Systems Insight Manager AMF Deserialization RCE
 use exploit/windows/http/hpe_sim_76_amf_deserialization
-set THREADS 1
+# set TARGETURI /       # adjust if needed
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Mirth Connect Deserialization RCE
-#
+# Mirth Connect Deserialization RCE (CVE-2023-43208)
 use exploit/multi/http/mirth_connect_cve_2023_43208
-set THREADS 1
+# set TARGETURI /       # adjust if install not at root
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Adobe ColdFusion Unauthenticated Remote Code Execution
-#
+# Adobe ColdFusion RCE (CVE-2023-26360)
 use exploit/multi/http/adobe_coldfusion_rce_cve_2023_26360
-set THREADS 1
+# set TARGETURI /CFIDE  # ColdFusion path
+# set RPORT 8500        # default
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Inductive Automation Ignition Remote Code Execution
-#
+# Inductive Automation Ignition RCE
 use exploit/multi/scada/inductive_ignition_rce
-set THREADS 1
+# set RPORT 8088        # default Ignition port
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: LG Simple Editor Command Injection (CVE-2023-40504)
-#
+# LG Simple Editor RCE (CVE-2023-40504)
 use exploit/windows/http/lg_simple_editor_rce_uploadvideo
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Cacti Import Packages RCE
-#
+# Cacti Import Packages RCE
 use exploit/multi/http/cacti_package_import_rce
-set THREADS 1
+# set TARGETURI /cacti  # adjust if needed
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: vBulletin 5.x /ajax/render/widget_tabbedcontainer_tab_panel PHP remote code execution
-#
+# vBulletin 5.x widget_tabbedcontainer_tab_panel RCE
 use exploit/multi/http/vbulletin_widget_template_rce
-set THREADS 1
+# set TARGETURI /       # adjust if forum not at root
 check
 back
-sleep 2
+sleep 1
 
-#
-
+# ---- End ----
 exit

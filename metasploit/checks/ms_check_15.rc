@@ -2,58 +2,48 @@
 # This script will check for the presence of multiple vulnerabilities on multiple hosts.
 # WARNING: This file should only be used in a legal, controlled lab environment.
 
-# Logging & session defaults
+# ---- Global Defaults ----
 setg VERBOSE true
 setg LogLevel 1
 setg HttpClientTimeout 8
 setg ConnectTimeout 8
 setg THREADS 4
-setg SRVHOST 127.0.0.1
-setg LHOST 127.0.0.1
 
-# Targets (edit this path if needed)
+# Listener defaults (update to your environment)
+setg SRVHOST 0.0.0.0
+setg LHOST 0.0.0.0
+
+# Targets
 setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 
-#
+# ---- Module Checks ----
 
-# Exploit: Monitorr unauthenticated Remote Code Execution (RCE)
-#
+# Monitorr unauthenticated RCE (CVE-2020-28871)
 use exploit/multi/http/monitorr_webshell_rce_cve_2020_28871
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: NorthStar C2 XSS to Agent RCE
-#
+# NorthStar C2 XSS → Agent RCE
 use exploit/windows/http/northstar_c2_xss_to_agent_rce
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Rockwell FactoryTalk View SE SCADA Unauthenticated Remote Code Execution
-#
+# Rockwell FactoryTalk View SE SCADA Unauth RCE
 use exploit/windows/scada/rockwell_factorytalk_rce
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Microsoft SharePoint Unsafe Control and ViewState RCE
-#
+# Microsoft SharePoint Unsafe Control & ViewState RCE
 use exploit/windows/http/sharepoint_unsafe_control
-set THREADS 1
+# set DOMAIN domain.local
+# set USERNAME user
+# set PASSWORD pass
 check
 back
-sleep 2
+sleep 1
 
-#
-
+# ---- End ----
 exit

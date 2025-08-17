@@ -2,16 +2,18 @@
 # This script will check for the presence of multiple vulnerabilities on multiple hosts.
 # WARNING: This file should only be used in a legal, controlled lab environment.
 
-# Logging & session defaults
+# ---- Global Defaults ----
 setg VERBOSE true
 setg LogLevel 1
 setg HttpClientTimeout 8
 setg ConnectTimeout 8
 setg THREADS 4
-setg SRVHOST 127.0.0.1
-setg LHOST 127.0.0.1
 
-# Targets (edit this path if needed)
+# Listener defaults (adjust for your lab environment)
+setg SRVHOST 0.0.0.0
+setg LHOST 0.0.0.0
+
+# Targets
 setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 
 # Optional HTTP defaults (uncomment if needed)
@@ -19,35 +21,37 @@ setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 # setg RPORT 443
 # setg SSL true
 
-# exploit/multi/http/thinkphp_rce
+# ---- Module Checks ----
+
+# ThinkPHP Remote Code Execution
 use exploit/multi/http/thinkphp_rce
 check
 back
-sleep 2
+sleep 1
 
-# exploit/multi/http/php_cgi_arg_injection
+# PHP CGI Argument Injection
 use exploit/multi/http/php_cgi_arg_injection
 check
 back
-sleep 2
+sleep 1
 
-# exploit/multi/http/php_fpm_rce
+# PHP-FPM Remote Code Execution
 use exploit/multi/http/php_fpm_rce
 check
 back
-sleep 2
+sleep 1
 
-# exploit/multi/http/gitlab_file_read_rce
+# GitLab Arbitrary File Read RCE
 use exploit/multi/http/gitlab_file_read_rce
 check
 back
-sleep 2
+sleep 1
 
-# exploit/multi/http/gitlab_graphql_user_enum
+# GitLab GraphQL User Enumeration
 use exploit/multi/http/gitlab_graphql_user_enum
 check
 back
-sleep 2
+sleep 1
 
-spool off
+# ---- End ----
 exit

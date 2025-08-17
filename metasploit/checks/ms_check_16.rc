@@ -2,61 +2,47 @@
 # This script will check for the presence of multiple vulnerabilities on multiple hosts.
 # WARNING: This file should only be used in a legal, controlled lab environment.
 
-# Logging & session defaults
+# ---- Global Defaults ----
 setg VERBOSE true
 setg LogLevel 1
 setg HttpClientTimeout 8
 setg ConnectTimeout 8
 setg THREADS 4
-setg SRVHOST 127.0.0.1
-setg LHOST 127.0.0.1
 
-# Targets (edit this path if needed)
+# Listener defaults (update these for your lab)
+setg SRVHOST 0.0.0.0
+setg LHOST 0.0.0.0
+
+# Targets
 setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 
+# ---- Module Checks ----
 
-#
-
-# Exploit: PRTG CVE-2023-32781 Authenticated RCE
-#
+# PRTG Network Monitor – Authenticated RCE (CVE-2023-32781)
 use exploit/windows/http/prtg_authenticated_rce_cve_2023_32781
-set THREADS 1
 set USERNAME fake_user
 set PASSWORD fake_password
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: WordPress Royal Elementor Addons RCE
-#
+# WordPress Royal Elementor Addons RCE
 use exploit/multi/http/wp_royal_elementor_addons_rce
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: mySCADA myPRO Manager Unauthenticated Command Injection (CVE-2024-47407)
-#
+# mySCADA myPRO Manager – Unauthenticated Command Injection (CVE-2024-47407)
 use exploit/windows/scada/mypro_mgr_cmd
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Zoho Password Manager Pro XML-RPC Java Deserialization
-#
+# Zoho Password Manager Pro – XML-RPC Java Deserialization RCE
 use exploit/windows/http/zoho_password_manager_pro_xml_rpc_rce
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
+# ---- End ----
 exit

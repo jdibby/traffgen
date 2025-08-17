@@ -2,89 +2,77 @@
 # This script will check for the presence of multiple vulnerabilities on multiple hosts.
 # WARNING: This file should only be used in a legal, controlled lab environment.
 
-# Logging & session defaults
+# ---- Global Defaults ----
 setg VERBOSE true
 setg LogLevel 1
 setg HttpClientTimeout 8
 setg ConnectTimeout 8
 setg THREADS 4
-setg SRVHOST 127.0.0.1
-setg LHOST 127.0.0.1
 
-# Targets (edit this path if needed)
+# Routable listener settings (Docker bridge IP, LAN IP, or 0.0.0.0 for broad compatibility)
+setg SRVHOST 0.0.0.0
+setg LHOST 0.0.0.0
+
+# Targets
 setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 
-#
+# ---- Module Checks ----
 
-# Exploit: Apache Commons Text RCE
-#
+# Apache Commons Text RCE (Text4Shell)
 use exploit/multi/http/apache_commons_text4shell
-set THREADS 1
-set PARAM q
+set PARAM q              # required by module
+# set TARGETURI /         # adjust if needed
+# set SSL true            # if target is HTTPS
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Gitea Git Hooks Remote Code Execution
-#
+# Gitea Git Hooks RCE
 use exploit/multi/http/gitea_git_hooks_rce
-set THREADS 1
+# set TARGETURI /         # adjust if not default
+# set RPORT 3000          # Gitea default port
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: FlexDotnetCMS Arbitrary ASP File Upload
-#
+# FlexDotnetCMS Arbitrary ASP File Upload
 use exploit/windows/http/flexdotnetcms_upload_exec
-set THREADS 1
+# set TARGETURI /         # adjust if needed
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: WordPress Really Simple SSL Plugin Authentication Bypass to RCE
-#
+# WordPress Really Simple SSL Plugin 2FA Bypass → RCE
 use exploit/multi/http/wp_reallysimplessl_2fa_bypass_rce
-set THREADS 1
+# set TARGETURI /         # adjust if needed
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: ManageEngine ADSelfService Plus Custom Script Execution
-#
+# ManageEngine ADSelfService Plus CVE-2022-28810
 use exploit/windows/http/manageengine_adselfservice_plus_cve_2022_28810
-set THREADS 1
+# set USERNAME fake_user
+# set PASSWORD fake_password
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Progress Software WS_FTP Unauthenticated Remote Code Execution
-#
+# Progress WS_FTP RCE (CVE-2023-40044)
 use exploit/windows/http/ws_ftp_rce_cve_2023_40044
-set THREADS 1
+# set RPORT 443           # WS_FTP default
+# set SSL true            # if HTTPS
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Microsoft SharePoint Server-Side Include and ViewState RCE
-#
+# Microsoft SharePoint SSI + ViewState RCE
 use exploit/windows/http/sharepoint_ssi_viewstate
-set THREADS 1
+# set DOMAIN fake.local
+# set USERNAME fake_user
+# set PASSWORD fake_password
 check
 back
-sleep 2
+sleep 1
 
-#
-
+# ---- End ----
 exit

@@ -2,58 +2,52 @@
 # This script will check for the presence of multiple vulnerabilities on multiple hosts.
 # WARNING: This file should only be used in a legal, controlled lab environment.
 
-# Logging & session defaults
+# ---- Global Defaults ----
 setg VERBOSE true
 setg LogLevel 1
 setg HttpClientTimeout 8
 setg ConnectTimeout 8
 setg THREADS 4
-setg SRVHOST 127.0.0.1
-setg LHOST 127.0.0.1
 
-# Targets (edit this path if needed)
+# Routable IPs (Docker: 172.17.x.x, LAN IP, or 0.0.0.0 for broadest compatibility)
+setg SRVHOST 0.0.0.0
+setg LHOST 0.0.0.0
+
+# Targets
 setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 
-#
+# ---- Module Checks ----
 
-# Exploit: MaraCMS Arbitrary PHP File Upload
-#
+# MaraCMS Arbitrary PHP File Upload
 use exploit/multi/http/maracms_upload_exec
-set THREADS 1
+# set TARGETURI /    # adjust if needed
+# set SSL true       # if HTTPS
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Unauthenticated RCE in Bricks Builder Theme
-#
+# Bricks Builder Theme Unauthenticated RCE
 use exploit/multi/http/wp_bricks_builder_rce
-set THREADS 1
+# set TARGETURI /    # adjust if needed
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Sharepoint Dynamic Proxy Generator Unauth RCE
-#
+# SharePoint Dynamic Proxy Generator Unauth RCE
 use exploit/windows/http/sharepoint_dynamic_proxy_generator_auth_bypass_rce
-set THREADS 1
+# set DOMAIN fake.local
+# set USERNAME fake_user
+# set PASSWORD fake_password
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: MyBB Admin Control Code Injection RCE
-#
+# MyBB Admin Control Code Injection RCE (CVE-2022-24734)
 use exploit/multi/http/mybb_rce_cve_2022_24734
-set THREADS 1
+# set TARGETURI /mybb   # adjust if install not at /
 check
 back
-sleep 2
+sleep 1
 
-#
-
+# ---- End ----
 exit

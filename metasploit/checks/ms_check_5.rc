@@ -1,78 +1,44 @@
 # Automated vulnerability verification script.
-# This script will check for the presence of multiple vulnerabilities on multiple hosts.
-# WARNING: This file should only be used in a legal, controlled lab environment.
+# WARNING: Use only in a legal, controlled lab environment.
 
-# Logging & session defaults
+# ---- Global Defaults ----
 setg VERBOSE true
 setg LogLevel 1
 setg HttpClientTimeout 8
 setg ConnectTimeout 8
 setg THREADS 4
-setg SRVHOST 127.0.0.1
-setg LHOST 127.0.0.1
-# Targets (edit this path if needed)
+
+# Routable listener settings (adjust IP for your environment)
+setg SRVHOST 0.0.0.0
+setg LHOST 0.0.0.0
+
+# Targets
 setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 
-#
+# Optional logging
+# spool /opt/metasploit-framework/ms_checks/logs/ms_check_<%= Time.now.strftime("%Y%m%d_%H%M%S") %>.log
 
-# Exploit: AVideo WWBNIndex Plugin Unauthenticated RCE
-#
-use exploit/multi/http/avideo_wwbnindex_unauth_rce
-set THREADS 1
+# ---- Module Checks ----
+
+# Example: DotCMS File Upload RCE
+use exploit/multi/http/dotcms_file_upload_rce
+# set TARGETURI /        # uncomment if needed
+# set SSL true           # if HTTPS
+# set RPORT 8080         # adjust if service not default
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Unauthenticated remote code execution in Ignition
-#
-use exploit/multi/php/ignition_laravel_debug_rce
-set THREADS 1
+# Example: Exchange Control Panel ViewState Deserialization
+use exploit/windows/http/exchange_ecp_viewstate
+set USERNAME fake_user
+set PASSWORD fake_password
+# set DOMAIN fake.local
+# set EMAIL fake@example.com
+# set SSL true           # if HTTPS
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: WordPress Backup Migration Plugin PHP Filter Chain RCE
-#
-use exploit/multi/http/wp_backup_migration_php_filter
-set THREADS 1
-check
-back
-sleep 2
-
-#
-
-# Exploit: ManageEngine ServiceDesk Plus CVE-2021-44077
-#
-use exploit/windows/http/manageengine_servicedesk_plus_cve_2021_44077
-set THREADS 1
-check
-back
-sleep 2
-
-#
-
-# Exploit: Samsung MagicINFO 9 Server Remote Code Execution (CVE-2024-7399)
-#
-use exploit/windows/http/magicinfo_traversal
-set THREADS 1
-check
-back
-sleep 2
-
-#
-
-# Exploit: WordPress WP Time Capsule Arbitrary File Upload to RCE
-#
-use exploit/multi/http/wp_time_capsule_file_upload_rce
-set THREADS 1
-check
-back
-sleep 2
-
-#
-
+# ---- End ----
 exit

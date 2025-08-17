@@ -2,101 +2,71 @@
 # This script will check for the presence of multiple vulnerabilities on multiple hosts.
 # WARNING: This file should only be used in a legal, controlled lab environment.
 
-# Logging & session defaults
+# ---- Global Defaults ----
 setg VERBOSE true
 setg LogLevel 1
 setg HttpClientTimeout 8
 setg ConnectTimeout 8
 setg THREADS 4
-setg SRVHOST 127.0.0.1
-setg LHOST 127.0.0.1
 
-# Targets (edit this path if needed)
+# Listener defaults (adjust for your lab environment)
+setg SRVHOST 0.0.0.0
+setg LHOST 0.0.0.0
+
+# Targets
 setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 
+# ---- Module Checks ----
 
-#
-
-# Exploit: CrushFTP Unauthenticated RCE
-#
+# CrushFTP Unauthenticated RCE (CVE-2023-43177)
 use exploit/multi/http/crushftp_rce_cve_2023_43177
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: DIAEnergie SQL Injection (CVE-2024-4548)
-#
+# DIAEnergie SQL Injection (CVE-2024-4548)
 use exploit/windows/scada/diaenergie_sqli
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: CA Unified Infrastructure Management Nimsoft 7.80 - Remote Buffer Overflow
-#
+# CA Unified Infrastructure Management Nimsoft 7.80 – Remote Buffer Overflow
 use exploit/windows/nimsoft/nimcontroller_bof
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Calibre Python Code Injection (CVE-2024-6782)
-#
+# Calibre Python Code Injection (CVE-2024-6782)
 use exploit/multi/misc/calibre_exec
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Gitea Git Fetch Remote Code Execution
-#
+# Gitea Git Fetch Remote Code Execution
 use exploit/multi/http/gitea_git_fetch_rce
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Wordpress LiteSpeed Cache plugin cookie theft
-#
+# WordPress LiteSpeed Cache Plugin – Cookie Theft
 use exploit/multi/http/wp_litespeed_cookie_theft
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: qdPM 9.1 Authenticated Arbitrary PHP File Upload (RCE)
-#
+# qdPM 9.1 Authenticated Arbitrary PHP File Upload RCE
 use exploit/multi/http/qdpm_authenticated_rce
-set THREADS 1
 set USERNAME fake_user
 set PASSWORD fake_password
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: SharePoint DataSet / DataTable Deserialization
-#
+# SharePoint DataSet / DataTable Deserialization RCE
 use exploit/windows/http/sharepoint_data_deserialization
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
+# ---- End ----
 exit

@@ -2,68 +2,51 @@
 # This script will check for the presence of multiple vulnerabilities on multiple hosts.
 # WARNING: This file should only be used in a legal, controlled lab environment.
 
-# Logging & session defaults
+# ---- Global Defaults ----
 setg VERBOSE true
 setg LogLevel 1
 setg HttpClientTimeout 8
 setg ConnectTimeout 8
 setg THREADS 4
-setg SRVHOST 127.0.0.1
-setg LHOST 127.0.0.1
 
-# Targets (edit this path if needed)
+# Listener defaults (adjust for your lab environment)
+setg SRVHOST 0.0.0.0
+setg LHOST 0.0.0.0
+
+# Targets
 setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 
-#
+# ---- Module Checks ----
 
-# Exploit: Log4Shell HTTP Header Injection
-#
+# Log4Shell HTTP Header Injection (CVE-2021-44228 variant)
 use exploit/multi/http/log4shell_header_injection
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: ManageEngine ADSelfService Plus Unauthenticated SAML RCE
-#
+# ManageEngine ADSelfService Plus Unauthenticated SAML RCE (CVE-2022-47966)
 use exploit/multi/http/manageengine_adselfservice_plus_saml_rce_cve_2022_47966
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: ManageEngine ServiceDesk Plus Unauthenticated SAML RCE
-#
+# ManageEngine ServiceDesk Plus Unauthenticated SAML RCE (CVE-2022-47966)
 use exploit/multi/http/manageengine_servicedesk_plus_saml_rce_cve_2022_47966
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: ManageEngine OpManager SumPDU Java Deserialization
-#
+# ManageEngine OpManager SumPDU Java Deserialization
 use exploit/multi/http/opmanager_sumpdu_deserialization
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Sonicwall
-#
+# SonicWall SSL-VPN Shell Injection (CVE-2023-34124)
 use exploit/multi/http/sonicwall_shell_injection_cve_2023_34124
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
+# ---- End ----
 exit

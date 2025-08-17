@@ -2,98 +2,79 @@
 # This script will check for the presence of multiple vulnerabilities on multiple hosts.
 # WARNING: This file should only be used in a legal, controlled lab environment.
 
-# Logging & session defaults
+# ---- Global Defaults ----
 setg VERBOSE true
 setg LogLevel 1
 setg HttpClientTimeout 8
 setg ConnectTimeout 8
 setg THREADS 4
-setg SRVHOST 127.0.0.1
-setg LHOST 127.0.0.1
 
-# Targets (edit this path if needed)
+# Routable IPs (Docker: 172.17.x.x, LAN IP, or 0.0.0.0 for broad compatibility)
+setg SRVHOST 0.0.0.0
+setg LHOST 0.0.0.0
+
+# Targets
 setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 
-#
+# ---- Module Checks ----
 
-# Exploit: Tomcat Partial PUT Java Deserialization
-#
+# Tomcat Partial PUT Java Deserialization
 use exploit/multi/http/tomcat_partial_put_deserialization
-set THREADS 1
+# set TARGETURI /    # if check fails
+# set SSL true       # if HTTPS
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Ivanti Avalanche FileStoreConfig File Upload
-#
+# Ivanti Avalanche FileStoreConfig File Upload
 use exploit/windows/http/ivanti_avalanche_filestoreconfig_upload
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Sitecore CVE-2025-27218 BinaryFormatter Deserialization Exploit
-#
+# Sitecore CVE-2025-27218 BinaryFormatter Deserialization Exploit
 use exploit/windows/http/sitecore_xp_cve_2025_27218
-set THREADS 1
+# set TARGETURI /sitecore    # if needed
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Microsoft Exchange ProxyNotShell RCE
-#
+# Microsoft Exchange ProxyNotShell RCE
 use exploit/windows/http/exchange_proxynotshell_rce
-set THREADS 1
+# set USERNAME fake_user
+# set PASSWORD fake_password
+# set DOMAIN fake.local
+# set EMAIL fake@example.com
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: WordPress SureTriggers (aka OttoKit) Combined Auth Bypass
-#
+# WordPress SureTriggers (OttoKit) Auth Bypass
 use exploit/multi/http/wp_suretriggers_auth_bypass
-set THREADS 1
+# set TARGETURI /   # if not default
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: VMware vCenter Server Unauthenticated JNDI Injection RCE (via Log4Shell)
-#
+# VMware vCenter Server JNDI Injection (Log4Shell)
 use exploit/multi/http/vmware_vcenter_log4shell
-set THREADS 1
+# set SRVPORT 8081  # change if 8080 conflicts
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Cayin xPost wayfinder_seqid SQLi to RCE
-#
+# Cayin xPost wayfinder_seqid SQLi to RCE
 use exploit/windows/http/cayin_xpost_sql_rce
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: pgAdmin Binary Path API RCE
-#
+# pgAdmin Binary Path API RCE
 use exploit/windows/http/pgadmin_binary_path_api
-set THREADS 1
+# set TARGETURI /pgadmin4  # if needed
 check
 back
-sleep 2
+sleep 1
 
-#
-
+# ---- End ----
 exit

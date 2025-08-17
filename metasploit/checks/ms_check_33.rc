@@ -2,16 +2,18 @@
 # This script will check for the presence of multiple vulnerabilities on multiple hosts.
 # WARNING: This file should only be used in a legal, controlled lab environment.
 
-# Logging & session defaults
+# ---- Global Defaults ----
 setg VERBOSE true
 setg LogLevel 1
 setg HttpClientTimeout 8
 setg ConnectTimeout 8
 setg THREADS 4
-setg SRVHOST 127.0.0.1
-setg LHOST 127.0.0.1
 
-# Targets (edit this path if needed)
+# Listener defaults (adjust for your lab environment)
+setg SRVHOST 0.0.0.0
+setg LHOST 0.0.0.0
+
+# Targets
 setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 
 # Optional HTTP defaults (uncomment if needed)
@@ -19,35 +21,37 @@ setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 # setg RPORT 443
 # setg SSL true
 
-# exploit/multi/http/sap_webdynpro_deserialization
+# ---- Module Checks ----
+
+# SAP WebDynpro Deserialization
 use exploit/multi/http/sap_webdynpro_deserialization
 check
 back
-sleep 2
+sleep 1
 
-# exploit/multi/http/oracle_report_server_deserialization
+# Oracle Report Server Deserialization
 use exploit/multi/http/oracle_report_server_deserialization
 check
 back
-sleep 2
+sleep 1
 
-# exploit/multi/http/saltstack_salt_api_cmd_exec
+# SaltStack Salt API Command Exec
 use exploit/multi/http/saltstack_salt_api_cmd_exec
 check
 back
-sleep 2
+sleep 1
 
-# exploit/multi/http/roxywi_rce
+# Roxy-WI RCE
 use exploit/multi/http/roxywi_rce
 check
 back
-sleep 2
+sleep 1
 
-# exploit/multi/http/nexus_repository_rce
+# Nexus Repository RCE
 use exploit/multi/http/nexus_repository_rce
 check
 back
-sleep 2
+sleep 1
 
-spool off
+# ---- End ----
 exit

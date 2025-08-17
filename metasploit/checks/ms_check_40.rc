@@ -2,16 +2,18 @@
 # This script will check for the presence of multiple vulnerabilities on multiple hosts.
 # WARNING: This file should only be used in a legal, controlled lab environment.
 
-# Logging & session defaults
+# ---- Global Defaults ----
 setg VERBOSE true
 setg LogLevel 1
 setg HttpClientTimeout 8
 setg ConnectTimeout 8
 setg THREADS 4
-setg SRVHOST 127.0.0.1
-setg LHOST 127.0.0.1
 
-# Targets (edit this path if needed)
+# Listener defaults (adjust if needed)
+setg SRVHOST 0.0.0.0
+setg LHOST 0.0.0.0
+
+# Targets
 setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 
 # Optional HTTP defaults (uncomment if needed)
@@ -19,35 +21,37 @@ setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 # setg RPORT 443
 # setg SSL true
 
-# exploit/multi/http/spip_bigup_unauth_rce
+# ---- Module Checks ----
+
+# SPIP BigUp Plugin Unauthenticated RCE
 use exploit/multi/http/spip_bigup_unauth_rce
 check
 back
-sleep 2
+sleep 1
 
-# exploit/multi/http/atlassian_confluence_namespace_ognl_injection
+# Atlassian Confluence Namespace OGNL Injection
 use exploit/multi/http/atlassian_confluence_namespace_ognl_injection
 check
 back
-sleep 2
+sleep 1
 
-# exploit/windows/http/softing_sis_rce
+# Softing Secure Integration Server RCE
 use exploit/windows/http/softing_sis_rce
 check
 back
-sleep 2
+sleep 1
 
-# exploit/multi/http/cacti_pollers_sqli_rce
+# Cacti Pollers SQLi to RCE
 use exploit/multi/http/cacti_pollers_sqli_rce
 check
 back
-sleep 2
+sleep 1
 
-# exploit/windows/http/exchange_chainedserializationbinder_rce
+# Microsoft Exchange ChainedSerializationBinder RCE
 use exploit/windows/http/exchange_chainedserializationbinder_rce
 check
 back
-sleep 2
+sleep 1
 
-spool off
+# ---- End ----
 exit

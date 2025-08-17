@@ -1,59 +1,51 @@
 # Automated vulnerability verification script.
-# This script will check for the presence of multiple vulnerabilities on multiple hosts.
-# WARNING: This file should only be used in a legal, controlled lab environment.
+# WARNING: Use only in a legal, controlled lab environment.
 
-# Logging & session defaults
+# ---- Global Defaults ----
 setg VERBOSE true
 setg LogLevel 1
 setg HttpClientTimeout 8
 setg ConnectTimeout 8
 setg THREADS 4
-setg SRVHOST 127.0.0.1
-setg LHOST 127.0.0.1
 
-# Targets (edit this path if needed)
+# Routable IPs
+setg SRVHOST 0.0.0.0
+setg LHOST 0.0.0.0
+
+# Targets
 setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 
-#
+# ---- Module Checks ----
 
-# Exploit: Wing FTP Server NULL-byte Authentication Bypass (CVE-2025-47812)
-#
+# Wing FTP Server NULL-byte Authentication Bypass (CVE-2025-47812)
 use exploit/multi/http/wingftp_null_byte_rce
-set THREADS 1
+# set TARGETURI /    # add if check complains
+# set SSL true       # add if HTTPS
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: PHP CGI Argument Injection Remote Code Execution
-#
+# PHP CGI Argument Injection RCE (CVE-2024-4577)
 use exploit/windows/http/php_cgi_arg_injection_rce_cve_2024_4577
-set THREADS 1
+# set TARGETURI /php-cgi   # often required
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Veritas Backup Exec Agent Remote Code Execution
-#
+# Veritas Backup Exec Agent RCE
 use exploit/multi/veritas/beagent_sha_auth_rce
-set THREADS 1
+# set RPORT 10000   # default port, change if needed
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: NETGEAR ProSafe Network Management System 300 Arbitrary File Upload
-#
+# NETGEAR ProSafe NMS 300 Arbitrary File Upload RCE
 use exploit/windows/http/netgear_nms_rce
-set THREADS 1
+# set RPORT 8080    # default
+# set SSL true      # if HTTPS
 check
 back
-sleep 2
+sleep 1
 
-#
-
+# ---- End ----
 exit

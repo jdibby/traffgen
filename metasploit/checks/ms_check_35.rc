@@ -2,16 +2,18 @@
 # This script will check for the presence of multiple vulnerabilities on multiple hosts.
 # WARNING: This file should only be used in a legal, controlled lab environment.
 
-# Logging & session defaults
+# ---- Global Defaults ----
 setg VERBOSE true
 setg LogLevel 1
 setg HttpClientTimeout 8
 setg ConnectTimeout 8
 setg THREADS 4
-setg SRVHOST 127.0.0.1
-setg LHOST 127.0.0.1
 
-# Targets (edit this path if needed)
+# Listener defaults (adjust if needed)
+setg SRVHOST 0.0.0.0
+setg LHOST 0.0.0.0
+
+# Targets
 setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 
 # Optional HTTP defaults (uncomment if needed)
@@ -19,35 +21,37 @@ setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 # setg RPORT 443
 # setg SSL true
 
-# exploit/multi/http/bitbucket_authenticated_rce
+# ---- Module Checks ----
+
+# Bitbucket Authenticated RCE
 use exploit/multi/http/bitbucket_authenticated_rce
 check
 back
-sleep 2
+sleep 1
 
-# exploit/multi/http/gitlab_shell_rce
+# GitLab Shell RCE
 use exploit/multi/http/gitlab_shell_rce
 check
 back
-sleep 2
+sleep 1
 
-# exploit/multi/http/gitlab_ci_lfs_rce
+# GitLab CI LFS RCE
 use exploit/multi/http/gitlab_ci_lfs_rce
 check
 back
-sleep 2
+sleep 1
 
-# exploit/multi/http/roundcube_deserialization
+# Roundcube Deserialization
 use exploit/multi/http/roundcube_deserialization
 check
 back
-sleep 2
+sleep 1
 
-# exploit/multi/http/horde_webmail_rce
+# Horde Webmail RCE
 use exploit/multi/http/horde_webmail_rce
 check
 back
-sleep 2
+sleep 1
 
-spool off
+# ---- End ----
 exit

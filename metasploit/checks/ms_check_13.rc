@@ -2,80 +2,67 @@
 # This script will check for the presence of multiple vulnerabilities on multiple hosts.
 # WARNING: This file should only be used in a legal, controlled lab environment.
 
-# Logging & session defaults
+# ---- Global Defaults ----
 setg VERBOSE true
 setg LogLevel 1
 setg HttpClientTimeout 8
 setg ConnectTimeout 8
 setg THREADS 4
-setg SRVHOST 127.0.0.1
-setg LHOST 127.0.0.1
 
-# Targets (edit this path if needed)
+# Routable listener settings (Docker bridge IP, LAN IP, or 0.0.0.0 for broad compatibility)
+setg SRVHOST 0.0.0.0
+setg LHOST 0.0.0.0
+
+# Targets
 setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 
-#
+# ---- Module Checks ----
 
-# Exploit: FortiNet FortiClient Endpoint Management Server FCTID SQLi to RCE
-#
+# FortiClient EMS FCTID SQLi → RCE
 use exploit/windows/http/forticlient_ems_fctid_sqli
-set THREADS 1
+# set RPORT 443       # default
+# set SSL true        # if HTTPS
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Telerik Report Server Auth Bypass and Deserialization RCE
-#
+# Telerik Report Server Auth Bypass + Deserialization RCE
 use exploit/windows/http/telerik_report_server_deserialization
-set THREADS 1
+# set RPORT 8080      # default Telerik port
+# set SSL true        # if HTTPS
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: JetBrains TeamCity Unauthenticated Remote Code Execution
-#
+# JetBrains TeamCity Unauthenticated RCE (CVE-2023-42793)
 use exploit/multi/http/jetbrains_teamcity_rce_cve_2023_42793
-set THREADS 1
+# set RPORT 8111      # default TeamCity port
+# set SSL true        # if HTTPS
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Delta Electronics InfraSuite Device Master Deserialization
-#
+# Delta Electronics InfraSuite Device Master Deserialization
 use exploit/windows/misc/delta_electronics_infrasuite_deserialization
-set THREADS 1
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: ManageEngine ADManager Plus ChangePasswordAction Authenticated Command Injection
-#
+# ManageEngine ADManager Plus ChangePasswordAction Authenticated Command Injection
 use exploit/windows/http/manageengine_admanager_plus_cve_2023_29084_auth_cmd_injection
-set THREADS 1
 set USERNAME fake_user
 set PASSWORD fake_password
+# set DOMAIN fake.local
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: HorizontCMS Arbitrary PHP File Upload
-#
+# HorizontCMS Arbitrary PHP File Upload
 use exploit/multi/http/horizontcms_upload_exec
-set THREADS 1
+# set TARGETURI /     # adjust if CMS not at root
 check
 back
-sleep 2
+sleep 1
 
-#
-
+# ---- End ----
 exit

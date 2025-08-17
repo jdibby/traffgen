@@ -2,70 +2,59 @@
 # This script will check for the presence of multiple vulnerabilities on multiple hosts.
 # WARNING: This file should only be used in a legal, controlled lab environment.
 
-# Logging & session defaults
+# ---- Global Defaults ----
 setg VERBOSE true
 setg LogLevel 1
 setg HttpClientTimeout 8
 setg ConnectTimeout 8
 setg THREADS 4
-setg SRVHOST 127.0.0.1
-setg LHOST 127.0.0.1
 
-# Targets (edit this path if needed)
+# Routable listener settings (Docker bridge IP, LAN IP, or 0.0.0.0 for broad compatibility)
+setg SRVHOST 0.0.0.0
+setg LHOST 0.0.0.0
+
+# Targets
 setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 
-#
+# ---- Module Checks ----
 
-# Exploit: ZenTao Pro 8.8.2 Remote Code Execution
-#
+# ZenTao Pro 8.8.2 RCE
 use exploit/windows/http/zentao_pro_rce
-set THREADS 1
 set USERNAME fake_user
 set PASSWORD fake_password
+# set TARGETURI /zentao   # adjust if not default
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: LG Simple Editor Remote Code Execution
-#
+# LG Simple Editor RCE
 use exploit/windows/http/lg_simple_editor_rce
-set THREADS 1
+# set TARGETURI /    # adjust if needed
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: ManageEngine Endpoint Central Unauthenticated SAML RCE
-#
+# ManageEngine Endpoint Central Unauthenticated SAML RCE (CVE-2022-47966)
 use exploit/windows/http/manageengine_endpoint_central_saml_rce_cve_2022_47966
-set THREADS 1
+# set ISSUER_URL https://example.invalid/   # often required
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: SQL Server Reporting Services (SSRS) ViewState Deserialization
-#
+# SQL Server Reporting Services (SSRS) ViewState Deserialization
 use exploit/windows/http/ssrs_navcorrector_viewstate
-set THREADS 1
+# set TARGETURI /Reports   # adjust if not default
 check
 back
-sleep 2
+sleep 1
 
-#
-
-# Exploit: Gogs Git Hooks Remote Code Execution
-#
+# Gogs Git Hooks RCE
 use exploit/multi/http/gogs_git_hooks_rce
-set THREADS 1
+# set RPORT 3000           # Gogs default port
+# set TARGETURI /          # adjust if not default
 check
 back
-sleep 2
+sleep 1
 
-#
-
+# ---- End ----
 exit

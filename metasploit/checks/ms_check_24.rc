@@ -2,16 +2,18 @@
 # This script will check for the presence of multiple vulnerabilities on multiple hosts.
 # WARNING: This file should only be used in a legal, controlled lab environment.
 
-# Logging & session defaults
+# ---- Global Defaults ----
 setg VERBOSE true
 setg LogLevel 1
 setg HttpClientTimeout 8
 setg ConnectTimeout 8
 setg THREADS 4
-setg SRVHOST 127.0.0.1
-setg LHOST 127.0.0.1
 
-# Targets (edit this path if needed)
+# Listener defaults (adjust for your lab environment)
+setg SRVHOST 0.0.0.0
+setg LHOST 0.0.0.0
+
+# Targets
 setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 
 # Optional HTTP defaults (uncomment if needed)
@@ -19,35 +21,37 @@ setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 # setg RPORT 443
 # setg SSL true
 
-# exploit/linux/http/f5_icontrol_rest_auth_bypass_rce
+# ---- Module Checks ----
+
+# F5 iControl REST Auth Bypass RCE
 use exploit/linux/http/f5_icontrol_rest_auth_bypass_rce
 check
 back
-sleep 2
+sleep 1
 
-# auxiliary/gather/fortinet_fortios_ssl_vpn_info_disclosure
+# Fortinet FortiOS SSL VPN Information Disclosure
 use auxiliary/gather/fortinet_fortios_ssl_vpn_info_disclosure
 check
 back
-sleep 2
+sleep 1
 
-# auxiliary/scanner/http/citrix_dir_traversal
+# Citrix Directory Traversal Scanner
 use auxiliary/scanner/http/citrix_dir_traversal
 check
 back
-sleep 2
+sleep 1
 
-# exploit/multi/http/struts2_namespace_ognl
+# Apache Struts2 Namespace OGNL Injection
 use exploit/multi/http/struts2_namespace_ognl
 check
 back
-sleep 2
+sleep 1
 
-# exploit/multi/http/struts2_content_type_ognl
+# Apache Struts2 Content-Type OGNL Injection
 use exploit/multi/http/struts2_content_type_ognl
 check
 back
-sleep 2
+sleep 1
 
-spool off
+# ---- End ----
 exit
