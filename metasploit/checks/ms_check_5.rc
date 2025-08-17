@@ -3,10 +3,13 @@
 # WARNING: This file should only be used in a legal, controlled lab environment.
 
 # Logging & session defaults
+setg VERBOSE true
 setg LogLevel 1
-setg HttpClientTimeout 5
+setg HttpClientTimeout 8
+setg ConnectTimeout 8
 setg THREADS 4
-
+setg SRVHOST 127.0.0.1
+setg LHOST 127.0.0.1
 # Targets (edit this path if needed)
 setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 
