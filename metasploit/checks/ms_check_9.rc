@@ -20,56 +20,65 @@ setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 
 # Apache Commons Text RCE (Text4Shell)
 use exploit/multi/http/apache_commons_text4shell
-set PARAM q              # required by module
-# set TARGETURI /         # adjust if needed
-# set SSL true            # if target is HTTPS
+set PARAM q                 # required by module
+# set TARGETURI /           # adjust if needed
+# set RPORT 8080            # common default for webapps
+# set SSL true              # enable if target uses HTTPS
 check
 back
 sleep 1
 
 # Gitea Git Hooks RCE
 use exploit/multi/http/gitea_git_hooks_rce
-# set TARGETURI /         # adjust if not default
-# set RPORT 3000          # Gitea default port
+# set TARGETURI /           # adjust if not default
+# set RPORT 3000            # default for Gitea
+# set SSL true              # enable if HTTPS
 check
 back
 sleep 1
 
 # FlexDotnetCMS Arbitrary ASP File Upload
 use exploit/windows/http/flexdotnetcms_upload_exec
-# set TARGETURI /         # adjust if needed
+# set TARGETURI /           # adjust if needed
+# set RPORT 80              # default
+# set SSL true              # enable if HTTPS
 check
 back
 sleep 1
 
 # WordPress Really Simple SSL Plugin 2FA Bypass → RCE
 use exploit/multi/http/wp_reallysimplessl_2fa_bypass_rce
-# set TARGETURI /         # adjust if needed
+# set TARGETURI /           # adjust if needed
+# set RPORT 443             # typical WordPress HTTPS
+# set SSL true              # if HTTPS
 check
 back
 sleep 1
 
 # ManageEngine ADSelfService Plus CVE-2022-28810
 use exploit/windows/http/manageengine_adselfservice_plus_cve_2022_28810
-# set USERNAME fake_user
-# set PASSWORD fake_password
+set USERNAME fake_user      # required creds
+set PASSWORD fake_password  # required creds
+# set RPORT 8888            # ManageEngine default
 check
 back
 sleep 1
 
 # Progress WS_FTP RCE (CVE-2023-40044)
 use exploit/windows/http/ws_ftp_rce_cve_2023_40044
-# set RPORT 443           # WS_FTP default
-# set SSL true            # if HTTPS
+# set RPORT 443             # WS_FTP default HTTPS
+# set SSL true              # if HTTPS
 check
 back
 sleep 1
 
 # Microsoft SharePoint SSI + ViewState RCE
 use exploit/windows/http/sharepoint_ssi_viewstate
-# set DOMAIN fake.local
-# set USERNAME fake_user
-# set PASSWORD fake_password
+set DOMAIN fake.local       # required
+set USERNAME fake_user      # required
+set PASSWORD fake_password  # required
+# set RPORT 443             # SharePoint HTTPS
+# set SSL true
 check
 back
 sleep 1

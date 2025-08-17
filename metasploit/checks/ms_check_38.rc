@@ -16,11 +16,6 @@ setg LHOST 0.0.0.0
 # Targets
 setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
 
-# Optional HTTP defaults (uncomment if needed)
-# setg TARGETURI /
-# setg RPORT 443
-# setg SSL true
-
 # ---- Module Checks ----
 
 # Apache Struts2 REST XStream Deserialization
@@ -29,26 +24,26 @@ check
 back
 sleep 1
 
-# Laravel Ignition RCE
-use exploit/multi/http/laravel_ignition_rce
+# Apache Struts2 Content-Type OGNL Injection (S2-045)
+use exploit/multi/http/struts2_content_type_ognl
 check
 back
 sleep 1
 
-# CodeIgniter Session Deserialization
-use exploit/multi/http/codeigniter_session_deserialize
+# Atlassian Confluence Widget Connector OGNL Injection
+use exploit/multi/http/atlassian_confluence_widget_connector
 check
 back
 sleep 1
 
-# vBulletin Widget Template RCE
-use exploit/multi/http/vbulletin_widget_tpl_rce
+# Oracle WebLogic Server Deserialization RCE (T3)
+use exploit/multi/misc/weblogic_deserialize
 check
 back
 sleep 1
 
-# MyBB Admin Control Panel RCE
-use exploit/multi/http/mybb_admin_rce
+# Jenkins CLI Java Deserialization
+use exploit/multi/http/jenkins_cli_serialize
 check
 back
 sleep 1
