@@ -549,7 +549,7 @@ def speedtest_fast():
                 console.log(f"Starting Fast.com test {i}/{duration} (timeout {timeout_per_test}s)")
                 try:
                     result = subprocess.run(
-                        "python3 -m fastcli'",
+                        "python3 -m fastcli",
                         shell=True,
                         check=True,
                         timeout=timeout_per_test,
