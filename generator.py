@@ -515,36 +515,70 @@ def traceroute_random():
     except Exception as e:
         ui_error(f"[traceroute_random] error: {e}")
 
-
 def speedtest_fast():
-    ui_banner("Netflix Fast.com", "Running fastcli multiple times")
     try:
-        duration = _size_to_limits(ARGS.size, 1, 2, 3, 4)
-        timeout_per_test = 20
+        # Map size -> duration
+        if ARGS.size == 'S':
+            duration = 1
+        elif ARGS.size == 'M':
+            duration = 2
+        elif ARGS.size == 'L':
+            duration = 3
+        elif ARGS.size == 'XL':
+            duration = 4
+        else:
+            duration = 2
 
-        with Progress(SpinnerColumn(), TextColumn("[cyan]FAST.com[/]"), MofNCompleteColumn(), BarColumn(), TimeElapsedColumn(), console=console) as progress:
+        timeout_per_test = 20
+        console = Console(highlight=False)
+
+        console.print(Panel.fit("Netflix Fast.com\nRunning fastcli tests", 
+                                title="Speed Test", border_style="green"))
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[cyan]FAST.com[/]"),
+            MofNCompleteColumn(),
+            BarColumn(),
+            TimeElapsedColumn(),
+            console=console
+        ) as progress:
             task = progress.add_task("fast", total=duration)
+
             for i in range(1, duration + 1):
                 console.log(f"Starting Fast.com test {i}/{duration} (timeout {timeout_per_test}s)")
                 try:
                     result = subprocess.run(
-                        'python3 -m fastcli',
+                        "fastcli",
                         shell=True,
                         check=True,
                         timeout=timeout_per_test,
                         capture_output=True,
                         text=True
                     )
-                    console.log(f"[green]OK[/] fastcli result:\n{result.stdout.strip()[:400]}")
+                    console.log(f"[green]Test {i} completed successfully.[/]")
+                    if result.stdout.strip():
+                        console.log(f"stdout:\n{result.stdout.strip()[:400]}")
+                    if result.stderr.strip():
+                        console.log(f"stderr:\n{result.stderr.strip()[:400]}")
                 except subprocess.TimeoutExpired:
-                    console.log("[yellow]Timeout[/] fastcli")
+                    console.log(f"[yellow]Test {i} timed out after {timeout_per_test}s.[/]")
                 except subprocess.CalledProcessError as e:
-                    console.log(f"[red]Error[/] fastcli: {e}\n{(e.stderr or '')[:200]}")
-                finally:
-                    progress.update(task, advance=1)
-        ui_ok("Fast.com tests complete")
+                    console.log(f"[red]Test {i} failed: {e}[/]")
+                    if e.stdout:
+                        console.log(f"stdout:\n{e.stdout.strip()[:400]}")
+                    if e.stderr:
+                        console.log(f"stderr:\n{e.stderr.strip()[:400]}")
+                except Exception as e:
+                    console.log(f"[red]Unexpected error during test {i}: {e}[/]")
+
+                progress.update(task, advance=1)
+
+        console.print("[bold green]All Fast.com tests attempted.[/]")
+    except (ssl.SSLError, socket.error) as e:
+        print(f"[speedtest_fast] network/ssl exception error: {e}")
     except Exception as e:
-        ui_error(f"[speedtest_fast] error: {e}")
+        print(f"[speedtest_fast] unexpected exception error: {e}")
 
 
 def nmap_1024os():
