@@ -965,7 +965,6 @@ A versatile tool for simulating various network traffic types with a clean termi
 def build_testsuite():
     if ARGS.suite == 'all':
         testsuite = [
-            bigfile,
             webcrawl,
             dig_random,
             bgp_peering,
