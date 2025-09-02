@@ -106,7 +106,6 @@ This document outlines the various network connectivity, web protocol, security,
 The following functions are executed when running the complete suite:
 
 ```
-                bigfile
                 webcrawl
                 dig_random
                 bgp_peering
