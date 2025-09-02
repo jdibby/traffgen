@@ -1967,7 +1967,7 @@ bgp_neighbors = [
     "12.12.12.12",
 ]
 
-kyber_random = [
+kyber_endpoints = [
     "https://192.168.1.1",
     "https://10.0.0.1",
     "https://172.16.0.1",
