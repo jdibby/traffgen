@@ -58,6 +58,7 @@ This document outlines the various network connectivity, web protocol, security,
 | **Squatting Domain Filtering Checks** | `squatting_domains` | `squatting` | This check uses [`dnstwist`](https://github.com/elceef/dnstwist) to **generate and verify the real registration status of squatting domains**, employing various techniques such as **typosquatting**, **bitsquatting**, and **homograph attacks**. These variations are derived from a static list of real domains in endpoints.py. The goal is to test security controls that prevent access to these undesirable lookalike domains. |
 | **Nikto Scans** | `web_scanner` | `web-scanner` | Launches a Nikto web vulnerability scan against `testmyids.com`, emulating attacker reconnaissance behavior. Scan intensity is configurable via the `--size` argument (`S`, `M`, `L`, `XL`), which adjusts the `-maxtime` value (60–240 seconds). All scans use a forced 1-second request timeout to simulate aggressive probing. Commonly used to validate web-based IDS detection of high-noise application-layer scans. |
 | **Metasploit Checks** | `metasploit_check` | `metasploit-check` | Runs randomized **Metasploit `.rc` scripts** in `check` mode against targets listed in `targets.list`. Each script includes 2–5 modules from categories like **web**, **SSH**, **SMB**, and **fuzzing**. All modules use `check` only (no exploitation), include `THREADS 1`, and inject a `sleep 2` delay between checks to simulate slow scans. This activity is designed to **trigger IDS/IPS alerts** for lab validation and blue team exercises without causing system compromise. |
+| **Kyber Tests** | `kyber_random` | `kyber` | Transmits **HTTPS/TLS GET requests** to secure web servers, utilizing randomized `User-Agent` strings. This validates **TLS handshake completion**, **certificate chain validation**, and **secure web content retrieval**. What is unique is this test simulates Kyber encrypted client hellos (ECH). |
 
 ---
 
@@ -122,6 +123,7 @@ The following functions are executed when running the complete suite:
                 ping_random
                 traceroute_random
                 snmp_random
+                kyber_random
                 ips
                 ads_random
                 github_domain_check
