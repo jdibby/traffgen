@@ -1,5 +1,5 @@
 # ---------- Stage 1: build GoBGP ----------
-FROM ubuntu:24.04 AS gobgp-build
+FROM ubuntu:25.10 AS gobgp-build
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -14,7 +14,7 @@ RUN git -c http.sslVerify=false clone https://github.com/osrg/gobgp.git . && \
     strip /tmp/gobgp-bin/gobgp /tmp/gobgp-bin/gobgpd
 
 # ---------- Stage 2: build Metasploit (fat builder) ----------
-FROM ubuntu:24.04 AS msf-build
+FROM ubuntu:25.10 AS msf-build
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -42,7 +42,7 @@ RUN gem install --no-document bundler && \
     find / -name "stringio-3.0.4.gemspec" -delete || true
 
 # ---------- Stage 3: runtime (slim) ----------
-FROM ubuntu:24.04
+FROM ubuntu:25.10
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=America/Denver
 
@@ -50,7 +50,7 @@ ENV TZ=America/Denver
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tzdata ca-certificates curl wget git \
     iproute2 traceroute iputils-ping net-tools netcat-openbsd dnsutils openssh-client \
-    nmap snmp \
+    nmap snmp openssl libssl-dev \
     perl python3 python3-pip sqlite3 ruby make bash nikto \
   && ln -fs /usr/share/zoneinfo/$TZ /etc/localtime \
   && dpkg-reconfigure --frontend noninteractive tzdata \

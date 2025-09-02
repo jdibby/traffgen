@@ -343,6 +343,26 @@ def https_random():
         ui_ok("HTTPS random complete")
     except Exception as e:
         ui_error(f"[https_random] error: {e}")
+        
+def kyber_random():
+    ui_banner("Kyber HEAD", "Random endpoints")
+    try:
+        target_urls = _size_to_limits(ARGS.size, 10, 20, 50, len(kyber_endpoints))
+        random.shuffle(kyber_endpoints)
+
+        with Progress(SpinnerColumn(), TextColumn("[cyan]HTTPS[/]"), BarColumn(), TimeElapsedColumn(), console=console) as progress:
+            task = progress.add_task("kyber", total=target_urls)
+            for count, url in enumerate(kyber_endpoints[:target_urls], 1):
+                user_agent = random.choice(user_agents)
+                cmd = f"curl -k -s --curves X25519MLKEM768 --show-error --connect-timeout 5 -I -o /dev/null --max-time 5 -A '{user_agent}' {url}"
+                console.log(f"HTTPS ({count}/{target_urls}) {url}")
+                try:
+                    subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, timeout=10)
+                finally:
+                    progress.update(task, advance=1)
+        ui_ok("Kyber random complete")
+    except Exception as e:
+        ui_error(f"[kyber_random] error: {e}")
 
 
 def ai_https_random():
@@ -973,6 +993,7 @@ def build_testsuite():
             http_download_zip,
             http_random,
             https_random,
+            kyber_random,
             https_crawl,
             pornography_crawl,
             metasploit_check,
@@ -1015,6 +1036,7 @@ def build_testsuite():
         'icmp': [ping_random, traceroute_random],
         'snmp': [snmp_random],
         'ips': [ips],
+        'kyber': [kyber_random],
         'ads': [ads_random],
         'domain-check': [github_domain_check],
         'phishing-domains': [github_phishing_domain_check],
