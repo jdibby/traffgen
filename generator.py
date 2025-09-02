@@ -958,7 +958,7 @@ A versatile tool for simulating various network traffic types with a clean termi
 
     suite_choices = [
         'all', 'ads', 'ai', 'bigfile', 'bgp', 'crawl', 'dlp', 'dns', 'ftp',
-        'domain-check', 'http', 'https', 'icmp', 'ips', 'malware-agents', 'malware-download',
+        'domain-check', 'http', 'https', 'kyber', 'icmp', 'ips', 'malware-agents', 'malware-download',
         'metasploit-check', 'netflix', 'nmap', 'ntp', 'phishing-domains',
         'pornography', 'snmp', 'ssh', 'squatting', 'url-response', 'virus', 'web-scanner',
     ]
