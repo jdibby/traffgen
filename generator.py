@@ -347,7 +347,7 @@ def https_random():
 def kyber_random():
     ui_banner("Kyber HEAD", "Random endpoints")
     try:
-        target_urls = _size_to_limits(ARGS.size, 10, 20, 50, len(kyber_endpoints))
+        target_urls = _size_to_limits(ARGS.size, 10, 20, 50, len(https_endpoints))
         random.shuffle(https_endpoints)
 
         with Progress(SpinnerColumn(), TextColumn("[cyan]HTTPS[/]"), BarColumn(), TimeElapsedColumn(), console=console) as progress:
