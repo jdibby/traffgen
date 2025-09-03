@@ -354,7 +354,7 @@ def kyber_random():
             task = progress.add_task("kyber", total=target_urls)
             for count, url in enumerate(https_endpoints[:target_urls], 1):
                 user_agent = random.choice(user_agents)
-                cmd = f"curl -k -s --curves X25519MLKEM768 --show-error --connect-timeout 5 -I -o /dev/null --max-time 2 --retry 0 -A '{user_agent}' {url}"
+                cmd = f"curl -k -s --curves X25519:X25519MLKEM768 --show-error --connect-timeout 5 -I -o /dev/null --max-time 2 --retry 0 -A '{user_agent}' {url}"
                 console.log(f"HTTPS ({count}/{target_urls}) {url}")
                 try:
                     subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, timeout=10)
