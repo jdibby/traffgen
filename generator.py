@@ -1,14 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Generator with Rich UI:
-- Consistent panels/banners instead of manual hashes
-- Live progress bars where useful (downloads, waits)
-- Status spinners for 'in progress' operations
-- Structured startup summary
-- Keeps your watchdog logic and arguments
-- Drops Colorama/tqdm; uses Rich everywhere
-"""
 
 import os, sys, time, random, threading, argparse, subprocess, socket, ssl, traceback
 import urllib.request
@@ -345,7 +336,7 @@ def https_random():
     except Exception as e:
         ui_error(f"[https_random] error: {e}")
         
-def kyber_random():
+'''def kyber_random():
     ui_banner("Kyber HEAD", "Random endpoints")
     try:
         target_urls = _size_to_limits(ARGS.size, 10, 20, 50, len(https_endpoints))
@@ -354,6 +345,27 @@ def kyber_random():
         with Progress(SpinnerColumn(), TextColumn("[cyan]HTTPS[/]"), BarColumn(), TimeElapsedColumn(), console=console) as progress:
             task = progress.add_task("kyber", total=target_urls)
             for count, url in enumerate(https_endpoints[:target_urls], 1):
+                user_agent = random.choice(user_agents)
+                cmd = f"curl -k -s --curves X25519:X25519MLKEM768 --show-error --connect-timeout 5 -I -o /dev/null --max-time 2 --retry 0 -A '{user_agent}' {url}"
+                console.log(f"HTTP ({count}/{target_urls}) {url} | UA: {user_agent[:50]}")
+                try:
+                    subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, timeout=10)
+                finally:
+                    progress.update(task, advance=1)
+        ui_ok("Kyber random complete")
+    except Exception as e:
+        ui_error(f"[kyber_random] error: {e}")
+'''
+        
+def kyber_random():
+    ui_banner("Kyber HEAD", "Random endpoints")
+    try:
+        target_urls = _size_to_limits(ARGS.size, 10, 20, 50, len(kyber_endpoints))
+        random.shuffle(kyber_endpoints)
+
+        with Progress(SpinnerColumn(), TextColumn("[cyan]HTTPS[/]"), BarColumn(), TimeElapsedColumn(), console=console) as progress:
+            task = progress.add_task("kyber", total=target_urls)
+            for count, url in enumerate(kyber_endpoints[:target_urls], 1):
                 user_agent = random.choice(user_agents)
                 cmd = f"curl -k -s --curves X25519:X25519MLKEM768 --show-error --connect-timeout 5 -I -o /dev/null --max-time 2 --retry 0 -A '{user_agent}' {url}"
                 console.log(f"HTTP ({count}/{target_urls}) {url} | UA: {user_agent[:50]}")
