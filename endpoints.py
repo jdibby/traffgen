@@ -1970,4 +1970,5 @@ bgp_neighbors = [
 
 kyber_endpoints = [
     "172.22.10.112",
+    "10.177.177.56"
 ]
