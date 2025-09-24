@@ -10,7 +10,7 @@ import urllib3
 from bs4 import BeautifulSoup
 
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
-from endpoints import *  # your existing endpoints file
+from endpoints import *
 
 # ---- Rich UI imports ----
 from rich.console import Console
@@ -21,7 +21,7 @@ from rich import box
 
 console = Console(highlight=False)
 
-# Disable SSL warning for self-signed certs (as in your original script)
+# Disable SSL warning for self-signed certs
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -70,7 +70,7 @@ def progress_wait(seconds: int, label: str = "Waiting"):
 
 
 # ==========================
-# Watchdog (unchanged logic)
+# Watchdog
 # ==========================
 class watchdog:
     def __init__(self, timeout_seconds):
@@ -208,10 +208,8 @@ def bigfile():
     except Exception as e:
         ui_error(f"[bigfile] unexpected exception error: {e}")
 
-
 def _size_to_limits(size, s, m, l, xl):
     return {'S': s, 'M': m, 'L': l, 'XL': xl}.get(size, m)
-
 
 def dig_random():
     ui_banner("DNS", "Random dig queries")
