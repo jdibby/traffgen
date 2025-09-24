@@ -542,12 +542,12 @@ def speedtest_fast():
         timeout_per_test = 20
         console = Console(highlight=False)
 
-        console.print(Panel.fit("Netflix Fast.com\nRunning fastcli tests", 
+        console.print(Panel.fit("Netflix fast.com\nRunning fastcli tests", 
                                 title="Speed Test", border_style="green"))
 
         with Progress(
             SpinnerColumn(),
-            TextColumn("[cyan]FAST.com[/]"),
+            TextColumn("[cyan]fast.com[/]"),
             MofNCompleteColumn(),
             BarColumn(),
             TimeElapsedColumn(),
@@ -556,7 +556,7 @@ def speedtest_fast():
             task = progress.add_task("fast", total=duration)
 
             for i in range(1, duration + 1):
-                console.log(f"Starting Fast.com test {i}/{duration} (timeout {timeout_per_test}s)")
+                console.log(f"Starting fast.com test {i}/{duration} (timeout {timeout_per_test}s)")
                 try:
                     result = subprocess.run(
                         "python3 -m fastcli",
