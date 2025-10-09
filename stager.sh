@@ -169,7 +169,7 @@ echo "${BOLD}### DOCKER INSTALLATION COMPLETE ###${NORMAL}"
 echo ""
 
 echo "${BOLD}### STARTING TRAFFGEN CONTAINER ###${NORMAL}"
-docker run --pull=always --detach --restart unless-stopped jdibby/traffgen:latest --suite=all --size=S --max-wait-secs=40 --loop
+docker run --pull=always --detach --restart unless-stopped jdibby/traffgen:latest --suite=all --size=S --max-wait-secs=20 --loop
 
 echo ""
 echo "${BOLD}### TRAFFGEN INSTALL COMPLETE ###${NORMAL}"
