@@ -800,7 +800,7 @@ ai_endpoints = [
     "https://koalawriter.com",
     "https://tidio.com",
     "https://digitalgenius.com",
-    "https://paperswithcode.com"
+    "https://paperswithcode.com",
     ]
 
 user_agents = [
