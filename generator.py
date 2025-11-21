@@ -531,15 +531,15 @@ def speedtest_fast():
         if ARGS.size == 'S':
             duration = 1
         elif ARGS.size == 'M':
-            duration = 2
+            duration = 1
         elif ARGS.size == 'L':
-            duration = 3
-        elif ARGS.size == 'XL':
-            duration = 4
-        else:
             duration = 2
+        elif ARGS.size == 'XL':
+            duration = 3
+        else:
+            duration = 1
 
-        timeout_per_test = 20
+        timeout_per_test = 5
         console = Console(highlight=False)
 
         console.print(Panel.fit("Netflix fast.com\nRunning fastcli tests", 
