@@ -237,7 +237,7 @@ Three-stage multi-arch build (`linux/amd64`, `linux/arm64`, `linux/arm/v7`):
 
 **❤️ Healthcheck:** `healthcheck.sh` uses `pgrep` to verify `generator.py` is running. Evaluated every 10 seconds with a 3-second timeout and 2 retries.
 
-**🚀 Entrypoint:** `docker-entrypoint.sh` installs any injected CA certificates, then launches `python3 -u /traffgen/generator.py`. Default `CMD` is `--suite=all --size=XS --max-wait-secs=40 --loop`.
+**🚀 Entrypoint:** `docker-entrypoint.sh` installs any injected CA certificates, then launches `python3 -u /traffgen/generator.py`. Default `CMD` is `--suite=all --size=XS --max-wait-secs=20 --loop`.
 
 **📊 Suite Summary:** After every suite completes, a summary panel is printed to the CLI — see [Suite Summary](#-suite-summary) below.
 

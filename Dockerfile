@@ -164,4 +164,4 @@ RUN rm -rf \
 # Entrypoint — installs any custom CA certs before launching the generator.
 # Bind-mount a .crt file or pass EXTRA_CA_CERT env var to inject a CA.
 ENTRYPOINT ["/traffgen/docker-entrypoint.sh"]
-CMD ["--suite=all", "--size=XS", "--max-wait-secs=40", "--loop"]
+CMD ["--suite=all", "--size=XS", "--max-wait-secs=20", "--loop"]
