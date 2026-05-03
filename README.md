@@ -5,7 +5,7 @@
 [![Docker Hub](https://img.shields.io/docker/pulls/jdibby/traffgen?logo=docker&label=Docker%20Hub)](https://hub.docker.com/r/jdibby/traffgen)
 [![Multi-arch](https://img.shields.io/badge/arch-amd64%20%7C%20arm64%20%7C%20arm%2Fv7-blue?logo=linux)](https://hub.docker.com/r/jdibby/traffgen)
 
-Traffgen simulates realistic network traffic across **46 test suites** — DNS, HTTP/S, FTP, SSH, BGP, ICMP, NTP, SNMP, DoH, DoT, C2 beacons, DNS exfiltration, AI/LLM DLP, Metasploit checks, malware downloads, phishing probes, web scanning, and more.
+Traffgen simulates realistic network traffic across **47 test suites** — DNS, HTTP/S, FTP, SSH, BGP, ICMP, NTP, SNMP, DoH, DoT, C2 beacons, DNS exfiltration, AI/LLM DLP, Metasploit checks, malware downloads, phishing probes, web scanning, and more.
 
 Purpose-built to stress-test **firewalls**, **IDS/IPS**, **URL filters**, **DLP engines**, **CASB platforms**, and **SIEM pipelines**.
 
@@ -83,7 +83,7 @@ sudo bash < <(curl -s https://raw.githubusercontent.com/jdibby/traffgen/refs/hea
 | 🔒 `https` | HTTPS HEAD requests to a wide endpoint pool followed by an iterative TLS crawl. Tests TLS inspection policy, certificate validation enforcement, and HTTPS download logging. |
 | 🕷️ `crawl` | Iterative web crawl from a configurable seed URL (`--crawl-start`). Follows links up to a depth that scales with `--size`. Mimics a browser session for URL categorisation and user-activity analytics testing. |
 | ⏱️ `url-response` | Measures HTTPS response times across a diverse URL set using the Python `requests` library. Populates URL-filter logs and response-time dashboards. |
-| 💾 `bigfile` | Streams a 5 GB HTTP download to `/dev/null` for bandwidth saturation and QoS testing. Validates that large-file or bandwidth-cap policies trigger correctly and that flow records capture high-volume sessions. |
+| 💾 `bigfile` | Streams an HTTP download to `/dev/null` — file size scales with `--size` (S=100 MB, M=1 GB, L=2 GB, XL=5 GB). Tests large-file and bandwidth-cap policies across the full volume range without always hitting the ceiling. |
 | 📂 `ftp` | FTP file download via `curl` with rate limiting against a public test server. Validates FTP inspection, logging, and file-transfer policy enforcement. |
 
 ---
@@ -160,6 +160,14 @@ All requests use a fake `sk-DLPTEST-…` token — responses are HTTP 401/403. T
 | 🤖 `ai-browse` | HEAD requests to AI and LLM service endpoints (API gateways, model-serving hosts). Tests the AI-category URL filter independently from browser-facing chat UIs. Useful for testing API-level AI access policies. |
 | 🔞 `pornography` | HTTPS crawl of adult-content endpoints. Tests the adult-content URL filter category and confirms policy enforcement is logging correctly. |
 | 🗂️ `dlp` | Downloads DLP test files over HTTPS containing structured PII and PCI data patterns (SSNs, credit card numbers, bank account numbers). Tests inline DLP file-scanning and download-inspection policies. |
+
+---
+
+### 📞 VoIP & Video
+
+| Suite | Description |
+|---|---|
+| 📞 `voip` | Simulates voice and video call traffic across three phases to trigger application-identification on NGFWs and SASE platforms (Cato Networks, Prisma Access, Palo Alto, etc.):<br><br>**Phase 1 — STUN Binding Requests:** Raw UDP packets with the STUN magic cookie (`0x2112A442`) sent to public STUN servers (Google, Cloudflare, Zoom, Mozilla, and others on UDP/3478). The magic cookie is the primary fingerprint app-ID engines use to classify WebRTC, Zoom, Teams, and generic VoIP sessions.<br><br>**Phase 2 — UCaaS Signaling:** HTTPS requests to meeting/calling APIs for Zoom, Microsoft Teams, Cisco WebEx, Google Meet, Slack, RingCentral, 8x8, GoTo Meeting, Discord, WhatsApp, FaceTime, Vonage, Twilio, and Jitsi. URL-category databases identify these hostnames as "voice/video-conferencing" and trigger the relevant policy hit.<br><br>**Phase 3 — RTP Media Simulation:** UDP packets with valid RTP headers (V=2, PCMU/PCMA audio or H.264/H.265 video payload type) sent to STUN server IPs on standard media ports (5004, 5005, 16384+). Triggers RTP/SRTP app-classification rules without establishing a real media session. Packets are paced with 0.2–0.8 s gaps to mimic real codec timing. |
 
 ---
 
@@ -333,6 +341,8 @@ All network targets are defined as plain Python lists in `endpoints.py` — DNS 
 | `pornography_endpoints` | `pornography` | Adult-content URLs |
 | `dlp_https_endpoints` | `dlp` | DLP test-data file URLs |
 | `user_agents` | all HTTP suites | 500 realistic browser user-agent strings |
+| `stun_servers` | `voip` | `(host, port)` tuples for STUN Binding Requests |
+| `ucaas_endpoints` | `voip` | UCaaS platform signaling URLs (Zoom, Teams, WebEx, etc.) |
 | `llm_api_endpoints` | `llm-dlp` | LLM provider REST API paths |
 | `llm_web_endpoints` | `llm-dlp`, `ai-browse` | Browser-facing AI app URLs |
 
