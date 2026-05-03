@@ -300,7 +300,58 @@ The color-coded HTTP code buckets tell you what your security stack is doing wit
 
 ## 🎯 Custom Endpoints
 
-All network targets — DNS resolvers, URLs, user-agent strings, SNMP community strings, BGP neighbors, and more — are defined as plain Python lists in `endpoints.py`. The file is loaded at startup and kept separate from test logic so targets can be swapped without touching generator code.
+All network targets are defined as plain Python lists in `endpoints.py` — DNS resolvers, domain names, HTTPS URLs, user-agent strings, SNMP community strings, BGP neighbors, and more. Test logic lives in `generator.py` and references these lists by name, so you can customise targets without touching generator code.
+
+### Variable reference
+
+| Variable | Used by | Contents |
+|---|---|---|
+| `dns_endpoints` | `dns`, `dns-exfil` | Public DNS resolver IPs |
+| `dns_urls` | `dns`, `http`, `doh` | Domain names to resolve / request |
+| `doh_providers` | `doh` | DNS-over-HTTPS provider URLs |
+| `dot_servers` | `dot` | `(ip, servername)` tuples for DNS-over-TLS |
+| `dns_exfil_domains` | `dns-exfil` | Domains used for DNS-tunnel simulation |
+| `icmp_endpoints` | `icmp`, `traceroute` | IPs for ping and traceroute |
+| `bgp_neighbors` | `bgp` | BGP peer IPs for GoBGP session attempts |
+| `ntp_endpoints` | `ntp` | NTP server hostnames |
+| `ssh_endpoints` | `ssh` | SSH probe targets |
+| `nmap_endpoints` | `nmap` | Nmap port-scan targets |
+| `snmp_endpoints` | `snmp` | SNMP walk targets |
+| `snmp_strings` | `snmp` | SNMP community strings |
+| `http_endpoints` | `http` | Plain HTTP hostnames |
+| `https_endpoints` | `https`, `crawl`, `http3`, `speedtest`, `web-scanner` | General HTTPS URLs |
+| `ad_endpoints` | `ads` | Ad-network and tracker URLs |
+| `ai_endpoints` | `ai-browse` | AI-service HTTPS endpoints |
+| `webscan_endpoints` | `web-scanner` | Intentionally-vulnerable web app targets |
+| `kyber_endpoints` | `kyber` | Post-quantum TLS server URLs |
+| `malware_endpoints` | `malware-agents` | Malware / C2-category domains |
+| `malware_user_agents` | `malware-agents`, `c2-beacon` | Bot / malware user-agent strings |
+| `malware_files` | `malware-download` | RAT archive URLs for download testing |
+| `c2_beacon_targets` | `c2-beacon` | Public echo services for C2 check-in simulation |
+| `virus_endpoints` | `virus` | EICAR / AV-test file URLs |
+| `squatting_endpoints` | `domain-check`, `phishing-domains` | Domains probed for squatting detection |
+| `pornography_endpoints` | `pornography` | Adult-content URLs |
+| `dlp_https_endpoints` | `dlp` | DLP test-data file URLs |
+| `user_agents` | all HTTP suites | 500 realistic browser user-agent strings |
+| `llm_api_endpoints` | `llm-dlp` | LLM provider REST API paths |
+| `llm_web_endpoints` | `llm-dlp`, `ai-browse` | Browser-facing AI app URLs |
+
+### User agents
+
+The `user_agents` list ships **500 entries** covering current 2024–2025 devices:
+
+- **Windows** — Chrome 120–136, Firefox 120–137, Edge 120–136
+- **macOS Sonoma/Sequoia** — Safari 17/18, Chrome, Firefox, Edge
+- **iPhone iOS 17/18** — Safari, Chrome (CriOS), Firefox (FxiOS)
+- **iPad iPadOS 17/18** — Safari, Chrome
+- **Android 13–15** — Samsung Galaxy S23/S24/S25, A-series, Z-Fold, Pixel 6–9, OnePlus, Xiaomi, OPPO, vivo, Motorola, POCO, Redmi
+- **Samsung Internet** 23–26, Huawei Browser, Opera, Vivaldi, Brave
+- **Linux** Chrome/Firefox, ChromeOS, WebView UAs
+- **Smart TVs** — Samsung Tizen, LG webOS, Sony Android TV
+- **Gaming** — PS5, Xbox Series X/S
+- **Other** — Meta Quest 2/3, Apple TV
+
+### Customising
 
 To use a custom endpoints file, bind-mount it at container start:
 

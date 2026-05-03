@@ -8,7 +8,7 @@ by generator.py are defined here as plain Python lists.  Keeping data
 separate from logic makes it easy to customise targets without touching
 test code.
 
-The reload_endpoints() function in generator.py can hot-swap this file
+The replace_all_endpoints() function in generator.py can hot-swap this file
 at runtime from a remote URL.
 
 Variable index (matches generator.py usage names 1-to-1):
