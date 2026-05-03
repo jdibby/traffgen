@@ -26,6 +26,7 @@ import sys
 import ssl
 import time
 import base64
+import signal
 import socket
 import random
 import threading
@@ -238,6 +239,7 @@ def get_container_ip() -> str:
              "ip route get 1 | awk '{for(i=1;i<=NF;i++) if ($i==\"src\") {print $(i+1); exit}}'"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            timeout=5,
             check=True,
         )
         ip = result.stdout.decode().strip()
@@ -308,6 +310,84 @@ def _status_style(code: str) -> str:
     if code.startswith("4"):  return "yellow"
     if code.startswith("5"):  return "red"
     return "dim"
+
+
+def _popen_kill_group(cmd: str, timeout: int,
+                      stdout=subprocess.DEVNULL,
+                      stderr=subprocess.DEVNULL) -> None:
+    """
+    Run `cmd` in a new process group and guarantee the *entire* process tree
+    is killed on timeout.
+
+    When shell=True, Python's subprocess.TimeoutExpired only kills the shell
+    wrapper — child processes (msfconsole, nmap, nikto) are left orphaned.
+    Using os.setsid() puts the shell in its own session/group so
+    os.killpg() reaches every descendant.
+    """
+    proc = subprocess.Popen(
+        cmd, shell=True,
+        stdout=stdout, stderr=stderr,
+        preexec_fn=os.setsid,
+    )
+    try:
+        proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        ui_warn(f"Process timed out after {timeout}s — sending SIGTERM to group")
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        try:
+            proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+
+
+# Per-function wall-clock limits (seconds).  Functions not listed fall back to
+# 120 s.  These are upper-bounds; most tests complete well within the limit.
+_SUITE_TIMEOUTS: dict[str, int] = {
+    "metasploit_check":   360,
+    "web_scanner":        300,
+    "nmap_1024os":        210,
+    "nmap_cve":           210,
+    "bigfile":            180,
+    "bgp_peering":        120,
+    "llm_dlp_sim":        120,
+    "webcrawl":           120,
+    "https_crawl":         90,
+    "pornography_crawl":   90,
+    "squatting_domains":   90,
+}
+
+
+def _run_guarded(func) -> None:
+    """
+    Run `func()` in a daemon thread bounded by `_SUITE_TIMEOUTS`.
+
+    If the thread is still alive after the deadline, a warning is logged and
+    the main loop continues — the thread is abandoned (daemon=True) so it
+    can't block a clean exit.  Exceptions inside func() are caught and logged
+    rather than propagating to the caller.
+    """
+    limit = _SUITE_TIMEOUTS.get(func.__name__, 120)
+    exc_box: list[BaseException] = []
+
+    def _wrapper() -> None:
+        try:
+            func()
+        except BaseException as e:  # noqa: BLE001
+            exc_box.append(e)
+
+    t = threading.Thread(target=_wrapper, daemon=True, name=func.__name__)
+    t.start()
+    t.join(timeout=limit)
+    if t.is_alive():
+        ui_warn(f"[guard] {func.__name__} exceeded {limit}s — advancing to next test")
+    elif exc_box:
+        ui_error(f"[{func.__name__}] {exc_box[0]}")
 
 
 def _run_head_batch(urls: list[str], label: str,
@@ -399,6 +479,7 @@ def bgp_peering() -> None:
                     ["gobgp", "-u", "127.0.0.1", "-p", "50051",
                      "global", "as", "65555", "router-id", router_id],
                     check=True,
+                    timeout=10,
                 )
             ui_ok(f"Global BGP configured (router-id: {router_id})")
 
@@ -408,6 +489,7 @@ def bgp_peering() -> None:
                         ["gobgp", "-u", "127.0.0.1", "-p", "50051",
                          "neighbor", "add", neighbor_ip, "as", "65555"],
                         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                        timeout=10,
                     )
                 if result.returncode != 0:
                     ui_warn(f"Neighbor {neighbor_ip}: {result.stderr.decode().strip()}")
@@ -440,7 +522,7 @@ def bigfile() -> None:
     url = "http://ipv4.download.thinkbroadband.com/5GB.zip"
     ui_banner("Big-file Download", f"5 GB ZIP: {url}")
     try:
-        with requests.get(url, stream=True, verify=False, timeout=5) as resp:
+        with requests.get(url, stream=True, verify=False, timeout=(5, 30)) as resp:
             resp.raise_for_status()
             total = int(resp.headers.get("content-length", 0))
             with Progress(
@@ -743,10 +825,7 @@ def metasploit_check() -> None:
                 rc_path = os.path.join(rc_dir, rc)
                 console.log(f"msfconsole ({i}/{len(files)}): {rc}")
                 try:
-                    subprocess.run(
-                        f"msfconsole -q -r '{rc_path}'",
-                        shell=True,
-                    )
+                    _popen_kill_group(f"msfconsole -q -r '{rc_path}'", timeout=300)
                 except Exception as e:
                     console.log(f"[yellow]msf error: {e}[/]")
                 finally:
@@ -882,7 +961,7 @@ def nmap_1024os() -> None:
                 f'--script-args http.useragent="Mozilla/5.0" -debug'
             )
             try:
-                subprocess.run(cmd, shell=True, timeout=120)
+                _popen_kill_group(cmd, timeout=120, stdout=None, stderr=None)
             except Exception as e:
                 console.log(f"[yellow]nmap {ip}: {e}[/]")
         ui_ok("Nmap 1-1024 complete")
@@ -909,7 +988,7 @@ def nmap_cve() -> None:
                 f'--script-args http.useragent="Mozilla/5.0" -debug'
             )
             try:
-                subprocess.run(cmd, shell=True, timeout=120)
+                _popen_kill_group(cmd, timeout=120, stdout=None, stderr=None)
             except Exception as e:
                 console.log(f"[yellow]nmap {ip}: {e}[/]")
         ui_ok("Nmap CVE scan complete")
@@ -1143,10 +1222,8 @@ def web_scanner() -> None:
     url     = random.choice(webscan_endpoints)
     ui_banner("Nikto Web Scanner", f"target={url}  maxtime={timeout}s")
     try:
-        subprocess.run(
+        _popen_kill_group(
             f"echo y | nikto -h '{url}' -maxtime '{timeout}' -timeout 1 -nointeractive",
-            shell=True,
-            stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
             timeout=timeout + 30,
         )
         ui_ok("Nikto scan complete")
@@ -1857,7 +1934,7 @@ def replace_all_endpoints(url: str) -> None:
     Used for live-updating the endpoint lists without rebuilding the container.
     """
     console.log(f"Replacing endpoints.py from: {url}")
-    data = urllib.request.urlopen(url).read()
+    data = urllib.request.urlopen(url, timeout=15).read()
     with open("endpoints.py", "w") as fh:
         fh.write(data.decode("utf-8"))
     ui_ok("endpoints.py updated")
@@ -1994,7 +2071,7 @@ def finish_test() -> None:
     (unless --nowait) so traffic is paced rather than wall-to-wall.
     """
     if ARGS.loop and not ARGS.nowait:
-        wait = random.randint(2, int(ARGS.max_wait_secs))
+        wait = random.randint(2, max(3, int(ARGS.max_wait_secs)))
         progress_wait(wait, label="Pause between iterations")
     console.print("")   # visual separator in output
 
@@ -2016,7 +2093,7 @@ def run_test(func_list: list) -> None:
             iteration += 1
             console.rule(f"[dim]iteration {iteration}[/]")
             func = random.choice(func_list)
-            func()
+            _run_guarded(func)
             WATCHDOG.kick()
             finish_test()
     else:
@@ -2024,7 +2101,7 @@ def run_test(func_list: list) -> None:
         for func in func_list:
             iteration += 1
             console.rule(f"[dim]test {iteration}/{len(func_list)}[/]")
-            func()
+            _run_guarded(func)
             WATCHDOG.kick()
             finish_test()
 
@@ -2110,7 +2187,7 @@ if __name__ == "__main__":
     try:
         STARTTIME = time.time()
         ARGS      = parse_cli()
-        WATCHDOG  = Watchdog(timeout_seconds=600)
+        WATCHDOG  = Watchdog(timeout_seconds=300)
 
         suite = build_testsuite()
         run_test(suite)
