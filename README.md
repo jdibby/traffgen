@@ -237,7 +237,7 @@ Three-stage multi-arch build (`linux/amd64`, `linux/arm64`, `linux/arm/v7`):
 
 **❤️ Healthcheck:** `healthcheck.sh` uses `pgrep` to verify `generator.py` is running. Evaluated every 10 seconds with a 3-second timeout and 2 retries.
 
-**🚀 Entrypoint:** `docker-entrypoint.sh` installs any injected CA certificates, then launches `python3 -u /traffgen/generator.py`. Default `CMD` is `--suite=all --size=XS --max-wait-secs=20 --loop`.
+**🚀 Entrypoint:** `docker-entrypoint.sh` auto-detects TLS-inspection proxies, installs any injected CA certificates, then launches `python3 -u /traffgen/generator.py`. Default `CMD` is `--suite=all --size=XS --max-wait-secs=20 --loop`.
 
 **📊 Suite Summary:** After every suite completes, a summary panel is printed to the CLI — see [Suite Summary](#-suite-summary) below.
 
@@ -245,11 +245,34 @@ Three-stage multi-arch build (`linux/amd64`, `linux/arm64`, `linux/arm/v7`):
 
 ## 🔒 TLS Inspection Proxies
 
-When a TLS-inspection proxy sits between the container and the internet it intercepts HTTPS connections and re-signs them with its own CA certificate. Tools that verify certificates — Ruby/Metasploit, `openssl s_client` (DoT tests), and Go — will reject these connections unless the proxy's CA is trusted.
+When a TLS-inspection proxy (Cato Networks, Prisma Access, Palo Alto, Zscaler, Netskope, etc.) sits between the container and the internet, it re-signs intercepted HTTPS connections with its own CA certificate. Tools that verify certificates — Ruby/Metasploit, `openssl s_client` (DoT tests), and Go — will reject those connections unless the proxy's CA is trusted.
 
-The container handles this at startup via `docker-entrypoint.sh`, which calls `update-ca-certificates` before the generator runs. Two ways to inject your CA:
+`docker-entrypoint.sh` handles this at startup through three options, applied in order:
 
-### Option 1 — Bind-mount a certificate file _(recommended)_
+### Option 3 — Fully automatic _(zero configuration)_
+
+Just run the container — no flags, no cert files. On startup the entrypoint probes `www.google.com`, `www.cloudflare.com`, and `1.1.1.1` over HTTPS. If any probe fails certificate validation it means a MITM proxy is in the path. The entrypoint then:
+
+1. Fetches the full certificate chain the proxy is presenting (`openssl s_client -showcerts`)
+2. Walks the chain looking for a CA certificate (`CA:TRUE`) that is not yet in the system trust store
+3. Saves it to `/usr/local/share/ca-certificates/auto-proxy-ca.crt`
+4. Runs `update-ca-certificates` so every tool in the container trusts it
+
+```
+[entrypoint] Auto-CA probe: www.google.com:443 ...
+[entrypoint] TLS verification failed on www.google.com (code 20) — interception likely.
+[entrypoint] Fetching full certificate chain from www.google.com...
+[entrypoint] 3 certificate(s) in chain — scanning for injected CA...
+[entrypoint] Found injected proxy CA:
+[entrypoint]   Subject : CN=Cato Networks Root CA, O=Cato Networks, C=IL
+[entrypoint]   Expires : Dec 31 23:59:59 2035 GMT
+[entrypoint] Installing proxy CA into trust store...
+[entrypoint] Proxy CA trusted — TLS interception will work transparently.
+```
+
+Set `DISABLE_AUTO_CA=1` to skip this step if you want to manage certs entirely yourself.
+
+### Option 1 — Bind-mount a certificate file
 
 Export your proxy's CA as a PEM file and mount it into the container:
 
@@ -271,7 +294,7 @@ docker run --pull=always --detach --restart unless-stopped \
   --suite=all --size=XS --max-wait-secs=20 --loop
 ```
 
-Both options can be combined, and multiple `.crt` files can be mounted simultaneously. The CA is installed into `/etc/ssl/certs/ca-certificates.crt` at container start — no image rebuild required when the certificate rotates.
+Options 1 and 2 are installed first; the auto-probe (Option 3) runs after, so if a manually-supplied cert already covers the proxy the probe will see a clean chain and skip.  All options can be combined, and multiple `.crt` files can be mounted simultaneously.
 
 > 💡 **Note:** `REQUESTS_CA_BUNDLE` and `SSL_CERT_FILE` are pre-configured in the image to point at the system CA bundle, so Python's `requests` library and `ssl` module automatically pick up any injected CA without code changes.
 
