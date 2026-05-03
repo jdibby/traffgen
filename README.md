@@ -210,6 +210,8 @@ Three-stage multi-arch build (`linux/amd64`, `linux/arm64`, `linux/arm/v7`):
 
 **🚀 Entrypoint:** `docker-entrypoint.sh` installs any injected CA certificates, then launches `python3 -u /traffgen/generator.py`. Default `CMD` is `--suite=all --size=S --max-wait-secs=40 --loop`.
 
+**📊 Suite Summary:** After every suite completes, a summary panel is printed to the CLI — see [Suite Summary](#-suite-summary) below.
+
 ---
 
 ## 🔒 TLS Inspection Proxies
@@ -243,6 +245,56 @@ docker run --pull=always --detach --restart unless-stopped \
 Both options can be combined, and multiple `.crt` files can be mounted simultaneously. The CA is installed into `/etc/ssl/certs/ca-certificates.crt` at container start — no image rebuild required when the certificate rotates.
 
 > 💡 **Note:** `REQUESTS_CA_BUNDLE` and `SSL_CERT_FILE` are pre-configured in the image to point at the system CA bundle, so Python's `requests` library and `ssl` module automatically pick up any injected CA without code changes.
+
+---
+
+## 📊 Suite Summary
+
+After every suite completes, traffgen prints a **Suite Summary** panel directly in the CLI output. This is the quickest way to tell whether your upstream security controls are seeing and acting on the traffic.
+
+```
+╭──── Suite Summary ─────────────────────────────────╮
+│  suite       https_random                          │
+│  elapsed     14.2s                                 │
+│  attempted   20                                    │
+│  responses   18  (90%)                             │
+│  errors       2  (10%)                             │
+│  http codes  2xx=12  3xx=3  4xx=3                  │
+╰────────────────────────────────────────────────────╯
+```
+
+### Fields
+
+| Field | What it means |
+|---|---|
+| **suite** | The internal function name for the suite that just ran |
+| **elapsed** | Wall-clock time the suite took to complete |
+| **attempted** | Total number of individual probes sent (HTTP requests, DNS queries, pings, etc.) |
+| **responses** | Probes that received any response — connection reached the destination |
+| **errors** | Probes that never got a response (connection refused, timeout, network error) |
+| **http codes** | Breakdown of HTTP status code families for HTTP-based suites |
+
+### Reading the HTTP code breakdown
+
+The color-coded HTTP code buckets tell you what your security stack is doing with the traffic:
+
+| Code | Color | What it likely means |
+|:---:|:---:|---|
+| 🟢 `2xx` | Green | Traffic reached the server and got a normal response — **not blocked** |
+| 🔵 `3xx` | Cyan | Redirect — traffic is reaching the internet and being redirected |
+| 🟡 `4xx` | Yellow | Got a response but access was denied — could be a **firewall block page**, proxy auth challenge, or a legitimate 403/404 from the server |
+| 🔴 `5xx` | Red | Server-side error — traffic reached a destination but the server is unhappy |
+| — | — | **High error rate** — connections are being hard-dropped (TCP RST / no response) — your firewall may be silently blocking the traffic |
+
+### Interpreting results
+
+- **All `2xx`, low errors** → traffic is flowing through uninspected. Your firewall/proxy may not be examining this category of traffic.
+- **Mix of `4xx` and errors** → some traffic is being blocked (4xx = block page returned; errors = hard-drop). This is healthy for threat-simulation suites.
+- **High error rate on `dns`, `ntp`, `icmp`** → those protocols may be blocked at the perimeter — check your outbound policy for UDP/53, UDP/123, ICMP.
+- **High `4xx` on `llm-dlp`, `malware-agents`, `c2-beacon`** → your proxy/CASB is actively blocking and returning its own response — security controls are working.
+- **`2xx` on `malware-download`, `virus`, `dlp`** → the files downloaded without being blocked. Your inline AV/DLP may need attention.
+
+> 💡 **Non-HTTP suites** (`dns`, `ping`, `traceroute`, `ssh`, `ntp`, `snmp`, `nmap`, `metasploit-check`, etc.) show `responses` and `errors` only — no HTTP code breakdown. An `ok` response means the probe ran to completion without an exception; an `error` means the subprocess timed out, the host was unreachable, or the command itself failed.
 
 ---
 
