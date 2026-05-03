@@ -123,9 +123,16 @@ RUN printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec 
     printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec ./msfvenom "$@"\n'   > /usr/local/bin/msfvenom && \
     chmod +x /usr/local/bin/msfconsole /usr/local/bin/msfvenom
 
+# Point Python's requests library and ssl module at the system CA bundle so
+# that update-ca-certificates (run at container start) is picked up
+# automatically — no code changes needed when a custom CA is injected.
+ENV REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+
 # App files
 WORKDIR /traffgen
-COPY generator.py endpoints.py healthcheck.sh ./
+COPY generator.py endpoints.py healthcheck.sh docker-entrypoint.sh ./
+RUN chmod +x /traffgen/docker-entrypoint.sh
 
 # Ensure checks dir exists; copy RC scripts; move targets.list up one level
 RUN mkdir -p /opt/metasploit-framework/ms_checks/checks
@@ -152,6 +159,7 @@ RUN rm -rf \
     find /usr -name '*.pyc' -delete 2>/dev/null || true && \
     find /usr -type d -name rdoc -exec rm -rf {} + 2>/dev/null || true
 
-# Entrypoint
-ENTRYPOINT ["python3", "-u", "/traffgen/generator.py"]
+# Entrypoint — installs any custom CA certs before launching the generator.
+# Bind-mount a .crt file or pass EXTRA_CA_CERT env var to inject a CA.
+ENTRYPOINT ["/traffgen/docker-entrypoint.sh"]
 CMD ["--suite=all", "--size=S", "--max-wait-secs=40", "--loop"]

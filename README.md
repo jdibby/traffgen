@@ -249,6 +249,40 @@ Three-stage multi-arch build (`linux/amd64`, `linux/arm64`, `linux/arm/v7`):
 
 ---
 
+## TLS Inspection Proxies (Cato Networks, Zscaler, Palo Alto, etc.)
+
+When a TLS-inspection proxy sits between the container and the internet it intercepts HTTPS connections and re-signs them with its own CA certificate. Tools that verify certificates — Ruby/Metasploit, `openssl s_client` (DoT tests), and Go — will reject these connections unless the proxy's CA is trusted.
+
+The container handles this at startup via `docker-entrypoint.sh`, which calls `update-ca-certificates` before the generator runs. Two ways to inject your CA:
+
+### Option 1 — Bind-mount a certificate file (recommended)
+
+Export the Cato CA (or your proxy CA) as a PEM file and mount it:
+
+```bash
+docker run --pull=always --detach --restart unless-stopped \
+  -v /path/to/cato-ca.crt:/usr/local/share/ca-certificates/cato-ca.crt \
+  --name traffgen jdibby/traffgen:latest \
+  --suite=all --size=S --max-wait-secs=20 --loop
+```
+
+### Option 2 — Inline PEM via environment variable
+
+Useful for Kubernetes secrets, Docker Swarm configs, or CI pipelines:
+
+```bash
+docker run --pull=always --detach --restart unless-stopped \
+  -e EXTRA_CA_CERT="$(cat /path/to/cato-ca.crt)" \
+  --name traffgen jdibby/traffgen:latest \
+  --suite=all --size=S --max-wait-secs=20 --loop
+```
+
+Both options can be combined, and multiple `.crt` files can be mounted simultaneously. The CA is installed into `/etc/ssl/certs/ca-certificates.crt` at container start — no image rebuild required when the certificate rotates.
+
+> **Note:** `REQUESTS_CA_BUNDLE` and `SSL_CERT_FILE` are pre-configured in the image to point at the system CA bundle, so Python's `requests` library and `ssl` module automatically pick up any injected CA without code changes.
+
+---
+
 ## Custom Endpoints
 
 All network targets — DNS resolvers, URLs, user-agent strings, SNMP community strings, BGP neighbors, and more — are defined as plain Python lists in `endpoints.py`. The file is loaded at startup and kept separate from test logic so targets can be swapped without touching generator code.
