@@ -271,13 +271,21 @@ class SuiteStats:
             self.attempts += 1
             self.errors   += 1
 
-    def print_summary(self) -> None:
-        elapsed = time.time() - self.start_time
-        if self.attempts == 0:
-            return
+    def merge(self, other: "SuiteStats") -> None:
+        """Accumulate counters from another SuiteStats instance into this one."""
+        with self._lock:
+            self.attempts  += other.attempts
+            self.responses += other.responses
+            self.errors    += other.errors
+            for bucket, cnt in other.codes.items():
+                self.codes[bucket] = self.codes.get(bucket, 0) + cnt
 
-        pct_ok  = 100 * self.responses / self.attempts
-        pct_err = 100 * self.errors    / self.attempts
+    def print_summary(self, title: str = "Suite Summary",
+                      border_style: str = "blue") -> None:
+        elapsed = time.time() - self.start_time
+
+        pct_ok  = (100 * self.responses / self.attempts) if self.attempts else 0
+        pct_err = (100 * self.errors    / self.attempts) if self.attempts else 0
 
         grid = Table.grid(padding=(0, 2))
         grid.add_column(justify="right", style="dim", no_wrap=True)
@@ -285,33 +293,38 @@ class SuiteStats:
 
         grid.add_row("suite",     f"[bold cyan]{self.name}[/]")
         grid.add_row("elapsed",   f"{elapsed:.1f}s")
-        grid.add_row("attempted", f"[bold]{self.attempts}[/]")
-        grid.add_row("responses", f"[bold green]{self.responses}[/]  ({pct_ok:.0f}%)")
-        grid.add_row("errors",
-                     (f"[bold red]{self.errors}[/]  ({pct_err:.0f}%)"
-                      if self.errors else "[dim]0[/]"))
 
-        if self.codes:
-            parts = []
-            for bucket in sorted(self.codes):
-                cnt = self.codes[bucket]
-                if   bucket.startswith("2"): s = "green"
-                elif bucket.startswith("3"): s = "cyan"
-                elif bucket.startswith("4"): s = "yellow"
-                elif bucket.startswith("5"): s = "red"
-                else:                        s = "dim"
-                parts.append(f"[{s}]{bucket}={cnt}[/]")
-            grid.add_row("http codes", "  ".join(parts))
+        if self.attempts == 0:
+            grid.add_row("probes", "[dim]none recorded[/]")
+        else:
+            grid.add_row("attempted", f"[bold]{self.attempts}[/]")
+            grid.add_row("responses", f"[bold green]{self.responses}[/]  ({pct_ok:.0f}%)")
+            grid.add_row("errors",
+                         (f"[bold red]{self.errors}[/]  ({pct_err:.0f}%)"
+                          if self.errors else "[dim]0[/]"))
+
+            if self.codes:
+                parts = []
+                for bucket in sorted(self.codes):
+                    cnt = self.codes[bucket]
+                    if   bucket.startswith("2"): s = "green"
+                    elif bucket.startswith("3"): s = "cyan"
+                    elif bucket.startswith("4"): s = "yellow"
+                    elif bucket.startswith("5"): s = "red"
+                    else:                        s = "dim"
+                    parts.append(f"[{s}]{bucket}={cnt}[/]")
+                grid.add_row("http codes", "  ".join(parts))
 
         console.print(Panel(
             grid,
-            title="[bold]Suite Summary[/]",
-            border_style="blue",
+            title=f"[bold]{title}[/]",
+            border_style=border_style,
             box=box.ROUNDED,
         ))
 
 
-_stats = SuiteStats()
+_stats       = SuiteStats()   # per-function stats, reset before each function
+_suite_stats = SuiteStats()   # aggregate across all functions in a suite run
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -2270,13 +2283,24 @@ def run_test(func_list: list) -> None:
             WATCHDOG.kick()
             finish_test()
     else:
+        _suite_stats.reset(ARGS.suite)
         random.shuffle(func_list)
         for func in func_list:
             iteration += 1
             console.rule(f"[dim]test {iteration}/{len(func_list)}[/]")
             _run_guarded(func)
+            _suite_stats.merge(_stats)
             WATCHDOG.kick()
             finish_test()
+
+        # Print aggregate only when more than one function ran (avoids duplicate
+        # of the per-function summary for single-function suites like 'dns').
+        if len(func_list) > 1:
+            console.rule("[bold green]Suite Complete[/]")
+            _suite_stats.print_summary(
+                title=f"Suite Total — {ARGS.suite}",
+                border_style="green",
+            )
 
 
 def parse_cli() -> argparse.Namespace:
