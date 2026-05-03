@@ -258,46 +258,56 @@ def _size_to_limits(size: str, s, m, l, xl):
 
 def _curl_head(url: str, user_agent: str,
                connect_timeout: int = 3, max_time: int = 5,
-               extra_flags: str = "") -> None:
+               extra_flags: str = "") -> str:
     """
-    Issue a single HTTP HEAD request via curl.
+    Issue a single HTTP HEAD request via curl and return the HTTP status code.
 
     Using curl (rather than requests) keeps the traffic realistic: it sends
     the same TLS fingerprint, header order, and timing patterns as a real
-    browser-side tool.  Output is discarded — we care only about generating
-    the traffic, not the response body.
+    browser-side tool.  The response body is discarded; only the status code
+    is returned for logging.
     """
     cmd = (
         f"curl -k -s --show-error "
         f"--connect-timeout {connect_timeout} "
-        f"-I -o /dev/null --max-time {max_time} "
+        f"-I -o /dev/null -w '%{{http_code}}' --max-time {max_time} "
         f"{extra_flags} "
         f"-A '{user_agent}' {url}"
     )
-    subprocess.run(cmd, shell=True,
-                   stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
-                   timeout=max_time + 5)
+    result = subprocess.run(cmd, shell=True, capture_output=True, text=True,
+                            timeout=max_time + 5)
+    return result.stdout.strip() or "---"
 
 
 def _curl_download(url: str, rate_limit: str = "3M",
                    connect_timeout: int = 4, timeout: int = 20,
-                   user_agent: str = "") -> None:
+                   user_agent: str = "") -> str:
     """
     Download a remote file via curl, discarding data to /dev/null.
 
     `rate_limit` caps bandwidth (e.g. "3M" = 3 MB/s) so the test doesn't
     saturate the uplink.  Use an empty string to remove the cap.
+    Returns the HTTP/FTP response code string.
     """
     rate_flag = f"--limit-rate {rate_limit}" if rate_limit else ""
     ua_flag   = f"-A '{user_agent}'"          if user_agent  else ""
     cmd = (
         f"curl {rate_flag} -k --show-error "
         f"--connect-timeout {connect_timeout} "
-        f"-L -o /dev/null {ua_flag} {url}"
+        f"-L -o /dev/null -w '%{{response_code}}' {ua_flag} {url}"
     )
-    subprocess.run(cmd, shell=True,
-                   stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
-                   timeout=timeout)
+    result = subprocess.run(cmd, shell=True, capture_output=True, text=True,
+                            timeout=timeout)
+    return result.stdout.strip() or "---"
+
+
+def _status_style(code: str) -> str:
+    """Map an HTTP status code string to a Rich colour name for log output."""
+    if code.startswith("2"):  return "green"
+    if code.startswith("3"):  return "cyan"
+    if code.startswith("4"):  return "yellow"
+    if code.startswith("5"):  return "red"
+    return "dim"
 
 
 def _run_head_batch(urls: list[str], label: str,
@@ -327,11 +337,12 @@ def _run_head_batch(urls: list[str], label: str,
 
         def _worker(idx: int, url: str) -> None:
             ua = random.choice(user_agents_pool)
-            console.log(f"[{idx}/{len(urls)}] {url}")
             try:
-                _curl_head(url, ua, connect_timeout, max_time, extra_flags)
+                status = _curl_head(url, ua, connect_timeout, max_time, extra_flags)
+                style  = _status_style(status)
+                console.log(f"[{idx}/{len(urls)}] {url}  [{style}]HTTP {status}[/]")
             except Exception as e:
-                console.log(f"[yellow]  ↳ {url}: {e}[/]")
+                console.log(f"[yellow][{idx}/{len(urls)}] {url}  {e.__class__.__name__}[/]")
             finally:
                 prog.update(task, advance=1)
 
@@ -503,12 +514,9 @@ def ftp_random() -> None:
     try:
         target = _size_to_limits(ARGS.size, "1MB", "10MB", "100MB", "1GB")
         url    = f"ftp://speedtest:speedtest@ftp.otenet.gr/test{target}.db"
-        console.log(f"FTP download: {target}")
-        subprocess.run(
-            f"curl --limit-rate 3M -k --show-error --connect-timeout 5 -o /dev/null {url}",
-            shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
-            timeout=60,
-        )
+        console.log(f"FTP → {url}  ({target}, rate-limited 3 MB/s)")
+        status = _curl_download(url, rate_limit="3M", connect_timeout=5, timeout=60)
+        console.log(f"  ↳ FTP response {status}")
         ui_ok("FTP test complete")
     except Exception as e:
         ui_error(f"[ftp_random] {e}")
@@ -540,7 +548,8 @@ def http_download_zip() -> None:
     ua     = random.choice(user_agents)
     ui_banner("HTTP Download (ZIP)", f"{target} — {url}")
     try:
-        _curl_download(url, rate_limit="3M", connect_timeout=5, timeout=120, user_agent=ua)
+        status = _curl_download(url, rate_limit="3M", connect_timeout=5, timeout=120, user_agent=ua)
+        console.log(f"  ↳ [{_status_style(status)}]HTTP {status}[/]  ({target} ZIP)")
         ui_ok("HTTP ZIP download complete")
     except Exception as e:
         ui_error(f"[http_download_zip] {e}")
@@ -550,8 +559,9 @@ def http_download_targz() -> None:
     """Download the WordPress latest.tar.gz archive (plain HTTP)."""
     ui_banner("HTTP Download (tar.gz)", "WordPress latest.tar.gz")
     try:
-        _curl_download("http://wordpress.org/latest.tar.gz",
-                       rate_limit="3M", connect_timeout=5, timeout=120)
+        status = _curl_download("http://wordpress.org/latest.tar.gz",
+                                rate_limit="3M", connect_timeout=5, timeout=120)
+        console.log(f"  ↳ [{_status_style(status)}]HTTP {status}[/]  (wordpress latest.tar.gz)")
         ui_ok("HTTP tar.gz download complete")
     except Exception as e:
         ui_error(f"[http_download_targz] {e}")
@@ -945,20 +955,27 @@ def ssh_random() -> None:
     try:
         random.shuffle(ssh_endpoints)
         for i, ip in enumerate(ssh_endpoints[:n], 1):
-            console.log(f"ssh ({i}/{n}) {ip}")
             try:
-                subprocess.run(
+                result = subprocess.run(
                     ["ssh",
                      "-o", "BatchMode=yes",
                      "-o", "StrictHostKeyChecking=no",
                      "-o", "UserKnownHostsFile=/dev/null",
                      "-o", "ConnectTimeout=1",
                      ip],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
+                    stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
                     timeout=5,
                 )
+                # rc=0: logged in; rc=255: network unreachable; other: TCP ok, auth rejected
+                if result.returncode == 0:
+                    outcome = "[green]connected[/]"
+                elif result.returncode == 255:
+                    outcome = "[dim]unreachable[/]"
+                else:
+                    outcome = "[green]reachable[/] [dim](auth rejected — TCP/22 open)[/]"
+                console.log(f"ssh ({i}/{n}) {ip}  → {outcome}")
             except Exception as e:
-                console.log(f"[yellow]ssh {ip}: {e}[/]")
+                console.log(f"[yellow]ssh ({i}/{n}) {ip}  → {e.__class__.__name__}[/]")
         ui_ok("SSH test complete")
     except Exception as e:
         ui_error(f"[ssh_random] {e}")
@@ -1002,11 +1019,11 @@ def virus_sim() -> None:
     try:
         random.shuffle(virus_endpoints)
         for i, url in enumerate(virus_endpoints[:n], 1):
-            console.log(f"virus-sim ({i}/{n}) {url}")
             try:
-                _curl_download(url, rate_limit="3M", connect_timeout=4, timeout=20)
+                status = _curl_download(url, rate_limit="3M", connect_timeout=4, timeout=20)
+                console.log(f"virus-sim ({i}/{n}) {url}  [{_status_style(status)}]HTTP {status}[/]")
             except Exception as e:
-                console.log(f"[yellow]{url}: {e}[/]")
+                console.log(f"[yellow]virus-sim ({i}/{n}) {url}  {e.__class__.__name__}[/]")
         ui_ok("Virus simulation complete")
     except Exception as e:
         ui_error(f"[virus_sim] {e}")
@@ -1022,11 +1039,11 @@ def dlp_sim_https() -> None:
     try:
         random.shuffle(dlp_https_endpoints)
         for i, url in enumerate(dlp_https_endpoints[:n], 1):
-            console.log(f"dlp-sim ({i}/{n}) {url}")
             try:
-                _curl_download(url, rate_limit="3M", connect_timeout=4, timeout=20)
+                status = _curl_download(url, rate_limit="3M", connect_timeout=4, timeout=20)
+                console.log(f"dlp-sim ({i}/{n}) {url}  [{_status_style(status)}]HTTP {status}[/]")
             except Exception as e:
-                console.log(f"[yellow]{url}: {e}[/]")
+                console.log(f"[yellow]dlp-sim ({i}/{n}) {url}  {e.__class__.__name__}[/]")
         ui_ok("DLP simulation complete")
     except Exception as e:
         ui_error(f"[dlp_sim_https] {e}")
@@ -1043,11 +1060,11 @@ def malware_download() -> None:
     try:
         random.shuffle(malware_files)
         for i, url in enumerate(malware_files[:n], 1):
-            console.log(f"malware-dl ({i}/{n}) {url}")
             try:
-                _curl_download(url, rate_limit="3M", connect_timeout=4, timeout=20)
+                status = _curl_download(url, rate_limit="3M", connect_timeout=4, timeout=20)
+                console.log(f"malware-dl ({i}/{n}) {url}  [{_status_style(status)}]HTTP {status}[/]")
             except Exception as e:
-                console.log(f"[yellow]{url}: {e}[/]")
+                console.log(f"[yellow]malware-dl ({i}/{n}) {url}  {e.__class__.__name__}[/]")
         ui_ok("Malware download complete")
     except Exception as e:
         ui_error(f"[malware_download] {e}")
@@ -1099,16 +1116,19 @@ def ips() -> None:
     which matches a classic Snort/Suricata IPS signature.  Confirms that
     IPS alert rules are active and generating events.
     """
-    ui_banner("IPS Trigger", "BlackSun UA → testmyids.com")
+    ui_banner("IDS/IPS Trigger", "BlackSun UA → testmyids.com")
     try:
-        subprocess.run(
+        console.log("HEAD www.testmyids.com  User-Agent: BlackSun")
+        result = subprocess.run(
             ["curl", "-k", "-s", "--show-error", "--connect-timeout", "3",
-             "-I", "--max-time", "5", "-A", "BlackSun",
-             "www.testmyids.com"],
-            stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
+             "-I", "-o", "/dev/null", "-w", "%{http_code}", "--max-time", "5",
+             "-A", "BlackSun", "www.testmyids.com"],
+            capture_output=True, text=True,
             timeout=10,
         )
-        ui_ok("IPS trigger complete")
+        status = result.stdout.strip()
+        console.log(f"  ↳ [{_status_style(status)}]HTTP {status}[/]  (IDS signature: BlackSun UA)")
+        ui_ok("IDS/IPS trigger complete")
     except Exception as e:
         ui_error(f"[ips] {e}")
 
@@ -1161,20 +1181,24 @@ def doh_random() -> None:
             for i, domain in enumerate(domains, 1):
                 provider = random.choice(doh_providers)
                 url = f"{provider}?name={domain}&type=A"
-                console.log(f"DoH ({i}/{len(domains)}) {domain}  provider={provider.split('/')[2]}")
                 try:
-                    subprocess.run(
+                    result = subprocess.run(
                         ["curl", "-k", "-s",
                          "-H", "accept: application/dns-json",
-                         "-o", "/dev/null",
+                         "-o", "/dev/null", "-w", "%{http_code}",
                          "--connect-timeout", "3",
                          "--max-time", "5",
                          url],
-                        stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
+                        capture_output=True, text=True,
                         timeout=10,
                     )
+                    status = result.stdout.strip()
+                    console.log(
+                        f"DoH ({i}/{len(domains)}) {domain}  "
+                        f"@{provider.split('/')[2]}  [{_status_style(status)}]HTTP {status}[/]"
+                    )
                 except Exception as e:
-                    console.log(f"[yellow]DoH {domain}: {e}[/]")
+                    console.log(f"[yellow]DoH ({i}/{len(domains)}) {domain}: {e.__class__.__name__}[/]")
                 finally:
                     prog.update(task, advance=1)
         ui_ok("DoH test complete")
@@ -1198,19 +1222,20 @@ def dot_random() -> None:
         random.shuffle(servers)
 
         for i, (ip, servername) in enumerate(servers[:n], 1):
-            console.log(f"DoT ({i}/{n}) {ip}:853  SNI={servername}")
             try:
                 # Send a newline so openssl s_client closes after the handshake
                 # rather than waiting for stdin.
-                subprocess.run(
+                result = subprocess.run(
                     f"echo | openssl s_client -connect {ip}:853 "
-                    f"-servername {servername} -brief 2>&1 | head -5",
-                    shell=True,
-                    stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
+                    f"-servername {servername} -brief 2>&1 | head -3",
+                    shell=True, capture_output=True, text=True,
                     timeout=8,
                 )
+                first_line = (result.stdout.strip().split("\n")[0]
+                              if result.stdout.strip() else "no response")
+                console.log(f"DoT ({i}/{n}) {ip}:853  SNI={servername}  → {first_line[:70]}")
             except Exception as e:
-                console.log(f"[yellow]DoT {ip}: {e}[/]")
+                console.log(f"[yellow]DoT ({i}/{n}) {ip}:853  → {e.__class__.__name__}[/]")
         ui_ok("DoT test complete")
     except Exception as e:
         ui_error(f"[dot_random] {e}")
