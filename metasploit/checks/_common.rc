@@ -1,0 +1,19 @@
+# _common.rc — Shared global defaults for all ms_check_*.rc scripts.
+# Sourced via: resource /opt/metasploit-framework/ms_checks/checks/_common.rc
+# Do not run this file directly.
+
+# ---- Global Defaults ----
+setg VERBOSE true
+setg LogLevel 1
+setg HttpClientTimeout 8
+setg ConnectTimeout 8
+setg THREADS 4
+
+# SRVHOST/LHOST: use 0.0.0.0 so the daemon listens on all interfaces
+# inside the container regardless of bridge IP assignment.
+setg SRVHOST 0.0.0.0
+setg LHOST 0.0.0.0
+
+# Target list shared across all check scripts.
+# Bind-mount a custom targets.list to override at container start.
+setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list

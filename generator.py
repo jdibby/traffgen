@@ -730,7 +730,8 @@ def metasploit_check() -> None:
     try:
         n      = _size_to_limits(ARGS.size, 1, 3, 5, 7)
         rc_dir = "/opt/metasploit-framework/ms_checks/checks"
-        files  = [f for f in os.listdir(rc_dir) if f.endswith(".rc")]
+        files  = [f for f in os.listdir(rc_dir)
+                  if f.startswith("ms_check_") and f.endswith(".rc")]
         random.shuffle(files)
         files  = files[:n]
 

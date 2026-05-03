@@ -1,22 +1,7 @@
 # Automated vulnerability verification script.
 # WARNING: Use only in a legal, controlled lab environment.
 
-# ---- Global Defaults ----
-setg VERBOSE true
-setg LogLevel 1
-setg HttpClientTimeout 8
-setg ConnectTimeout 8
-setg THREADS 4
-
-# Routable listener settings (adjust IP for your environment)
-setg SRVHOST 0.0.0.0
-setg LHOST 0.0.0.0
-
-# Targets
-setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
-
-# Optional logging
-# spool /opt/metasploit-framework/ms_checks/logs/ms_check_<%= Time.now.strftime("%Y%m%d_%H%M%S") %>.log
+resource /opt/metasploit-framework/ms_checks/checks/_common.rc
 
 # ---- Module Checks ----
 
