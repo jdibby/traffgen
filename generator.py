@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-generator.py — Traffic Generator v2.2.0
+generator.py — Traffic Generator v2.3.0
 ========================================
 Simulates realistic network traffic across a wide range of protocols and
 behaviours: DNS, HTTP/HTTPS/HTTP3, FTP, SSH, NTP, BGP, ICMP, SNMP,
-DoH, DoT, C2 beacon, DNS exfiltration, Metasploit checks, web crawling,
+DoH, DoT, C2 beacon, DNS exfiltration, LLM/AI DLP simulation (fake PII
+uploads to known LLM API endpoints), Metasploit checks, web crawling,
 malware/phishing domain probing, ad-tracker HEAD requests, speed-tests,
 and more.
 
@@ -54,7 +55,7 @@ from rich import box
 from endpoints import *           # noqa: F401,F403  (large data file)
 
 # ── Globals ───────────────────────────────────────────────────────────────────
-VERSION = "2.2.0"
+VERSION = "2.3.0"
 console = Console(highlight=False)
 
 # Suppress SSL warnings — this tool intentionally hits self-signed / expired certs.
@@ -160,6 +161,7 @@ _SUITE_DESCRIPTIONS: list[tuple[str, str]] = [
     ("bgp",              "GoBGP peering session with configured neighbors"),
     ("bigfile",          "5 GB HTTP download (bandwidth saturation)"),
     ("c2-beacon",        "C2 beacon: periodic HTTP POSTs with malware UA and jitter"),
+    ("llm-dlp",          "POST fake PII (SSN, CC, passwords) to known LLM API endpoints"),
     ("crawl",            "Iterative web crawl from a configurable start URL"),
     ("dlp",              "DLP test file downloads over HTTPS"),
     ("dns",              "dig queries across multiple resolvers and domains"),
@@ -1362,6 +1364,222 @@ def dns_exfil() -> None:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# LLM / AI DLP SIMULATION
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Realistic prompt contexts that justify why someone would paste PII into an AI.
+_LLM_CONTEXTS = [
+    "Help me process this new employee onboarding record:",
+    "I need to verify this customer's identity. Here are their details:",
+    "Please review this loan application and summarise any issues:",
+    "Can you help me fill out this insurance claim form?",
+    "I'm completing a patient intake form. Please check the data below:",
+    "Help me prepare this tax filing. The taxpayer information is:",
+    "Summarise this support ticket and flag any issues:",
+    "I need to create a new account in the CRM with the following info:",
+    "Check this job application for completeness. Applicant details:",
+    "Process this wire transfer authorisation request:",
+]
+
+# LLM model names to include in the request body for realism.
+_LLM_MODELS = [
+    "gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo",
+    "claude-3-5-sonnet-20241022", "claude-3-opus-20240229",
+    "gemini-1.5-pro", "gemini-1.5-flash",
+    "mistral-large-latest", "open-mixtral-8x22b",
+    "command-r-plus", "llama-3.1-70b-versatile",
+]
+
+
+def _fake_pii_block() -> dict[str, str]:
+    """
+    Generate one block of format-valid but obviously fake PII for DLP testing.
+
+    Number ranges are chosen to be impossible / reserved so these values
+    can never be mistaken for real personal data:
+      - SSNs starting with 9xx are permanently unassigned by SSA
+      - Phone numbers with 555 area code are reserved for fictional use
+      - Credit card numbers are well-known public test values (Luhn-valid)
+      - Passport and DL numbers use TEST prefix
+      - Bank routing number 999999999 is not a real ABA routing number
+    """
+    ssn = (
+        f"9{random.randint(0, 9)}{random.randint(0, 9)}"
+        f"-{random.randint(10, 99)}"
+        f"-{random.randint(1000, 9999)}"
+    )
+    phone = f"(555) {random.randint(100, 999)}-{random.randint(1000, 9999)}"
+
+    # Luhn-valid public test card numbers — these appear in every card-processor
+    # test suite and are universally flagged by PCI-DSS DLP rules.
+    card_number, card_type = random.choice([
+        ("4111 1111 1111 1111", "Visa"),
+        ("5500 0000 0000 0004", "Mastercard"),
+        ("3714 496353 98431",   "Amex"),
+        ("6011 1111 1111 1117", "Discover"),
+        ("3056 930902 5904",    "Diners"),
+    ])
+    cvv    = f"{random.randint(100, 999)}"
+    expiry = f"{random.randint(1, 12):02d}/{random.randint(26, 30)}"
+
+    password = random.choice([
+        "P@ssw0rd123!", "Test#Security99!", "FakePass!2024",
+        "DLP_T3st_Pass!", "S3cur1ty!TestOnly", "Tr0ub4dor&3",
+    ])
+
+    first = random.choice(["John", "Jane", "Robert", "Alice", "Carlos", "Diana"])
+    last  = random.choice(["Doe", "Smith", "Johnson", "Test", "Sample", "Example"])
+    dob   = (
+        f"{random.randint(1, 12):02d}/"
+        f"{random.randint(1, 28):02d}/"
+        f"{random.randint(1950, 2000)}"
+    )
+
+    return {
+        "name":         f"{first} {last}",
+        "email":        f"{first.lower()}.{last.lower()}{random.randint(10, 99)}@example-test.com",
+        "ssn":          ssn,
+        "phone":        phone,
+        "dob":          dob,
+        "address":      f"{random.randint(100, 9999)} Test St, Anytown, TS {random.randint(10000, 99999)}",
+        "card_number":  card_number,
+        "card_type":    card_type,
+        "card_cvv":     cvv,
+        "card_expiry":  expiry,
+        "password":     password,
+        "bank_routing": "999999999",
+        "bank_account": f"{random.randint(10000000, 99999999)}",
+        "passport":     f"TEST{random.randint(1000000, 9999999)}",
+        "drivers_lic":  f"TEST-DL-{random.randint(100000, 999999)}",
+        "mrn":          f"MRN-TEST-{random.randint(10000, 99999)}",
+    }
+
+
+def _build_chat_request(pii: dict, model: str) -> dict:
+    """
+    Build a realistic OpenAI-compatible chat completion request body
+    containing a user message that embeds PII, mimicking what an employee
+    might paste into ChatGPT or a similar assistant.
+    """
+    context = random.choice(_LLM_CONTEXTS)
+
+    # Pick a random subset of PII fields per request so not every call
+    # looks identical — varying field selection exercises more DLP rules.
+    fields: list[tuple[str, str]] = [
+        ("Full name",          pii["name"]),
+        ("Email",              pii["email"]),
+        ("SSN",                pii["ssn"]),
+        ("Phone",              pii["phone"]),
+        ("Date of birth",      pii["dob"]),
+        ("Home address",       pii["address"]),
+        (f"{pii['card_type']} card", pii["card_number"]),
+        ("Card CVV",           pii["card_cvv"]),
+        ("Card expiry",        pii["card_expiry"]),
+        ("Password",           pii["password"]),
+        ("Bank routing",       pii["bank_routing"]),
+        ("Bank account",       pii["bank_account"]),
+        ("Passport no.",       pii["passport"]),
+        ("Driver's license",   pii["drivers_lic"]),
+        ("Medical record no.", pii["mrn"]),
+    ]
+    # Always include at least 4 fields; scale up randomly for variety.
+    n_fields = random.randint(4, len(fields))
+    selected = random.sample(fields, n_fields)
+
+    lines = [context, ""]
+    for label, value in selected:
+        lines.append(f"  {label}: {value}")
+    prompt = "\n".join(lines)
+
+    return {
+        "model":    model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 256,
+        "temperature": 0.7,
+    }
+
+
+def llm_dlp_sim() -> None:
+    """
+    LLM / AI DLP simulation — POST fake PII inside chat API requests.
+
+    Simulates the real-world scenario of an employee copy-pasting sensitive
+    data into an AI assistant.  Each request:
+
+      1. Generates a unique block of format-valid but obviously fake PII
+         (SSN, credit card, phone, password, bank account, passport, etc.)
+      2. Embeds it inside a realistic OpenAI-compatible chat completion body
+      3. POSTs to a known LLM API endpoint with a fake (clearly labelled)
+         Bearer token so the URL + payload are visible to DLP
+
+    The requests always return 401 / 403 (no real credentials are provided),
+    but the traffic exercises:
+      • DLP rules for SSN, PCI-DSS card numbers, phone, passport patterns
+      • AI-category URL filtering for known LLM API hostnames
+      • Behavioural detection of PII uploads to cloud AI services
+      • API key / credential-in-request-body DLP signatures
+    """
+    n = _size_to_limits(ARGS.size, 3, 5, 10, len(llm_api_endpoints))
+    ui_banner("LLM / AI DLP Simulation",
+              f"{n} chat API POSTs with fake PII payloads", style="yellow")
+    try:
+        endpoints = llm_api_endpoints[:]
+        random.shuffle(endpoints)
+
+        with Progress(
+            SpinnerColumn(), TextColumn("[yellow]LLM-DLP[/]"),
+            MofNCompleteColumn(), BarColumn(), TimeElapsedColumn(),
+            console=console,
+        ) as prog:
+            task = prog.add_task("llm-dlp", total=n)
+            for i, endpoint in enumerate(endpoints[:n], 1):
+                pii   = _fake_pii_block()
+                model = random.choice(_LLM_MODELS)
+                body  = _build_chat_request(pii, model)
+                ua    = random.choice(user_agents)
+
+                # Fake API key — prefixed to be unmistakably a test value,
+                # but formatted to match real key patterns so DLP credential
+                # detection signatures recognise the pattern.
+                fake_key = f"sk-DLPTEST-{''.join(random.choices('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', k=32))}"
+
+                console.log(
+                    f"LLM-DLP ({i}/{n}) → {endpoint.split('/')[2]}  "
+                    f"model={model}  pii_fields={len(body['messages'][0]['content'].splitlines())-2}"
+                )
+                try:
+                    resp = requests.post(
+                        endpoint,
+                        json=body,
+                        headers={
+                            "Content-Type":  "application/json",
+                            "Authorization": f"Bearer {fake_key}",
+                            "User-Agent":    ua,
+                            "x-api-key":     fake_key,   # Anthropic-style header
+                        },
+                        timeout=5,
+                        verify=False,
+                        allow_redirects=False,
+                    )
+                    console.log(
+                        f"  ↳ HTTP {resp.status_code} "
+                        f"({'expected — no real credentials' if resp.status_code in (401, 403) else 'unexpected'})"
+                    )
+                except requests.exceptions.ConnectionError:
+                    console.log(f"  ↳ connection refused / unreachable (expected)")
+                except requests.exceptions.Timeout:
+                    console.log(f"  ↳ timeout (expected)")
+                except Exception as e:
+                    console.log(f"[yellow]  ↳ {e.__class__.__name__}: {e}[/]")
+                finally:
+                    prog.update(task, advance=1)
+
+        ui_ok("LLM / AI DLP simulation complete")
+    except Exception as e:
+        ui_error(f"[llm_dlp_sim] {e}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # GITHUB DOMAIN CHECKS
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -1557,6 +1775,7 @@ _SUITE_MAP: dict[str, list] = {
     "bgp":              [bgp_peering],
     "bigfile":          [bigfile],
     "c2-beacon":        [c2_beacon],
+    "llm-dlp":          [llm_dlp_sim],
     "crawl":            [webcrawl],
     "dlp":              [dlp_sim_https],
     "dns":              [dig_random],

@@ -2153,3 +2153,31 @@ dns_exfil_domains = [
     "dns-test.net",
     "dnsleaktest.com",
 ]
+
+# ---------------------------------------------------------------------------
+# LLM API endpoints — publicly known REST API paths for major AI providers.
+# Requests are sent without valid credentials so they return 401/403, but the
+# URL + request body are fully visible to DLP and AI-category URL filters.
+# ---------------------------------------------------------------------------
+llm_api_endpoints = [
+    "https://api.openai.com/v1/chat/completions",
+    "https://api.openai.com/v1/completions",
+    "https://api.openai.com/v1/embeddings",
+    "https://api.anthropic.com/v1/messages",
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent",
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
+    "https://api.mistral.ai/v1/chat/completions",
+    "https://api.cohere.ai/v1/chat",
+    "https://api.cohere.ai/v1/generate",
+    "https://api.perplexity.ai/chat/completions",
+    "https://api.together.xyz/v1/chat/completions",
+    "https://api.groq.com/openai/v1/chat/completions",
+    "https://openrouter.ai/api/v1/chat/completions",
+    "https://api.deepseek.com/v1/chat/completions",
+    "https://api.x.ai/v1/chat/completions",
+    "https://api.fireworks.ai/inference/v1/chat/completions",
+    "https://api.replicate.com/v1/predictions",
+    "https://api-inference.huggingface.co/models/gpt2",
+    "https://api.ai21.com/studio/v1/chat/completions",
+    "https://api.cerebras.ai/v1/chat/completions",
+]

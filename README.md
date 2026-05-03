@@ -1,6 +1,6 @@
 # 🛡️ Traffgen — Containerised multi-protocol network traffic generator
 
-Traffgen generates realistic network traffic across 34 test suites to stress-test firewalls, IDS/IPS systems, URL filters, and security analytics pipelines. It runs as a Docker container with a built-in watchdog, healthcheck, and configurable traffic volume.
+Traffgen generates realistic network traffic across 34 test suites to stress-test firewalls, IDS/IPS systems, URL filters, DLP engines, and security analytics pipelines. It runs as a Docker container with a built-in watchdog, healthcheck, and configurable traffic volume.
 
 ---
 
@@ -112,8 +112,24 @@ sudo bash < <(curl -s https://raw.githubusercontent.com/jdibby/traffgen/refs/hea
 
 | Suite | Description |
 |---|---|
-| `c2-beacon` | C2 beacon simulation: periodic HTTP POSTs with randomised jitter. |
-| `dns-exfil` | DNS TXT exfiltration simulation: base32-encoded subdomains. |
+| `c2-beacon` | C2 beacon simulation: periodic HTTP POSTs with randomised jitter using malware user-agents. |
+| `dns-exfil` | DNS TXT exfiltration simulation: base32-encoded subdomains to mimic iodine/dnscat2 patterns. |
+| `llm-dlp` | LLM/AI DLP simulation: POST fake PII payloads to known LLM API endpoints (see below). |
+
+#### LLM / AI DLP Simulation (`llm-dlp`)
+
+This suite simulates the real-world scenario of an employee copy-pasting sensitive data into a public AI assistant. Each iteration:
+
+1. Generates a unique block of **format-valid but obviously fake PII** — SSNs in the 9xx range (permanently unassigned), 555 phone numbers (reserved for fiction), well-known public Luhn-valid test card numbers (Visa `4111 1111 1111 1111`, Mastercard `5500 0000 0000 0004`, etc.), test-prefix passport and driver's licence numbers, and weak-pattern passwords.
+2. Embeds the PII inside a realistic **OpenAI-compatible chat completion request** with a context prompt such as *"Help me process this new employee onboarding record:"*.
+3. POSTs to a randomly chosen **LLM API endpoint** (OpenAI, Anthropic, Gemini, Mistral, Cohere, Groq, Perplexity, and others) with a fake `Bearer sk-DLPTEST-…` token.
+
+Requests return HTTP 401 / 403 — no real credentials are provided. The value to security teams is in the traffic, not the response:
+
+- DLP rules for **SSN, PCI-DSS card numbers, phone, passport, credential patterns** in outbound HTTPS bodies
+- **AI-category URL filtering** for known LLM API hostnames
+- Behavioural analytics detecting **PII uploads to cloud AI services**
+- API key / credential-in-request-body DLP signatures
 
 ### Content Filtering
 
@@ -185,6 +201,49 @@ docker run --pull=always -it \
 ```
 
 `generator.py` also exposes a `replace_all_endpoints()` function that can hot-swap `endpoints.py` from a remote URL at runtime without restarting the container.
+
+---
+
+## Building and Publishing the Image
+
+The image is published to Docker Hub as a multi-architecture manifest covering **linux/amd64**, **linux/arm64**, and **linux/arm/v7** so it runs natively on x86_64 servers, ARM64 (Raspberry Pi 5, Apple Silicon workers), and ARMv7 (Raspberry Pi 4).
+
+### Prerequisites
+
+```bash
+# Enable BuildKit multi-arch support once per host
+docker buildx create --name multi --driver docker-container --bootstrap --use
+docker buildx inspect --bootstrap
+```
+
+### Build and push (all three architectures in one command)
+
+```bash
+docker buildx build \
+  --platform linux/amd64,linux/arm64,linux/arm/v7 \
+  --tag jdibby/traffgen:latest \
+  --push \
+  .
+```
+
+This pushes a combined manifest to Docker Hub. Clients that `docker pull jdibby/traffgen:latest` automatically receive the image that matches their host architecture.
+
+### Tag a versioned release alongside `latest`
+
+```bash
+docker buildx build \
+  --platform linux/amd64,linux/arm64,linux/arm/v7 \
+  --tag jdibby/traffgen:latest \
+  --tag jdibby/traffgen:2.3.0 \
+  --push \
+  .
+```
+
+### Verify the manifest
+
+```bash
+docker buildx imagetools inspect jdibby/traffgen:latest
+```
 
 ---
 
