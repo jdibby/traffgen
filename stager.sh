@@ -1,178 +1,160 @@
 #!/bin/bash
+# stager.sh — Installs Docker and starts the traffgen container on a fresh host.
+# Supports: Ubuntu, Debian, Raspbian (Raspberry Pi 4/5), and Rocky Linux.
+# Usage: sudo bash < <(curl -s https://raw.githubusercontent.com/jdibby/traffgen/refs/heads/main/stager.sh)
 
-### VALIDATE ROOT PRIVILEGES ###
-echo "Checking for root privileges..."
-WHOAREYOU=$(whoami)
-if [ "$WHOAREYOU" != "root" ]; then
-    echo "#######################################################################"
-    echo "############## YOU MUST BE ROOT OR ELSE SUDO THIS SCRIPT ##############"
-    echo "#######################################################################"
+set -euo pipefail
+
+# ── Privilege check ───────────────────────────────────────────────────────────
+if [ "$(whoami)" != "root" ]; then
+    echo "ERROR: This script must be run as root (or via sudo)."
     exit 1
 fi
 
-### SETTING DEBIAN ENV VARIABLES FOR APT ###
-export DEBIAN_FRONTEND=noninteractive
-export NEEDRESTART_MODE=a
+# ── Environment setup ─────────────────────────────────────────────────────────
+export DEBIAN_FRONTEND=noninteractive   # suppress interactive apt prompts
+export NEEDRESTART_MODE=a               # auto-restart services without asking
 
-### INITIALIZE FORMATTING ###
-BOLD=$(tput bold)
-NORMAL=$(tput sgr0)
+BOLD=$(tput bold 2>/dev/null || true)
+NORMAL=$(tput sgr0 2>/dev/null || true)
+
+# ── OS detection ──────────────────────────────────────────────────────────────
 echo ""
 echo "${BOLD}### DETECTING OPERATING SYSTEM ###${NORMAL}"
 echo ""
 
-### OS DETECTION LOGIC ###
 RPIVER=""
 if [ -f /proc/device-tree/model ]; then
-    RPIVER=$(grep -a "Raspberry" /proc/device-tree/model | awk '{print $3}')
+    # Extract the Raspberry Pi generation number (4 or 5) from the device tree
+    RPIVER=$(grep -a "Raspberry" /proc/device-tree/model 2>/dev/null | awk '{print $3}' || true)
 fi
 
-### RESET OS VARIABLES ###
-UBUNTU=0
-ROCKY=0
-RASPBIAN=0
-DEBIAN=0
+UBUNTU=0; ROCKY=0; RASPBIAN=0; DEBIAN=0
 
 if [ -f /etc/os-release ]; then
-    UBUNTU=$(grep 'NAME="Ubuntu"' /etc/os-release | wc -l)
-    ROCKY=$(grep -i 'NAME="Rocky Linux"' /etc/os-release | wc -l)
-    RASPBIAN=$(grep 'ID=raspbian' /etc/os-release | wc -l)
-    DEBIAN=$(grep '^ID=debian$' /etc/os-release | wc -l)
-    if [ "$DEBIAN" -gt 0 ] && [ "$RASPBIAN" -gt 0 ]; then
-        DEBIAN=0
-    fi
+    UBUNTU=$(grep -c  'NAME="Ubuntu"'      /etc/os-release || true)
+    ROCKY=$(grep  -ci 'NAME="Rocky Linux"' /etc/os-release || true)
+    RASPBIAN=$(grep -c 'ID=raspbian'       /etc/os-release || true)
+    DEBIAN=$(grep  -c '^ID=debian$'        /etc/os-release || true)
+    # Raspbian ships with both ID=raspbian and ID_LIKE=debian; treat it as
+    # Raspbian only so it gets the correct Docker repo below.
+    [ "$RASPBIAN" -gt 0 ] && DEBIAN=0
 fi
 
-### DISPLAY OS AND PERFORM GLOBAL UPDATE ###
-if [ "$RASPBIAN" -gt 0 ]; then
-    echo "#######################################################################"
-    echo "##########${BOLD} System detected as Raspbian ${NORMAL}###########################"
-    echo "#######################################################################"
-elif [ "$DEBIAN" -gt 0 ]; then
-    echo "#######################################################################"
-    echo "##########${BOLD} System detected as Pure Debian ${NORMAL}######################"
-    echo "#######################################################################"
-elif [ "$UBUNTU" -gt 0 ]; then
-    echo "#######################################################################"
-    echo "##########${BOLD} System detected as Ubuntu Linux ${NORMAL}#####################"
-    echo "#######################################################################"
-elif [ "$ROCKY" -gt 0 ]; then
-    echo "#######################################################################"
-    echo "##########${BOLD} System detected as Rocky Linux ${NORMAL}#####################"
-    echo "#######################################################################"
+if   [ "$RASPBIAN" -gt 0 ]; then OS_LABEL="Raspbian"
+elif [ "$DEBIAN"   -gt 0 ]; then OS_LABEL="Debian"
+elif [ "$UBUNTU"   -gt 0 ]; then OS_LABEL="Ubuntu"
+elif [ "$ROCKY"    -gt 0 ]; then OS_LABEL="Rocky Linux"
 else
-    echo "#######################################################################"
-    echo "#################### UNSUPPORTED OPERATING SYSTEM #####################"
-    echo "#######################################################################"
+    echo "ERROR: Unsupported operating system. Exiting."
     exit 1
 fi
 
+echo "Detected: ${BOLD}${OS_LABEL}${NORMAL}"
+
+# ── System update ─────────────────────────────────────────────────────────────
 echo ""
 echo "${BOLD}### UPDATING SYSTEM PACKAGES ###${NORMAL}"
 if [ "$ROCKY" -gt 0 ]; then
     dnf update -y && dnf upgrade -y
 else
-    apt update -y && apt upgrade -y && apt autoremove -y && apt clean -y
+    apt-get update -y && apt-get upgrade -y && apt-get autoremove -y && apt-get clean -y
 fi
 
-### CLEANUP EXISTING CONTAINERS ###
+# ── Remove any existing Docker installation ───────────────────────────────────
 echo ""
-echo "${BOLD}### CLEANING UP DOCKER CONTAINERS AND IMAGES ###${NORMAL}"
-docker stop $(docker ps -aq) &>/dev/null
-docker rm $(docker ps -aq) &>/dev/null
-docker images | awk '{print $3}' | xargs docker rmi -f &>/dev/null
+echo "${BOLD}### REMOVING EXISTING DOCKER INSTALLATIONS AND CONTAINERS ###${NORMAL}"
 
-### REMOVE OLD DOCKER INSTALLATIONS ###
-echo ""
-echo "${BOLD}### REMOVING OLD DOCKER INSTALLATIONS ###${NORMAL}"
 if [ "$ROCKY" -gt 0 ]; then
-    dnf remove -y docker-ce docker-ce-cli containerd.io
+    dnf remove -y docker-ce docker-ce-cli containerd.io 2>/dev/null || true
     rm -rf /var/lib/docker /var/lib/containerd
 else
-    for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do
-        apt remove -y $pkg
+    # Stop and remove all running containers before removing packages
+    docker stop  "$(docker ps -aq)" 2>/dev/null || true
+    docker rm    "$(docker ps -aq)" 2>/dev/null || true
+    docker images -q | xargs -r docker rmi -f    2>/dev/null || true
+
+    for pkg in docker.io docker-doc docker-compose docker-compose-v2 \
+               podman-docker containerd runc; do
+        apt-get remove -y "$pkg" 2>/dev/null || true
     done
 fi
 
-### CONFIGURE DOCKER REPOSITORY ###
+# ── Install Docker ────────────────────────────────────────────────────────────
 echo ""
-echo "${BOLD}### CONFIGURING DOCKER REPOSITORY ###${NORMAL}"
+echo "${BOLD}### INSTALLING DOCKER ###${NORMAL}"
+
 if [ "$ROCKY" -gt 0 ]; then
+    # Rocky Linux uses the CentOS Docker repo
     dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
     dnf update -y
-    dnf install docker-ce docker-ce-cli containerd.io docker-compose-plugin -y
+    dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
     systemctl enable --now docker
 else
-    echo ""
-    echo "${BOLD}### CLEANING UP APT SOURCE REPOS ###${NORMAL}"
-    echo ""
+    # Debian-family: deduplicate APT sources, then install via the official Docker repo
+    apt-get install -y python3-apt python3-regex
 
-    ### Cleanup apt repo deduplicates
-    ### Install dependencies (if not already present)
-    sudo apt install python3-apt python3-regex -y
+    # Download and run the aptsources-cleanup tool to remove duplicate sources
+    wget -q -O /tmp/aptsources-cleanup.pyz \
+        https://github.com/davidfoerster/aptsources-cleanup/releases/download/v0.1.7.5.2/aptsources-cleanup.pyz
+    chmod +x /tmp/aptsources-cleanup.pyz
+    bash -c "echo all | python3 /tmp/aptsources-cleanup.pyz --yes" || true
+    rm -f /tmp/aptsources-cleanup.pyz
 
-    ### Download the script
-    wget https://github.com/davidfoerster/aptsources-cleanup/releases/download/v0.1.7.5.2/aptsources-cleanup.pyz
-
-    ### Make it executable
-    chmod +x aptsources-cleanup.pyz
-
-    ### Run the script
-    sudo bash -c "echo all | ./aptsources-cleanup.pyz --yes"
-
-    ### Remove the script after use
-    rm aptsources-cleanup.pyz
-
-    echo ""
-    echo "${BOLD}### APT SOURCE REPOS ARE NOW CLEAN ###${NORMAL}"
-    echo ""
-
-    apt install -y ca-certificates curl gnupg lsb-release
+    # Install prerequisites for adding the Docker GPG key
+    apt-get install -y ca-certificates curl gnupg lsb-release
     install -m 0755 -d /etc/apt/keyrings
 
     ARCH=$(dpkg --print-architecture)
     CODENAME=$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)
 
-    if [ "$RASPBIAN" -gt 0 ]; then
-        if [ "$RPIVER" -eq 5 ]; then
-            curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
-            echo "deb [arch=$ARCH signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian $CODENAME stable" \
-                | tee /etc/apt/sources.list.d/docker.list > /dev/null
-        else
-            curl -fsSL https://download.docker.com/linux/raspbian/gpg -o /etc/apt/keyrings/docker.asc
-            echo "deb [arch=$ARCH signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/raspbian $CODENAME stable" \
-                | tee /etc/apt/sources.list.d/docker.list > /dev/null
-        fi
+    # Select the correct Docker GPG key and repo URL for each distro variant
+    if [ "$RASPBIAN" -gt 0 ] && [ "${RPIVER:-0}" -eq 5 ]; then
+        # Raspberry Pi 5 runs a 64-bit Debian kernel — use the Debian repo
+        DOCKER_GPG="https://download.docker.com/linux/debian/gpg"
+        DOCKER_REPO="https://download.docker.com/linux/debian"
+    elif [ "$RASPBIAN" -gt 0 ]; then
+        # Raspberry Pi 4 (ARMv7) uses the dedicated Raspbian repo
+        DOCKER_GPG="https://download.docker.com/linux/raspbian/gpg"
+        DOCKER_REPO="https://download.docker.com/linux/raspbian"
     elif [ "$UBUNTU" -gt 0 ]; then
-        curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-        echo "deb [arch=$ARCH signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $CODENAME stable" \
-            | tee /etc/apt/sources.list.d/docker.list > /dev/null
-    elif [ "$DEBIAN" -gt 0 ]; then
-        curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
-        echo "deb [arch=$ARCH signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian $CODENAME stable" \
-            | tee /etc/apt/sources.list.d/docker.list > /dev/null
+        DOCKER_GPG="https://download.docker.com/linux/ubuntu/gpg"
+        DOCKER_REPO="https://download.docker.com/linux/ubuntu"
+    else
+        # Pure Debian
+        DOCKER_GPG="https://download.docker.com/linux/debian/gpg"
+        DOCKER_REPO="https://download.docker.com/linux/debian"
     fi
 
+    curl -fsSL "$DOCKER_GPG" -o /etc/apt/keyrings/docker.asc
     chmod a+r /etc/apt/keyrings/docker.asc
-    apt update -y
-    apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    echo "deb [arch=${ARCH} signed-by=/etc/apt/keyrings/docker.asc] ${DOCKER_REPO} ${CODENAME} stable" \
+        > /etc/apt/sources.list.d/docker.list
+
+    apt-get update -y
+    apt-get install -y docker-ce docker-ce-cli containerd.io \
+                       docker-buildx-plugin docker-compose-plugin
+
+    # Restart Docker and prune any leftover images/volumes from prior installs
     systemctl restart docker
     docker system prune -f
-    docker image prune -f
-    docker volume prune -f
-    docker network prune -f
-    docker container prune -f
-fi  
+fi
 
 echo ""
 echo "${BOLD}### DOCKER INSTALLATION COMPLETE ###${NORMAL}"
-echo ""
 
+# ── Start traffgen container ──────────────────────────────────────────────────
+echo ""
 echo "${BOLD}### STARTING TRAFFGEN CONTAINER ###${NORMAL}"
-docker run --pull=always --detach --restart unless-stopped jdibby/traffgen:latest --suite=all --size=S --max-wait-secs=20 --loop
+docker run \
+    --pull=always \
+    --detach \
+    --restart unless-stopped \
+    jdibby/traffgen:latest \
+    --suite=all --size=S --max-wait-secs=20 --loop
 
 echo ""
-echo "${BOLD}### TRAFFGEN INSTALL COMPLETE ###${NORMAL}"
+echo "${BOLD}### INSTALL COMPLETE ###${NORMAL}"
 echo ""
-docker ps -a --format "table {{.ID}} -- {{.Image}} -- {{.Names}} -- {{.Status}}"
+docker ps -a --format "table {{.ID}}\t{{.Image}}\t{{.Names}}\t{{.Status}}"
 echo ""

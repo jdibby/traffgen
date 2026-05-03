@@ -2155,29 +2155,157 @@ dns_exfil_domains = [
 ]
 
 # ---------------------------------------------------------------------------
-# LLM API endpoints — publicly known REST API paths for major AI providers.
-# Requests are sent without valid credentials so they return 401/403, but the
-# URL + request body are fully visible to DLP and AI-category URL filters.
+# LLM API endpoints — REST API paths for major AI providers.
+# Grouped by provider; requests return 401/403 (no real auth) but the
+# URL + payload are fully visible to DLP and AI-category URL filters.
+#
+# Provider-specific formats handled in generator.py:
+#   - OpenAI-compatible  : {"model":..., "messages":[...], "max_tokens":...}
+#   - Anthropic          : same body + anthropic-version / x-api-key headers
+#   - Google Gemini      : {"contents":[{"parts":[{"text":...}]}], ...}
+#   - Cohere             : {"model":..., "message":..., "max_tokens":...}
 # ---------------------------------------------------------------------------
 llm_api_endpoints = [
+    # ── OpenAI / ChatGPT ────────────────────────────────────────────────────
     "https://api.openai.com/v1/chat/completions",
     "https://api.openai.com/v1/completions",
     "https://api.openai.com/v1/embeddings",
+    "https://api.openai.com/v1/images/generations",
+
+    # ── Anthropic / Claude ──────────────────────────────────────────────────
     "https://api.anthropic.com/v1/messages",
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent",
+    "https://api.anthropic.com/v1/complete",
+
+    # ── Google Gemini / PaLM ────────────────────────────────────────────────
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent",
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent",
+
+    # ── Microsoft Azure OpenAI ──────────────────────────────────────────────
+    # Generic patterns; real deployments use tenant-specific subdomains.
+    "https://api.cognitive.microsoft.com/openai/deployments/gpt-4/chat/completions",
+    "https://eastus.api.cognitive.microsoft.com/openai/deployments/gpt-4o/chat/completions",
+
+    # ── Microsoft Copilot ───────────────────────────────────────────────────
+    "https://copilot.microsoft.com/api/chat",
+    "https://sydney.bing.com/sydney/ChatHub",
+
+    # ── Perplexity AI ───────────────────────────────────────────────────────
+    "https://api.perplexity.ai/chat/completions",
+
+    # ── Meta / Llama ────────────────────────────────────────────────────────
+    "https://api.llama-api.com/chat/completions",
+    "https://llama.developer.meta.com/api/chat/completions",
+
+    # ── Mistral AI ──────────────────────────────────────────────────────────
     "https://api.mistral.ai/v1/chat/completions",
+    "https://api.mistral.ai/v1/embeddings",
+
+    # ── Cohere ──────────────────────────────────────────────────────────────
     "https://api.cohere.ai/v1/chat",
     "https://api.cohere.ai/v1/generate",
-    "https://api.perplexity.ai/chat/completions",
-    "https://api.together.xyz/v1/chat/completions",
-    "https://api.groq.com/openai/v1/chat/completions",
-    "https://openrouter.ai/api/v1/chat/completions",
-    "https://api.deepseek.com/v1/chat/completions",
+    "https://api.cohere.com/v2/chat",
+
+    # ── xAI / Grok ──────────────────────────────────────────────────────────
     "https://api.x.ai/v1/chat/completions",
+
+    # ── DeepSeek ────────────────────────────────────────────────────────────
+    "https://api.deepseek.com/v1/chat/completions",
+
+    # ── Groq ────────────────────────────────────────────────────────────────
+    "https://api.groq.com/openai/v1/chat/completions",
+
+    # ── Together AI ─────────────────────────────────────────────────────────
+    "https://api.together.xyz/v1/chat/completions",
+    "https://api.together.ai/v1/chat/completions",
+
+    # ── Fireworks AI ────────────────────────────────────────────────────────
     "https://api.fireworks.ai/inference/v1/chat/completions",
-    "https://api.replicate.com/v1/predictions",
-    "https://api-inference.huggingface.co/models/gpt2",
+
+    # ── OpenRouter (multi-provider gateway) ─────────────────────────────────
+    "https://openrouter.ai/api/v1/chat/completions",
+
+    # ── Amazon Bedrock ──────────────────────────────────────────────────────
+    "https://bedrock-runtime.us-east-1.amazonaws.com/model/anthropic.claude-3-sonnet-20240229-v1:0/invoke",
+    "https://bedrock-runtime.us-east-1.amazonaws.com/model/amazon.titan-text-express-v1/invoke",
+    "https://bedrock-runtime.us-west-2.amazonaws.com/model/meta.llama3-70b-instruct-v1:0/invoke",
+
+    # ── Hugging Face Inference API ──────────────────────────────────────────
+    "https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct",
+    "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3",
+
+    # ── Smaller / emerging providers ────────────────────────────────────────
     "https://api.ai21.com/studio/v1/chat/completions",
     "https://api.cerebras.ai/v1/chat/completions",
+    "https://api.writer.com/v1/llm/chat",
+    "https://api.scale.com/v1/chat",
+    "https://inference.friendli.ai/v1/chat/completions",
+    "https://api.nvidia.com/v1/chat/completions",
+]
+
+# ---------------------------------------------------------------------------
+# LLM web UI endpoints — browser-facing URLs for major AI applications.
+# Used for HEAD requests to exercise AI-category URL-filtering rules and
+# Cato Networks AI Security app-discovery signatures.
+# Covers: text generation, code generation, image generation, enterprise AI.
+# ---------------------------------------------------------------------------
+llm_web_endpoints = [
+    # ── Text / chat ─────────────────────────────────────────────────────────
+    "https://chat.openai.com",
+    "https://chatgpt.com",
+    "https://claude.ai",
+    "https://claude.ai/new",
+    "https://gemini.google.com",
+    "https://bard.google.com",
+    "https://copilot.microsoft.com",
+    "https://perplexity.ai",
+    "https://www.perplexity.ai",
+    "https://poe.com",
+    "https://you.com",
+    "https://pi.ai",
+    "https://character.ai",
+    "https://beta.character.ai",
+    "https://chat.deepseek.com",
+    "https://grok.x.ai",
+    "https://grok.com",
+    "https://chat.mistral.ai",
+    "https://coral.cohere.com",
+    "https://meta.ai",
+    "https://huggingface.co/chat",
+    "https://lmsys.org/chat",
+    "https://groq.com",
+
+    # ── Code generation ─────────────────────────────────────────────────────
+    "https://github.com/features/copilot",
+    "https://copilot.github.com",
+    "https://cursor.com",
+    "https://www.cursor.com",
+    "https://codeium.com",
+    "https://tabnine.com",
+    "https://replit.com/ai",
+    "https://www.codewhisperer.aws",
+    "https://aws.amazon.com/q/developer",
+
+    # ── Image generation ────────────────────────────────────────────────────
+    "https://midjourney.com",
+    "https://www.midjourney.com",
+    "https://platform.stability.ai",
+    "https://stability.ai",
+    "https://labs.openai.com",
+    "https://firefly.adobe.com",
+    "https://www.adobe.com/products/firefly.html",
+    "https://leonardo.ai",
+    "https://ideogram.ai",
+    "https://playground.com",
+    "https://www.bing.com/images/create",
+
+    # ── Enterprise / productivity AI ────────────────────────────────────────
+    "https://www.notion.so/product/ai",
+    "https://slack.com/features/ai",
+    "https://workspace.google.com/products/gemini",
+    "https://microsoft365.com/copilot",
+    "https://einstein.salesforce.com",
+    "https://aws.amazon.com/bedrock",
+    "https://azure.microsoft.com/en-us/products/ai-services/openai-service",
 ]
