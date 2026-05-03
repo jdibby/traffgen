@@ -51,7 +51,7 @@ sudo bash < <(curl -s https://raw.githubusercontent.com/jdibby/traffgen/refs/hea
 | Flag | Values | Default | Description |
 |---|---|---|---|
 | `--suite` | See suite names below | `all` | Test suite to run |
-| `--size` | `S` `M` `L` `XL` | `M` | Traffic volume / intensity |
+| `--size` | `XS` `S` `M` `L` `XL` | `M` | Traffic volume / intensity |
 | `--loop` | — | off | Loop forever, picking tests at random each iteration |
 | `--max-wait-secs` | integer | `20` | Max random pause between iterations when looping |
 | `--nowait` | — | off | Disable inter-test pauses when looping |
@@ -83,7 +83,7 @@ sudo bash < <(curl -s https://raw.githubusercontent.com/jdibby/traffgen/refs/hea
 | 🔒 `https` | HTTPS HEAD requests to a wide endpoint pool followed by an iterative TLS crawl. Tests TLS inspection policy, certificate validation enforcement, and HTTPS download logging. |
 | 🕷️ `crawl` | Iterative web crawl from a configurable seed URL (`--crawl-start`). Follows links up to a depth that scales with `--size`. Mimics a browser session for URL categorisation and user-activity analytics testing. |
 | ⏱️ `url-response` | Measures HTTPS response times across a diverse URL set using the Python `requests` library. Populates URL-filter logs and response-time dashboards. |
-| 💾 `bigfile` | Streams a 5 GB HTTP download to `/dev/null` for bandwidth saturation and QoS testing. Validates that large-file or bandwidth-cap policies trigger correctly and that flow records capture high-volume sessions. |
+| 💾 `bigfile` | Streams an HTTP download to `/dev/null` — file size scales with `--size` (XS=10 MB, S=100 MB, M=1 GB, L=2 GB, XL=5 GB). Tests large-file and bandwidth-cap policies across the full volume range without always hitting the ceiling. |
 | 📂 `ftp` | FTP file download via `curl` with rate limiting against a public test server. Validates FTP inspection, logging, and file-transfer policy enforcement. |
 
 ---
@@ -185,6 +185,7 @@ The `--size` flag scales test intensity across all suites:
 
 | Size | Intended Use |
 |:---:|---|
+| ⚪ `XS` | Ultra-light — single tiny requests, very slow pacing; ideal for smoke tests |
 | 🟢 `S` | Long-running background daemons — low bandwidth impact |
 | 🟡 `M` | General-purpose testing (default) |
 | 🟠 `L` | Heavier load for firewall and IDS stress tests |
