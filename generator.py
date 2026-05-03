@@ -1,55 +1,104 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""
+generator.py — Traffic Generator v2.1.0
+========================================
+Simulates realistic network traffic across a wide range of protocols and
+behaviours: DNS, HTTP/HTTPS, FTP, SSH, NTP, BGP, ICMP, SNMP, Metasploit
+checks, web crawling, malware/phishing domain probing, ad-tracker HEAD
+requests, speed-tests, and more.
 
-import os, sys, time, random, threading, argparse, subprocess, socket, ssl, traceback
+Designed to run inside a Docker container as a continuous traffic source
+for testing firewalls, IDS/IPS rules, and security analytics pipelines.
+
+Usage (stand-alone):
+    python3 generator.py --suite=all --size=M --loop
+
+Usage (Docker default):
+    # See CMD in Dockerfile — runs suite=all, size=S, loop
+"""
+
+# ── Standard library ──────────────────────────────────────────────────────────
+import os
+import sys
+import ssl
+import time
+import socket
+import random
+import threading
+import argparse
+import subprocess
+import traceback
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urljoin
 
+# ── Third-party ───────────────────────────────────────────────────────────────
 import requests
 import urllib3
 from bs4 import BeautifulSoup
 
-from requests.packages.urllib3.exceptions import InsecureRequestWarning
-from endpoints import *
-
-# ---- Rich UI imports ----
+# Rich terminal UI
 from rich.console import Console
 from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeElapsedColumn, TimeRemainingColumn, MofNCompleteColumn
+from rich.progress import (
+    Progress, SpinnerColumn, BarColumn, TextColumn,
+    TimeElapsedColumn, TimeRemainingColumn, MofNCompleteColumn,
+)
 from rich.table import Table
 from rich import box
 
+# ── Local config ──────────────────────────────────────────────────────────────
+from endpoints import *           # noqa: F401,F403  (large data file)
+
+# ── Globals ───────────────────────────────────────────────────────────────────
+VERSION = "2.1.0"
 console = Console(highlight=False)
 
-# Disable SSL warning for self-signed certs
+# Suppress SSL warnings — this tool intentionally hits self-signed / expired certs.
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 ssl._create_default_https_context = ssl._create_unverified_context
 
 
-# ==========================
-# UI helpers
-# ==========================
+# ══════════════════════════════════════════════════════════════════════════════
+# UI HELPERS
+# ══════════════════════════════════════════════════════════════════════════════
 
-def ui_banner(title: str, subtitle: str = "", style: str = "green"):
+def ui_banner(title: str, subtitle: str = "", style: str = "green") -> None:
+    """Print a Rich panel banner marking the start of a test section."""
     content = f"[bold {style}]{title}[/]"
     if subtitle:
         content += f"\n{subtitle}"
     console.print(Panel.fit(content, border_style=style))
 
+
 def ui_status(msg: str, style: str = "cyan"):
+    """Return a Rich live-status spinner context manager."""
     return console.status(f"[{style}]{msg}[/]")
 
-def ui_error(msg: str):
-    console.print(f"[bold red]❌ {msg}[/]")
 
-def ui_ok(msg: str):
-    console.print(f"[bold green]✅ {msg}[/]")
+def ui_error(msg: str) -> None:
+    """Print a red error line."""
+    console.print(f"[bold red]✗ {msg}[/]")
 
-def ui_warn(msg: str):
+
+def ui_ok(msg: str) -> None:
+    """Print a green success line."""
+    console.print(f"[bold green]✔ {msg}[/]")
+
+
+def ui_warn(msg: str) -> None:
+    """Print a yellow warning line."""
     console.print(f"[bold yellow]⚠ {msg}[/]")
 
-def progress_wait(seconds: int, label: str = "Waiting"):
-    """Rich-based countdown wait used between looped tests."""
+
+def ui_info(msg: str) -> None:
+    """Print a dim informational line."""
+    console.print(f"[dim]{msg}[/]")
+
+
+def progress_wait(seconds: int, label: str = "Waiting") -> None:
+    """Animated countdown bar used between loop iterations."""
     if seconds <= 0:
         return
     with Progress(
@@ -60,79 +109,262 @@ def progress_wait(seconds: int, label: str = "Waiting"):
         TimeRemainingColumn(),
         console=console,
         transient=True,
-    ) as progress:
-        task = progress.add_task("wait", total=seconds)
+    ) as prog:
+        task = prog.add_task("wait", total=seconds)
         start = time.time()
-        while not progress.finished:
-            elapsed = time.time() - start
-            progress.update(task, completed=min(elapsed, seconds))
+        while not prog.finished:
+            prog.update(task, completed=min(time.time() - start, seconds))
             time.sleep(0.1)
 
 
-# ==========================
-# Watchdog
-# ==========================
-class watchdog:
-    def __init__(self, timeout_seconds):
+def ui_startup_banner() -> None:
+    """
+    Print the full startup header: version, active config, and a table of
+    every available suite so operators immediately know what the tool can do.
+    """
+    # Title panel
+    console.print(Panel.fit(
+        f"[bold cyan]Traffic Generator[/]  [dim]v{VERSION}[/]\n"
+        "[dim]Multi-protocol network traffic simulation[/]",
+        border_style="cyan",
+        box=box.DOUBLE_EDGE,
+    ))
+
+    # Configuration table
+    size_name = {"S": "Small", "M": "Medium", "L": "Large", "XL": "Extra-Large"}.get(ARGS.size, "Medium")
+    cfg = Table.grid(padding=(0, 2))
+    cfg.add_row("[bold]Suite[/]",        ":", ARGS.suite.upper())
+    cfg.add_row("[bold]Size[/]",         ":", size_name)
+    cfg.add_row("[bold]Loop[/]",         ":", "[green]yes[/]" if ARGS.loop else "[dim]no[/]")
+    cfg.add_row("[bold]Max Wait[/]",     ":", f"{ARGS.max_wait_secs}s")
+    cfg.add_row("[bold]No-wait[/]",      ":", "[green]yes[/]" if ARGS.nowait else "[dim]no[/]")
+    cfg.add_row("[bold]Crawl Start[/]",  ":", ARGS.crawl_start)
+    console.print(Panel(cfg, title="Run Configuration", border_style="blue", box=box.ROUNDED))
+
+    # Suite reference table (only shown when running 'all' or on first boot)
+    if ARGS.suite == "all":
+        tbl = Table(title="Available Suites", box=box.SIMPLE, show_header=True, header_style="bold magenta")
+        tbl.add_column("Suite", style="cyan", no_wrap=True)
+        tbl.add_column("Description", style="white")
+        for name, desc in _SUITE_DESCRIPTIONS:
+            tbl.add_row(name, desc)
+        console.print(tbl)
+
+
+# Suite metadata used both for the startup table and the --list flag.
+_SUITE_DESCRIPTIONS: list[tuple[str, str]] = [
+    ("ads",              "HEAD requests to ad-tracker / analytics endpoints"),
+    ("ai",               "HEAD requests to AI-service endpoints"),
+    ("bgp",              "GoBGP peering session with configured neighbors"),
+    ("bigfile",          "5 GB HTTP download (bandwidth saturation)"),
+    ("crawl",            "Iterative web crawl from a configurable start URL"),
+    ("dlp",              "DLP test file downloads over HTTPS"),
+    ("dns",              "dig queries across multiple resolvers and domains"),
+    ("domain-check",     "Probe random samples from Hagezi DNS blocklist"),
+    ("ftp",              "FTP download via curl with rate limiting"),
+    ("http",             "HTTP HEAD + file downloads (ZIP, tar.gz)"),
+    ("https",            "HTTPS HEAD requests + iterative crawl"),
+    ("icmp",             "Ping + traceroute to a set of remote hosts"),
+    ("ips",              "BlackSun user-agent IPS trigger to testmyids.com"),
+    ("kyber",            "HTTPS HEAD with X25519MLKEM768 post-quantum curves"),
+    ("malware-agents",   "HEAD requests using known malware user-agents"),
+    ("malware-download", "Download known-malware file samples (to /dev/null)"),
+    ("metasploit-check", "Run Metasploit .rc check scripts (no exploitation)"),
+    ("netflix",          "fast.com speed-test via fastcli"),
+    ("nmap",             "Nmap port scan (1-1024) + CVE script scan"),
+    ("ntp",              "NTP UDP probes to a pool of public time servers"),
+    ("phishing-domains", "Probe random samples from active phishing domain list"),
+    ("pornography",      "HTTPS crawl of adult-content endpoints"),
+    ("snmp",             "SNMPv2c walks with rotating community strings"),
+    ("squatting",        "dnstwist typosquatting generation for popular domains"),
+    ("ssh",              "Non-interactive SSH connection attempts"),
+    ("url-response",     "Measure HTTPS response times via requests library"),
+    ("virus",            "Download known-virus samples (to /dev/null)"),
+    ("web-scanner",      "Nikto web vulnerability scan"),
+    ("all",              "Run every suite above in random order"),
+]
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# WATCHDOG
+# ══════════════════════════════════════════════════════════════════════════════
+
+class Watchdog:
+    """
+    Background thread that force-exits the process when no test has run for
+    `timeout_seconds`.  The container's restart policy will then re-launch it,
+    preventing silent hangs from idle loops.
+    """
+
+    def __init__(self, timeout_seconds: int) -> None:
         self.timeout = timeout_seconds
         self.last_kick = time.time()
-        self.thread = threading.Thread(target=self._watch, daemon=True)
-        self.thread.start()
+        self._thread = threading.Thread(target=self._watch, daemon=True)
+        self._thread.start()
 
-    def kick(self):
+    def kick(self) -> None:
+        """Reset the inactivity timer — call this after every test completes."""
         self.last_kick = time.time()
 
-    def _watch(self):
+    def _watch(self) -> None:
         while True:
             if time.time() - self.last_kick > self.timeout:
-                ui_warn("WATCHDOG: No activity detected. Exiting to force container restart...")
+                ui_warn("WATCHDOG: No activity detected — exiting to trigger container restart.")
                 os._exit(1)
             time.sleep(1)
 
 
-# ==========================
-# Utilities
-# ==========================
+# ══════════════════════════════════════════════════════════════════════════════
+# UTILITIES
+# ══════════════════════════════════════════════════════════════════════════════
 
-def get_container_ip():
+def get_container_ip() -> str:
+    """
+    Detect the container's primary outbound IP by inspecting the routing table.
+    Falls back to 127.0.0.1 on any failure.
+    """
     try:
         result = subprocess.run(
-            ["sh", "-lc", "ip route get 1 | awk '{for(i=1;i<=NF;i++) if ($i==\"src\") {print $(i+1); exit}}'"],
+            ["sh", "-lc",
+             "ip route get 1 | awk '{for(i=1;i<=NF;i++) if ($i==\"src\") {print $(i+1); exit}}'"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             check=True,
         )
-        output = result.stdout.decode().strip()
-        return output if output else "127.0.0.1"
+        ip = result.stdout.decode().strip()
+        return ip if ip else "127.0.0.1"
     except Exception as e:
-        ui_warn(f"Failed to determine container IP: {e}")
+        ui_warn(f"Could not determine container IP: {e}")
         return "127.0.0.1"
 
 
-# ==========================
-# Tests
-# ==========================
+def _size_to_limits(size: str, s, m, l, xl):
+    """Map the --size flag to one of four pre-defined values (S/M/L/XL)."""
+    return {"S": s, "M": m, "L": l, "XL": xl}.get(size, m)
 
-def bgp_peering():
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SUBPROCESS HELPERS
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _curl_head(url: str, user_agent: str,
+               connect_timeout: int = 3, max_time: int = 5,
+               extra_flags: str = "") -> None:
+    """
+    Issue a single HTTP HEAD request via curl.
+
+    Using curl (rather than requests) keeps the traffic realistic: it sends
+    the same TLS fingerprint, header order, and timing patterns as a real
+    browser-side tool.  Output is discarded — we care only about generating
+    the traffic, not the response body.
+    """
+    cmd = (
+        f"curl -k -s --show-error "
+        f"--connect-timeout {connect_timeout} "
+        f"-I -o /dev/null --max-time {max_time} "
+        f"{extra_flags} "
+        f"-A '{user_agent}' {url}"
+    )
+    subprocess.run(cmd, shell=True,
+                   stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
+                   timeout=max_time + 5)
+
+
+def _curl_download(url: str, rate_limit: str = "3M",
+                   connect_timeout: int = 4, timeout: int = 20,
+                   user_agent: str = "") -> None:
+    """
+    Download a remote file via curl, discarding data to /dev/null.
+
+    `rate_limit` caps bandwidth (e.g. "3M" = 3 MB/s) so the test doesn't
+    saturate the uplink.  Use an empty string to remove the cap.
+    """
+    rate_flag = f"--limit-rate {rate_limit}" if rate_limit else ""
+    ua_flag   = f"-A '{user_agent}'"          if user_agent  else ""
+    cmd = (
+        f"curl {rate_flag} -k --show-error "
+        f"--connect-timeout {connect_timeout} "
+        f"-L -o /dev/null {ua_flag} {url}"
+    )
+    subprocess.run(cmd, shell=True,
+                   stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
+                   timeout=timeout)
+
+
+def _run_head_batch(urls: list[str], label: str,
+                    user_agents_pool: list[str],
+                    connect_timeout: int = 3, max_time: int = 5,
+                    extra_flags: str = "",
+                    max_workers: int = 6) -> None:
+    """
+    Run HEAD requests against *urls* concurrently using a thread pool.
+
+    Concurrency (default 6 workers) reduces wall-clock time significantly for
+    large URL lists without overwhelming any single target — each individual
+    request still has its own connect/max-time limits.
+
+    Thread-safety note: subprocess.run is re-entrant and console.log acquires
+    Rich's internal lock, so parallel calls are safe.
+    """
+    with Progress(
+        SpinnerColumn(),
+        TextColumn(f"[cyan]{label}[/]"),
+        MofNCompleteColumn(),
+        BarColumn(),
+        TimeElapsedColumn(),
+        console=console,
+    ) as prog:
+        task = prog.add_task(label, total=len(urls))
+
+        def _worker(idx: int, url: str) -> None:
+            ua = random.choice(user_agents_pool)
+            console.log(f"[{idx}/{len(urls)}] {url}")
+            try:
+                _curl_head(url, ua, connect_timeout, max_time, extra_flags)
+            except Exception as e:
+                console.log(f"[yellow]  ↳ {url}: {e}[/]")
+            finally:
+                prog.update(task, advance=1)
+
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures = {pool.submit(_worker, i + 1, url): url
+                       for i, url in enumerate(urls)}
+            # Consume futures so exceptions propagate and are logged.
+            for fut in as_completed(futures):
+                try:
+                    fut.result()
+                except Exception:
+                    pass
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TEST FUNCTIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+def bgp_peering() -> None:
+    """
+    Start gobgpd, wait for its gRPC API, configure AS 65555 with the
+    container's own IP as the router-id, then add all neighbors from
+    `bgp_neighbors` (endpoints.py).  Tears gobgpd down cleanly when done.
+    """
     ui_banner("BGP Peering", "Starting gobgpd and configuring neighbors", "magenta")
     gobgpd_proc = None
     try:
-        # Start gobgpd
         with ui_status("Starting gobgpd..."):
             try:
                 gobgpd_proc = subprocess.Popen(
                     ["gobgpd", "--api-hosts", "127.0.0.1:50051"],
-                    stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                 )
                 ui_ok("gobgpd started")
             except Exception as e:
                 ui_warn(f"Failed to start gobgpd: {e}")
                 gobgpd_proc = None
 
-        # Wait for API
-        def gobgp_wait_api(host, port, timeout=15):
-            start = time.time()
-            while time.time() - start < timeout:
+        def _wait_api(host: str, port: int, timeout: int = 15) -> bool:
+            """Poll until the gobgpd gRPC port accepts connections."""
+            deadline = time.time() + timeout
+            while time.time() < deadline:
                 try:
                     with socket.create_connection((host, port), timeout=1):
                         return True
@@ -140,37 +372,35 @@ def bgp_peering():
                     time.sleep(0.3)
             return False
 
-        # Configure BGP if up
-        if gobgpd_proc and gobgp_wait_api("127.0.0.1", 50051, timeout=15):
-            try:
-                router_id = get_container_ip()
-                with ui_status("Configuring global BGP instance..."):
-                    subprocess.run(
-                        ["gobgp", "-u", "127.0.0.1", "-p", "50051", "global", "as", "65555", "router-id", router_id],
-                        check=True
-                    )
-                ui_ok(f"Global BGP configured (router-id: {router_id})")
+        if gobgpd_proc and _wait_api("127.0.0.1", 50051):
+            router_id = get_container_ip()
+            with ui_status("Configuring global BGP instance..."):
+                subprocess.run(
+                    ["gobgp", "-u", "127.0.0.1", "-p", "50051",
+                     "global", "as", "65555", "router-id", router_id],
+                    check=True,
+                )
+            ui_ok(f"Global BGP configured (router-id: {router_id})")
 
-                # Add neighbors
-                for neighbor_ip in bgp_neighbors:
-                    with ui_status(f"Adding neighbor {neighbor_ip}..."):
-                        result = subprocess.run(
-                            ["gobgp", "-u", "127.0.0.1", "-p", "50051", "neighbor", "add", neighbor_ip, "as", "65555"],
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE
-                        )
-                    if result.returncode != 0:
-                        ui_warn(f"Error adding neighbor {neighbor_ip}: {result.stderr.decode().strip()}")
-                    else:
-                        ui_ok(f"Neighbor added: {neighbor_ip}")
-            except Exception as e:
-                ui_error(f"BGP configuration failed: {e}")
+            for neighbor_ip in bgp_neighbors:
+                with ui_status(f"Adding neighbor {neighbor_ip}..."):
+                    result = subprocess.run(
+                        ["gobgp", "-u", "127.0.0.1", "-p", "50051",
+                         "neighbor", "add", neighbor_ip, "as", "65555"],
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                    )
+                if result.returncode != 0:
+                    ui_warn(f"Neighbor {neighbor_ip}: {result.stderr.decode().strip()}")
+                else:
+                    ui_ok(f"Neighbor added: {neighbor_ip}")
         else:
-            ui_warn("gobgpd not ready — skipping BGP setup")
+            ui_warn("gobgpd not ready — skipping BGP neighbor setup")
+
     except Exception as e:
-        ui_error(f"[bgp_peering] unexpected exception error: {e}")
+        ui_error(f"[bgp_peering] {e}")
     finally:
-        # Give it a moment and terminate
-        with ui_status("Terminating gobgpd in 10s..."):
+        # Brief settle time before tearing down the daemon.
+        with ui_status("Terminating gobgpd in 10 s..."):
             time.sleep(10)
         if gobgpd_proc:
             gobgpd_proc.terminate()
@@ -178,17 +408,21 @@ def bgp_peering():
                 gobgpd_proc.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 gobgpd_proc.kill()
-        ui_ok("BGP Peering test complete")
+        ui_ok("BGP peering test complete")
 
 
-def bigfile():
-    url = 'http://ipv4.download.thinkbroadband.com/5GB.zip'
-    ui_banner("Bigfile", f"Downloading 5GB ZIP: {url}")
+def bigfile() -> None:
+    """
+    Download a 5 GB ZIP file from Thinkbroadband's test server, streaming
+    content to /dev/null.  Designed to generate sustained high-bandwidth
+    traffic and trigger bandwidth-based policy rules.
+    """
+    url = "http://ipv4.download.thinkbroadband.com/5GB.zip"
+    ui_banner("Big-file Download", f"5 GB ZIP: {url}")
     try:
-        with requests.get(url, stream=True, verify=False, timeout=5) as response:
-            response.raise_for_status()
-            total = int(response.headers.get('content-length', 0))
-
+        with requests.get(url, stream=True, verify=False, timeout=5) as resp:
+            resp.raise_for_status()
+            total = int(resp.headers.get("content-length", 0))
             with Progress(
                 SpinnerColumn(),
                 TextColumn("[cyan]Downloading[/]"),
@@ -197,28 +431,33 @@ def bigfile():
                 TimeElapsedColumn(),
                 TimeRemainingColumn(),
                 console=console,
-            ) as progress:
-                task = progress.add_task("download", total=total if total > 0 else None)
-                for chunk in response.iter_content(chunk_size=1024 * 64):
+            ) as prog:
+                task = prog.add_task("dl", total=total or None)
+                for chunk in resp.iter_content(chunk_size=65536):
                     if chunk:
-                        progress.update(task, advance=len(chunk))
-        ui_ok("Bigfile download test complete")
+                        prog.update(task, advance=len(chunk))
+        ui_ok("Big-file download complete")
     except (requests.exceptions.RequestException, socket.error, ssl.SSLError, OSError) as e:
-        ui_error(f"[bigfile] network/file exception error: {e}")
+        ui_error(f"[bigfile] {e}")
     except Exception as e:
-        ui_error(f"[bigfile] unexpected exception error: {e}")
+        ui_error(f"[bigfile] unexpected: {e}")
 
-def _size_to_limits(size, s, m, l, xl):
-    return {'S': s, 'M': m, 'L': l, 'XL': xl}.get(size, m)
 
-def dig_random():
+def dig_random() -> None:
+    """
+    Send dig queries for every URL in `dns_urls` to every server in
+    `dns_endpoints`.  Size controls how many servers / URLs are sampled.
+    Short timeouts (+time=1 +tries=1) keep the test brisk.
+    """
     ui_banner("DNS", "Random dig queries")
     try:
-        target_ips = _size_to_limits(ARGS.size, 1, 2, 4, len(dns_endpoints))
-        target_urls = _size_to_limits(ARGS.size, 10, 20, 50, len(dns_urls))
+        n_servers = _size_to_limits(ARGS.size, 1,  2,  4,  len(dns_endpoints))
+        n_domains  = _size_to_limits(ARGS.size, 10, 20, 50, len(dns_urls))
 
         random.shuffle(dns_endpoints)
         random.shuffle(dns_urls)
+        servers = dns_endpoints[:n_servers]
+        domains = dns_urls[:n_domains]
 
         with Progress(
             SpinnerColumn(),
@@ -227,695 +466,925 @@ def dig_random():
             BarColumn(),
             TimeElapsedColumn(),
             console=console,
-        ) as progress:
-            task = progress.add_task("dig", total=target_ips * target_urls)
-            for i, ip in enumerate(dns_endpoints[:target_ips], 1):
-                for j, url in enumerate(dns_urls[:target_urls], 1):
-                    console.log(f"[bold]DNS:[/] {url} @ {ip} ({j}/{target_urls} on server {i}/{target_ips})")
-                    cmd = f"dig {url} @{ip} +time=1 +tries=1 +short"
+        ) as prog:
+            task = prog.add_task("dig", total=len(servers) * len(domains))
+            for si, ip in enumerate(servers, 1):
+                for di, domain in enumerate(domains, 1):
+                    console.log(f"dig {domain} @{ip}  ({di}/{len(domains)}, server {si}/{len(servers)})")
                     try:
-                        subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+                        subprocess.run(
+                            ["dig", domain, f"@{ip}", "+time=1", "+tries=1", "+short"],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                            timeout=5,
+                        )
                     except Exception as e:
-                        console.log(f"[yellow]dig error[/]: {e}")
+                        console.log(f"[yellow]dig error: {e}[/]")
                     finally:
-                        progress.update(task, advance=1)
+                        prog.update(task, advance=1)
     except Exception as e:
-        ui_error(f"[dig_random] unexpected error: {e}")
+        ui_error(f"[dig_random] {e}")
 
 
-def ftp_random():
+def ftp_random() -> None:
+    """
+    FTP download from a public speed-test server, rate-limited to 3 MB/s.
+    File size scales with --size (1 MB → 1 GB).
+    """
     ui_banner("FTP", "Rate-limited download via curl")
     try:
-        target = _size_to_limits(ARGS.size, '1MB', '10MB', '100MB', '1GB')
-        cmd = f"curl --limit-rate 3M -k --show-error --connect-timeout 5 -o /dev/null ftp://speedtest:speedtest@ftp.otenet.gr/test{target}.db"
-        console.log(f"curl FTP {target}")
-        subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, timeout=60)
+        target = _size_to_limits(ARGS.size, "1MB", "10MB", "100MB", "1GB")
+        url    = f"ftp://speedtest:speedtest@ftp.otenet.gr/test{target}.db"
+        console.log(f"FTP download: {target}")
+        subprocess.run(
+            f"curl --limit-rate 3M -k --show-error --connect-timeout 5 -o /dev/null {url}",
+            shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
+            timeout=60,
+        )
         ui_ok("FTP test complete")
     except Exception as e:
-        ui_error(f"[ftp_random] error: {e}")
+        ui_error(f"[ftp_random] {e}")
 
 
-def http_random():
-    ui_banner("HTTP HEAD", "Random endpoints + DNS URLs")
+def http_random() -> None:
+    """
+    HEAD requests to a shuffled mix of plain-HTTP and DNS endpoints.
+    Runs concurrently to maximise traffic density within the time budget.
+    """
+    ui_banner("HTTP HEAD", "Mixed HTTP + DNS URL pool")
     try:
-        target_urls = _size_to_limits(ARGS.size, 10, 20, 50, len(http_endpoints + dns_urls))
-        pool = http_endpoints[:] + dns_urls[:]
+        n     = _size_to_limits(ARGS.size, 10, 20, 50, len(http_endpoints + dns_urls))
+        pool  = http_endpoints[:] + dns_urls[:]
         random.shuffle(pool)
-
-        with Progress(SpinnerColumn(), TextColumn("[cyan]HTTP[/]"), BarColumn(), TimeElapsedColumn(), console=console) as progress:
-            task = progress.add_task("http", total=target_urls)
-            for count, url in enumerate(pool[:target_urls], 1):
-                user_agent = random.choice(user_agents)
-                cmd = f"curl -k -s --show-error --connect-timeout 5 -I -L -o /dev/null --max-time 5 -A '{user_agent}' {url}"
-                console.log(f"HTTP ({count}/{target_urls}) {url} | UA: {user_agent[:50]}")
-                try:
-                    subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, timeout=10)
-                finally:
-                    progress.update(task, advance=1)
+        _run_head_batch(pool[:n], "HTTP", user_agents)
         ui_ok("HTTP random complete")
     except Exception as e:
-        ui_error(f"[http_random] unexpected exception error: {e}")
+        ui_error(f"[http_random] {e}")
 
 
-def http_download_zip():
+def http_download_zip() -> None:
+    """
+    Download a ZIP file (size scales with --size) from testfile.org,
+    discarding data to /dev/null.  Exercises HTTP/S content-inspection rules.
+    """
+    target = _size_to_limits(ARGS.size, "15MB", "30MB", "100MB", "1GB")
+    url    = f"https://link.testfile.org/{target}"
+    ua     = random.choice(user_agents)
+    ui_banner("HTTP Download (ZIP)", f"{target} — {url}")
     try:
-        user_agent = random.choice(user_agents)
-        targets = {'S': '15MB', 'M': '30MB', 'L': '100MB', 'XL': '1GB'}
-        target = targets.get(ARGS.size, '30MB')
-        url = f"https://link.testfile.org/{target}"
-        ui_banner("HTTP Download (ZIP)", f"{target} from {url}")
-        cmd = f"curl --limit-rate 3M -k --show-error --connect-timeout 5 -L -o /dev/null -A '{user_agent}' {url}"
-        subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, timeout=120)
+        _curl_download(url, rate_limit="3M", connect_timeout=5, timeout=120, user_agent=ua)
         ui_ok("HTTP ZIP download complete")
     except Exception as e:
-        ui_error(f"[http_download_zip] error: {e}")
+        ui_error(f"[http_download_zip] {e}")
 
 
-def http_download_targz():
+def http_download_targz() -> None:
+    """Download the WordPress latest.tar.gz archive (plain HTTP)."""
     ui_banner("HTTP Download (tar.gz)", "WordPress latest.tar.gz")
     try:
-        cmd = "curl --limit-rate 3M -k --show-error --connect-timeout 5 -o /dev/null http://wordpress.org/latest.tar.gz"
-        subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, timeout=120)
+        _curl_download("http://wordpress.org/latest.tar.gz",
+                       rate_limit="3M", connect_timeout=5, timeout=120)
         ui_ok("HTTP tar.gz download complete")
     except Exception as e:
-        ui_error(f"[http_download_targz] error: {e}")
+        ui_error(f"[http_download_targz] {e}")
 
 
-def web_scanner():
-    timeout = _size_to_limits(ARGS.size, 60, 120, 180, 240)
-    url = random.choice(webscan_endpoints)
-    ui_banner("Nikto Web Scanner", f"Target: {url} (maxtime {timeout}s)")
+def https_random() -> None:
+    """
+    HEAD requests to a large pool of HTTPS endpoints (sampled from
+    `https_endpoints` in endpoints.py).  Runs concurrently.
+    """
+    ui_banner("HTTPS HEAD", "Random HTTPS endpoint pool")
     try:
-        cmd = f"echo y | nikto -h '{url}' -maxtime '{timeout}' -timeout 1 -nointeractive"
-        subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, timeout=timeout + 30)
-        ui_ok("Nikto scan complete")
-    except Exception as e:
-        ui_error(f"[web_scanner] error: {e}")
-
-
-def https_random():
-    ui_banner("HTTPS HEAD", "Random endpoints")
-    try:
-        target_urls = _size_to_limits(ARGS.size, 10, 20, 50, len(https_endpoints))
+        n = _size_to_limits(ARGS.size, 10, 20, 50, len(https_endpoints))
         random.shuffle(https_endpoints)
-
-        with Progress(SpinnerColumn(), TextColumn("[cyan]HTTPS[/]"), BarColumn(), TimeElapsedColumn(), console=console) as progress:
-            task = progress.add_task("https", total=target_urls)
-            for count, url in enumerate(https_endpoints[:target_urls], 1):
-                user_agent = random.choice(user_agents)
-                cmd = f"curl -k -s --show-error --connect-timeout 5 -I -o /dev/null --max-time 5 -A '{user_agent}' {url}"
-                console.log(f"HTTPS ({count}/{target_urls}) {url} | UA: {user_agent[:50]}")
-
-                try:
-                    subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, timeout=10)
-                finally:
-                    progress.update(task, advance=1)
+        _run_head_batch(https_endpoints[:n], "HTTPS", user_agents)
         ui_ok("HTTPS random complete")
     except Exception as e:
-        ui_error(f"[https_random] error: {e}")
-           
-def kyber_random():
-    ui_banner("Kyber HEAD", "Random endpoints")
+        ui_error(f"[https_random] {e}")
+
+
+def kyber_random() -> None:
+    """
+    HTTPS HEAD requests negotiated with post-quantum curves
+    (X25519MLKEM768 / Kyber).  Tests whether firewall TLS inspection can
+    handle hybrid key-exchange cipher suites without breaking connections.
+    """
+    ui_banner("Kyber (PQ-TLS)", "HTTPS with X25519MLKEM768 curves")
     try:
-        target_urls = _size_to_limits(ARGS.size, 10, 20, 50, len(https_endpoints))
+        n = _size_to_limits(ARGS.size, 10, 20, 50, len(https_endpoints))
         random.shuffle(https_endpoints)
-
-        with Progress(SpinnerColumn(), TextColumn("[cyan]HTTPS[/]"), BarColumn(), TimeElapsedColumn(), console=console) as progress:
-            task = progress.add_task("kyber", total=target_urls)
-            for count, url in enumerate(https_endpoints[:target_urls], 1):
-                user_agent = random.choice(user_agents)
-                cmd = f"curl -k -s --curves X25519:X25519MLKEM768 --show-error --connect-timeout 5 -I -o /dev/null --max-time 2 --retry 0 -A '{user_agent}' {url}"
-                console.log(f"HTTPS ({count}/{target_urls}) {url} | UA: {user_agent[:50]}")
-                try:
-                    subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, timeout=10)
-                finally:
-                    progress.update(task, advance=1)
-        ui_ok("Kyber random complete")
+        _run_head_batch(
+            https_endpoints[:n], "Kyber", user_agents,
+            connect_timeout=5, max_time=2,
+            # Offer both classical and Kyber curves so servers that don't
+            # support ML-KEM fall back gracefully.
+            extra_flags="--curves X25519:X25519MLKEM768 --retry 0",
+        )
+        ui_ok("Kyber test complete")
     except Exception as e:
-        ui_error(f"[kyber_random] error: {e}")
+        ui_error(f"[kyber_random] {e}")
 
 
-def ai_https_random():
-    ui_banner("AI HTTPS HEAD", "AI endpoints")
+def ai_https_random() -> None:
+    """
+    HEAD requests to AI-service endpoints (OpenAI, Anthropic, Google AI,
+    etc.) sampled from `ai_endpoints` in endpoints.py.  Useful for testing
+    AI-category URL filters.
+    """
+    ui_banner("AI HTTPS HEAD", "AI / LLM service endpoints")
     try:
-        target_urls = _size_to_limits(ARGS.size, 10, 20, 50, len(ai_endpoints))
+        n = _size_to_limits(ARGS.size, 10, 20, 50, len(ai_endpoints))
         random.shuffle(ai_endpoints)
-
-        with Progress(SpinnerColumn(), TextColumn("[cyan]AI HTTPS[/]"), BarColumn(), TimeElapsedColumn(), console=console) as progress:
-            task = progress.add_task("aihttps", total=target_urls)
-            for count, url in enumerate(ai_endpoints[:target_urls], 1):
-                user_agent = random.choice(user_agents)
-                cmd = f"curl -k -s --show-error --connect-timeout 3 -I -o /dev/null --max-time 5 -A '{user_agent}' {url}"
-                console.log(f"AI HTTPS ({count}/{target_urls}) {url}")
-                try:
-                    subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, timeout=10)
-                finally:
-                    progress.update(task, advance=1)
-        ui_ok("AI HTTPS random complete")
+        _run_head_batch(ai_endpoints[:n], "AI HTTPS", user_agents,
+                        connect_timeout=3, max_time=5)
+        ui_ok("AI HTTPS complete")
     except Exception as e:
-        ui_error(f"[ai_https_random] error: {e}")
+        ui_error(f"[ai_https_random] {e}")
 
 
-def ads_random():
-    ui_banner("Ad Endpoints (HEAD)", "Ad/tracker endpoints")
+def ads_random() -> None:
+    """
+    HEAD requests to ad-network, analytics, and tracker endpoints.
+    Exercises ad-blocking and tracker-blocking URL filter categories.
+    """
+    ui_banner("Ad / Tracker HEAD", "Ad & analytics endpoint pool")
     try:
-        target_urls = _size_to_limits(ARGS.size, 10, 20, 50, len(ad_endpoints))
+        n = _size_to_limits(ARGS.size, 10, 20, 50, len(ad_endpoints))
         random.shuffle(ad_endpoints)
-        with Progress(SpinnerColumn(), TextColumn("[cyan]ADS[/]"), BarColumn(), TimeElapsedColumn(), console=console) as progress:
-            task = progress.add_task("ads", total=target_urls)
-            for count, url in enumerate(ad_endpoints[:target_urls], 1):
-                user_agent = random.choice(user_agents)
-                cmd = f"curl -k -s --show-error --connect-timeout 3 -I -o /dev/null --max-time 5 -A '{user_agent}' {url}"
-                console.log(f"ADS ({count}/{target_urls}) {url}")
-                try:
-                    subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, timeout=10)
-                finally:
-                    progress.update(task, advance=1)
-        ui_ok("Ads random complete")
+        _run_head_batch(ad_endpoints[:n], "ADS", user_agents,
+                        connect_timeout=3, max_time=5)
+        ui_ok("Ads test complete")
     except Exception as e:
-        ui_error(f"[ads_random] error: {e}")
+        ui_error(f"[ads_random] {e}")
 
 
-def https_crawl():
+def https_crawl() -> None:
+    """
+    Iterative HTTPS crawl: start from each seed URL in `https_endpoints`,
+    follow discovered links for `iterations` hops.  Mimics organic browsing.
+    """
     iterations = _size_to_limits(ARGS.size, 1, 3, 5, 10)
-    target_urls = _size_to_limits(ARGS.size, 10, 20, 50, len(https_endpoints))
-    ui_banner("HTTPS Crawl", f"{iterations} deep across {target_urls} starts")
+    n          = _size_to_limits(ARGS.size, 10, 20, 50, len(https_endpoints))
+    ui_banner("HTTPS Crawl", f"{iterations} hops from {n} seed URLs")
     try:
         random.shuffle(https_endpoints)
-        for count, url in enumerate(https_endpoints[:target_urls], 1):
-            console.log(f"Crawl start ({count}/{target_urls}): {url}")
+        for i, url in enumerate(https_endpoints[:n], 1):
+            console.log(f"Crawl seed ({i}/{n}): {url}")
             scrape_iterative(url, iterations)
         ui_ok("HTTPS crawl complete")
     except Exception as e:
-        ui_error(f"[https_crawl] error: {e}")
+        ui_error(f"[https_crawl] {e}")
 
 
-def pornography_crawl():
+def pornography_crawl() -> None:
+    """
+    Iterative crawl of adult-content endpoints.  Validates that content-
+    category filtering rules correctly classify and act on this traffic.
+    """
     iterations = _size_to_limits(ARGS.size, 1, 3, 5, 10)
-    target_urls = _size_to_limits(ARGS.size, 10, 20, 50, len(pornography_endpoints))
-    ui_banner("Pornography Crawl", f"{iterations} deep across {target_urls} starts", style="red")
+    n          = _size_to_limits(ARGS.size, 10, 20, 50, len(pornography_endpoints))
+    ui_banner("Pornography Crawl", f"{iterations} hops from {n} seeds", style="red")
     try:
         random.shuffle(pornography_endpoints)
-        for count, url in enumerate(pornography_endpoints[:target_urls], 1):
-            console.log(f"Crawl start ({count}/{target_urls}): {url}")
+        for i, url in enumerate(pornography_endpoints[:n], 1):
+            console.log(f"Crawl seed ({i}/{n}): {url}")
             scrape_iterative(url, iterations)
         ui_ok("Pornography crawl complete")
     except Exception as e:
-        ui_error(f"[pornography_crawl] error: {e}")
+        ui_error(f"[pornography_crawl] {e}")
 
 
-def malware_random():
-    ui_banner("Malware Agents (HEAD)", "Known malware domains (safe HEAD)")
+def malware_random() -> None:
+    """
+    HEAD requests to known malware / C2 domains using realistic malware
+    user-agents.  Tests whether threat-intel feed blocks fire correctly.
+    No payload is downloaded — HEAD only.
+    """
+    ui_banner("Malware Agents (HEAD)", "Known malware domains with malware UAs")
     try:
-        target_urls = _size_to_limits(ARGS.size, 10, 20, 50, len(malware_endpoints))
+        n = _size_to_limits(ARGS.size, 10, 20, 50, len(malware_endpoints))
         random.shuffle(malware_endpoints)
-        with Progress(SpinnerColumn(), TextColumn("[cyan]MALWARE AGENTS[/]"), BarColumn(), TimeElapsedColumn(), console=console) as progress:
-            task = progress.add_task("malagents", total=target_urls)
-            for count, url in enumerate(malware_endpoints[:target_urls], 1):
-                ua = random.choice(malware_user_agents)
-                cmd = f"curl -k -s --show-error --connect-timeout 3 -I -o /dev/null --max-time 5 -A '{ua}' {url}"
-                console.log(f"Malware Agent ({count}/{target_urls}) {url}")
-                try:
-                    subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, timeout=10)
-                finally:
-                    progress.update(task, advance=1)
+        _run_head_batch(malware_endpoints[:n], "MALWARE", malware_user_agents,
+                        connect_timeout=3, max_time=5)
         ui_ok("Malware agent HEAD complete")
     except Exception as e:
-        ui_error(f"[malware_random] error: {e}")
+        ui_error(f"[malware_random] {e}")
 
 
-def ping_random():
-    target_ips = _size_to_limits(ARGS.size, 1, 2, 5, len(icmp_endpoints))
-    ui_banner("ICMP Ping", f"{target_ips} hosts")
+def ping_random() -> None:
+    """
+    ICMP echo to a random sample of `icmp_endpoints`.  Uses -c2 (two pings)
+    and a 1-second wait to generate light but recognisable ICMP traffic.
+    """
+    n = _size_to_limits(ARGS.size, 1, 2, 5, len(icmp_endpoints))
+    ui_banner("ICMP Ping", f"{n} hosts")
     try:
         random.shuffle(icmp_endpoints)
-        with Progress(SpinnerColumn(), TextColumn("[cyan]PING[/]"), BarColumn(), TimeElapsedColumn(), console=console) as progress:
-            task = progress.add_task("ping", total=target_ips)
-            for count, ip in enumerate(icmp_endpoints[:target_ips], 1):
-                cmd = f"ping -c2 -i1 -s64 -W1 -w2 {ip}"
-                console.log(f"Ping ({count}/{target_ips}) {ip}")
+        with Progress(SpinnerColumn(), TextColumn("[cyan]PING[/]"),
+                      MofNCompleteColumn(), BarColumn(), TimeElapsedColumn(),
+                      console=console) as prog:
+            task = prog.add_task("ping", total=n)
+            for i, ip in enumerate(icmp_endpoints[:n], 1):
+                console.log(f"ping ({i}/{n}) {ip}")
                 try:
-                    subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, timeout=10)
+                    subprocess.run(
+                        ["ping", "-c2", "-i1", "-s64", "-W1", "-w2", ip],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
+                        timeout=10,
+                    )
+                except Exception as e:
+                    console.log(f"[yellow]ping {ip}: {e}[/]")
                 finally:
-                    progress.update(task, advance=1)
+                    prog.update(task, advance=1)
         ui_ok("Ping complete")
     except Exception as e:
-        ui_error(f"[ping_random] error: {e}")
+        ui_error(f"[ping_random] {e}")
 
 
-def metasploit_check():
-    ui_banner("Metasploit Checks", "Running .rc files")
+def metasploit_check() -> None:
+    """
+    Run a random selection of Metasploit .rc resource scripts.  Each script
+    performs *check* operations only (no exploitation) against
+    scanme.nmap.org / testmyids.com.  Exercises IDS/IPS signature coverage.
+    """
+    ui_banner("Metasploit Checks", "Running .rc check scripts")
     try:
-        ms_checks = _size_to_limits(ARGS.size, 1, 3, 5, 7)
-        rc_dir = '/opt/metasploit-framework/ms_checks/checks'
-        rc_files = [f for f in os.listdir(rc_dir) if f.endswith('.rc')]
-        random.shuffle(rc_files)
-        rc_files = rc_files[:ms_checks]
+        n      = _size_to_limits(ARGS.size, 1, 3, 5, 7)
+        rc_dir = "/opt/metasploit-framework/ms_checks/checks"
+        files  = [f for f in os.listdir(rc_dir) if f.endswith(".rc")]
+        random.shuffle(files)
+        files  = files[:n]
 
-        with Progress(SpinnerColumn(), TextColumn("[cyan]MSF[/]"), MofNCompleteColumn(), BarColumn(), TimeElapsedColumn(), console=console) as progress:
-            task = progress.add_task("msf", total=len(rc_files))
-            for idx, rc in enumerate(rc_files, 1):
-                cmd = f"msfconsole -q -r '{os.path.join(rc_dir, rc)}'"
-                console.log(f"MSF ({idx}/{len(rc_files)}): {rc}")
+        with Progress(SpinnerColumn(), TextColumn("[cyan]MSF[/]"),
+                      MofNCompleteColumn(), BarColumn(), TimeElapsedColumn(),
+                      console=console) as prog:
+            task = prog.add_task("msf", total=len(files))
+            for i, rc in enumerate(files, 1):
+                rc_path = os.path.join(rc_dir, rc)
+                console.log(f"msfconsole ({i}/{len(files)}): {rc}")
                 try:
-                    subprocess.run(cmd, shell=True)
+                    subprocess.run(
+                        f"msfconsole -q -r '{rc_path}'",
+                        shell=True,
+                    )
+                except Exception as e:
+                    console.log(f"[yellow]msf error: {e}[/]")
                 finally:
-                    progress.update(task, advance=1)
+                    prog.update(task, advance=1)
         ui_ok("Metasploit checks complete")
     except Exception as e:
-        ui_error(f"[metasploit_check] error: {e}")
+        ui_error(f"[metasploit_check] {e}")
 
 
-def snmp_random():
-    target_ips = _size_to_limits(ARGS.size, 1, 2, 5, len(snmp_endpoints))
-    ui_banner("SNMP Walk", f"{target_ips} hosts")
+def snmp_random() -> None:
+    """
+    SNMPv2c walks on `snmp_endpoints` using community strings from
+    `snmp_strings`.  Low retry counts (-r1 -t1) avoid long waits on
+    non-responsive hosts.
+    """
+    n = _size_to_limits(ARGS.size, 1, 2, 5, len(snmp_endpoints))
+    ui_banner("SNMP Walk", f"{n} hosts")
     try:
         random.shuffle(snmp_endpoints)
         random.shuffle(snmp_strings)
-        with Progress(SpinnerColumn(), TextColumn("[cyan]SNMP[/]"), BarColumn(), TimeElapsedColumn(), console=console) as progress:
-            task = progress.add_task("snmp", total=target_ips)
-            for idx, ip in enumerate(snmp_endpoints[:target_ips], 1):
-                community = snmp_strings[idx % len(snmp_strings)]
-                cmd = f"snmpwalk -v2c -t1 -r1 -c {community} {ip} 1.3.6"
-                console.log(f"SNMP ({idx}/{target_ips}) {ip} community={community}")
+        with Progress(SpinnerColumn(), TextColumn("[cyan]SNMP[/]"),
+                      MofNCompleteColumn(), BarColumn(), TimeElapsedColumn(),
+                      console=console) as prog:
+            task = prog.add_task("snmp", total=n)
+            for i, ip in enumerate(snmp_endpoints[:n], 1):
+                community = snmp_strings[i % len(snmp_strings)]
+                console.log(f"snmpwalk ({i}/{n}) {ip}  community={community}")
                 try:
-                    subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, timeout=15)
+                    subprocess.run(
+                        f"snmpwalk -v2c -t1 -r1 -c {community} {ip} 1.3.6",
+                        shell=True,
+                        stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
+                        timeout=15,
+                    )
+                except Exception as e:
+                    console.log(f"[yellow]snmp {ip}: {e}[/]")
                 finally:
-                    progress.update(task, advance=1)
+                    prog.update(task, advance=1)
         ui_ok("SNMP complete")
     except Exception as e:
-        ui_error(f"[snmp_random] error: {e}")
+        ui_error(f"[snmp_random] {e}")
 
 
-def traceroute_random():
-    target_ips = _size_to_limits(ARGS.size, 1, 2, 5, len(icmp_endpoints))
-    ui_banner("Traceroute", f"{target_ips} hosts")
+def traceroute_random() -> None:
+    """
+    traceroute to sampled hosts.  Limited to 5 hops (-m5) and 1-second
+    waits per probe (-w1 -q1) to stay fast while still producing realistic
+    ICMP TTL-exceeded traffic.
+    """
+    n = _size_to_limits(ARGS.size, 1, 2, 5, len(icmp_endpoints))
+    ui_banner("Traceroute", f"{n} hosts (max 5 hops)")
     try:
         random.shuffle(icmp_endpoints)
-        with Progress(SpinnerColumn(), TextColumn("[cyan]TRACEROUTE[/]"), BarColumn(), TimeElapsedColumn(), console=console) as progress:
-            task = progress.add_task("trace", total=target_ips)
-            for idx, ip in enumerate(icmp_endpoints[:target_ips], 1):
-                cmd = f"traceroute {ip} -w1 -q1 -m5"
-                console.log(f"Traceroute ({idx}/{target_ips}) {ip}")
+        with Progress(SpinnerColumn(), TextColumn("[cyan]TRACEROUTE[/]"),
+                      MofNCompleteColumn(), BarColumn(), TimeElapsedColumn(),
+                      console=console) as prog:
+            task = prog.add_task("trace", total=n)
+            for i, ip in enumerate(icmp_endpoints[:n], 1):
+                console.log(f"traceroute ({i}/{n}) {ip}")
                 try:
-                    subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, timeout=30)
+                    subprocess.run(
+                        ["traceroute", ip, "-w1", "-q1", "-m5"],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
+                        timeout=30,
+                    )
+                except Exception as e:
+                    console.log(f"[yellow]traceroute {ip}: {e}[/]")
                 finally:
-                    progress.update(task, advance=1)
+                    prog.update(task, advance=1)
         ui_ok("Traceroute complete")
     except Exception as e:
-        ui_error(f"[traceroute_random] error: {e}")
+        ui_error(f"[traceroute_random] {e}")
 
-def speedtest_fast():
+
+def speedtest_fast() -> None:
+    """
+    Netflix fast.com speed-test via the `fastcli` Python package.
+    Number of test rounds scales with --size.  Each round has a 5-second
+    timeout so a slow/blocked connection doesn't stall the suite.
+    """
+    ui_banner("Netflix fast.com Speed-test", "fastcli rounds")
     try:
-        # Map size -> duration
-        if ARGS.size == 'S':
-            duration = 1
-        elif ARGS.size == 'M':
-            duration = 1
-        elif ARGS.size == 'L':
-            duration = 2
-        elif ARGS.size == 'XL':
-            duration = 3
-        else:
-            duration = 1
-
-        timeout_per_test = 5
-        console = Console(highlight=False)
-
-        console.print(Panel.fit("Netflix fast.com\nRunning fastcli tests", 
-                                title="Speed Test", border_style="green"))
+        rounds  = _size_to_limits(ARGS.size, 1, 1, 2, 3)
+        timeout = 5   # seconds per fastcli invocation
 
         with Progress(
-            SpinnerColumn(),
-            TextColumn("[cyan]fast.com[/]"),
-            MofNCompleteColumn(),
-            BarColumn(),
-            TimeElapsedColumn(),
-            console=console
-        ) as progress:
-            task = progress.add_task("fast", total=duration)
-
-            for i in range(1, duration + 1):
-                console.log(f"Starting fast.com test {i}/{duration} (timeout {timeout_per_test}s)")
+            SpinnerColumn(), TextColumn("[cyan]fast.com[/]"),
+            MofNCompleteColumn(), BarColumn(), TimeElapsedColumn(),
+            console=console,
+        ) as prog:
+            task = prog.add_task("fast", total=rounds)
+            for i in range(1, rounds + 1):
+                console.log(f"fast.com round {i}/{rounds} (timeout {timeout}s)")
                 try:
                     result = subprocess.run(
-                        "python3 -m fastcli",
-                        shell=True,
-                        check=True,
-                        timeout=timeout_per_test,
-                        capture_output=True,
-                        text=True
+                        ["python3", "-m", "fastcli"],
+                        check=True, timeout=timeout,
+                        capture_output=True, text=True,
                     )
-                    console.log(f"[green]Test {i} completed successfully.[/]")
                     if result.stdout.strip():
-                        console.log(f"stdout:\n{result.stdout.strip()[:400]}")
-                    if result.stderr.strip():
-                        console.log(f"stderr:\n{result.stderr.strip()[:400]}")
+                        console.log(result.stdout.strip()[:400])
                 except subprocess.TimeoutExpired:
-                    console.log(f"[yellow]Test {i} timed out after {timeout_per_test}s.[/]")
+                    console.log(f"[yellow]Round {i} timed out[/]")
                 except subprocess.CalledProcessError as e:
-                    console.log(f"[red]Test {i} failed: {e}[/]")
-                    if e.stdout:
-                        console.log(f"stdout:\n{e.stdout.strip()[:400]}")
+                    console.log(f"[red]Round {i} failed: {e}[/]")
                     if e.stderr:
-                        console.log(f"stderr:\n{e.stderr.strip()[:400]}")
+                        console.log(e.stderr.strip()[:400])
                 except Exception as e:
-                    console.log(f"[red]Unexpected error during test {i}: {e}[/]")
+                    console.log(f"[red]Round {i} error: {e}[/]")
+                finally:
+                    prog.update(task, advance=1)
 
-                progress.update(task, advance=1)
-
-        console.print("[bold green]All Fast.com tests attempted.[/]")
-    except (ssl.SSLError, socket.error) as e:
-        print(f"[speedtest_fast] network/ssl exception error: {e}")
+        ui_ok("Speed-test complete")
     except Exception as e:
-        print(f"[speedtest_fast] unexpected exception error: {e}")
+        ui_error(f"[speedtest_fast] {e}")
 
 
-def nmap_1024os():
-    target_ips = _size_to_limits(ARGS.size, 1, 2, 5, len(nmap_endpoints))
-    ui_banner("Nmap 1-1024", f"{target_ips} hosts")
+def nmap_1024os() -> None:
+    """
+    Nmap port scan covering ports 1-1024 on sampled `nmap_endpoints`.
+    Aggressive timing (-T4) with parallelism capped at 2 to avoid flooding.
+    """
+    n = _size_to_limits(ARGS.size, 1, 2, 5, len(nmap_endpoints))
+    ui_banner("Nmap 1-1024", f"{n} hosts")
     try:
         random.shuffle(nmap_endpoints)
-        for idx, ip in enumerate(nmap_endpoints[:target_ips], 1):
-            cmd = ('nmap -Pn -p 1-1024 %s -T4 --max-retries 0 --max-parallelism 2 '
-                   '--randomize-hosts --host-timeout 1m --script-timeout 1m '
-                   '--script-args http.useragent="Mozilla/5.0" -debug') % ip
-            console.log(f"Nmap 1-1024 ({idx}/{target_ips}) {ip}")
-            subprocess.run(cmd, shell=True)
+        for i, ip in enumerate(nmap_endpoints[:n], 1):
+            console.log(f"nmap 1-1024 ({i}/{n}) {ip}")
+            cmd = (
+                f"nmap -Pn -p 1-1024 {ip} -T4 "
+                f"--max-retries 0 --max-parallelism 2 "
+                f"--randomize-hosts --host-timeout 1m --script-timeout 1m "
+                f'--script-args http.useragent="Mozilla/5.0" -debug'
+            )
+            try:
+                subprocess.run(cmd, shell=True, timeout=120)
+            except Exception as e:
+                console.log(f"[yellow]nmap {ip}: {e}[/]")
         ui_ok("Nmap 1-1024 complete")
     except Exception as e:
-        ui_error(f"[nmap_1024os] error: {e}")
+        ui_error(f"[nmap_1024os] {e}")
 
 
-def nmap_cve():
-    target_ips = _size_to_limits(ARGS.size, 1, 2, 5, len(nmap_endpoints))
-    ui_banner("Nmap CVE (scripts)", f"{target_ips} hosts")
+def nmap_cve() -> None:
+    """
+    Nmap service-version scan with the full script library (--script=ALL)
+    on sampled `nmap_endpoints`.  Triggers a broad sweep of NSE scripts
+    including many CVE-detection scripts.
+    """
+    n = _size_to_limits(ARGS.size, 1, 2, 5, len(nmap_endpoints))
+    ui_banner("Nmap CVE scripts", f"{n} hosts")
     try:
         random.shuffle(nmap_endpoints)
-        for idx, ip in enumerate(nmap_endpoints[:target_ips], 1):
-            cmd = ('nmap -sV --script=ALL %s -T4 --max-retries 0 --max-parallelism 2 '
-                   '--randomize-hosts --host-timeout 1m --script-timeout 1m '
-                   '--script-args http.useragent="Mozilla/5.0" -debug') % ip
-            console.log(f"Nmap CVE ({idx}/{target_ips}) {ip}")
-            subprocess.run(cmd, shell=True)
-        ui_ok("Nmap CVE complete")
+        for i, ip in enumerate(nmap_endpoints[:n], 1):
+            console.log(f"nmap --script=ALL ({i}/{n}) {ip}")
+            cmd = (
+                f"nmap -sV --script=ALL {ip} -T4 "
+                f"--max-retries 0 --max-parallelism 2 "
+                f"--randomize-hosts --host-timeout 1m --script-timeout 1m "
+                f'--script-args http.useragent="Mozilla/5.0" -debug'
+            )
+            try:
+                subprocess.run(cmd, shell=True, timeout=120)
+            except Exception as e:
+                console.log(f"[yellow]nmap {ip}: {e}[/]")
+        ui_ok("Nmap CVE scan complete")
     except Exception as e:
-        ui_error(f"[nmap_cve] error: {e}")
+        ui_error(f"[nmap_cve] {e}")
 
 
-def ntp_random():
-    target_urls = _size_to_limits(ARGS.size, 1, 2, 5, len(ntp_endpoints))
-    ui_banner("NTP (UDP/123)", f"{target_urls} servers")
+def ntp_random() -> None:
+    """
+    Send a minimal NTP mode-3 (client) packet over UDP/123 to each sampled
+    server.  Uses netcat with a 1-byte version + 47 null bytes — enough to
+    elicit a response from most servers and register the traffic in logs.
+    """
+    n = _size_to_limits(ARGS.size, 1, 2, 5, len(ntp_endpoints))
+    ui_banner("NTP (UDP/123)", f"{n} servers")
     try:
         random.shuffle(ntp_endpoints)
-        for idx, url in enumerate(ntp_endpoints[:target_urls], 1):
-            cmd = f"(printf '\\x1b'; head -c 47 < /dev/zero) | nc -u -w1 {url} 123"
-            console.log(f"NTP ({idx}/{target_urls}) {url}")
-            subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+        for i, host in enumerate(ntp_endpoints[:n], 1):
+            console.log(f"ntp ({i}/{n}) {host}")
+            try:
+                # Byte 0x1b = NTP version 3, mode 3 (client request).
+                subprocess.run(
+                    f"(printf '\\x1b'; head -c 47 < /dev/zero) | nc -u -w1 {host} 123",
+                    shell=True,
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    timeout=5,
+                )
+            except Exception as e:
+                console.log(f"[yellow]ntp {host}: {e}[/]")
         ui_ok("NTP complete")
     except Exception as e:
-        ui_error(f"[ntp_random] error: {e}")
+        ui_error(f"[ntp_random] {e}")
 
 
-def ssh_random():
-    target_ips = _size_to_limits(ARGS.size, 1, 2, 5, len(ssh_endpoints))
-    ui_banner("SSH Connect", f"{target_ips} hosts (non-interactive)")
+def ssh_random() -> None:
+    """
+    Non-interactive SSH connection attempts to `ssh_endpoints`.  BatchMode
+    prevents password prompts; StrictHostKeyChecking is disabled so missing
+    host keys don't block the connection attempt.  Exercises SSH-category
+    firewall rules and IDS SSH-brute signatures.
+    """
+    n = _size_to_limits(ARGS.size, 1, 2, 5, len(ssh_endpoints))
+    ui_banner("SSH Connect", f"{n} hosts (non-interactive)")
     try:
         random.shuffle(ssh_endpoints)
-        for idx, ip in enumerate(ssh_endpoints[:target_ips], 1):
-            cmd = f"ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=1 {ip}"
-            console.log(f"SSH ({idx}/{target_ips}) {ip}")
-            subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, timeout=5)
+        for i, ip in enumerate(ssh_endpoints[:n], 1):
+            console.log(f"ssh ({i}/{n}) {ip}")
+            try:
+                subprocess.run(
+                    ["ssh",
+                     "-o", "BatchMode=yes",
+                     "-o", "StrictHostKeyChecking=no",
+                     "-o", "UserKnownHostsFile=/dev/null",
+                     "-o", "ConnectTimeout=1",
+                     ip],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
+                    timeout=5,
+                )
+            except Exception as e:
+                console.log(f"[yellow]ssh {ip}: {e}[/]")
         ui_ok("SSH test complete")
     except Exception as e:
-        ui_error(f"[ssh_random] error: {e}")
+        ui_error(f"[ssh_random] {e}")
 
 
-def urlresponse_random():
-    target_urls = _size_to_limits(ARGS.size, 10, 20, 50, len(https_endpoints))
-    ui_banner("HTTPS Response Time", f"{target_urls} URLs")
+def urlresponse_random() -> None:
+    """
+    Measure HTTPS response times using the Python requests library (rather
+    than curl) to capture the `elapsed` attribute.  Logs each URL and its
+    round-trip time.  Useful for baselining latency through an inspection
+    proxy.
+    """
+    n = _size_to_limits(ARGS.size, 10, 20, 50, len(https_endpoints))
+    ui_banner("HTTPS Response Time", f"{n} URLs")
     try:
         random.shuffle(https_endpoints)
-        with Progress(SpinnerColumn(), TextColumn("[cyan]RESP TIME[/]"), BarColumn(), TimeElapsedColumn(), console=console) as progress:
-            task = progress.add_task("resp", total=target_urls)
-            for count, url in enumerate(https_endpoints[:target_urls], 1):
+        with Progress(SpinnerColumn(), TextColumn("[cyan]RESP TIME[/]"),
+                      MofNCompleteColumn(), BarColumn(), TimeElapsedColumn(),
+                      console=console) as prog:
+            task = prog.add_task("resp", total=n)
+            for i, url in enumerate(https_endpoints[:n], 1):
                 try:
                     t = requests.get(url, timeout=3, verify=False).elapsed.total_seconds()
-                    console.log(f"HTTPS ({count}/{target_urls}) {url} -> {t:.3f}s")
+                    console.log(f"({i}/{n}) {url}  {t:.3f}s")
                 except Exception:
-                    console.log(f"[yellow]Skip[/] {url}")
+                    console.log(f"[yellow]skip[/] {url}")
                 finally:
-                    progress.update(task, advance=1)
-        ui_ok("HTTPS response time test complete")
+                    prog.update(task, advance=1)
+        ui_ok("Response-time test complete")
     except Exception as e:
-        ui_error(f"[urlresponse_random] error: {e}")
+        ui_error(f"[urlresponse_random] {e}")
 
 
-def virus_sim():
-    target_urls = _size_to_limits(ARGS.size, 1, 2, 3, len(virus_endpoints))
-    ui_banner("Virus Simulation (downloads)", f"{target_urls} files")
+def virus_sim() -> None:
+    """
+    Download known virus-sample files (EICAR strings, inert POC malware)
+    to /dev/null.  Tests anti-virus / threat-prevention download inspection.
+    """
+    n = _size_to_limits(ARGS.size, 1, 2, 3, len(virus_endpoints))
+    ui_banner("Virus Simulation", f"{n} sample downloads")
     try:
         random.shuffle(virus_endpoints)
-        for idx, url in enumerate(virus_endpoints[:target_urls], 1):
-            cmd = f"curl --limit-rate 3M -k --show-error --connect-timeout 4 -o /dev/null {url}"
-            console.log(f"Virus sim ({idx}/{target_urls}) {url}")
-            subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, timeout=20)
+        for i, url in enumerate(virus_endpoints[:n], 1):
+            console.log(f"virus-sim ({i}/{n}) {url}")
+            try:
+                _curl_download(url, rate_limit="3M", connect_timeout=4, timeout=20)
+            except Exception as e:
+                console.log(f"[yellow]{url}: {e}[/]")
         ui_ok("Virus simulation complete")
     except Exception as e:
-        ui_error(f"[virus_sim] error: {e}")
+        ui_error(f"[virus_sim] {e}")
 
 
-def dlp_sim_https():
-    target_urls = _size_to_limits(ARGS.size, 1, 2, 3, len(dlp_https_endpoints))
-    ui_banner("DLP Simulation (HTTPS)", f"{target_urls} files")
+def dlp_sim_https() -> None:
+    """
+    Download DLP test files (credit-card patterns, SSN strings, etc.) over
+    HTTPS to /dev/null.  Tests DLP content-inspection policies.
+    """
+    n = _size_to_limits(ARGS.size, 1, 2, 3, len(dlp_https_endpoints))
+    ui_banner("DLP Simulation (HTTPS)", f"{n} files")
     try:
         random.shuffle(dlp_https_endpoints)
-        for idx, url in enumerate(dlp_https_endpoints[:target_urls], 1):
-            cmd = f"curl --limit-rate 3M -k --show-error --connect-timeout 4 -o /dev/null {url}"
-            console.log(f"DLP sim ({idx}/{target_urls}) {url}")
-            subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, timeout=20)
-        ui_ok("DLP HTTPS simulation complete")
+        for i, url in enumerate(dlp_https_endpoints[:n], 1):
+            console.log(f"dlp-sim ({i}/{n}) {url}")
+            try:
+                _curl_download(url, rate_limit="3M", connect_timeout=4, timeout=20)
+            except Exception as e:
+                console.log(f"[yellow]{url}: {e}[/]")
+        ui_ok("DLP simulation complete")
     except Exception as e:
-        ui_error(f"[dlp_sim_https] error: {e}")
+        ui_error(f"[dlp_sim_https] {e}")
 
 
-def malware_download():
-    target_urls = _size_to_limits(ARGS.size, 1, 2, 3, len(malware_files))
-    ui_banner("Malware File Download (HTTPS)", f"{target_urls} files")
+def malware_download() -> None:
+    """
+    Download known-malware files (PE samples, archives) to /dev/null.
+    Complements `malware_random` (which only sends HEAD) by testing
+    whether download-level threat-prevention blocks the transfer.
+    """
+    n = _size_to_limits(ARGS.size, 1, 2, 3, len(malware_files))
+    ui_banner("Malware File Downloads", f"{n} files")
     try:
         random.shuffle(malware_files)
-        for idx, url in enumerate(malware_files[:target_urls], 1):
-            cmd = f"curl --limit-rate 3M -k --show-error --connect-timeout 4 -o /dev/null {url}"
-            console.log(f"Malware file ({idx}/{target_urls}) {url}")
-            subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, timeout=20)
-        ui_ok("Malware file download complete")
+        for i, url in enumerate(malware_files[:n], 1):
+            console.log(f"malware-dl ({i}/{n}) {url}")
+            try:
+                _curl_download(url, rate_limit="3M", connect_timeout=4, timeout=20)
+            except Exception as e:
+                console.log(f"[yellow]{url}: {e}[/]")
+        ui_ok("Malware download complete")
     except Exception as e:
-        ui_error(f"[malware_download] error: {e}")
+        ui_error(f"[malware_download] {e}")
 
 
-def squatting_domains():
-    target_domains = _size_to_limits(ARGS.size, 1, 2, 3, 4)
-    ui_banner("Typosquatting Generator", f"{target_domains} base domains")
+def squatting_domains() -> None:
+    """
+    Run dnstwist against a sample of popular domains to generate and resolve
+    typosquatting / combo-squatting variants.  Exercises DNS-based threat-
+    intel and domain-reputation filters.
+    """
+    n = _size_to_limits(ARGS.size, 1, 2, 3, 4)
+    ui_banner("Typosquatting (dnstwist)", f"{n} base domains")
     try:
         random.shuffle(squatting_endpoints)
-        for idx, url in enumerate(squatting_endpoints[:target_domains], 1):
-            cmd = f"dnstwist --registered {url}"
-            console.log(f"dnstwist ({idx}/{target_domains}) {url}")
-            subprocess.run(cmd, shell=True)
-        ui_ok("Squatting domains generation complete")
+        for i, domain in enumerate(squatting_endpoints[:n], 1):
+            console.log(f"dnstwist ({i}/{n}) {domain}")
+            try:
+                subprocess.run(["dnstwist", "--registered", domain], timeout=60)
+            except Exception as e:
+                console.log(f"[yellow]dnstwist {domain}: {e}[/]")
+        ui_ok("Squatting-domains test complete")
     except Exception as e:
-        ui_error(f"[squatting_domains] error: {e}")
+        ui_error(f"[squatting_domains] {e}")
 
 
-def webcrawl():
+def webcrawl() -> None:
+    """
+    Iterative web crawl starting from `--crawl-start` URL (default:
+    data.commoncrawl.org).  Follows discovered hyperlinks for `iterations`
+    hops, repeating `attempts` times.  Produces realistic browsing traffic.
+    """
     iterations = _size_to_limits(ARGS.size, 10, 20, 50, 100)
-    attempts = _size_to_limits(ARGS.size, 1, 3, 5, 10)
-    ui_banner("Web Crawl", f"Start: {ARGS.crawl_start} | depth {iterations} | attempts {attempts}")
+    attempts   = _size_to_limits(ARGS.size,  1,  3,  5,  10)
+    ui_banner("Web Crawl",
+              f"start={ARGS.crawl_start}  hops={iterations}  attempts={attempts}")
     try:
         for attempt in range(1, attempts + 1):
             console.log(f"Crawl attempt {attempt}/{attempts}")
             scrape_iterative(ARGS.crawl_start, iterations)
         ui_ok("Web crawl complete")
     except Exception as e:
-        ui_error(f"[webcrawl] error: {e}")
+        ui_error(f"[webcrawl] {e}")
 
 
-def ips():
-    ui_banner("IPS Trigger", "BlackSun user-agent to testmyids.com")
+def ips() -> None:
+    """
+    Send a HEAD request to testmyids.com using the "BlackSun" user-agent,
+    which matches a classic Snort/Suricata IPS signature.  Confirms that
+    IPS alert rules are active and generating events.
+    """
+    ui_banner("IPS Trigger", "BlackSun UA → testmyids.com")
     try:
-        cmd = "curl -k -s --show-error --connect-timeout 3 -I --max-time 5 -A BlackSun www.testmyids.com"
-        subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, timeout=10)
+        subprocess.run(
+            ["curl", "-k", "-s", "--show-error", "--connect-timeout", "3",
+             "-I", "--max-time", "5", "-A", "BlackSun",
+             "www.testmyids.com"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
+            timeout=10,
+        )
         ui_ok("IPS trigger complete")
     except Exception as e:
-        ui_error(f"[ips] error: {e}")
+        ui_error(f"[ips] {e}")
 
 
-# ==========================
-# GitHub domain checks
-# ==========================
-
-def github_domain_check_download_file(url, local_filename):
-    console.log(f"Download {url} -> {local_filename}")
+def web_scanner() -> None:
+    """
+    Run a Nikto web-application vulnerability scan against a randomly chosen
+    target from `webscan_endpoints`.  `maxtime` scales with --size.
+    """
+    timeout = _size_to_limits(ARGS.size, 60, 120, 180, 240)
+    url     = random.choice(webscan_endpoints)
+    ui_banner("Nikto Web Scanner", f"target={url}  maxtime={timeout}s")
     try:
-        with requests.get(url, stream=True, verify=False, timeout=5) as r:
-            r.raise_for_status()
-            with open(local_filename, 'wb') as f:
-                for chunk in r.iter_content(chunk_size=8192):
-                    f.write(chunk)
+        subprocess.run(
+            f"echo y | nikto -h '{url}' -maxtime '{timeout}' -timeout 1 -nointeractive",
+            shell=True,
+            stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
+            timeout=timeout + 30,
+        )
+        ui_ok("Nikto scan complete")
+    except Exception as e:
+        ui_error(f"[web_scanner] {e}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GITHUB DOMAIN CHECKS
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _download_domain_list(url: str, local_path: str) -> bool:
+    """
+    Stream-download a plain-text domain list to `local_path`.
+    Returns True on success, False on any network or I/O error.
+    """
+    console.log(f"Downloading {url} → {local_path}")
+    try:
+        with requests.get(url, stream=True, verify=False, timeout=10) as resp:
+            resp.raise_for_status()
+            with open(local_path, "wb") as fh:
+                for chunk in resp.iter_content(chunk_size=8192):
+                    fh.write(chunk)
         return True
     except Exception as e:
-        ui_error(f"Domain list download failed: {e}")
+        ui_error(f"Domain-list download failed: {e}")
         return False
 
-def _github_read_and_probe(local_filename, num_random_domains=10):
-    console.log(f"Reading domains from: {local_filename}")
+
+def _probe_domain_list(local_path: str, n: int = 10) -> None:
+    """
+    Read a plain-text domain list (one domain per line, # comments ignored),
+    pick `n` random entries, and issue an HTTPS GET to each.  Exercises
+    threat-intel domain-blocklist enforcement.
+    """
+    console.log(f"Reading domains from: {local_path}")
     try:
-        with open(local_filename, 'r', encoding='utf-8') as f:
-            all_domains = f.readlines()
-        valid = [d.strip() for d in all_domains if d.strip() and not d.strip().startswith('#')]
+        with open(local_path, "r", encoding="utf-8") as fh:
+            lines = fh.readlines()
+        domains = [l.strip() for l in lines if l.strip() and not l.startswith("#")]
     except Exception as e:
-        ui_error(f"Read file failed: {e}")
+        ui_error(f"Could not read {local_path}: {e}")
         return
 
-    if len(valid) < num_random_domains:
-        selected = valid
-    else:
-        selected = random.sample(valid, num_random_domains)
+    sample = random.sample(domains, min(n, len(domains)))
 
-    with Progress(SpinnerColumn(), TextColumn("[cyan]Query[/]"), MofNCompleteColumn(), BarColumn(), TimeElapsedColumn(), console=console) as progress:
-        task = progress.add_task("probe", total=len(selected))
-        for i, domain in enumerate(selected, 1):
+    with Progress(SpinnerColumn(), TextColumn("[cyan]Probe[/]"),
+                  MofNCompleteColumn(), BarColumn(), TimeElapsedColumn(),
+                  console=console) as prog:
+        task = prog.add_task("probe", total=len(sample))
+        for i, domain in enumerate(sample, 1):
             url = f"https://{domain}"
             try:
                 r = requests.get(url, timeout=1, verify=False, allow_redirects=True)
-                console.log(f"[{i}/{len(selected)}] {url} -> {r.status_code}")
+                console.log(f"({i}/{len(sample)}) {url}  →  {r.status_code}")
             except Exception as e:
-                console.log(f"[{i}/{len(selected)}] {url} -> error ({e.__class__.__name__})")
+                console.log(f"({i}/{len(sample)}) {url}  →  {e.__class__.__name__}")
             finally:
-                progress.update(task, advance=1)
+                prog.update(task, advance=1)
 
-def github_domain_check():
-    ui_banner("GitHub Domain Check", "Hagezi domain blocklist sample")
+
+def github_domain_check() -> None:
+    """
+    Download (or reuse a cached copy of) the Hagezi multi-category DNS
+    blocklist from GitHub, then probe a random sample of domains from it.
+    """
+    ui_banner("GitHub Domain Check", "Hagezi blocklist sample")
+    local = "git-domains-list"
+    url   = "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/domains/multi.txt"
     try:
-        url = "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/domains/multi.txt"
-        local = "git-domains-list"
         if not os.path.exists(local):
-            if not github_domain_check_download_file(url, local):
-                ui_error("Failed to download domain list")
+            if not _download_domain_list(url, local):
+                ui_error("Could not download domain list — skipping")
                 return
         else:
-            console.log(f"Using cached list: {local}")
-        _github_read_and_probe(local, num_random_domains=10)
+            console.log(f"Using cached: {local}")
+        _probe_domain_list(local, n=10)
         ui_ok("GitHub domain check complete")
     except Exception as e:
-        ui_error(f"[github_domain_check] error: {e}")
+        ui_error(f"[github_domain_check] {e}")
 
 
-def github_phishing_domain_check():
-    ui_banner("GitHub Phishing Domain Check", "Active phishing list")
+def github_phishing_domain_check() -> None:
+    """
+    Download (or reuse a cached copy of) the Phishing.Database active
+    phishing domain list from GitHub, then probe a random sample.
+    """
+    ui_banner("Phishing Domain Check", "Phishing.Database active list")
+    local = "git-phishing-list"
+    url   = (
+        "https://raw.githubusercontent.com/Phishing-Database/Phishing.Database"
+        "/refs/heads/master/phishing-domains-ACTIVE.txt"
+    )
     try:
-        url = "https://raw.githubusercontent.com/Phishing-Database/Phishing.Database/refs/heads/master/phishing-domains-ACTIVE.txt"
-        local = "git-phishing-list"
         if not os.path.exists(local):
-            if not github_domain_check_download_file(url, local):
-                ui_error("Failed to download phishing list")
+            if not _download_domain_list(url, local):
+                ui_error("Could not download phishing list — skipping")
                 return
         else:
-            console.log(f"Using cached list: {local}")
-        _github_read_and_probe(local, num_random_domains=10)
-        ui_ok("GitHub phishing domain check complete")
+            console.log(f"Using cached: {local}")
+        _probe_domain_list(local, n=10)
+        ui_ok("Phishing domain check complete")
     except Exception as e:
-        ui_error(f"[github_phishing_domain_check] error: {e}")
+        ui_error(f"[github_phishing_domain_check] {e}")
 
 
-# ==========================
-# Scraper helpers (mostly same logic, nicer logs)
-# ==========================
+# ══════════════════════════════════════════════════════════════════════════════
+# SCRAPER HELPERS
+# ══════════════════════════════════════════════════════════════════════════════
 
-def replace_all_endpoints(url):
-    console.log(f"Replacing endpoints.py with {url}")
-    response = urllib.request.urlopen(url)
-    data = response.read()
-    text = data.decode('utf-8')
-    with open('endpoints.py', 'w') as f:
-        f.write(text)
+def replace_all_endpoints(url: str) -> None:
+    """
+    Fetch a remote endpoints.py replacement file and overwrite the local copy.
+    Used for live-updating the endpoint lists without rebuilding the container.
+    """
+    console.log(f"Replacing endpoints.py from: {url}")
+    data = urllib.request.urlopen(url).read()
+    with open("endpoints.py", "w") as fh:
+        fh.write(data.decode("utf-8"))
     ui_ok("endpoints.py updated")
 
-def scrape_single_link(url):
+
+def scrape_single_link(url: str) -> str | None:
+    """
+    Fetch `url`, parse the HTML, and return the first resolvable hyperlink
+    found (randomised order so subsequent crawl hops vary across runs).
+    Returns None when no link is found or the request fails.
+
+    A short random delay (0.2–2 s) is injected before each request to
+    produce organic-looking inter-request timing in traffic logs.
+    """
     time.sleep(random.uniform(0.2, 2))
-    user_agent = random.choice(user_agents)
-    console.log(f"Visiting: {url} | UA: {user_agent[:60]}")
+    ua = random.choice(user_agents)
+    console.log(f"→ {url}  [dim]{ua[:60]}[/]")
 
     try:
-        response = requests.get(
-            url=url,
+        resp = requests.get(
+            url,
             timeout=2,
             allow_redirects=True,
-            headers={'User-Agent': user_agent},
-            verify=False
+            headers={"User-Agent": ua},
+            verify=False,
         )
-        response.raise_for_status()
-        response.encoding = response.apparent_encoding or 'utf-8'
-        html = response.text
+        resp.raise_for_status()
+        resp.encoding = resp.apparent_encoding or "utf-8"
+        html = resp.text
     except requests.exceptions.HTTPError as e:
+        # 404s are expected when following random links; log others.
         if e.response is not None and e.response.status_code == 404:
             return None
-        ui_warn(f"HTTP error for {url}: {e}")
+        ui_warn(f"HTTP error {url}: {e}")
         return None
-    except (requests.exceptions.SSLError, requests.exceptions.Timeout, requests.exceptions.TooManyRedirects) as e:
-        ui_warn(f"Request issue for {url}: {e}")
-        return None
-    except requests.exceptions.RequestException as e:
-        ui_warn(f"General failure for {url}: {e}")
+    except (requests.exceptions.SSLError,
+            requests.exceptions.Timeout,
+            requests.exceptions.TooManyRedirects,
+            requests.exceptions.RequestException) as e:
+        ui_warn(f"Request failed {url}: {e}")
         return None
 
-    soup = BeautifulSoup(html, 'html.parser')
-    all_links = soup.find_all("a")
-    random.shuffle(all_links)
+    soup  = BeautifulSoup(html, "html.parser")
+    links = soup.find_all("a")
+    random.shuffle(links)
 
-    for link in all_links:
-        href = link.get('href')
-        if not href or '#' in href:
+    for link in links:
+        href = link.get("href")
+        if not href or "#" in href:
             continue
-        if href.startswith('//') or href.startswith('/'):
+        if href.startswith("//") or href.startswith("/"):
             resolved = urljoin(url, href)
-            console.log(f"Found: {resolved}")
+            console.log(f"  found: {resolved}")
             return resolved
-        elif href.startswith('http'):
-            console.log(f"Found: {href}")
+        if href.startswith("http"):
+            console.log(f"  found: {href}")
             return href
 
-    console.log("No Links Found")
+    console.log("  no links found")
     return None
 
-def scrape_iterative(base_url, iterations=3):
-    next_link = scrape_single_link(base_url)
+
+def scrape_iterative(base_url: str, iterations: int = 3) -> None:
+    """
+    Follow a chain of discovered links starting from `base_url` for up to
+    `iterations` hops.  Stops early if a page returns no usable links.
+    """
+    link = scrape_single_link(base_url)
     for _ in range(iterations):
-        if next_link:
-            next_link = scrape_single_link(next_link)
+        if link:
+            link = scrape_single_link(link)
         else:
             break
 
 
-# ==========================
-# Runner / CLI
-# ==========================
+# ══════════════════════════════════════════════════════════════════════════════
+# CLI & RUNNER
+# ══════════════════════════════════════════════════════════════════════════════
 
-def run_test(func_list):
-    size_name = {'S': 'SMALL', 'M': 'MEDIUM', 'L': 'LARGE', 'XL': 'EXTRA-LARGE'}.get(ARGS.size, 'MEDIUM')
-    cfg = Table.grid(padding=(0, 2))
-    cfg.add_row("[bold]Suite[/]:", ARGS.suite.upper())
-    cfg.add_row("[bold]Size[/]:", size_name)
-    cfg.add_row("[bold]Loop[/]:", str(ARGS.loop))
-    cfg.add_row("[bold]Max Wait (s)[/]:", str(ARGS.max_wait_secs))
-    cfg.add_row("[bold]No Wait[/]:", str(ARGS.nowait))
-    cfg.add_row("[bold]Crawl Start[/]:", ARGS.crawl_start)
-    console.print(Panel(cfg, title="Run Configuration", border_style="blue", box=box.ROUNDED))
+# Maps every --suite value to the list of test functions it runs.
+_SUITE_MAP: dict[str, list] = {
+    "ads":              [ads_random],
+    "ai":               [ai_https_random],
+    "bgp":              [bgp_peering],
+    "bigfile":          [bigfile],
+    "crawl":            [webcrawl],
+    "dlp":              [dlp_sim_https],
+    "dns":              [dig_random],
+    "domain-check":     [github_domain_check],
+    "ftp":              [ftp_random],
+    "http":             [http_download_targz, http_download_zip, http_random],
+    "https":            [https_random, https_crawl],
+    "icmp":             [ping_random, traceroute_random],
+    "ips":              [ips],
+    "kyber":            [kyber_random],
+    "malware-agents":   [malware_random],
+    "malware-download": [malware_download],
+    "metasploit-check": [metasploit_check],
+    "netflix":          [speedtest_fast],
+    "nmap":             [nmap_1024os, nmap_cve],
+    "ntp":              [ntp_random],
+    "phishing-domains": [github_phishing_domain_check],
+    "pornography":      [pornography_crawl],
+    "snmp":             [snmp_random],
+    "squatting":        [squatting_domains],
+    "ssh":              [ssh_random],
+    "url-response":     [urlresponse_random],
+    "virus":            [virus_sim],
+    "web-scanner":      [web_scanner],
+}
 
-    time.sleep(0.5)
 
+def build_testsuite() -> list:
+    """
+    Return the ordered list of test functions to run for the requested suite.
+    The 'all' suite includes every function from `_SUITE_MAP`, shuffled.
+    """
+    if ARGS.suite == "all":
+        all_funcs = [f for funcs in _SUITE_MAP.values() for f in funcs]
+        random.shuffle(all_funcs)
+        return all_funcs
+    return _SUITE_MAP.get(ARGS.suite, [https_random])
+
+
+def finish_test() -> None:
+    """
+    Called after each test completes.  In loop mode, inserts a random pause
+    (unless --nowait) so traffic is paced rather than wall-to-wall.
+    """
+    if ARGS.loop and not ARGS.nowait:
+        wait = random.randint(2, int(ARGS.max_wait_secs))
+        progress_wait(wait, label="Pause between iterations")
+    console.print("")   # visual separator in output
+
+
+def run_test(func_list: list) -> None:
+    """
+    Execute `func_list` tests.
+
+    * Non-loop mode: run each function once in shuffled order.
+    * Loop mode: pick a random function each iteration, run indefinitely,
+      kicking the watchdog after each test so it doesn't time out.
+    """
+    ui_startup_banner()
+    time.sleep(0.3)     # let the banner render before test output begins
+
+    iteration = 0
     if ARGS.loop:
         while True:
+            iteration += 1
+            console.rule(f"[dim]iteration {iteration}[/]")
             func = random.choice(func_list)
             func()
             WATCHDOG.kick()
@@ -923,143 +1392,106 @@ def run_test(func_list):
     else:
         random.shuffle(func_list)
         for func in func_list:
+            iteration += 1
+            console.rule(f"[dim]test {iteration}/{len(func_list)}[/]")
             func()
             WATCHDOG.kick()
             finish_test()
 
 
-def finish_test():
-    if ARGS.loop:
-        if not ARGS.nowait:
-            max_wait = int(ARGS.max_wait_secs)
-            wait_sec = random.randint(2, max_wait)
-            progress_wait(wait_sec, label="Pause between loop iterations")
-        console.print("")  # spacer
+def parse_cli() -> argparse.Namespace:
+    """
+    Build and parse the CLI argument parser.
+    Exits with a formatted help/list message for --help and --list.
+    """
+    suite_choices = ["all"] + sorted(_SUITE_MAP.keys())
 
-
-def parse_cli():
     parser = argparse.ArgumentParser(
-        description="""Traffic Generator with Rich UI
-A versatile tool for simulating various network traffic types with a clean terminal UI.
-""",
+        description=(
+            "Traffic Generator — multi-protocol network traffic simulator.\n"
+            "Run with --list to see all available suites and their descriptions."
+        ),
         formatter_class=argparse.RawTextHelpFormatter,
-        usage=argparse.SUPPRESS
+        add_help=True,
     )
 
-    suite_choices = [
-        'all', 'ads', 'ai', 'bigfile', 'bgp', 'crawl', 'dlp', 'dns', 'ftp',
-        'domain-check', 'http', 'https', 'kyber', 'icmp', 'ips', 'malware-agents', 'malware-download',
-        'metasploit-check', 'netflix', 'nmap', 'ntp', 'phishing-domains',
-        'pornography', 'snmp', 'ssh', 'squatting', 'url-response', 'virus', 'web-scanner',
-    ]
-    size_choices = ['S', 'M', 'L', 'XL']
+    parser.add_argument(
+        "--version", action="version",
+        version=f"Traffic Generator v{VERSION}",
+    )
+    parser.add_argument(
+        "--list", action="store_true",
+        help="Print all available suites with descriptions and exit",
+    )
 
-    traffic_group = parser.add_argument_group('Traffic Generation Options')
-    traffic_group.add_argument('--suite', type=str.lower, choices=suite_choices, default='all',
-        help="Specify the test suite to run. Default: all")
-    traffic_group.add_argument('--size', type=str.upper, choices=size_choices, default='M',
-        help="Size/volume of tests (S/M/L/XL)")
+    traffic = parser.add_argument_group("Traffic Generation")
+    traffic.add_argument(
+        "--suite", type=str.lower, choices=suite_choices, default="all",
+        metavar="SUITE",
+        help=f"Test suite to run (default: all).  Choices:\n  {', '.join(suite_choices)}",
+    )
+    traffic.add_argument(
+        "--size", type=str.upper, choices=["S", "M", "L", "XL"], default="M",
+        help="Volume of traffic: S=small  M=medium  L=large  XL=extra-large (default: M)",
+    )
 
-    timing_group = parser.add_argument_group('Timing and Loop Options')
-    timing_group.add_argument('--loop', action='store_true', help='Continuously loop the selected suite(s)')
-    timing_group.add_argument('--max-wait-secs', type=int, default=20, help='Max pause between loop iterations')
-    timing_group.add_argument('--nowait', action='store_true', help='No pause between tests when looping')
+    timing = parser.add_argument_group("Timing & Loop")
+    timing.add_argument(
+        "--loop", action="store_true",
+        help="Loop forever, picking tests at random each iteration",
+    )
+    timing.add_argument(
+        "--max-wait-secs", type=int, default=20, metavar="N",
+        help="Max random pause between loop iterations in seconds (default: 20)",
+    )
+    timing.add_argument(
+        "--nowait", action="store_true",
+        help="Disable inter-test pauses when looping",
+    )
 
-    specific_suite_group = parser.add_argument_group('Suite-Specific Options')
-    specific_suite_group.add_argument('--crawl-start', default='https://data.commoncrawl.org',
-        help='Initial URL for crawl suite')
+    specific = parser.add_argument_group("Suite-Specific Options")
+    specific.add_argument(
+        "--crawl-start", default="https://data.commoncrawl.org",
+        metavar="URL",
+        help="Seed URL for the 'crawl' suite (default: https://data.commoncrawl.org)",
+    )
 
-    return parser.parse_args()
+    args = parser.parse_args()
 
+    # --list: print suite descriptions and exit without running tests.
+    if args.list:
+        tbl = Table(title=f"Traffic Generator v{VERSION} — Available Suites",
+                    box=box.SIMPLE, show_header=True, header_style="bold cyan")
+        tbl.add_column("Suite",       style="cyan",  no_wrap=True)
+        tbl.add_column("Description", style="white")
+        for name, desc in _SUITE_DESCRIPTIONS:
+            tbl.add_row(name, desc)
+        Console().print(tbl)
+        sys.exit(0)
 
-def build_testsuite():
-    if ARGS.suite == 'all':
-        testsuite = [
-            webcrawl,
-            dig_random,
-            bgp_peering,
-            ftp_random,
-            http_download_targz,
-            http_download_zip,
-            http_random,
-            https_random,
-            kyber_random,
-            https_crawl,
-            pornography_crawl,
-            metasploit_check,
-            malware_random,
-            ai_https_random,
-            ping_random,
-            traceroute_random,
-            snmp_random,
-            ips,
-            ads_random,
-            github_domain_check,
-            github_phishing_domain_check,
-            squatting_domains,
-            speedtest_fast,
-            web_scanner,
-            nmap_1024os,
-            nmap_cve,
-            ntp_random,
-            ssh_random,
-            urlresponse_random,
-            virus_sim,
-            dlp_sim_https,
-            malware_download,
-        ]
-        random.shuffle(testsuite)
-        return testsuite
-
-    mapping = {
-        'bigfile': [bigfile],
-        'crawl': [webcrawl],
-        'dns': [dig_random],
-        'bgp': [bgp_peering],
-        'ftp': [ftp_random],
-        'http': [http_download_targz, http_download_zip, http_random],
-        'https': [https_random, https_crawl],
-        'pornography': [pornography_crawl],
-        'metasploit-check': [metasploit_check],
-        'malware-agents': [malware_random],
-        'ai': [ai_https_random],
-        'icmp': [ping_random, traceroute_random],
-        'snmp': [snmp_random],
-        'ips': [ips],
-        'kyber': [kyber_random],
-        'ads': [ads_random],
-        'domain-check': [github_domain_check],
-        'phishing-domains': [github_phishing_domain_check],
-        'squatting': [squatting_domains],
-        'netflix': [speedtest_fast],
-        'web-scanner': [web_scanner],
-        'nmap': [nmap_1024os, nmap_cve],
-        'ntp': [ntp_random],
-        'ssh': [ssh_random],
-        'url-response': [urlresponse_random],
-        'virus': [virus_sim],
-        'dlp': [dlp_sim_https],
-        'malware-download': [malware_download],
-    }
-    return mapping.get(ARGS.suite, [https_random])
+    return args
 
 
-# ==========================
-# Main
-# ==========================
+# ══════════════════════════════════════════════════════════════════════════════
+# ENTRY POINT
+# ══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
     try:
         STARTTIME = time.time()
-        ARGS = parse_cli()
-        WATCHDOG = watchdog(timeout_seconds=600)
+        ARGS      = parse_cli()
+        WATCHDOG  = Watchdog(timeout_seconds=600)
 
-        testsuite = build_testsuite()
-        run_test(testsuite)
+        suite = build_testsuite()
+        run_test(suite)
 
-        ENDTIME = time.time() - STARTTIME
-        console.print(Panel.fit(f"[bold]Total Run Time:[/] {time.strftime('%H:%M:%S', time.gmtime(ENDTIME))}", border_style="blue"))
+        elapsed = time.time() - STARTTIME
+        console.print(Panel.fit(
+            f"[bold]Total run time:[/]  {time.strftime('%H:%M:%S', time.gmtime(elapsed))}",
+            border_style="blue",
+        ))
     except KeyboardInterrupt:
         sys.exit(0)
     except Exception as e:
-        ui_error(f"An error occurred: {e}\n{traceback.format_exc()}")
+        ui_error(f"Fatal: {e}\n{traceback.format_exc()}")
+        sys.exit(1)

@@ -1,4 +1,16 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+endpoints.py — Traffic Generator endpoint data
+================================================
+All network targets (IPs, URLs, user-agents, community strings, etc.) used
+by generator.py are defined here as plain Python lists.  Keeping data
+separate from logic makes it easy to customise targets without touching
+test code.
+
+The replace_all_endpoints() function in generator.py can hot-swap this file
+at runtime from a remote URL.
+"""
 
 dns_endpoints = [
     "8.8.8.8",
@@ -715,7 +727,7 @@ ai_endpoints = [
     "https://audo.ai",
     "https://uberduck.ai",
     "https://revoicer.com",
-    "https://www.jammable.com",/
+    "https://www.jammable.com",
     "https://fliki.ai",
     "https://labs.openai.com",
     "https://bing.com/create",
