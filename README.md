@@ -179,7 +179,7 @@ All requests use a fake `sk-DLPTEST-…` token — responses are HTTP 401/403. T
 - DLP rules for SSN, PCI-DSS card numbers, phone, passport, and credential patterns in outbound HTTPS POST bodies
 - AI-category URL filtering for API hostnames and browser UIs
 - Behavioural analytics detecting PII uploads to cloud AI services
-- Prompt injection / jailbreak detection (Cato AI Security and equivalents)
+- Prompt injection / jailbreak detection (AI security and CASB platforms)
 
 ---
 
