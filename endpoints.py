@@ -1,4 +1,16 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+endpoints.py — Traffic Generator endpoint data
+================================================
+All network targets (IPs, URLs, user-agents, community strings, etc.) used
+by generator.py are defined here as plain Python lists.  Keeping data
+separate from logic makes it easy to customise targets without touching
+test code.
+
+The replace_all_endpoints() function in generator.py can hot-swap this file
+at runtime from a remote URL.
+"""
 
 dns_endpoints = [
     "8.8.8.8",
@@ -715,7 +727,7 @@ ai_endpoints = [
     "https://audo.ai",
     "https://uberduck.ai",
     "https://revoicer.com",
-    "https://www.jammable.com",/
+    "https://www.jammable.com",
     "https://fliki.ai",
     "https://labs.openai.com",
     "https://bing.com/create",
@@ -2075,4 +2087,97 @@ kyber_endpoints = [
     "https://172.22.10.112:4433",
     "https://172.22.10.112:4433",
     "https://172.22.10.112:4433",
+]
+
+# ---------------------------------------------------------------------------
+# DNS over HTTPS (DoH) providers — RFC 8484 JSON API endpoints
+# ---------------------------------------------------------------------------
+doh_providers = [
+    "https://cloudflare-dns.com/dns-query",
+    "https://dns.google/dns-query",
+    "https://doh.opendns.com/dns-query",
+    "https://dns.quad9.net/dns-query",
+    "https://doh.cleanbrowsing.org/doh/family-filter/",
+    "https://dns.nextdns.io",
+    "https://doh.dns.sb/dns-query",
+    "https://rdns.ipv64.net/dns-query",
+    "https://dns.adguard-dns.com/dns-query",
+    "https://unfiltered.adguard-dns.com/dns-query",
+]
+
+# ---------------------------------------------------------------------------
+# DNS over TLS (DoT) servers — list of (ip, tls_servername) tuples
+# Used by openssl s_client to open TCP/853 and complete the TLS handshake
+# ---------------------------------------------------------------------------
+dot_servers = [
+    ("1.1.1.1",         "cloudflare-dns.com"),
+    ("1.0.0.1",         "cloudflare-dns.com"),
+    ("8.8.8.8",         "dns.google"),
+    ("8.8.4.4",         "dns.google"),
+    ("9.9.9.9",         "dns.quad9.net"),
+    ("149.112.112.112", "dns.quad9.net"),
+    ("208.67.222.222",  "dns.opendns.com"),
+    ("208.67.220.220",  "dns.opendns.com"),
+    ("94.140.14.14",    "dns.adguard-dns.com"),
+    ("94.140.15.15",    "dns.adguard-dns.com"),
+]
+
+# ---------------------------------------------------------------------------
+# C2 beacon targets — public test/echo services used to simulate C2 check-ins
+# All targets are designed for security testing or accept arbitrary POSTs
+# ---------------------------------------------------------------------------
+c2_beacon_targets = [
+    "http://www.testmyids.com",
+    "https://www.testmyids.com",
+    "http://scanme.nmap.org",
+    "https://httpbin.org/post",
+    "https://httpbin.org/anything",
+    "https://httpbin.org/status/200",
+    "https://postman-echo.com/post",
+    "https://webhook.site/token",
+]
+
+# ---------------------------------------------------------------------------
+# DNS exfil simulation domains — queries are sent with long base32-encoded
+# subdomains (e.g. ABCDEF123.example.com) to mimic DNS tunnelling traffic
+# ---------------------------------------------------------------------------
+dns_exfil_domains = [
+    "testmyids.com",
+    "scanme.nmap.org",
+    "neverssl.com",
+    "info.cern.ch",
+    "example.com",
+    "example.org",
+    "example.net",
+    "test.example.com",
+    "dns-test.net",
+    "dnsleaktest.com",
+]
+
+# ---------------------------------------------------------------------------
+# LLM API endpoints — publicly known REST API paths for major AI providers.
+# Requests are sent without valid credentials so they return 401/403, but the
+# URL + request body are fully visible to DLP and AI-category URL filters.
+# ---------------------------------------------------------------------------
+llm_api_endpoints = [
+    "https://api.openai.com/v1/chat/completions",
+    "https://api.openai.com/v1/completions",
+    "https://api.openai.com/v1/embeddings",
+    "https://api.anthropic.com/v1/messages",
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent",
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
+    "https://api.mistral.ai/v1/chat/completions",
+    "https://api.cohere.ai/v1/chat",
+    "https://api.cohere.ai/v1/generate",
+    "https://api.perplexity.ai/chat/completions",
+    "https://api.together.xyz/v1/chat/completions",
+    "https://api.groq.com/openai/v1/chat/completions",
+    "https://openrouter.ai/api/v1/chat/completions",
+    "https://api.deepseek.com/v1/chat/completions",
+    "https://api.x.ai/v1/chat/completions",
+    "https://api.fireworks.ai/inference/v1/chat/completions",
+    "https://api.replicate.com/v1/predictions",
+    "https://api-inference.huggingface.co/models/gpt2",
+    "https://api.ai21.com/studio/v1/chat/completions",
+    "https://api.cerebras.ai/v1/chat/completions",
 ]

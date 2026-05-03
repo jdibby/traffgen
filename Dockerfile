@@ -1,4 +1,5 @@
 # ---------- Stage 1: build GoBGP ----------
+# Shallow clone (--depth 1) avoids downloading full git history, saving ~100 MB+
 FROM ubuntu:25.10 AS gobgp-build
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -7,8 +8,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /tmp/gobgp
-RUN git -c http.sslVerify=false clone https://github.com/osrg/gobgp.git . && \
-    git checkout v3.36.0 && \
+# --depth 1 --single-branch fetches only the tagged commit, not the entire history
+RUN git -c http.sslVerify=false clone --depth 1 --single-branch --branch v3.36.0 \
+        https://github.com/osrg/gobgp.git . && \
     go build -ldflags="-s -w" -o /tmp/gobgp-bin/gobgp ./cmd/gobgp && \
     go build -ldflags="-s -w" -o /tmp/gobgp-bin/gobgpd ./cmd/gobgpd && \
     strip /tmp/gobgp-bin/gobgp /tmp/gobgp-bin/gobgpd
@@ -17,6 +19,7 @@ RUN git -c http.sslVerify=false clone https://github.com/osrg/gobgp.git . && \
 FROM ubuntu:25.10 AS msf-build
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Build-time toolchain only — nothing from this layer ships to runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates git ruby-full build-essential pkg-config \
     libssl-dev libffi-dev libpcap-dev libreadline-dev zlib1g-dev \
@@ -24,10 +27,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt
-RUN git -c http.sslVerify=false clone https://github.com/rapid7/metasploit-framework.git metasploit-framework
+# --depth 1 skips the full MSF git history (~1 GB uncompressed)
+RUN git -c http.sslVerify=false clone --depth 1 \
+        https://github.com/rapid7/metasploit-framework.git metasploit-framework
 WORKDIR /opt/metasploit-framework
 
-# Install bundler + vendor gems (no dev/test), small fixes
+# Install bundler + vendor gems (no dev/test), small fixes, then aggressive cleanup
 RUN gem install --no-document bundler && \
     bundle config set --local without 'development test' && \
     bundle config set --local path 'vendor/bundle' && \
@@ -38,42 +43,83 @@ RUN gem install --no-document bundler && \
     NOKOGIRI_USE_SYSTEM_LIBRARIES=1 bundle install --jobs 4 --retry 3 && \
     bundle clean --force && \
     rm -rf ~/.gem ~/.bundle /root/.bundle vendor/bundle/ruby/*/cache tmp/cache && \
-    # Remove default stringio gemspec in this stage to avoid duplicate warnings
-    find / -name "stringio-3.0.4.gemspec" -delete || true
+    # Remove default stringio gemspec to avoid duplicate warnings
+    find / -name "stringio-3.0.4.gemspec" -delete 2>/dev/null || true
+
+# Aggressive post-install size reduction — everything below is safe for check-only use
+RUN \
+    # Drop .git — history not needed at runtime (~hundreds of MB)
+    rm -rf /opt/metasploit-framework/.git && \
+    # Remove MSF module directories not needed for check-only operation
+    rm -rf /opt/metasploit-framework/modules/payloads \
+           /opt/metasploit-framework/modules/post \
+           /opt/metasploit-framework/modules/encoders \
+           /opt/metasploit-framework/modules/nops \
+           /opt/metasploit-framework/modules/evasion && \
+    # Remove documentation, developer tools, and exploit data blobs
+    rm -rf /opt/metasploit-framework/documentation \
+           /opt/metasploit-framework/tools \
+           /opt/metasploit-framework/data/exploits \
+           /opt/metasploit-framework/data/meterpreter \
+           /opt/metasploit-framework/data/templates && \
+    # Strip debug symbols from native extension .so files in the vendor bundle
+    find /opt/metasploit-framework/vendor/bundle -name "*.so" \
+         -exec strip --strip-debug {} \; 2>/dev/null || true && \
+    # Remove gem spec/test directories (not needed at runtime)
+    find /opt/metasploit-framework/vendor/bundle -type d \
+         \( -name spec -o -name test -o -name tests -o -name "test-unit" \) \
+         -exec rm -rf {} + 2>/dev/null || true && \
+    # Remove C/C++ source and build artefacts used only during gem compilation
+    find /opt/metasploit-framework/vendor/bundle -name "*.c"       -delete 2>/dev/null; \
+    find /opt/metasploit-framework/vendor/bundle -name "*.h"       -delete 2>/dev/null; \
+    find /opt/metasploit-framework/vendor/bundle -name "Makefile"  -delete 2>/dev/null || true && \
+    # Remove cached .gem archives (already installed, wasting space)
+    find /opt/metasploit-framework/vendor/bundle -name "*.gem"     -delete 2>/dev/null || true && \
+    # Remove Ruby ri documentation from vendor bundle
+    find /opt/metasploit-framework/vendor/bundle -type d -name "ri" \
+         -exec rm -rf {} + 2>/dev/null || true
 
 # ---------- Stage 3: runtime (slim) ----------
 FROM ubuntu:25.10
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=America/Denver
 
-# Core runtime deps only (no dev toolchains, no MIBs)
+# Core runtime deps only — no dev headers, no build tools, no redundant utilities
+# Removed vs original: libssl-dev (dev headers), make (build done in stage 2),
+#                      wget (unused by app), net-tools (superseded by iproute2)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    tzdata ca-certificates curl wget git \
-    iproute2 traceroute iputils-ping net-tools netcat-openbsd dnsutils openssh-client \
-    nmap snmp openssl libssl-dev \
-    perl python3 python3-pip sqlite3 ruby make bash nikto \
+    tzdata ca-certificates curl git \
+    iproute2 traceroute iputils-ping netcat-openbsd dnsutils openssh-client \
+    nmap snmp openssl \
+    perl python3 python3-pip sqlite3 ruby bash nikto \
   && ln -fs /usr/share/zoneinfo/$TZ /etc/localtime \
   && dpkg-reconfigure --frontend noninteractive tzdata \
   && rm -rf /var/lib/apt/lists/*
 
-# Install Bundler in runtime so wrappers can call `bundle exec`
+# Bundler in runtime so wrappers can call `bundle exec`
 RUN gem install --no-document bundler
 
-# Python packages (no cache)
+# Python packages — colorama and tqdm removed (unused in generator.py)
 RUN pip3 install --no-cache-dir --break-system-packages \
-      fastcli requests colorama beautifulsoup4 tqdm dnspython dnstwist rich
+      fastcli requests beautifulsoup4 dnspython dnstwist rich && \
+    # Remove compiled bytecode cache left by pip
+    find /usr -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 
-# Copy stripped GoBGP binaries
+# Remove static/libtool artefacts BEFORE copying Metasploit so the find
+# does not traverse the large vendor tree unnecessarily
+RUN find /usr -name '*.a' -o -name '*.la' -o -name '*.o' | xargs -r rm -f
+
+# Copy stripped GoBGP binaries from build stage
 COPY --from=gobgp-build /tmp/gobgp-bin/gobgp  /usr/local/bin/gobgp
 COPY --from=gobgp-build /tmp/gobgp-bin/gobgpd /usr/local/bin/gobgpd
 
 # Copy Metasploit framework (with vendor bundle) from builder
 COPY --from=msf-build /opt/metasploit-framework /opt/metasploit-framework
 
-# Kill duplicate default stringio warning in runtime too (path varies)
+# Kill duplicate default stringio warning in runtime (path varies by Ruby version)
 RUN find / -name "stringio-3.0.4.gemspec" -delete || true
 
-# Wrappers for msfconsole/msfvenom under bundler
+# Wrappers for msfconsole/msfvenom that run under bundler context
 RUN printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec ./msfconsole "$@"\n' > /usr/local/bin/msfconsole && \
     printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec ./msfvenom "$@"\n'   > /usr/local/bin/msfvenom && \
     chmod +x /usr/local/bin/msfconsole /usr/local/bin/msfvenom
@@ -92,9 +138,22 @@ RUN mv /opt/metasploit-framework/ms_checks/checks/targets.list \
 RUN chmod +x /traffgen/healthcheck.sh
 HEALTHCHECK --interval=10s --timeout=3s --retries=2 CMD /traffgen/healthcheck.sh
 
-# Final cleanup (docs, manpages, caches, static libs)
-RUN rm -rf /usr/share/doc /usr/share/man /usr/share/man-db /usr/share/locale /var/cache/* /root/.cache && \
-    find / -name '*.a' -o -name '*.la' -o -name '*.o' | xargs -r rm -f
+# Final cleanup — docs, manpages, locale data, caches, i18n tables,
+# games/pixmaps, Python .pyc files, Ruby rdoc cache
+RUN rm -rf \
+      /usr/share/doc \
+      /usr/share/man \
+      /usr/share/man-db \
+      /usr/share/locale \
+      /usr/share/i18n \
+      /usr/share/games \
+      /usr/share/pixmaps \
+      /var/cache/* \
+      /root/.cache && \
+    # Python bytecode
+    find /usr -name '*.pyc' -delete 2>/dev/null || true && \
+    # Ruby rdoc cache
+    find /usr -type d -name rdoc -exec rm -rf {} + 2>/dev/null || true
 
 # Entrypoint
 ENTRYPOINT ["python3", "-u", "/traffgen/generator.py"]
