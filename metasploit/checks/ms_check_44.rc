@@ -1,0 +1,36 @@
+# Automated vulnerability verification script.
+# WARNING: Use only in a legal, controlled lab environment.
+
+resource /opt/metasploit-framework/ms_checks/checks/_common.rc
+
+# ---- Module Checks ----
+# HTTP application fingerprinting — lightweight probes that generate WAF/IDS
+# signatures without large wordlist scans.  Each module sends a small fixed
+# number of requests so total runtime is bounded and predictable.
+
+# HTTP server version banner grab — triggers reconnaissance IDS alerts
+use auxiliary/scanner/http/http_version
+run
+back
+sleep 1
+
+# robots.txt fetch — triggers information-disclosure IDS rules
+use auxiliary/scanner/http/robots_txt
+run
+back
+sleep 1
+
+# HTTP TRACE/TRACK request — triggers Cross-Site Tracing (XST) WAF signatures
+use auxiliary/scanner/http/trace
+run
+back
+sleep 1
+
+# HTTP OPTIONS probe — triggers WAF anomaly rules for method enumeration
+use auxiliary/scanner/http/options
+run
+back
+sleep 1
+
+# ---- End ----
+exit

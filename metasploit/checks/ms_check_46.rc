@@ -1,0 +1,40 @@
+# Automated vulnerability verification script.
+# WARNING: Use only in a legal, controlled lab environment.
+
+resource /opt/metasploit-framework/ms_checks/checks/_common.rc
+
+# ---- Module Checks ----
+# 2024–2025 critical CVEs not covered in earlier check scripts.
+# Covers managed file transfer, VPN, and cloud-adjacent infrastructure —
+# all high-value targets generating strong IDS/IPS and CASB alert signals.
+
+# Barracuda Email Security Gateway RCE (CVE-2023-2868)
+# CISA KEV — pre-auth RCE via crafted email attachment header
+use exploit/linux/http/barracuda_esg_rce_cve_2023_2868
+check
+back
+sleep 1
+
+# SolarWinds Web Help Desk Java deserialization RCE (CVE-2024-28986)
+# CISA KEV — unauthenticated deserialization on the helpdesk API endpoint
+use exploit/multi/http/solarwinds_web_help_desk_rce_cve_2024_28986
+check
+back
+sleep 1
+
+# Progress WhatsUp Gold SQL injection → RCE (CVE-2024-4885)
+# Unauthenticated path traversal leading to remote code execution
+use exploit/multi/http/progress_whatsup_gold_writetofile_cve_2024_4885
+check
+back
+sleep 1
+
+# Check Point SSL VPN information disclosure (CVE-2024-24919)
+# Unauthenticated arbitrary file read on Check Point Security Gateway
+use exploit/multi/http/check_point_ssl_vpn_traversal_cve_2024_24919
+check
+back
+sleep 1
+
+# ---- End ----
+exit

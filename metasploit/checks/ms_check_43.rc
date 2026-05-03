@@ -1,0 +1,43 @@
+# Automated vulnerability verification script.
+# WARNING: Use only in a legal, controlled lab environment.
+
+resource /opt/metasploit-framework/ms_checks/checks/_common.rc
+
+# ---- Module Checks ----
+# Database and cache service exposure — generates protocol-level fingerprint
+# traffic that triggers DLP (data-at-rest exposure), IDS database-attack
+# signatures, and CASB unsanctioned-data-source alerts.
+
+# MySQL version probe — triggers database recon signatures
+use auxiliary/scanner/mysql/mysql_version
+run
+back
+sleep 1
+
+# PostgreSQL login probe — triggers credential-stuffing IDS rules
+use auxiliary/scanner/postgres/postgres_login
+set STOP_ON_SUCCESS true
+run
+back
+sleep 1
+
+# Redis unauthenticated access — triggers exposed-cache-service alerts
+use auxiliary/scanner/redis/redis_server
+run
+back
+sleep 1
+
+# Elasticsearch index enumeration — triggers data-exposure DLP signatures
+use auxiliary/scanner/elasticsearch/indices_enum
+run
+back
+sleep 1
+
+# MongoDB unauthenticated access — triggers NoSQL exposure IDS rules
+use auxiliary/scanner/mongodb/mongodb_login
+run
+back
+sleep 1
+
+# ---- End ----
+exit

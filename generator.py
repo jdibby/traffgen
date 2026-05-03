@@ -335,14 +335,14 @@ def _popen_kill_group(cmd: str, timeout: int,
         ui_warn(f"Process timed out after {timeout}s — sending SIGTERM to group")
         try:
             os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-        except ProcessLookupError:
+        except OSError:
             pass
         try:
             proc.wait(timeout=3)
         except subprocess.TimeoutExpired:
             try:
                 os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-            except ProcessLookupError:
+            except OSError:
                 pass
 
 
@@ -855,8 +855,7 @@ def snmp_random() -> None:
                 console.log(f"snmpwalk ({i}/{n}) {ip}  community={community}")
                 try:
                     subprocess.run(
-                        f"snmpwalk -v2c -t1 -r1 -c {community} {ip} 1.3.6",
-                        shell=True,
+                        ["snmpwalk", "-v2c", "-t1", "-r1", "-c", community, ip, "1.3.6"],
                         stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
                         timeout=15,
                     )
@@ -1932,11 +1931,22 @@ def replace_all_endpoints(url: str) -> None:
     """
     Fetch a remote endpoints.py replacement file and overwrite the local copy.
     Used for live-updating the endpoint lists without rebuilding the container.
+
+    Security note: endpoints.py is executed as Python on import (from endpoints
+    import *).  Only fetch from URLs you control and trust.  The payload is
+    syntax-checked with ast.parse() before writing; malformed Python is rejected.
     """
+    import ast
     console.log(f"Replacing endpoints.py from: {url}")
     data = urllib.request.urlopen(url, timeout=15).read()
+    src = data.decode("utf-8")
+    try:
+        ast.parse(src)
+    except SyntaxError as e:
+        ui_error(f"replace_all_endpoints: remote file has invalid syntax — aborting ({e})")
+        return
     with open("endpoints.py", "w") as fh:
-        fh.write(data.decode("utf-8"))
+        fh.write(src)
     ui_ok("endpoints.py updated")
 
 
@@ -2187,7 +2197,7 @@ if __name__ == "__main__":
     try:
         STARTTIME = time.time()
         ARGS      = parse_cli()
-        WATCHDOG  = Watchdog(timeout_seconds=300)
+        WATCHDOG  = Watchdog(timeout_seconds=600)
 
         suite = build_testsuite()
         run_test(suite)

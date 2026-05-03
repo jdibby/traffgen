@@ -1,0 +1,40 @@
+# Automated vulnerability verification script.
+# WARNING: Use only in a legal, controlled lab environment.
+
+resource /opt/metasploit-framework/ms_checks/checks/_common.rc
+
+# ---- Module Checks ----
+# Network protocol recon — SMB, RDP, and port-scan signatures.
+# These trigger tier-1 IDS/IPS rules: EternalBlue probes, lateral-movement
+# SMB patterns, RDP scan signatures, and firewall ACL logging.
+
+# EternalBlue (MS17-010) probe — highest-fidelity SMB IDS signature
+use auxiliary/scanner/smb/smb_ms17_010
+run
+back
+sleep 1
+
+# SMB share enumeration — lateral-movement reconnaissance signature
+use auxiliary/scanner/smb/smb_enumshares
+run
+back
+sleep 1
+
+# RDP service detection — triggers RDP-scan IDS rules
+use auxiliary/scanner/rdp/rdp_scanner
+run
+back
+sleep 1
+
+# TCP port scan — validates firewall ACL logging across common service ports.
+# TIMEOUT=3 caps per-connection wait so the full scan completes well within
+# the 300-second msfconsole timeout.
+use auxiliary/scanner/portscan/tcp
+set PORTS 21,22,23,25,53,80,110,143,443,445,1433,1521,3306,3389,5432,5900,6379,8080,8443,8888,27017
+set TIMEOUT 3
+run
+back
+sleep 1
+
+# ---- End ----
+exit

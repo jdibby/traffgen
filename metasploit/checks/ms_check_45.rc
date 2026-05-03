@@ -1,0 +1,40 @@
+# Automated vulnerability verification script.
+# WARNING: Use only in a legal, controlled lab environment.
+
+resource /opt/metasploit-framework/ms_checks/checks/_common.rc
+
+# ---- Module Checks ----
+# Network security appliance CVEs — Cisco IOS XE, Palo Alto PAN-OS, and
+# Juniper. These generate the probe patterns that IDS/IPS and NGFW vendors
+# specifically signature-match as targeted appliance attacks.
+
+# Cisco IOS XE WebUI privilege escalation (CVE-2023-20198 / CVE-2023-20273)
+# CISA KEV — actively exploited in the wild to create rogue admin accounts
+use exploit/multi/http/cisco_ios_xe_webui_cmd_exec
+check
+back
+sleep 1
+
+# Palo Alto PAN-OS GlobalProtect OS command injection (CVE-2024-3400)
+# CVSS 10.0 — unauthenticated RCE via crafted session cookie
+use exploit/linux/http/palo_alto_pan_os_rce_cve_2024_3400
+check
+back
+sleep 1
+
+# Juniper SRX/EX J-Web RCE chain (CVE-2023-36844 / CVE-2023-36851)
+# Unauthenticated PHP environment variable injection leading to RCE
+use exploit/multi/http/juniper_gopher_rce_cve_2023_36844
+check
+back
+sleep 1
+
+# Fortinet FortiOS SSL VPN heap buffer overflow (CVE-2023-27997)
+# Pre-auth RCE against FortiGate SSL VPN — triggers network appliance IDS
+use exploit/linux/http/fortinet_ssl_vpn_rce_cve_2023_27997
+check
+back
+sleep 1
+
+# ---- End ----
+exit
