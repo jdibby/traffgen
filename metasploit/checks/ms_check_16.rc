@@ -1,20 +1,7 @@
 # Automated vulnerability verification script.
-# This script will check for the presence of multiple vulnerabilities on multiple hosts.
-# WARNING: This file should only be used in a legal, controlled lab environment.
+# WARNING: Use only in a legal, controlled lab environment.
 
-# ---- Global Defaults ----
-setg VERBOSE true
-setg LogLevel 1
-setg HttpClientTimeout 8
-setg ConnectTimeout 8
-setg THREADS 4
-
-# Listener defaults (update these for your lab)
-setg SRVHOST 0.0.0.0
-setg LHOST 0.0.0.0
-
-# Targets
-setg RHOSTS file:/opt/metasploit-framework/ms_checks/targets.list
+resource /opt/metasploit-framework/ms_checks/checks/_common.rc
 
 # ---- Module Checks ----
 
