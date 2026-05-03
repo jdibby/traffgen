@@ -251,22 +251,34 @@ When a TLS-inspection proxy (Cato Networks, Prisma Access, Palo Alto, Zscaler, N
 
 ### Option 3 — Fully automatic _(zero configuration)_
 
-Just run the container — no flags, no cert files. On startup the entrypoint probes `www.google.com`, `www.cloudflare.com`, and `1.1.1.1` over HTTPS. If any probe fails certificate validation it means a MITM proxy is in the path. The entrypoint then:
+Just run the container — no flags, no cert files. On startup the entrypoint probes **15 diverse HTTPS hosts** in parallel, spanning CDN providers, cloud platforms, developer tooling, OS vendors, and social platforms. Using a wide target set means the probe catches interception even when the proxy whitelists specific URL categories or ASNs (selective bypass).
+
+For every host that fails TLS verification the entrypoint:
 
 1. Fetches the full certificate chain the proxy is presenting (`openssl s_client -showcerts`)
-2. Walks the chain looking for a CA certificate (`CA:TRUE`) that is not yet in the system trust store
-3. Saves it to `/usr/local/share/ca-certificates/auto-proxy-ca.crt`
-4. Runs `update-ca-certificates` so every tool in the container trusts it
+2. Fingerprints (SHA-256) every `CA:TRUE` cert in the chain that is not yet in the system trust store
+3. Votes across all failed hosts — the CA fingerprint seen on the most hosts wins
+4. Saves the winning cert to `/usr/local/share/ca-certificates/auto-proxy-ca.crt` and runs `update-ca-certificates`
+5. Runs a **verification pass** on a sample of previously-failed hosts to confirm the fix worked
+
+Hosts that pass verification are reported as **bypassed** — useful for understanding the proxy's whitelist policy.
 
 ```
-[entrypoint] Auto-CA probe: www.google.com:443 ...
-[entrypoint] TLS verification failed on www.google.com (code 20) — interception likely.
-[entrypoint] Fetching full certificate chain from www.google.com...
-[entrypoint] 3 certificate(s) in chain — scanning for injected CA...
-[entrypoint] Found injected proxy CA:
-[entrypoint]   Subject : CN=Cato Networks Root CA, O=Cato Networks, C=IL
-[entrypoint]   Expires : Dec 31 23:59:59 2035 GMT
+[entrypoint] Probing 15 hosts to detect TLS interception...
+[entrypoint] Results: 3 clean  11 intercepted  1 unreachable
+[entrypoint] Selective bypass detected:
+[entrypoint]   Bypassed (clean cert) : www.apple.com ocsp.pki.goog www.digicert.com
+[entrypoint]   Intercepted           : www.google.com www.cloudflare.com github.com ...
+[entrypoint] Fingerprinting CA certs across 11 intercepted host(s)...
+[entrypoint] Proxy CA identified (seen on 11 of 11 intercepted host(s)):
+[entrypoint]   Subject    : CN=Cato Networks Root CA, O=Cato Networks, C=IL
+[entrypoint]   Expires    : Dec 31 23:59:59 2035 GMT
+[entrypoint]   SHA-256 fp : 4A3B...
 [entrypoint] Installing proxy CA into trust store...
+[entrypoint] Verification pass...
+[entrypoint]   www.google.com ✓ now verified
+[entrypoint]   github.com ✓ now verified
+[entrypoint]   pypi.org ✓ now verified
 [entrypoint] Proxy CA trusted — TLS interception will work transparently.
 ```
 
