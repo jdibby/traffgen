@@ -225,6 +225,96 @@ class Watchdog:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# SUITE STATS
+# ══════════════════════════════════════════════════════════════════════════════
+
+class SuiteStats:
+    """Thread-safe per-suite probe counters with HTTP response-code tracking."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._reset("unknown")
+
+    def reset(self, name: str) -> None:
+        with self._lock:
+            self._reset(name)
+
+    def _reset(self, name: str) -> None:
+        self.name       = name
+        self.attempts   = 0
+        self.responses  = 0   # got any response (HTTP or non-HTTP)
+        self.errors     = 0   # no response: timeout, conn refused, exception
+        self.codes: dict[str, int] = {}
+        self.start_time = time.time()
+
+    def record(self, code: str) -> None:
+        """Record an HTTP status code. '---' / '000' / '' counts as an error."""
+        with self._lock:
+            self.attempts += 1
+            c = str(code).strip()
+            if not c or c in ("---", "000", "0"):
+                self.errors += 1
+            else:
+                self.responses += 1
+                bucket = (c[0] + "xx") if c[:1].isdigit() else c[:3]
+                self.codes[bucket] = self.codes.get(bucket, 0) + 1
+
+    def ok(self) -> None:
+        """Record a successful non-HTTP probe (ping, dig, SSH reached, etc.)."""
+        with self._lock:
+            self.attempts  += 1
+            self.responses += 1
+
+    def fail(self) -> None:
+        """Record a failed probe (exception, timeout, unreachable)."""
+        with self._lock:
+            self.attempts += 1
+            self.errors   += 1
+
+    def print_summary(self) -> None:
+        elapsed = time.time() - self.start_time
+        if self.attempts == 0:
+            return
+
+        pct_ok  = 100 * self.responses / self.attempts
+        pct_err = 100 * self.errors    / self.attempts
+
+        grid = Table.grid(padding=(0, 2))
+        grid.add_column(justify="right", style="dim", no_wrap=True)
+        grid.add_column()
+
+        grid.add_row("suite",     f"[bold cyan]{self.name}[/]")
+        grid.add_row("elapsed",   f"{elapsed:.1f}s")
+        grid.add_row("attempted", f"[bold]{self.attempts}[/]")
+        grid.add_row("responses", f"[bold green]{self.responses}[/]  ({pct_ok:.0f}%)")
+        grid.add_row("errors",
+                     (f"[bold red]{self.errors}[/]  ({pct_err:.0f}%)"
+                      if self.errors else "[dim]0[/]"))
+
+        if self.codes:
+            parts = []
+            for bucket in sorted(self.codes):
+                cnt = self.codes[bucket]
+                if   bucket.startswith("2"): s = "green"
+                elif bucket.startswith("3"): s = "cyan"
+                elif bucket.startswith("4"): s = "yellow"
+                elif bucket.startswith("5"): s = "red"
+                else:                        s = "dim"
+                parts.append(f"[{s}]{bucket}={cnt}[/]")
+            grid.add_row("http codes", "  ".join(parts))
+
+        console.print(Panel(
+            grid,
+            title="[bold]Suite Summary[/]",
+            border_style="blue",
+            box=box.ROUNDED,
+        ))
+
+
+_stats = SuiteStats()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # UTILITIES
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -375,6 +465,8 @@ def _run_guarded(func) -> None:
     limit = _SUITE_TIMEOUTS.get(func.__name__, 120)
     exc_box: list[BaseException] = []
 
+    _stats.reset(func.__name__)
+
     def _wrapper() -> None:
         try:
             func()
@@ -388,6 +480,8 @@ def _run_guarded(func) -> None:
         ui_warn(f"[guard] {func.__name__} exceeded {limit}s — advancing to next test")
     elif exc_box:
         ui_error(f"[{func.__name__}] {exc_box[0]}")
+
+    _stats.print_summary()
 
 
 def _run_head_batch(urls: list[str], label: str,
@@ -421,8 +515,10 @@ def _run_head_batch(urls: list[str], label: str,
                 status = _curl_head(url, ua, connect_timeout, max_time, extra_flags)
                 style  = _status_style(status)
                 console.log(f"[{idx}/{len(urls)}] {url}  [{style}]HTTP {status}[/]")
+                _stats.record(status)
             except Exception as e:
                 console.log(f"[yellow][{idx}/{len(urls)}] {url}  {e.__class__.__name__}[/]")
+                _stats.fail()
             finally:
                 prog.update(task, advance=1)
 
@@ -493,8 +589,10 @@ def bgp_peering() -> None:
                     )
                 if result.returncode != 0:
                     ui_warn(f"Neighbor {neighbor_ip}: {result.stderr.decode().strip()}")
+                    _stats.fail()
                 else:
                     ui_ok(f"Neighbor added: {neighbor_ip}")
+                    _stats.ok()
         else:
             ui_warn("gobgpd not ready — skipping BGP neighbor setup")
 
@@ -538,10 +636,13 @@ def bigfile() -> None:
                 for chunk in resp.iter_content(chunk_size=65536):
                     if chunk:
                         prog.update(task, advance=len(chunk))
+        _stats.ok()
         ui_ok("Big-file download complete")
     except (requests.exceptions.RequestException, socket.error, ssl.SSLError, OSError) as e:
+        _stats.fail()
         ui_error(f"[bigfile] {e}")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[bigfile] unexpected: {e}")
 
 
@@ -579,8 +680,10 @@ def dig_random() -> None:
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                             timeout=5,
                         )
+                        _stats.ok()
                     except Exception as e:
                         console.log(f"[yellow]dig error: {e}[/]")
+                        _stats.fail()
                     finally:
                         prog.update(task, advance=1)
     except Exception as e:
@@ -599,8 +702,10 @@ def ftp_random() -> None:
         console.log(f"FTP → {url}  ({target}, rate-limited 3 MB/s)")
         status = _curl_download(url, rate_limit="3M", connect_timeout=5, timeout=60)
         console.log(f"  ↳ FTP response {status}")
+        _stats.record(status)
         ui_ok("FTP test complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[ftp_random] {e}")
 
 
@@ -632,8 +737,10 @@ def http_download_zip() -> None:
     try:
         status = _curl_download(url, rate_limit="3M", connect_timeout=5, timeout=120, user_agent=ua)
         console.log(f"  ↳ [{_status_style(status)}]HTTP {status}[/]  ({target} ZIP)")
+        _stats.record(status)
         ui_ok("HTTP ZIP download complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[http_download_zip] {e}")
 
 
@@ -644,8 +751,10 @@ def http_download_targz() -> None:
         status = _curl_download("http://wordpress.org/latest.tar.gz",
                                 rate_limit="3M", connect_timeout=5, timeout=120)
         console.log(f"  ↳ [{_status_style(status)}]HTTP {status}[/]  (wordpress latest.tar.gz)")
+        _stats.record(status)
         ui_ok("HTTP tar.gz download complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[http_download_targz] {e}")
 
 
@@ -793,8 +902,10 @@ def ping_random() -> None:
                         stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
                         timeout=10,
                     )
+                    _stats.ok()
                 except Exception as e:
                     console.log(f"[yellow]ping {ip}: {e}[/]")
+                    _stats.fail()
                 finally:
                     prog.update(task, advance=1)
         ui_ok("Ping complete")
@@ -826,8 +937,10 @@ def metasploit_check() -> None:
                 console.log(f"msfconsole ({i}/{len(files)}): {rc}")
                 try:
                     _popen_kill_group(f"msfconsole -q -r '{rc_path}'", timeout=300)
+                    _stats.ok()
                 except Exception as e:
                     console.log(f"[yellow]msf error: {e}[/]")
+                    _stats.fail()
                 finally:
                     prog.update(task, advance=1)
         ui_ok("Metasploit checks complete")
@@ -859,8 +972,10 @@ def snmp_random() -> None:
                         stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
                         timeout=15,
                     )
+                    _stats.ok()
                 except Exception as e:
                     console.log(f"[yellow]snmp {ip}: {e}[/]")
+                    _stats.fail()
                 finally:
                     prog.update(task, advance=1)
         ui_ok("SNMP complete")
@@ -890,8 +1005,10 @@ def traceroute_random() -> None:
                         stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
                         timeout=30,
                     )
+                    _stats.ok()
                 except Exception as e:
                     console.log(f"[yellow]traceroute {ip}: {e}[/]")
+                    _stats.fail()
                 finally:
                     prog.update(task, advance=1)
         ui_ok("Traceroute complete")
@@ -926,14 +1043,18 @@ def speedtest_fast() -> None:
                     )
                     if result.stdout.strip():
                         console.log(result.stdout.strip()[:400])
+                    _stats.ok()
                 except subprocess.TimeoutExpired:
                     console.log(f"[yellow]Round {i} timed out[/]")
+                    _stats.fail()
                 except subprocess.CalledProcessError as e:
                     console.log(f"[red]Round {i} failed: {e}[/]")
                     if e.stderr:
                         console.log(e.stderr.strip()[:400])
+                    _stats.fail()
                 except Exception as e:
                     console.log(f"[red]Round {i} error: {e}[/]")
+                    _stats.fail()
                 finally:
                     prog.update(task, advance=1)
 
@@ -961,8 +1082,10 @@ def nmap_1024os() -> None:
             )
             try:
                 _popen_kill_group(cmd, timeout=120, stdout=None, stderr=None)
+                _stats.ok()
             except Exception as e:
                 console.log(f"[yellow]nmap {ip}: {e}[/]")
+                _stats.fail()
         ui_ok("Nmap 1-1024 complete")
     except Exception as e:
         ui_error(f"[nmap_1024os] {e}")
@@ -988,8 +1111,10 @@ def nmap_cve() -> None:
             )
             try:
                 _popen_kill_group(cmd, timeout=120, stdout=None, stderr=None)
+                _stats.ok()
             except Exception as e:
                 console.log(f"[yellow]nmap {ip}: {e}[/]")
+                _stats.fail()
         ui_ok("Nmap CVE scan complete")
     except Exception as e:
         ui_error(f"[nmap_cve] {e}")
@@ -1015,8 +1140,10 @@ def ntp_random() -> None:
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                     timeout=5,
                 )
+                _stats.ok()
             except Exception as e:
                 console.log(f"[yellow]ntp {host}: {e}[/]")
+                _stats.fail()
         ui_ok("NTP complete")
     except Exception as e:
         ui_error(f"[ntp_random] {e}")
@@ -1053,8 +1180,10 @@ def ssh_random() -> None:
                 else:
                     outcome = "[green]reachable[/] [dim](auth rejected — TCP/22 open)[/]"
                 console.log(f"ssh ({i}/{n}) {ip}  → {outcome}")
+                _stats.ok()
             except Exception as e:
                 console.log(f"[yellow]ssh ({i}/{n}) {ip}  → {e.__class__.__name__}[/]")
+                _stats.fail()
         ui_ok("SSH test complete")
     except Exception as e:
         ui_error(f"[ssh_random] {e}")
@@ -1077,10 +1206,13 @@ def urlresponse_random() -> None:
             task = prog.add_task("resp", total=n)
             for i, url in enumerate(https_endpoints[:n], 1):
                 try:
-                    t = requests.get(url, timeout=3, verify=False).elapsed.total_seconds()
+                    r = requests.get(url, timeout=3, verify=False)
+                    t = r.elapsed.total_seconds()
                     console.log(f"({i}/{n}) {url}  {t:.3f}s")
+                    _stats.record(str(r.status_code))
                 except Exception:
                     console.log(f"[yellow]skip[/] {url}")
+                    _stats.fail()
                 finally:
                     prog.update(task, advance=1)
         ui_ok("Response-time test complete")
@@ -1101,8 +1233,10 @@ def virus_sim() -> None:
             try:
                 status = _curl_download(url, rate_limit="3M", connect_timeout=4, timeout=20)
                 console.log(f"virus-sim ({i}/{n}) {url}  [{_status_style(status)}]HTTP {status}[/]")
+                _stats.record(status)
             except Exception as e:
                 console.log(f"[yellow]virus-sim ({i}/{n}) {url}  {e.__class__.__name__}[/]")
+                _stats.fail()
         ui_ok("Virus simulation complete")
     except Exception as e:
         ui_error(f"[virus_sim] {e}")
@@ -1121,8 +1255,10 @@ def dlp_sim_https() -> None:
             try:
                 status = _curl_download(url, rate_limit="3M", connect_timeout=4, timeout=20)
                 console.log(f"dlp-sim ({i}/{n}) {url}  [{_status_style(status)}]HTTP {status}[/]")
+                _stats.record(status)
             except Exception as e:
                 console.log(f"[yellow]dlp-sim ({i}/{n}) {url}  {e.__class__.__name__}[/]")
+                _stats.fail()
         ui_ok("DLP simulation complete")
     except Exception as e:
         ui_error(f"[dlp_sim_https] {e}")
@@ -1142,8 +1278,10 @@ def malware_download() -> None:
             try:
                 status = _curl_download(url, rate_limit="3M", connect_timeout=4, timeout=20)
                 console.log(f"malware-dl ({i}/{n}) {url}  [{_status_style(status)}]HTTP {status}[/]")
+                _stats.record(status)
             except Exception as e:
                 console.log(f"[yellow]malware-dl ({i}/{n}) {url}  {e.__class__.__name__}[/]")
+                _stats.fail()
         ui_ok("Malware download complete")
     except Exception as e:
         ui_error(f"[malware_download] {e}")
@@ -1163,8 +1301,10 @@ def squatting_domains() -> None:
             console.log(f"dnstwist ({i}/{n}) {domain}")
             try:
                 subprocess.run(["dnstwist", "--registered", domain], timeout=60)
+                _stats.ok()
             except Exception as e:
                 console.log(f"[yellow]dnstwist {domain}: {e}[/]")
+                _stats.fail()
         ui_ok("Squatting-domains test complete")
     except Exception as e:
         ui_error(f"[squatting_domains] {e}")
@@ -1184,6 +1324,7 @@ def webcrawl() -> None:
         for attempt in range(1, attempts + 1):
             console.log(f"Crawl attempt {attempt}/{attempts}")
             scrape_iterative(ARGS.crawl_start, iterations)
+            _stats.ok()
         ui_ok("Web crawl complete")
     except Exception as e:
         ui_error(f"[webcrawl] {e}")
@@ -1207,8 +1348,10 @@ def ips() -> None:
         )
         status = result.stdout.strip()
         console.log(f"  ↳ [{_status_style(status)}]HTTP {status}[/]  (IDS signature: BlackSun UA)")
+        _stats.record(status)
         ui_ok("IDS/IPS trigger complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[ips] {e}")
 
 
@@ -1225,8 +1368,10 @@ def web_scanner() -> None:
             f"echo y | nikto -h '{url}' -maxtime '{timeout}' -timeout 1 -nointeractive",
             timeout=timeout + 30,
         )
+        _stats.ok()
         ui_ok("Nikto scan complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[web_scanner] {e}")
 
 
@@ -1274,8 +1419,10 @@ def doh_random() -> None:
                         f"DoH ({i}/{len(domains)}) {domain}  "
                         f"@{provider.split('/')[2]}  [{_status_style(status)}]HTTP {status}[/]"
                     )
+                    _stats.record(status)
                 except Exception as e:
                     console.log(f"[yellow]DoH ({i}/{len(domains)}) {domain}: {e.__class__.__name__}[/]")
+                    _stats.fail()
                 finally:
                     prog.update(task, advance=1)
         ui_ok("DoH test complete")
@@ -1311,8 +1458,13 @@ def dot_random() -> None:
                 first_line = (result.stdout.strip().split("\n")[0]
                               if result.stdout.strip() else "no response")
                 console.log(f"DoT ({i}/{n}) {ip}:853  SNI={servername}  → {first_line[:70]}")
+                if "CONNECTED" in first_line or "verify" in first_line.lower():
+                    _stats.ok()
+                else:
+                    _stats.fail()
             except Exception as e:
                 console.log(f"[yellow]DoT ({i}/{n}) {ip}:853  → {e.__class__.__name__}[/]")
+                _stats.fail()
         ui_ok("DoT test complete")
     except Exception as e:
         ui_error(f"[dot_random] {e}")
@@ -1396,7 +1548,7 @@ def c2_beacon() -> None:
                     f"jitter={jitter:.1f}s  ua={ua[:40]}"
                 )
                 try:
-                    requests.post(
+                    resp = requests.post(
                         target,
                         data={"id": payload[:16], "data": payload},
                         headers={"User-Agent": ua},
@@ -1404,8 +1556,9 @@ def c2_beacon() -> None:
                         verify=False,
                         allow_redirects=True,
                     )
+                    _stats.record(str(resp.status_code))
                 except Exception:
-                    pass  # Target may be unreachable; failure is expected / normal
+                    _stats.fail()  # Unreachable targets are expected / normal
                 time.sleep(jitter)
                 prog.update(task, advance=1)
         ui_ok("C2 beacon simulation complete")
@@ -1456,8 +1609,10 @@ def dns_exfil() -> None:
                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                         timeout=5,
                     )
+                    _stats.ok()
                 except Exception as e:
                     console.log(f"[yellow]dns-exfil: {e}[/]")
+                    _stats.fail()
                 finally:
                     prog.update(task, advance=1)
         ui_ok("DNS exfil simulation complete")
@@ -1801,11 +1956,14 @@ def llm_dlp_sim() -> None:
                         f"  ↳ HTTP {resp.status_code} "
                         f"({'expected' if resp.status_code in (401, 403, 422) else 'check'})"
                     )
+                    _stats.record(str(resp.status_code))
                 except (requests.exceptions.ConnectionError,
                         requests.exceptions.Timeout):
                     console.log("  ↳ unreachable (expected)")
+                    _stats.fail()
                 except Exception as e:
                     console.log(f"[yellow]  ↳ {e.__class__.__name__}[/]")
+                    _stats.fail()
                 finally:
                     prog.update(task, advance=1)
 
@@ -1871,8 +2029,10 @@ def _probe_domain_list(local_path: str, n: int = 10) -> None:
             try:
                 r = requests.get(url, timeout=1, verify=False, allow_redirects=True)
                 console.log(f"({i}/{len(sample)}) {url}  →  {r.status_code}")
+                _stats.record(str(r.status_code))
             except Exception as e:
                 console.log(f"({i}/{len(sample)}) {url}  →  {e.__class__.__name__}")
+                _stats.fail()
             finally:
                 prog.update(task, advance=1)
 
@@ -1973,16 +2133,20 @@ def scrape_single_link(url: str) -> str | None:
         resp.raise_for_status()
         resp.encoding = resp.apparent_encoding or "utf-8"
         html = resp.text
+        _stats.record(str(resp.status_code))
     except requests.exceptions.HTTPError as e:
         # 404s are expected when following random links; log others.
         if e.response is not None and e.response.status_code == 404:
+            _stats.record("404")
             return None
+        _stats.fail()
         ui_warn(f"HTTP error {url}: {e}")
         return None
     except (requests.exceptions.SSLError,
             requests.exceptions.Timeout,
             requests.exceptions.TooManyRedirects,
             requests.exceptions.RequestException) as e:
+        _stats.fail()
         ui_warn(f"Request failed {url}: {e}")
         return None
 
