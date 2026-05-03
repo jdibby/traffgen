@@ -14,10 +14,10 @@ Designed to run inside a Docker container as a continuous traffic source
 for testing firewalls, IDS/IPS rules, and security analytics pipelines.
 
 Usage (stand-alone):
-    python3 generator.py --suite=all --size=M --loop
+    python3 generator.py --suite=all --size=XS --loop
 
 Usage (Docker default):
-    # See CMD in Dockerfile — runs suite=all, size=S, loop
+    # See CMD in Dockerfile — runs suite=all, size=XS, loop
 """
 
 # ── Standard library ──────────────────────────────────────────────────────────
@@ -2557,8 +2557,8 @@ def parse_cli() -> argparse.Namespace:
         help=f"Test suite to run (default: all).  Choices:\n  {', '.join(suite_choices)}",
     )
     traffic.add_argument(
-        "--size", type=str.upper, choices=["XS", "S", "M", "L", "XL"], default="M",
-        help="Volume of traffic: XS=tiny  S=small  M=medium  L=large  XL=extra-large (default: M)",
+        "--size", type=str.upper, choices=["XS", "S", "M", "L", "XL"], default="XS",
+        help="Volume of traffic: XS=tiny  S=small  M=medium  L=large  XL=extra-large (default: XS)",
     )
 
     timing = parser.add_argument_group("Timing & Loop")

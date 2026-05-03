@@ -151,7 +151,7 @@ docker run \
     --detach \
     --restart unless-stopped \
     jdibby/traffgen:latest \
-    --suite=all --size=S --max-wait-secs=20 --loop
+    --suite=all --size=XS --max-wait-secs=20 --loop
 
 echo ""
 echo "${BOLD}### INSTALL COMPLETE ###${NORMAL}"

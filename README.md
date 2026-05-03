@@ -22,11 +22,11 @@ docker run --pull=always -it jdibby/traffgen:latest --help
 # Run all suites in a continuous loop (background daemon)
 docker run --pull=always --detach --restart unless-stopped \
   --name traffgen jdibby/traffgen:latest \
-  --suite=all --size=S --max-wait-secs=20 --loop
+  --suite=all --size=XS --max-wait-secs=20 --loop
 
 # Run all suites interactively
 docker run --pull=always --restart unless-stopped -it \
-  jdibby/traffgen:latest --suite=all --size=M --max-wait-secs=20 --loop
+  jdibby/traffgen:latest --suite=all --size=XS --max-wait-secs=20 --loop
 
 # Run a single suite once
 docker run --pull=always -it jdibby/traffgen:latest --suite=nmap --size=L
@@ -51,10 +51,10 @@ sudo bash < <(curl -s https://raw.githubusercontent.com/jdibby/traffgen/refs/hea
 | Flag | Values | Default | Description |
 |---|---|---|---|
 | `--suite` | See suite names below | `all` | Test suite to run |
-| `--size` | `XS` `S` `M` `L` `XL` | `M` | Traffic volume / intensity |
+| `--size` | `XS` `S` `M` `L` `XL` | `XS` | Traffic volume / intensity |
 | `--loop` | — | off | Loop forever, picking tests at random each iteration |
 | `--max-wait-secs` | integer | `20` | Max random pause between iterations when looping |
-| `--nowait` | — | off | Disable inter-test pauses when looping |
+| `--nowait` | — | off | Disable all inter-test pauses (loop and single-run mode) |
 | `--crawl-start` | URL | `https://data.commoncrawl.org` | Seed URL for the `crawl` suite |
 | `--list` | — | — | Print all suites with descriptions and exit |
 | `--version` | — | — | Print version and exit |
@@ -201,6 +201,26 @@ The `--size` flag scales test intensity across all suites:
 
 ---
 
+## ⏱️ Traffic Pacing
+
+Traffgen is designed to look like **normal human traffic** — not a scanner or DDoS tool. Every layer of the generator has deliberate pacing built in:
+
+| Layer | Behavior |
+|---|---|
+| **Between tests** | 2–5 s random pause after every test function (single-run mode). Loop mode uses `--max-wait-secs` (default 20 s). `--nowait` removes all pauses. |
+| **Concurrent requests** | `_run_head_batch` (used by `https`, `ads`, `ai-browse`, `malware-agents`, etc.) uses **3 concurrent workers** (down from 6) and adds 0.2–0.6 s random jitter between each request submission — no burst of parallel connections. |
+| **DNS over HTTPS** | 0.3–0.8 s between each DoH query. |
+| **DNS over TLS** | 0.5–1.2 s between TLS handshakes. |
+| **NTP** | 0.4–1.0 s between UDP probes. |
+| **Nmap** | 1–3 s between host scans (on top of nmap's own per-host timeout). |
+| **C2 beacon** | Bimodal jitter: 80 % short (1–5 s), 20 % slow-and-low (10–30 s) — matches real C2 beacon distributions. |
+| **DNS exfil** | 0.3–2.0 s between queries with mixed query types (TXT/A/MX). |
+| **VoIP / video** | Explicit 0.2–1.5 s sleeps between every STUN probe, UCaaS HTTPS request, and RTP packet. |
+
+The result: traffic patterns that appear in firewall and SIEM logs as **individual sessions from a single workstation**, not a flood.
+
+---
+
 ## 🏗️ Architecture
 
 Three-stage multi-arch build (`linux/amd64`, `linux/arm64`, `linux/arm/v7`):
@@ -217,7 +237,7 @@ Three-stage multi-arch build (`linux/amd64`, `linux/arm64`, `linux/arm/v7`):
 
 **❤️ Healthcheck:** `healthcheck.sh` uses `pgrep` to verify `generator.py` is running. Evaluated every 10 seconds with a 3-second timeout and 2 retries.
 
-**🚀 Entrypoint:** `docker-entrypoint.sh` installs any injected CA certificates, then launches `python3 -u /traffgen/generator.py`. Default `CMD` is `--suite=all --size=S --max-wait-secs=40 --loop`.
+**🚀 Entrypoint:** `docker-entrypoint.sh` installs any injected CA certificates, then launches `python3 -u /traffgen/generator.py`. Default `CMD` is `--suite=all --size=XS --max-wait-secs=40 --loop`.
 
 **📊 Suite Summary:** After every suite completes, a summary panel is printed to the CLI — see [Suite Summary](#-suite-summary) below.
 
@@ -237,7 +257,7 @@ Export your proxy's CA as a PEM file and mount it into the container:
 docker run --pull=always --detach --restart unless-stopped \
   -v /path/to/proxy-ca.crt:/usr/local/share/ca-certificates/proxy-ca.crt \
   --name traffgen jdibby/traffgen:latest \
-  --suite=all --size=S --max-wait-secs=20 --loop
+  --suite=all --size=XS --max-wait-secs=20 --loop
 ```
 
 ### Option 2 — Inline PEM via environment variable
@@ -248,7 +268,7 @@ Useful for Kubernetes secrets, Docker Swarm configs, or CI pipelines:
 docker run --pull=always --detach --restart unless-stopped \
   -e EXTRA_CA_CERT="$(cat /path/to/proxy-ca.crt)" \
   --name traffgen jdibby/traffgen:latest \
-  --suite=all --size=S --max-wait-secs=20 --loop
+  --suite=all --size=XS --max-wait-secs=20 --loop
 ```
 
 Both options can be combined, and multiple `.crt` files can be mounted simultaneously. The CA is installed into `/etc/ssl/certs/ca-certificates.crt` at container start — no image rebuild required when the certificate rotates.
