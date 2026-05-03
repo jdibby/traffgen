@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-generator.py — Traffic Generator v2.1.0
+generator.py — Traffic Generator v2.2.0
 ========================================
 Simulates realistic network traffic across a wide range of protocols and
-behaviours: DNS, HTTP/HTTPS, FTP, SSH, NTP, BGP, ICMP, SNMP, Metasploit
-checks, web crawling, malware/phishing domain probing, ad-tracker HEAD
-requests, speed-tests, and more.
+behaviours: DNS, HTTP/HTTPS/HTTP3, FTP, SSH, NTP, BGP, ICMP, SNMP,
+DoH, DoT, C2 beacon, DNS exfiltration, Metasploit checks, web crawling,
+malware/phishing domain probing, ad-tracker HEAD requests, speed-tests,
+and more.
 
 Designed to run inside a Docker container as a continuous traffic source
 for testing firewalls, IDS/IPS rules, and security analytics pipelines.
@@ -23,6 +24,7 @@ import os
 import sys
 import ssl
 import time
+import base64
 import socket
 import random
 import threading
@@ -52,7 +54,7 @@ from rich import box
 from endpoints import *           # noqa: F401,F403  (large data file)
 
 # ── Globals ───────────────────────────────────────────────────────────────────
-VERSION = "2.1.0"
+VERSION = "2.2.0"
 console = Console(highlight=False)
 
 # Suppress SSL warnings — this tool intentionally hits self-signed / expired certs.
@@ -157,12 +159,17 @@ _SUITE_DESCRIPTIONS: list[tuple[str, str]] = [
     ("ai",               "HEAD requests to AI-service endpoints"),
     ("bgp",              "GoBGP peering session with configured neighbors"),
     ("bigfile",          "5 GB HTTP download (bandwidth saturation)"),
+    ("c2-beacon",        "C2 beacon: periodic HTTP POSTs with malware UA and jitter"),
     ("crawl",            "Iterative web crawl from a configurable start URL"),
     ("dlp",              "DLP test file downloads over HTTPS"),
     ("dns",              "dig queries across multiple resolvers and domains"),
+    ("dns-exfil",        "DNS exfil simulation: TXT queries with base32 encoded subdomains"),
+    ("doh",              "DNS over HTTPS (RFC 8484 JSON API via curl)"),
     ("domain-check",     "Probe random samples from Hagezi DNS blocklist"),
+    ("dot",              "DNS over TLS: TCP/853 TLS handshake via openssl s_client"),
     ("ftp",              "FTP download via curl with rate limiting"),
     ("http",             "HTTP HEAD + file downloads (ZIP, tar.gz)"),
+    ("http3",            "HTTP/3 QUIC HEAD requests via curl --http3"),
     ("https",            "HTTPS HEAD requests + iterative crawl"),
     ("icmp",             "Ping + traceroute to a set of remote hosts"),
     ("ips",              "BlackSun user-agent IPS trigger to testmyids.com"),
@@ -1125,6 +1132,236 @@ def web_scanner() -> None:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# ENCRYPTED DNS TESTS  (DoH / DoT)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def doh_random() -> None:
+    """
+    DNS over HTTPS (DoH) — RFC 8484 JSON API.
+
+    Sends DNS A-record queries to public DoH providers via HTTPS using curl's
+    JSON wire format.  Exercises firewall rules and inspection engines that
+    must correctly classify or decrypt DoH traffic on TCP/443 rather than
+    treating it as regular HTTPS.
+    """
+    n = _size_to_limits(ARGS.size, 5, 10, 20, len(dns_urls))
+    ui_banner("DNS over HTTPS (DoH)", f"{n} queries across DoH providers")
+    try:
+        random.shuffle(dns_urls)
+        domains = dns_urls[:n]
+
+        with Progress(
+            SpinnerColumn(), TextColumn("[cyan]DoH[/]"),
+            MofNCompleteColumn(), BarColumn(), TimeElapsedColumn(),
+            console=console,
+        ) as prog:
+            task = prog.add_task("doh", total=len(domains))
+            for i, domain in enumerate(domains, 1):
+                provider = random.choice(doh_providers)
+                url = f"{provider}?name={domain}&type=A"
+                console.log(f"DoH ({i}/{len(domains)}) {domain}  provider={provider.split('/')[2]}")
+                try:
+                    subprocess.run(
+                        ["curl", "-k", "-s",
+                         "-H", "accept: application/dns-json",
+                         "-o", "/dev/null",
+                         "--connect-timeout", "3",
+                         "--max-time", "5",
+                         url],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
+                        timeout=10,
+                    )
+                except Exception as e:
+                    console.log(f"[yellow]DoH {domain}: {e}[/]")
+                finally:
+                    prog.update(task, advance=1)
+        ui_ok("DoH test complete")
+    except Exception as e:
+        ui_error(f"[doh_random] {e}")
+
+
+def dot_random() -> None:
+    """
+    DNS over TLS (DoT) — TCP/853 TLS handshake via openssl s_client.
+
+    Opens a TLS connection to each server on port 853 and completes the
+    handshake with the correct SNI servername.  No DNS query is needed to
+    generate recognisable DoT traffic — the TLS handshake on port 853 is
+    the signature.  Validates that DoT detection or blocking rules fire.
+    """
+    n = _size_to_limits(ARGS.size, 2, 4, 8, len(dot_servers))
+    ui_banner("DNS over TLS (DoT)", f"TCP/853 handshakes to {n} servers")
+    try:
+        servers = dot_servers[:]
+        random.shuffle(servers)
+
+        for i, (ip, servername) in enumerate(servers[:n], 1):
+            console.log(f"DoT ({i}/{n}) {ip}:853  SNI={servername}")
+            try:
+                # Send a newline so openssl s_client closes after the handshake
+                # rather than waiting for stdin.
+                subprocess.run(
+                    f"echo | openssl s_client -connect {ip}:853 "
+                    f"-servername {servername} -brief 2>&1 | head -5",
+                    shell=True,
+                    stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
+                    timeout=8,
+                )
+            except Exception as e:
+                console.log(f"[yellow]DoT {ip}: {e}[/]")
+        ui_ok("DoT test complete")
+    except Exception as e:
+        ui_error(f"[dot_random] {e}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HTTP/3 (QUIC)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def http3_random() -> None:
+    """
+    HTTP/3 (QUIC) HEAD requests via curl --http3.
+
+    Tries to negotiate HTTP/3 first; falls back to HTTP/2 or HTTP/1.1 if the
+    server does not advertise h3 via Alt-Svc.  Validates whether the firewall's
+    TLS/QUIC inspection layer handles QUIC (UDP/443) or whether it silently
+    falls back to TCP.
+
+    If the installed curl binary has no HTTP/3 support compiled in, this test
+    logs a warning and exits cleanly rather than failing.
+    """
+    n = _size_to_limits(ARGS.size, 5, 10, 20, len(https_endpoints))
+    ui_banner("HTTP/3 (QUIC)", f"HEAD requests to {n} endpoints")
+    try:
+        # Probe curl build flags — skip gracefully if HTTP/3 is absent.
+        ver = subprocess.run(
+            ["curl", "--version"], capture_output=True, text=True, timeout=5
+        )
+        if "HTTP3" not in ver.stdout and "http3" not in ver.stdout.lower():
+            ui_warn("curl build does not include HTTP/3 support — skipping")
+            return
+
+        random.shuffle(https_endpoints)
+        _run_head_batch(
+            https_endpoints[:n], "HTTP3", user_agents,
+            connect_timeout=3, max_time=6,
+            # --http3 negotiates QUIC; curl falls back to TCP on failure.
+            extra_flags="--http3",
+        )
+        ui_ok("HTTP/3 test complete")
+    except Exception as e:
+        ui_error(f"[http3_random] {e}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ADVANCED EVASION / THREAT SIMULATION
+# ══════════════════════════════════════════════════════════════════════════════
+
+def c2_beacon() -> None:
+    """
+    C2 beacon simulation — periodic HTTP POSTs with randomised jitter.
+
+    Mimics the check-in pattern of common C2 frameworks:
+      • Small POST body with base64-encoded random bytes as a fake "agent ID"
+      • Malware-category user-agent header
+      • Random sleep between 1–5 s (jitter) to simulate variable beacon intervals
+      • Targets are public test/echo services designed for security validation
+
+    Validates that C2 detection rules (network-based behavioural analysis,
+    IDS POST-to-suspicious-domain signatures, and user-agent blocklists) fire
+    correctly without needing a live C2 server.
+    """
+    beacons = _size_to_limits(ARGS.size, 3, 5, 10, 20)
+    ui_banner("C2 Beacon Simulation",
+              f"{beacons} POSTs with jitter  (1–5 s between each)")
+    try:
+        with Progress(
+            SpinnerColumn(), TextColumn("[cyan]C2[/]"),
+            MofNCompleteColumn(), BarColumn(), TimeElapsedColumn(),
+            console=console,
+        ) as prog:
+            task = prog.add_task("c2", total=beacons)
+            for i in range(1, beacons + 1):
+                target = random.choice(c2_beacon_targets)
+                ua     = random.choice(malware_user_agents)
+                # Encode random bytes as the fake "check-in" payload.
+                payload = base64.b64encode(os.urandom(48)).decode()
+                jitter  = random.uniform(1, 5)
+                console.log(
+                    f"C2 ({i}/{beacons}) POST → {target}  "
+                    f"jitter={jitter:.1f}s  ua={ua[:40]}"
+                )
+                try:
+                    requests.post(
+                        target,
+                        data={"id": payload[:16], "data": payload},
+                        headers={"User-Agent": ua},
+                        timeout=4,
+                        verify=False,
+                        allow_redirects=True,
+                    )
+                except Exception:
+                    pass  # Target may be unreachable; failure is expected / normal
+                time.sleep(jitter)
+                prog.update(task, advance=1)
+        ui_ok("C2 beacon simulation complete")
+    except Exception as e:
+        ui_error(f"[c2_beacon] {e}")
+
+
+def dns_exfil() -> None:
+    """
+    DNS-based data exfiltration simulation — TXT queries with encoded subdomains.
+
+    Encodes random bytes as base32 strings and appends them as subdomain labels
+    (e.g. MFRA2YTFMF5Q.testmyids.com) to simulate the traffic pattern produced
+    by DNS tunnelling tools such as iodine, dnscat2, and DNSExfiltrator.
+
+    The queries will return NXDOMAIN (the subdomains do not exist), which is
+    normal and expected — the goal is to produce the *pattern* of traffic that
+    triggers DNS exfiltration detection signatures in NDR / DNS analytics
+    platforms.
+    """
+    n = _size_to_limits(ARGS.size, 5, 10, 20, 40)
+    ui_banner("DNS Exfil Simulation",
+              f"{n} TXT queries with base32-encoded subdomains")
+    try:
+        resolver = random.choice(dns_endpoints[:4])  # Use well-known public resolvers
+
+        with Progress(
+            SpinnerColumn(), TextColumn("[cyan]DNS-EXFIL[/]"),
+            MofNCompleteColumn(), BarColumn(), TimeElapsedColumn(),
+            console=console,
+        ) as prog:
+            task = prog.add_task("exfil", total=n)
+            for i in range(1, n + 1):
+                domain = random.choice(dns_exfil_domains)
+                # Vary chunk size per query to mimic real tunnelling fragmentation.
+                chunk  = base64.b32encode(
+                    os.urandom(random.randint(12, 28))
+                ).decode().lower().rstrip("=")
+                query  = f"{chunk}.{domain}"
+                console.log(
+                    f"DNS-exfil ({i}/{n}) TXT {query[:55]}{'…' if len(query) > 55 else ''}"
+                    f"  @{resolver}"
+                )
+                try:
+                    subprocess.run(
+                        ["dig", "TXT", query, f"@{resolver}",
+                         "+short", "+time=1", "+tries=1"],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                        timeout=5,
+                    )
+                except Exception as e:
+                    console.log(f"[yellow]dns-exfil: {e}[/]")
+                finally:
+                    prog.update(task, advance=1)
+        ui_ok("DNS exfil simulation complete")
+    except Exception as e:
+        ui_error(f"[dns_exfil] {e}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # GITHUB DOMAIN CHECKS
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -1319,12 +1556,17 @@ _SUITE_MAP: dict[str, list] = {
     "ai":               [ai_https_random],
     "bgp":              [bgp_peering],
     "bigfile":          [bigfile],
+    "c2-beacon":        [c2_beacon],
     "crawl":            [webcrawl],
     "dlp":              [dlp_sim_https],
     "dns":              [dig_random],
+    "dns-exfil":        [dns_exfil],
+    "doh":              [doh_random],
     "domain-check":     [github_domain_check],
+    "dot":              [dot_random],
     "ftp":              [ftp_random],
     "http":             [http_download_targz, http_download_zip, http_random],
+    "http3":            [http3_random],
     "https":            [https_random, https_crawl],
     "icmp":             [ping_random, traceroute_random],
     "ips":              [ips],

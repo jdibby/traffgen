@@ -2088,3 +2088,68 @@ kyber_endpoints = [
     "https://172.22.10.112:4433",
     "https://172.22.10.112:4433",
 ]
+
+# ---------------------------------------------------------------------------
+# DNS over HTTPS (DoH) providers — RFC 8484 JSON API endpoints
+# ---------------------------------------------------------------------------
+doh_providers = [
+    "https://cloudflare-dns.com/dns-query",
+    "https://dns.google/dns-query",
+    "https://doh.opendns.com/dns-query",
+    "https://dns.quad9.net/dns-query",
+    "https://doh.cleanbrowsing.org/doh/family-filter/",
+    "https://dns.nextdns.io",
+    "https://doh.dns.sb/dns-query",
+    "https://rdns.ipv64.net/dns-query",
+    "https://dns.adguard-dns.com/dns-query",
+    "https://unfiltered.adguard-dns.com/dns-query",
+]
+
+# ---------------------------------------------------------------------------
+# DNS over TLS (DoT) servers — list of (ip, tls_servername) tuples
+# Used by openssl s_client to open TCP/853 and complete the TLS handshake
+# ---------------------------------------------------------------------------
+dot_servers = [
+    ("1.1.1.1",         "cloudflare-dns.com"),
+    ("1.0.0.1",         "cloudflare-dns.com"),
+    ("8.8.8.8",         "dns.google"),
+    ("8.8.4.4",         "dns.google"),
+    ("9.9.9.9",         "dns.quad9.net"),
+    ("149.112.112.112", "dns.quad9.net"),
+    ("208.67.222.222",  "dns.opendns.com"),
+    ("208.67.220.220",  "dns.opendns.com"),
+    ("94.140.14.14",    "dns.adguard-dns.com"),
+    ("94.140.15.15",    "dns.adguard-dns.com"),
+]
+
+# ---------------------------------------------------------------------------
+# C2 beacon targets — public test/echo services used to simulate C2 check-ins
+# All targets are designed for security testing or accept arbitrary POSTs
+# ---------------------------------------------------------------------------
+c2_beacon_targets = [
+    "http://www.testmyids.com",
+    "https://www.testmyids.com",
+    "http://scanme.nmap.org",
+    "https://httpbin.org/post",
+    "https://httpbin.org/anything",
+    "https://httpbin.org/status/200",
+    "https://postman-echo.com/post",
+    "https://webhook.site/token",
+]
+
+# ---------------------------------------------------------------------------
+# DNS exfil simulation domains — queries are sent with long base32-encoded
+# subdomains (e.g. ABCDEF123.example.com) to mimic DNS tunnelling traffic
+# ---------------------------------------------------------------------------
+dns_exfil_domains = [
+    "testmyids.com",
+    "scanme.nmap.org",
+    "neverssl.com",
+    "info.cern.ch",
+    "example.com",
+    "example.org",
+    "example.net",
+    "test.example.com",
+    "dns-test.net",
+    "dnsleaktest.com",
+]
