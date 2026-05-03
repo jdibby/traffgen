@@ -249,7 +249,7 @@ Three-stage multi-arch build (`linux/amd64`, `linux/arm64`, `linux/arm/v7`):
 
 ---
 
-## TLS Inspection Proxies (Cato Networks, Zscaler, Palo Alto, etc.)
+## TLS Inspection Proxies
 
 When a TLS-inspection proxy sits between the container and the internet it intercepts HTTPS connections and re-signs them with its own CA certificate. Tools that verify certificates — Ruby/Metasploit, `openssl s_client` (DoT tests), and Go — will reject these connections unless the proxy's CA is trusted.
 
@@ -257,11 +257,11 @@ The container handles this at startup via `docker-entrypoint.sh`, which calls `u
 
 ### Option 1 — Bind-mount a certificate file (recommended)
 
-Export the Cato CA (or your proxy CA) as a PEM file and mount it:
+Export your proxy's CA as a PEM file and mount it into the container:
 
 ```bash
 docker run --pull=always --detach --restart unless-stopped \
-  -v /path/to/cato-ca.crt:/usr/local/share/ca-certificates/cato-ca.crt \
+  -v /path/to/proxy-ca.crt:/usr/local/share/ca-certificates/proxy-ca.crt \
   --name traffgen jdibby/traffgen:latest \
   --suite=all --size=S --max-wait-secs=20 --loop
 ```
@@ -272,7 +272,7 @@ Useful for Kubernetes secrets, Docker Swarm configs, or CI pipelines:
 
 ```bash
 docker run --pull=always --detach --restart unless-stopped \
-  -e EXTRA_CA_CERT="$(cat /path/to/cato-ca.crt)" \
+  -e EXTRA_CA_CERT="$(cat /path/to/proxy-ca.crt)" \
   --name traffgen jdibby/traffgen:latest \
   --suite=all --size=S --max-wait-secs=20 --loop
 ```

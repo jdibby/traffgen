@@ -124,8 +124,7 @@ RUN printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec 
     chmod +x /usr/local/bin/msfconsole /usr/local/bin/msfvenom
 
 # Point Python's requests library and ssl module at the system CA bundle so
-# that update-ca-certificates (run at container start) is picked up
-# automatically — no code changes needed when a custom CA is injected.
+# injected TLS-inspection proxy CAs are picked up automatically at startup.
 ENV REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 

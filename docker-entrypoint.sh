@@ -4,20 +4,20 @@ set -e
 # Install custom CA certificates before launching the generator so every tool
 # in the container (Ruby/Metasploit, openssl s_client, curl, Go) trusts them.
 #
-# TLS-inspection proxies (Cato Networks, Zscaler, Palo Alto, etc.) present
-# certificates signed by their own CA.  Add that CA here and all outbound
-# HTTPS connections through the proxy will verify cleanly.
+# TLS-inspection proxies re-sign intercepted HTTPS connections with their own
+# CA certificate.  Install that CA here and all outbound connections through
+# the proxy will verify cleanly.
 #
 # ── How to inject the CA ──────────────────────────────────────────────────────
 #
 #   Option 1 — bind-mount a PEM/CRT file (recommended):
 #     docker run \
-#       -v /path/to/cato-ca.crt:/usr/local/share/ca-certificates/cato-ca.crt \
+#       -v /path/to/proxy-ca.crt:/usr/local/share/ca-certificates/proxy-ca.crt \
 #       jdibby/traffgen:latest
 #
 #   Option 2 — inline PEM via environment variable (useful for secrets managers
 #              or Kubernetes secrets):
-#     docker run -e EXTRA_CA_CERT="$(cat cato-ca.crt)" jdibby/traffgen:latest
+#     docker run -e EXTRA_CA_CERT="$(cat proxy-ca.crt)" jdibby/traffgen:latest
 #
 # Both options can be combined.  Multiple files can be mounted simultaneously.
 # ─────────────────────────────────────────────────────────────────────────────
