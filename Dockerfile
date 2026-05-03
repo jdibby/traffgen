@@ -31,7 +31,7 @@ WORKDIR /opt/metasploit-framework
 # Install bundler + vendor gems (no dev/test), small fixes, then aggressive cleanup
 RUN gem install --no-document bundler && \
     bundle config set --local without 'development test' && \
-    bundle config set --local path 'vendor/bundle' && \
+    bundle config set --local path '/opt/metasploit-framework/vendor/bundle' && \
     (grep -Eq "^\s*gem ['\"]stringio['\"]" Gemfile && \
        sed -E -i "s|^\s*gem ['\"]stringio['\"].*|gem 'stringio', '3.1.1'|" Gemfile || \
        echo "gem 'stringio', '3.1.1'" >> Gemfile) && \
@@ -79,6 +79,9 @@ RUN \
 FROM debian:bookworm-slim
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=America/Denver
+ENV BUNDLE_GEMFILE=/opt/metasploit-framework/Gemfile
+ENV BUNDLE_PATH=/opt/metasploit-framework/vendor/bundle
+ENV BUNDLE_WITHOUT=development:test
 
 # Core runtime deps only — no dev headers, no build tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -119,8 +122,8 @@ COPY --from=msf-build /opt/metasploit-framework /opt/metasploit-framework
 RUN find / -name "stringio-3.0.4.gemspec" -delete || true
 
 # Wrappers for msfconsole/msfvenom that run under bundler context
-RUN printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec ./msfconsole "$@"\n' > /usr/local/bin/msfconsole && \
-    printf '#!/usr/bin/env bash\ncd /opt/metasploit-framework\nexec bundle exec ./msfvenom "$@"\n'   > /usr/local/bin/msfvenom && \
+RUN printf '#!/usr/bin/env bash\nexport BUNDLE_GEMFILE=/opt/metasploit-framework/Gemfile\nexport BUNDLE_PATH=/opt/metasploit-framework/vendor/bundle\nexport BUNDLE_WITHOUT=development:test\ncd /opt/metasploit-framework\nexec bundle exec ./msfconsole "$@"\n' > /usr/local/bin/msfconsole && \
+    printf '#!/usr/bin/env bash\nexport BUNDLE_GEMFILE=/opt/metasploit-framework/Gemfile\nexport BUNDLE_PATH=/opt/metasploit-framework/vendor/bundle\nexport BUNDLE_WITHOUT=development:test\ncd /opt/metasploit-framework\nexec bundle exec ./msfvenom "$@"\n' > /usr/local/bin/msfvenom && \
     chmod +x /usr/local/bin/msfconsole /usr/local/bin/msfvenom
 
 # Point Python's requests library and ssl module at the system CA bundle so
