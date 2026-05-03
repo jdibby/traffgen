@@ -1,22 +1,18 @@
 # ---------- Stage 1: build GoBGP ----------
-# Shallow clone (--depth 1) avoids downloading full git history, saving ~100 MB+
-FROM ubuntu:25.10 AS gobgp-build
-
-ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates git golang build-essential && \
-    rm -rf /var/lib/apt/lists/*
+# golang:1.23-bookworm already ships git, build-essential, and ca-certificates
+# so no extra apt install is needed in this stage.
+FROM golang:1.23-bookworm AS gobgp-build
 
 WORKDIR /tmp/gobgp
-# --depth 1 --single-branch fetches only the tagged commit, not the entire history
+# --depth 1 --single-branch fetches only the tagged commit, not the full history
 RUN git -c http.sslVerify=false clone --depth 1 --single-branch --branch v3.36.0 \
         https://github.com/osrg/gobgp.git . && \
-    go build -ldflags="-s -w" -o /tmp/gobgp-bin/gobgp ./cmd/gobgp && \
+    go build -ldflags="-s -w" -o /tmp/gobgp-bin/gobgp  ./cmd/gobgp  && \
     go build -ldflags="-s -w" -o /tmp/gobgp-bin/gobgpd ./cmd/gobgpd && \
     strip /tmp/gobgp-bin/gobgp /tmp/gobgp-bin/gobgpd
 
 # ---------- Stage 2: build Metasploit (fat builder) ----------
-FROM ubuntu:25.10 AS msf-build
+FROM debian:bookworm-slim AS msf-build
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Build-time toolchain only — nothing from this layer ships to runtime
@@ -79,30 +75,27 @@ RUN \
     find /opt/metasploit-framework/vendor/bundle -type d -name "ri" \
          -exec rm -rf {} + 2>/dev/null || true
 
-# ---------- Stage 3: runtime (slim) ----------
-FROM ubuntu:25.10
+# ---------- Stage 3: runtime ----------
+FROM debian:bookworm-slim
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=America/Denver
 
-# Core runtime deps only — no dev headers, no build tools, no redundant utilities
-# Removed vs original: libssl-dev (dev headers), make (build done in stage 2),
-#                      wget (unused by app), net-tools (superseded by iproute2)
+# Core runtime deps only — no dev headers, no build tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tzdata ca-certificates curl git \
     iproute2 traceroute iputils-ping netcat-openbsd dnsutils openssh-client \
     nmap snmp openssl \
     perl python3 python3-pip sqlite3 ruby bash nikto \
   && ln -fs /usr/share/zoneinfo/$TZ /etc/localtime \
-  && dpkg-reconfigure --frontend noninteractive tzdata \
+  && echo "$TZ" > /etc/timezone \
   && rm -rf /var/lib/apt/lists/*
 
 # Bundler in runtime so wrappers can call `bundle exec`
 RUN gem install --no-document bundler
 
-# Python packages — colorama and tqdm removed (unused in generator.py)
+# Python packages
 RUN pip3 install --no-cache-dir --break-system-packages \
       fastcli requests beautifulsoup4 dnspython dnstwist rich && \
-    # Remove compiled bytecode cache left by pip
     find /usr -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 
 # Remove static/libtool artefacts BEFORE copying Metasploit so the find
@@ -150,9 +143,7 @@ RUN rm -rf \
       /usr/share/pixmaps \
       /var/cache/* \
       /root/.cache && \
-    # Python bytecode
     find /usr -name '*.pyc' -delete 2>/dev/null || true && \
-    # Ruby rdoc cache
     find /usr -type d -name rdoc -exec rm -rf {} + 2>/dev/null || true
 
 # Entrypoint
