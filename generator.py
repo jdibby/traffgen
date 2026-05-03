@@ -136,7 +136,7 @@ def ui_startup_banner() -> None:
     ))
 
     # Configuration table
-    size_name = {"S": "Small", "M": "Medium", "L": "Large", "XL": "Extra-Large"}.get(ARGS.size, "Medium")
+    size_name = {"XS": "Extra-Small", "S": "Small", "M": "Medium", "L": "Large", "XL": "Extra-Large"}.get(ARGS.size, "Medium")
     cfg = Table.grid(padding=(0, 2))
     cfg.add_row("[bold]Suite[/]",        ":", ARGS.suite.upper())
     cfg.add_row("[bold]Size[/]",         ":", size_name)
@@ -161,7 +161,7 @@ _SUITE_DESCRIPTIONS: list[tuple[str, str]] = [
     ("ads",              "HEAD requests to ad-tracker / analytics endpoints"),
     ("ai-browse",        "HEAD requests to AI/LLM service endpoints for URL-filter validation"),
     ("bgp",              "GoBGP peering session with configured neighbors"),
-    ("bigfile",          "Size-scaled HTTP download: S=100MB M=1GB L=2GB XL=5GB"),
+    ("bigfile",          "Size-scaled HTTP download: XS=10MB S=100MB M=1GB L=2GB XL=5GB"),
     ("c2-beacon",        "C2 beacon: rotating POST formats (form/JSON/raw), bimodal jitter"),
     ("llm-dlp",          "POST fake PII to LLM APIs; two-phase: API POSTs + browser endpoint HEAD requests"),
     ("crawl",            "Iterative web crawl from a configurable start URL"),
@@ -354,9 +354,12 @@ def get_container_ip() -> str:
         return "127.0.0.1"
 
 
-def _size_to_limits(size: str, s, m, l, xl):
-    """Map the --size flag to one of four pre-defined values (S/M/L/XL)."""
-    return {"S": s, "M": m, "L": l, "XL": xl}.get(size, m)
+def _size_to_limits(size: str, s, m, l, xl, *, xs=None):
+    """Map the --size flag to one of five pre-defined values (XS/S/M/L/XL).
+
+    `xs` defaults to `s` when omitted so existing call sites work unchanged.
+    """
+    return {"XS": xs if xs is not None else s, "S": s, "M": m, "L": l, "XL": xl}.get(size, m)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -503,13 +506,13 @@ def _run_head_batch(urls: list[str], label: str,
                     user_agents_pool: list[str],
                     connect_timeout: int = 3, max_time: int = 5,
                     extra_flags: str = "",
-                    max_workers: int = 6) -> None:
+                    max_workers: int = 3) -> None:
     """
     Run HEAD requests against *urls* concurrently using a thread pool.
 
-    Concurrency (default 6 workers) reduces wall-clock time significantly for
-    large URL lists without overwhelming any single target — each individual
-    request still has its own connect/max-time limits.
+    Concurrency (default 3 workers) keeps parallel requests modest so we
+    don't look like a scanner.  Futures are submitted one-by-one with a small
+    random inter-submission delay to avoid bursting all requests simultaneously.
 
     Thread-safety note: subprocess.run is re-entrant and console.log acquires
     Rich's internal lock, so parallel calls are safe.
@@ -538,8 +541,12 @@ def _run_head_batch(urls: list[str], label: str,
                 prog.update(task, advance=1)
 
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
-            futures = {pool.submit(_worker, i + 1, url): url
-                       for i, url in enumerate(urls)}
+            futures = {}
+            for i, url in enumerate(urls):
+                futures[pool.submit(_worker, i + 1, url)] = url
+                # Stagger submissions so requests don't all land at once.
+                if i < len(urls) - 1:
+                    time.sleep(random.uniform(0.2, 0.6))
             # Consume futures so exceptions propagate and are logged.
             for fut in as_completed(futures):
                 try:
@@ -632,8 +639,9 @@ def bigfile() -> None:
     content to /dev/null.  Designed to generate sustained high-bandwidth
     traffic and trigger bandwidth-based policy rules.
     """
-    # Scale file size with --size: S=100MB, M=1GB, L=2GB, XL=5GB
+    # Scale file size with --size: XS=10MB, S=100MB, M=1GB, L=2GB, XL=5GB
     _BIGFILE_URLS = {
+        "XS": "http://ipv4.download.thinkbroadband.com/10MB.zip",
         "S":  "http://ipv4.download.thinkbroadband.com/100MB.zip",
         "M":  "http://ipv4.download.thinkbroadband.com/1GB.zip",
         "L":  "http://ipv4.download.thinkbroadband.com/2GB.zip",
@@ -1110,6 +1118,8 @@ def nmap_1024os() -> None:
             except Exception as e:
                 console.log(f"[yellow]nmap {ip}: {e}[/]")
                 _stats.fail()
+            if i < n:
+                time.sleep(random.uniform(1.0, 3.0))
         ui_ok("Nmap 1-1024 complete")
     except Exception as e:
         ui_error(f"[nmap_1024os] {e}")
@@ -1139,6 +1149,8 @@ def nmap_cve() -> None:
             except Exception as e:
                 console.log(f"[yellow]nmap {ip}: {e}[/]")
                 _stats.fail()
+            if i < n:
+                time.sleep(random.uniform(1.0, 3.0))
         ui_ok("Nmap CVE scan complete")
     except Exception as e:
         ui_error(f"[nmap_cve] {e}")
@@ -1168,6 +1180,8 @@ def ntp_random() -> None:
             except Exception as e:
                 console.log(f"[yellow]ntp {host}: {e}[/]")
                 _stats.fail()
+            if i < n:
+                time.sleep(random.uniform(0.4, 1.0))
         ui_ok("NTP complete")
     except Exception as e:
         ui_error(f"[ntp_random] {e}")
@@ -1453,6 +1467,8 @@ def doh_random() -> None:
                     _stats.fail()
                 finally:
                     prog.update(task, advance=1)
+                if i < len(domains):
+                    time.sleep(random.uniform(0.3, 0.8))
         ui_ok("DoH test complete")
     except Exception as e:
         ui_error(f"[doh_random] {e}")
@@ -1493,6 +1509,8 @@ def dot_random() -> None:
             except Exception as e:
                 console.log(f"[yellow]DoT ({i}/{n}) {ip}:853  → {e.__class__.__name__}[/]")
                 _stats.fail()
+            if i < n:
+                time.sleep(random.uniform(0.5, 1.2))
         ui_ok("DoT test complete")
     except Exception as e:
         ui_error(f"[dot_random] {e}")
@@ -2449,12 +2467,20 @@ def build_testsuite() -> list:
 
 def finish_test() -> None:
     """
-    Called after each test completes.  In loop mode, inserts a random pause
-    (unless --nowait) so traffic is paced rather than wall-to-wall.
+    Called after each test completes.  Inserts a random pause (unless
+    --nowait) so traffic looks natural rather than wall-to-wall.
+
+    Loop mode: longer pause governed by --max-wait-secs.
+    Single-run mode: short 2-5 s pause between consecutive test functions so
+    back-to-back suites (e.g. 'all') don't hammer targets without breathing room.
     """
-    if ARGS.loop and not ARGS.nowait:
-        wait = random.randint(2, max(3, int(ARGS.max_wait_secs)))
-        progress_wait(wait, label="Pause between iterations")
+    if not ARGS.nowait:
+        if ARGS.loop:
+            wait = random.randint(2, max(3, int(ARGS.max_wait_secs)))
+            progress_wait(wait, label="Pause between iterations")
+        else:
+            wait = random.randint(2, 5)
+            progress_wait(wait, label="Pause between tests")
     console.print("")   # visual separator in output
 
 
@@ -2531,8 +2557,8 @@ def parse_cli() -> argparse.Namespace:
         help=f"Test suite to run (default: all).  Choices:\n  {', '.join(suite_choices)}",
     )
     traffic.add_argument(
-        "--size", type=str.upper, choices=["S", "M", "L", "XL"], default="M",
-        help="Volume of traffic: S=small  M=medium  L=large  XL=extra-large (default: M)",
+        "--size", type=str.upper, choices=["XS", "S", "M", "L", "XL"], default="M",
+        help="Volume of traffic: XS=tiny  S=small  M=medium  L=large  XL=extra-large (default: M)",
     )
 
     timing = parser.add_argument_group("Timing & Loop")
