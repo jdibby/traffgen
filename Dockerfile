@@ -85,10 +85,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tzdata ca-certificates curl git \
     iproute2 traceroute iputils-ping netcat-openbsd dnsutils openssh-client \
     nmap snmp openssl \
-    perl python3 python3-pip sqlite3 ruby bash nikto \
+    perl python3 python3-pip sqlite3 ruby bash \
   && ln -fs /usr/share/zoneinfo/$TZ /etc/localtime \
   && echo "$TZ" > /etc/timezone \
   && rm -rf /var/lib/apt/lists/*
+
+# nikto is not in Debian repos — install from upstream (Perl script, no extra deps)
+RUN git -c http.sslVerify=false clone --depth 1 \
+        https://github.com/sullo/nikto.git /opt/nikto && \
+    ln -s /opt/nikto/program/nikto.pl /usr/local/bin/nikto && \
+    chmod +x /opt/nikto/program/nikto.pl
 
 # Bundler in runtime so wrappers can call `bundle exec`
 RUN gem install --no-document bundler
