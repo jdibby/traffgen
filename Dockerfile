@@ -144,7 +144,7 @@ RUN mv /opt/metasploit-framework/ms_checks/checks/targets.list \
 
 # Healthcheck
 RUN chmod +x /traffgen/healthcheck.sh
-HEALTHCHECK --interval=10s --timeout=3s --retries=2 CMD /traffgen/healthcheck.sh
+HEALTHCHECK --interval=15s --timeout=5s --start-period=90s --retries=3 CMD /traffgen/healthcheck.sh
 
 # Final cleanup — docs, manpages, locale data, caches, i18n tables,
 # games/pixmaps, Python .pyc files, Ruby rdoc cache

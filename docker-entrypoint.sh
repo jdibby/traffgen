@@ -102,14 +102,14 @@ auto_trust_proxy_ca() {
         mkdir -p "$chain_dir"
 
         # Reachability (3 s)
-        if ! timeout 3 bash -c "echo >/dev/tcp/${host}/${port}" 2>/dev/null; then
+        if ! timeout 2 bash -c "echo >/dev/tcp/${host}/${port}" 2>/dev/null; then
             echo "UNREACHABLE" > "$result_file"
             return 0
         fi
 
         # TLS verification against system store (4 s)
         local verify
-        verify=$(echo | timeout 4 openssl s_client \
+        verify=$(echo | timeout 3 openssl s_client \
             -connect "${host}:${port}" \
             -verify_return_error 2>&1 || true)
 
@@ -124,7 +124,7 @@ auto_trust_proxy_ca() {
 
         # Fetch full chain and split into per-cert PEM files
         local chain
-        chain=$(echo | timeout 4 openssl s_client \
+        chain=$(echo | timeout 3 openssl s_client \
             -connect "${host}:${port}" \
             -showcerts 2>/dev/null || true)
         [ -z "$chain" ] && return 0
@@ -268,7 +268,7 @@ auto_trust_proxy_ca() {
     [ "${#check_hosts[@]}" -gt 3 ] && check_hosts=("${check_hosts[@]:0:3}")
     for host in "${check_hosts[@]}"; do
         local v
-        v=$(echo | timeout 4 openssl s_client \
+        v=$(echo | timeout 3 openssl s_client \
             -connect "${host}:443" \
             -verify_return_error 2>&1 || true)
         if echo "$v" | grep -q "Verify return code: 0 (ok)"; then
