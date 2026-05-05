@@ -2821,10 +2821,30 @@ def parse_cli() -> argparse.Namespace:
 # ENTRY POINT
 # ══════════════════════════════════════════════════════════════════════════════
 
+def _start_heartbeat(path: str = "/tmp/traffgen.health", interval: int = 15) -> None:
+    """Write a Unix timestamp to *path* every *interval* seconds.
+
+    The Docker healthcheck reads this file and fails if it is stale, giving a
+    reliable liveness signal that does not depend on pgrep or process naming.
+    """
+    def _loop() -> None:
+        while True:
+            try:
+                with open(path, "w") as fh:
+                    fh.write(str(int(time.time())))
+            except Exception:
+                pass
+            time.sleep(interval)
+
+    t = threading.Thread(target=_loop, daemon=True, name="heartbeat")
+    t.start()
+
+
 if __name__ == "__main__":
     try:
         STARTTIME = time.time()
         ARGS      = parse_cli()
+        _start_heartbeat()
         WATCHDOG  = Watchdog(timeout_seconds=600)
 
         suite = build_testsuite()
