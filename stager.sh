@@ -141,9 +141,9 @@ else
             install -m 0755 -d /etc/apt/keyrings
 
             ARCH=$(dpkg --print-architecture)
-            CODENAME="${VERSION_CODENAME:-$(. /etc/os-release; echo "${VERSION_CODENAME:-}")"}"
-            # For Mint/Pop the UBUNTU_CODENAME is the correct base
-            [ -z "$CODENAME" ] && CODENAME=$(. /etc/os-release; echo "${UBUNTU_CODENAME:-}")
+            # VERSION_CODENAME and UBUNTU_CODENAME are already set from the . /etc/os-release above.
+            # UBUNTU_CODENAME is the fallback for Mint/Pop!_OS which set it but not VERSION_CODENAME.
+            CODENAME="${VERSION_CODENAME:-${UBUNTU_CODENAME:-}}"
 
             if [ "${ID:-}" = "raspbian" ] && [ "$RPIVER" -ge 5 ]; then
                 DOCKER_GPG="https://download.docker.com/linux/debian/gpg"
