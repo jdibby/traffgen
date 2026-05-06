@@ -638,6 +638,16 @@ input:checked+.tslider:before{transform:translateX(17px)}
 .empty{padding:26px;text-align:center;color:var(--muted);font-size:12px}
 ::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--dim);border-radius:2px}
 .mono{font-family:'SF Mono',Consolas,monospace;font-size:11px}
+.ll.banner{padding:1px 14px}
+.ll.banner .llm{color:#22c55e;white-space:pre;font-size:12px}
+.ll.rule{padding:3px 0;gap:0}
+.ll.summary{padding:3px 14px;border-left:2px solid var(--green);background:rgba(34,197,94,.04);margin:1px 0}
+.ll.summary .llm{color:#c9d1d9;white-space:pre;font-size:12px}
+.net-interval{background:var(--surf2);border:1px solid var(--border2);border-radius:4px;color:var(--muted);font-size:10px;padding:1px 4px;cursor:pointer;outline:none}
+.net-interval:focus{border-color:var(--green)}
+html.light{--bg:#f6f8fa;--sidebar:#eef1f5;--surf:#ffffff;--surf2:#f0f3f7;--border:#d0d7de;--border2:#8c959f;--text:#1f2328;--muted:#636e7b;--dim:#8c959f}
+html.light .obody{background:#f0f4f8}html.light .obody .llm{color:#24292f}html.light .obody .llt{color:#8c959f}
+html.light .obody .ll:hover{background:rgba(0,0,0,.04)}html.light .cmd-blk{background:#f0f4f8;color:#24292f}
 .h-gauges{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .h-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media(max-width:700px){.h-gauges,.h-row{grid-template-columns:1fr}}
@@ -686,6 +696,7 @@ input:checked+.tslider:before{transform:translateX(17px)}
     <button id="btn-pause" class="ico-btn" onclick="togglePause()" title="Pause / Resume">&#9208;</button>
     <button class="ico-btn danger" onclick="stopTests()" title="Stop all tests">&#9209;</button>
     <button class="ico-btn" onclick="openDrawer()" title="Settings">&#9881;</button>
+    <button class="ico-btn" id="btn-theme" onclick="toggleTheme()" title="Toggle dark / light mode">&#9790;</button>
     <span id="pill-live" class="tp-pill tp-running" style="cursor:pointer" onclick="handleLiveClick()" title="Click to stop all tests"><span class="pulse"></span>LIVE</span>
   </div>
   <div class="content">
@@ -698,7 +709,13 @@ input:checked+.tslider:before{transform:translateX(17px)}
         <div class="card"><div class="clbl">Iteration</div><div class="cval c-amber" id="v-iter">&#8212;</div><div class="csub" id="s-iter">&#8212;</div></div>
       </div>
       <div class="cc" style="display:flex;flex-direction:column;gap:10px">
-        <div class="ctitle">Network I/O <span id="net-iface" style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim);font-size:10px"></span></div>
+        <div class="ctitle">Network I/O <span id="net-iface" style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim);font-size:10px"></span>
+          <select class="net-interval" onchange="setNetInterval(+this.value)" title="Refresh interval">
+            <option value="1000" selected>1s</option><option value="2000">2s</option>
+            <option value="5000">5s</option><option value="10000">10s</option>
+            <option value="15000">15s</option><option value="30000">30s</option>
+          </select>
+        </div>
         <div class="net-widget">
           <div class="net-dir"><div class="net-lbl">&#9650; TX</div><div class="net-val c-blue" id="ov-tx">&#8212;</div></div>
           <div style="width:1px;background:var(--border);align-self:stretch"></div>
@@ -943,7 +960,7 @@ const RC=p=>p>=90?'var(--green)':p>=70?'var(--amber)':'var(--red)';
 let _start=null,_uptimer=null,_elTimer=null,_autoScroll=true;
 let _lastState=null,_logEs=null,_logFilter='all';
 let _xRows=new Set(),_xEvs=new Set(),_modalSuite=null,_isPaused=false,_lastTest=null;
-let _healthTimer=null,_lastHealth=null,_netHist=[],_hNetHist=[];
+let _healthTimer=null,_lastHealth=null,_netHist=[],_hNetHist=[],_netTimer=null,_netInterval=1000;
 function uptime(t){const s=Math.floor(Date.now()/1000-t);return[Math.floor(s/3600),Math.floor((s%3600)/60),s%60].map(v=>String(v).padStart(2,'0')).join(':');}
 function elapsed(t){if(!t)return'';const s=Math.floor(Date.now()/1000-t);if(s<60)return s+'s elapsed';if(s<3600)return Math.floor(s/60)+'m '+(s%60)+'s elapsed';return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m elapsed';}
 const PAGE_TITLES={overview:'Overview',tests:'Tests',output:'Output',health:'Health',about:'About'};
@@ -1080,11 +1097,16 @@ function connectLog(){
 function setFilter(btn,lvl){
   _logFilter=lvl;
   document.querySelectorAll('.fgrp .btn').forEach(b=>b.classList.remove('af'));btn.classList.add('af');
-  document.querySelectorAll('#obody .ll').forEach(el=>{if(el.classList.contains('ll-sep'))return;el.style.display=(lvl==='all'||el.classList.contains(lvl))?'':'none';});
+  document.querySelectorAll('#obody .ll').forEach(el=>{
+    if(el.classList.contains('ll-sep')||el.classList.contains('rule')||el.classList.contains('banner'))return;
+    el.style.display=(lvl==='all'||el.classList.contains(lvl))?'':'none';
+  });
 }
 function appendLog(d){
   const b=$('obody'),lvl=d.level||'info';
-  if(_logFilter!=='all'&&lvl!==_logFilter)return;
+  // rule and banner are always shown as structural context; others respect the filter
+  const structural=lvl==='rule'||lvl==='banner';
+  if(!structural&&_logFilter!=='all'&&lvl!==_logFilter)return;
   const test=d.test||'';
   if(test&&test!==_lastTest){
     _lastTest=test;
@@ -1092,13 +1114,29 @@ function appendLog(d){
     sep.innerHTML=`<div class="sep-line"></div><div class="sep-txt">${H(test.replace(/_/g,' '))}</div><div class="sep-line"></div>`;
     b.appendChild(sep);
   }
-  const div=document.createElement('div');div.className='ll '+lvl;
+  const div=document.createElement('div');
   const ts=Tc(d.t||Date.now()/1000);
-  div.innerHTML=`<span class="llt">${ts}</span><span class="llv">${H(lvl.toUpperCase().slice(0,5).padEnd(5))}</span><span class="llm">${H(d.msg||'')}</span>`;
-  if(_logFilter!=='all'&&!div.classList.contains(_logFilter))div.style.display='none';
+  const msg=d.msg||'';
+  if(lvl==='rule'){
+    // Strip leading/trailing dash chars and whitespace to extract label
+    const txt=msg.replace(/^[─━—\- ]+/,'').replace(/[─━—\- ]+$/,'').trim();
+    div.className='ll ll-sep rule';
+    div.innerHTML=`<div class="sep-line"></div>${txt?`<div class="sep-txt">${H(txt)}</div><div class="sep-line"></div>`:''}`;
+  } else if(lvl==='banner'){
+    div.className='ll banner';
+    div.innerHTML=`<span class="llm">${H(msg)}</span>`;
+  } else if(lvl==='summary'){
+    div.className='ll summary';
+    div.innerHTML=`<span class="llt">${ts}</span><span class="llm">${H(msg)}</span>`;
+  } else {
+    div.className='ll '+lvl;
+    const icon=lvl==='ok'?'✔ ':lvl==='error'?'✗ ':lvl==='warn'?'⚠ ':'';
+    div.innerHTML=`<span class="llt">${ts}</span><span class="llv">${H(lvl.toUpperCase().slice(0,5).padEnd(5))}</span><span class="llm">${icon?`<span style="opacity:.7">${icon}</span>`:''}${H(msg)}</span>`;
+  }
+  if(!structural&&_logFilter!=='all'&&!div.classList.contains(_logFilter))div.style.display='none';
   b.appendChild(div);
   if(_autoScroll)b.scrollTop=b.scrollHeight;
-  while(b.children.length>600)b.removeChild(b.firstChild);
+  while(b.children.length>800)b.removeChild(b.firstChild);
 }
 function toggleAS(){_autoScroll=!_autoScroll;$('btn-as').innerHTML='Auto-scroll '+(_autoScroll?'&#10003;':'&#10007;');}
 function openDrawer(){$('drawer').classList.add('open');$('overlay').classList.add('open');}
@@ -1218,8 +1256,21 @@ function applyHealth(d){
 function pollHealth(){
   fetch('/api/health').then(r=>r.json()).then(d=>applyHealth(d)).catch(()=>{});
 }
-// Kick off overview network widget immediately and keep it live
-setInterval(pollHealth,2500);
+function setNetInterval(ms){
+  _netInterval=ms||1000;
+  clearInterval(_netTimer);
+  _netTimer=setInterval(pollHealth,_netInterval);
+}
+// Kick off overview network widget immediately and keep it live at 1s default
+pollHealth();
+_netTimer=setInterval(pollHealth,_netInterval);
+function toggleTheme(){
+  const on=document.documentElement.classList.toggle('light');
+  $('btn-theme').innerHTML=on?'&#9788;':'&#9790;';
+  try{localStorage.setItem('tg-theme',on?'light':'dark');}catch(e){}
+}
+// Restore saved theme preference
+try{if(localStorage.getItem('tg-theme')==='light'){document.documentElement.classList.add('light');$('btn-theme').innerHTML='&#9788;';}}catch(e){}
 window.addEventListener('resize',()=>{
   if(_lastState)drawSpark(_lastState.history||[]);
   if(_lastHealth){drawDiskBars(_lastHealth.disk_read_kbps||0,_lastHealth.disk_write_kbps||0);drawNetSpark('net-spark',_netHist);drawNetSpark('h-net-spark',_hNetHist);}
