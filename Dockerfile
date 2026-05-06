@@ -80,6 +80,7 @@ RUN pip3 install --no-cache-dir --break-system-packages "pip>=26.1" && \
       fastcli \
       "flask==3.1.3" \
       "requests==2.33.1" \
+      "httpx[http3]" \
       "beautifulsoup4==4.14.3" \
       "dnspython==2.8.0" \
       "dnstwist==20250130" \
