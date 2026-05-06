@@ -204,32 +204,29 @@ else
     ok "Docker installed"
 fi
 
-# ── Container management (idempotent) ─────────────────────────────────────────
-step "Checking traffgen container"
+# ── Full cleanup and fresh start ──────────────────────────────────────────────
+step "Stopping and removing all containers"
+docker stop $(docker ps -aq) 2>/dev/null || true
+docker rm   $(docker ps -aq) 2>/dev/null || true
 
-RUNNING=$(docker ps  --filter "name=^traffgen$" --filter "status=running" -q 2>/dev/null || true)
-STOPPED=$(docker ps -a --filter "name=^traffgen$" -q 2>/dev/null || true)
+step "Pruning images, volumes, and build cache"
+docker image prune -af   2>/dev/null || true
+docker volume prune -f   2>/dev/null || true
+docker builder prune -af 2>/dev/null || true
 
-if [ -n "$RUNNING" ]; then
-    ok "traffgen is already running — nothing to do"
-else
-    if [ -n "$STOPPED" ]; then
-        echo "Removing stopped traffgen container..."
-        docker rm traffgen
-    fi
+step "Pulling latest traffgen image"
+docker pull jdibby/traffgen:latest
 
-    step "Starting traffgen container"
-    docker run \
-        --pull=always \
-        --detach \
-        --restart unless-stopped \
-        -p 7777:7777 \
-        --name traffgen \
-        jdibby/traffgen:latest \
-        --suite=all --size=XS --max-wait-secs=20 --loop
+step "Starting traffgen container"
+docker run \
+    --detach \
+    --restart unless-stopped \
+    -p 7777:7777 \
+    --name traffgen \
+    jdibby/traffgen:latest \
+    --suite=all --size=XS --max-wait-secs=20 --loop
 
-    ok "Container started"
-fi
+ok "Container started"
 
 # ── Done ──────────────────────────────────────────────────────────────────────
 echo ""
