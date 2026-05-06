@@ -355,7 +355,9 @@ def api_health():
 def _is_admin() -> bool:
     if ADMIN_TOKEN:
         return request.headers.get("X-Admin-Token", "") == ADMIN_TOKEN
-    sid = request.headers.get("X-Session-ID", "")
+    # Accept session ID from header OR query param — proxies may strip custom headers.
+    sid = (request.headers.get("X-Session-ID", "")
+           or request.args.get("sid", ""))
     if not sid:
         return False
     with _controller_lock:
@@ -1128,16 +1130,17 @@ let _isAdmin=true,_authRequired=false,_adminToken='',_sessionMode=false,_hasCont
 let _sessionId=(()=>{try{let s=sessionStorage.getItem('tg-sid');if(!s){s=crypto.randomUUID();sessionStorage.setItem('tg-sid',s);}return s;}catch(e){return '';}})();
 function _getToken(){try{return localStorage.getItem('tg-admin-token')||'';}catch(e){return '';}}
 function _setToken(t){try{if(t)localStorage.setItem('tg-admin-token',t);else localStorage.removeItem('tg-admin-token');}catch(e){}}
+function _sidQs(){return _sessionId?'?sid='+encodeURIComponent(_sessionId):'';}
 function _ctrl(body){
   const hdrs={'Content-Type':'application/json','X-Admin-Token':_adminToken};
   if(_sessionId)hdrs['X-Session-ID']=_sessionId;
-  return fetch('/api/control',{method:'POST',headers:hdrs,body:JSON.stringify(body)});
+  return fetch('/api/control'+_sidQs(),{method:'POST',headers:hdrs,body:JSON.stringify(body)});
 }
 function checkRole(){
   _adminToken=_getToken();
   const hdrs={'X-Admin-Token':_adminToken};
   if(_sessionId)hdrs['X-Session-ID']=_sessionId;
-  fetch('/api/role',{headers:hdrs}).then(r=>r.json()).then(d=>{
+  fetch('/api/role'+_sidQs(),{headers:hdrs}).then(r=>r.json()).then(d=>{
     _authRequired=d.auth_required;_sessionMode=d.session_mode||false;_hasController=d.has_controller||false;_isAdmin=d.admin;applyRoleUI();
   }).catch(()=>{});
 }
@@ -1156,7 +1159,7 @@ function closeAuthModal(){$('auth-ov').classList.remove('open');}
 function attemptAuth(){
   const t=$('auth-inp').value.trim();if(!t)return;
   const hdrs={'X-Admin-Token':t};if(_sessionId)hdrs['X-Session-ID']=_sessionId;
-  fetch('/api/role',{headers:hdrs}).then(r=>r.json()).then(d=>{
+  fetch('/api/role'+_sidQs(),{headers:hdrs}).then(r=>r.json()).then(d=>{
     if(d.admin){_adminToken=t;_setToken(t);_isAdmin=true;applyRoleUI();closeAuthModal();toast('Admin access granted',true);}
     else toast('Invalid admin token',false);
   }).catch(()=>toast('Request failed',false));
