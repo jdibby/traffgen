@@ -417,6 +417,7 @@ _WEB_STATE_LOCK  = threading.Lock()
 _WEB_LOG_LOCK    = threading.Lock()
 _WEB_LOG_COUNT   = 0
 _WEB_TEST_DURS: dict = {}   # name -> list[int] of last 10 dur_ms (not serialised)
+_bigfile_rr_idx: int  = 0  # round-robin position across bigfile() invocations
 
 
 def _web_flush() -> None:
@@ -871,11 +872,13 @@ def bgp_peering() -> None:
 
 def bigfile() -> None:
     """
-    Download a large file to /dev/null, streaming content to generate
-    sustained high-bandwidth traffic.  Multiple providers are tried in
-    random order so that IP blocks or outages at one host fall back
-    automatically to the next.
+    Download a large file to /dev/null to generate sustained high-bandwidth
+    traffic.  Providers are tried in round-robin order (rotating start position
+    across calls) so load spreads across hosts.  Connection attempts time out
+    after 3 s so a blocked IP fails over quickly.  L and XL fall back through
+    smaller files when the primary large-file hosts are unreachable.
     """
+    global _bigfile_rr_idx
     _BIGFILE_PROVIDERS: dict[str, list[str]] = {
         "XS": [
             "http://ipv4.download.thinkbroadband.com/10MB.zip",
@@ -895,25 +898,39 @@ def bigfile() -> None:
             "http://speedtest.tele2.net/1000MB.zip",
             "http://proof.ovh.net/files/1Gio.dat",
         ],
+        # L/XL: primary large-file hosts first, then 1 GB fallbacks so something
+        # always downloads even if the big-file servers block the IP.
         "L": [
             "http://ipv4.download.thinkbroadband.com/2GB.zip",
             "https://speed.cloudflare.com/__down?bytes=2147483648",
+            "http://ipv4.download.thinkbroadband.com/1GB.zip",
+            "https://speed.cloudflare.com/__down?bytes=1073741824",
+            "http://speedtest.tele2.net/1000MB.zip",
+            "http://proof.ovh.net/files/1Gio.dat",
         ],
         "XL": [
             "http://ipv4.download.thinkbroadband.com/5GB.zip",
             "https://speed.cloudflare.com/__down?bytes=5368709120",
+            "http://ipv4.download.thinkbroadband.com/2GB.zip",
+            "https://speed.cloudflare.com/__down?bytes=2147483648",
+            "http://speedtest.tele2.net/1000MB.zip",
+            "http://proof.ovh.net/files/1Gio.dat",
         ],
     }
     providers = list(_BIGFILE_PROVIDERS.get(ARGS.size, _BIGFILE_PROVIDERS["S"]))
-    random.shuffle(providers)
+    # Rotate start position for round-robin load distribution across calls.
+    idx = _bigfile_rr_idx % len(providers)
+    providers = providers[idx:] + providers[:idx]
+    _bigfile_rr_idx += 1
+
     ua = random.choice(user_agents)
-    ui_banner("Big-file Download", f"{ARGS.size} — trying {len(providers)} provider(s)")
+    ui_banner("Big-file Download", f"{ARGS.size} — {len(providers)} provider(s), round-robin")
 
     for url in providers:
         ui_info(f"Trying {url}")
         try:
             with requests.get(
-                url, stream=True, verify=False, timeout=(10, 60),
+                url, stream=True, verify=False, timeout=(3, 60),
                 headers={"User-Agent": ua},
             ) as resp:
                 if resp.status_code in (403, 429, 451):
