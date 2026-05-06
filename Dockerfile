@@ -1,7 +1,7 @@
 # ---------- Stage 1: build GoBGP ----------
 # golang:1.23-bookworm already ships git, build-essential, and ca-certificates
 # so no extra apt install is needed in this stage.
-FROM golang:1.23-bookworm AS gobgp-build
+FROM golang:1.24-bookworm AS gobgp-build
 
 ARG GOBGP_VERSION=v3.36.0
 
@@ -18,7 +18,8 @@ FROM debian:bookworm-slim AS msf-build
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Build-time toolchain only — nothing from this layer ships to runtime
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get upgrade -y --no-install-recommends && \
+    apt-get install -y --no-install-recommends \
     ca-certificates git ruby-full build-essential pkg-config \
     libssl-dev libffi-dev libpcap-dev libreadline-dev zlib1g-dev \
     libxml2-dev libxslt1-dev libyaml-dev libpq-dev sqlite3 libsqlite3-dev \
@@ -86,7 +87,8 @@ ENV BUNDLE_PATH=/opt/metasploit-framework/vendor/bundle
 ENV BUNDLE_WITHOUT=development:test
 
 # Core runtime deps only — no dev headers, no build tools
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get upgrade -y --no-install-recommends && \
+    apt-get install -y --no-install-recommends \
     tzdata ca-certificates curl git \
     iproute2 traceroute iputils-ping netcat-openbsd dnsutils openssh-client \
     nmap snmp openssl procps \
@@ -109,12 +111,12 @@ RUN gem install --no-document bundler
 # Python packages — versions pinned for reproducibility
 RUN pip3 install --no-cache-dir --break-system-packages \
       fastcli \
-      "flask==3.0.3" \
-      "requests==2.32.2" \
-      "beautifulsoup4==4.12.3" \
-      "dnspython==2.6.1" \
+      "flask==3.1.3" \
+      "requests==2.33.1" \
+      "beautifulsoup4==4.14.3" \
+      "dnspython==2.8.0" \
       "dnstwist==20250130" \
-      "rich==13.7.1" && \
+      "rich==15.0.0" && \
     find /usr -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 
 # Remove static/libtool artefacts BEFORE copying Metasploit so the find
