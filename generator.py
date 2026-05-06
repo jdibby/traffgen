@@ -2604,7 +2604,7 @@ def parse_cli() -> argparse.Namespace:
 # ENTRY POINT
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _start_heartbeat(path: str = "/tmp/traffgen.health", interval: int = 15) -> None:
+def _start_heartbeat(path: str = "/tmp/traffgen.health", interval: int = 2) -> None:
     """Write a Unix timestamp to *path* every *interval* seconds.
 
     The Docker healthcheck reads this file and fails if it is stale, giving a
@@ -2612,7 +2612,6 @@ def _start_heartbeat(path: str = "/tmp/traffgen.health", interval: int = 15) -> 
     """
     def _loop() -> None:
         tmp = path + ".tmp"
-        last_cmd_mtime = -1.0
         while True:
             # Health heartbeat
             try:
@@ -2630,21 +2629,16 @@ def _start_heartbeat(path: str = "/tmp/traffgen.health", interval: int = 15) -> 
                 _web_flush()
                 sys.exit(0)
 
-            # Web control command detection
+            # Web control: consume command file if present, then execv
             try:
-                mtime = os.path.getmtime(_WEB_CMD_FILE)
-                if last_cmd_mtime < 0:
-                    # First check: record current mtime, don't act on existing file
-                    last_cmd_mtime = mtime
-                elif mtime > last_cmd_mtime:
+                if os.path.exists(_WEB_CMD_FILE):
                     with open(_WEB_CMD_FILE) as f:
                         cmd = json.load(f)
+                    os.remove(_WEB_CMD_FILE)   # consume so we don't re-trigger
                     new_argv = _argv_from_cmd(cmd)
                     _web_log(f"Applying new settings: {cmd}", level="info")
                     time.sleep(0.3)  # let log line flush
                     os.execv(sys.executable, [sys.executable] + new_argv)
-            except FileNotFoundError:
-                last_cmd_mtime = -1.0
             except Exception:
                 pass
 
@@ -2677,6 +2671,13 @@ if __name__ == "__main__":
             f"suite={ARGS.suite} size={ARGS.size}",
             level="info",
         )
+
+        # Clear any stale command file from a previous run so the first
+        # heartbeat tick doesn't immediately execv with old settings.
+        try:
+            os.remove(_WEB_CMD_FILE)
+        except FileNotFoundError:
+            pass
 
         _start_heartbeat()
         WATCHDOG  = Watchdog(timeout_seconds=600)
