@@ -234,7 +234,7 @@ def _read_state() -> dict:
     except Exception:
         return {
             "version": "—", "started_at": time.time(), "suite": "all",
-            "size": "XS", "loop": True, "max_wait_secs": 20,
+            "size": "S", "loop": True, "max_wait_secs": 20,
             "current_test": "", "iteration": 0,
             "status": "starting", "test_started_at": 0.0,
             "tests": {}, "suites": [],
@@ -338,7 +338,7 @@ def api_control():
     if suite not in known:
         return jsonify({"error": f"Unknown suite: {suite}"}), 400
 
-    size = str(d.get("size", "XS"))
+    size = str(d.get("size", "S"))
     if size not in _VALID_SIZES:
         return jsonify({"error": f"Invalid size: {size}"}), 400
 
@@ -839,7 +839,7 @@ html.light .obody .ll:hover{background:rgba(0,0,0,.04)}html.light .cmd-blk{backg
         <div class="cmd-blk"><span class="cmt"># Run all suites in a continuous loop with web dashboard</span>
 docker run --pull=always --detach --restart unless-stopped \
   <span class="flg">-p 7777:7777</span> --name traffgen jdibby/traffgen:latest \
-  --suite=all --size=XS --max-wait-secs=20 --loop
+  --suite=all --size=S --max-wait-secs=20 --loop
 
 <span class="cmt"># One-command install on fresh host (Ubuntu / Debian / Rocky / Raspberry Pi)</span>
 sudo bash &lt; &lt;(curl -s https://raw.githubusercontent.com/jdibby/traffgen/refs/heads/main/stager.sh)
@@ -1078,7 +1078,7 @@ function apply(s){
   if(!$('drawer').classList.contains('open')){
     const sel=$('cfg-suite');
     if(sel.options.length<=1&&suites.length){suites.forEach(su=>{const o=document.createElement('option');o.value=su.name;o.textContent=su.name+' — '+su.description;sel.appendChild(o);});}
-    sel.value=s.suite||'all';$('cfg-size').value=s.size||'XS';$('cfg-wait').value=s.max_wait_secs||20;$('wait-val').textContent=(s.max_wait_secs||20)+'s';$('cfg-loop').checked=!!s.loop;
+    sel.value=s.suite||'all';$('cfg-size').value=s.size||'S';$('cfg-wait').value=s.max_wait_secs||20;$('wait-val').textContent=(s.max_wait_secs||20)+'s';$('cfg-loop').checked=!!s.loop;
   }
   $('cur-cfg').innerHTML=`<span class="cfg-chip">suite:${H(s.suite||'—')}</span><span class="cfg-chip">size:${H(s.size||'—')}</span><span class="cfg-chip">wait:${s.max_wait_secs||20}s</span><span class="cfg-chip">${s.loop?'loop':'single'}</span>`;
 }
@@ -1167,7 +1167,7 @@ function openModal(name,desc){
   const td=(_lastState&&_lastState.tests&&_lastState.tests[name])||{};
   const ta=td.attempts||0,tok=td.ok||0,tf=td.fail||0;
   $('ms-att').textContent=ta?N(ta):'—';$('ms-ok').textContent=tok?N(tok):'—';$('ms-fail').textContent=tf?N(tf):'—';
-  if(_lastState){$('modal-size').value=_lastState.size||'XS';$('modal-wait').value=_lastState.max_wait_secs||20;$('modal-wv').textContent=($('modal-wait').value)+'s';$('modal-loop').checked=!!_lastState.loop;}
+  if(_lastState){$('modal-size').value=_lastState.size||'S';$('modal-wait').value=_lastState.max_wait_secs||20;$('modal-wv').textContent=($('modal-wait').value)+'s';$('modal-loop').checked=!!_lastState.loop;}
   $('modal-ov').classList.add('open');
 }
 function closeModal(){$('modal-ov').classList.remove('open');_modalSuite=null;}
