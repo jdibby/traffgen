@@ -46,6 +46,22 @@ sudo bash < <(curl -s https://raw.githubusercontent.com/jdibby/traffgen/refs/hea
 
 ---
 
+## 🖥️ Web Dashboard
+
+Add `-p 7777:7777` to expose a live HTTPS monitoring dashboard at `https://<host>:7777`.
+
+```bash
+docker run --pull=always --detach --restart unless-stopped \
+  -p 7777:7777 --name traffgen jdibby/traffgen:latest \
+  --suite=all --size=XS --max-wait-secs=20 --loop
+```
+
+The dashboard includes an Overview page with live network I/O, a Health tab with CPU/memory gauges and top-processes, a CLI-style Output log, and controls to pause, stop, or change settings without restarting the container.
+
+> **Full documentation:** [docs/web-dashboard.md](docs/web-dashboard.md)
+
+---
+
 ## 🎛️ CLI Reference
 
 | Flag | Values | Default | Description |

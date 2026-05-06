@@ -24,6 +24,7 @@ Usage (Docker default):
 import os
 import sys
 import ssl
+import json
 import time
 import base64
 import signal
@@ -657,6 +658,8 @@ def _run_guarded(func) -> None:
         ui_error(f"[{func.__name__}] {exc_box[0]}")
 
     _stats.print_summary()
+    dur_ms = int((time.time() - t0) * 1000)
+    run_ok = not exc_box and not t.is_alive()
     _web_record(func.__name__, run_ok, dur_ms, _stats.responses, dict(_stats.codes))
     _web_log(
         f"{func.__name__}: {_stats.attempts} attempts, "

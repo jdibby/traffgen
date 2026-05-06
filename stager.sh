@@ -1,176 +1,245 @@
 #!/bin/bash
-# stager.sh — Installs Docker and starts the traffgen container on a fresh host.
-# Supports: Ubuntu, Debian, Raspbian (Raspberry Pi 4/5), and Rocky Linux.
-# Usage: sudo bash < <(curl -s https://raw.githubusercontent.com/jdibby/traffgen/refs/heads/main/stager.sh)
+# stager.sh — Installs Docker and starts the traffgen container.
+#
+# Idempotent: skips Docker install if already running, skips container
+# start if already running under the name "traffgen".
+#
+# Supported distros:
+#   Debian family : Ubuntu, Debian, Linux Mint, Pop!_OS
+#   Raspberry Pi  : Raspbian (Pi 4 ARMv7 / Pi 5 arm64)
+#   RHEL family   : Rocky Linux, AlmaLinux, CentOS Stream, RHEL, Fedora
+#   Amazon Linux  : Amazon Linux 2 and Amazon Linux 2023
+#
+# Usage:
+#   sudo bash < <(curl -s https://raw.githubusercontent.com/jdibby/traffgen/refs/heads/main/stager.sh)
 
 set -euo pipefail
 
 # ── Privilege check ───────────────────────────────────────────────────────────
-if [ "$(whoami)" != "root" ]; then
-    echo "ERROR: This script must be run as root (or via sudo)."
+if [ "$(id -u)" -ne 0 ]; then
+    echo "ERROR: Run as root or via sudo." >&2
     exit 1
 fi
 
-# ── Environment setup ─────────────────────────────────────────────────────────
-export DEBIAN_FRONTEND=noninteractive   # suppress interactive apt prompts
-export NEEDRESTART_MODE=a               # auto-restart services without asking
+# ── Terminal helpers ──────────────────────────────────────────────────────────
+if [ -t 1 ]; then
+    BOLD=$(tput bold 2>/dev/null || printf '')
+    GREEN=$(tput setaf 2 2>/dev/null || printf '')
+    CYAN=$(tput setaf 6 2>/dev/null || printf '')
+    RESET=$(tput sgr0 2>/dev/null || printf '')
+else
+    BOLD=''; GREEN=''; CYAN=''; RESET=''
+fi
 
-BOLD=$(tput bold 2>/dev/null || true)
-NORMAL=$(tput sgr0 2>/dev/null || true)
+step() { echo ""; echo "${BOLD}${CYAN}▶ $*${RESET}"; }
+ok()   { echo "${GREEN}✔ $*${RESET}"; }
 
 # ── OS detection ──────────────────────────────────────────────────────────────
-echo ""
-echo "${BOLD}### DETECTING OPERATING SYSTEM ###${NORMAL}"
-echo ""
+step "Detecting operating system"
 
-RPIVER=""
+ID=""
+ID_LIKE=""
+VERSION_CODENAME=""
+PRETTY_NAME=""
+VERSION_ID=""
+
+[ -f /etc/os-release ] && . /etc/os-release
+
+# Raspberry Pi model check
+RPIVER=0
 if [ -f /proc/device-tree/model ]; then
-    # Extract the Raspberry Pi generation number (4 or 5) from the device tree
-    RPIVER=$(grep -a "Raspberry" /proc/device-tree/model 2>/dev/null | awk '{print $3}' || true)
+    MODEL=$(cat /proc/device-tree/model 2>/dev/null || true)
+    case "$MODEL" in
+        *"Raspberry Pi 5"*) RPIVER=5 ;;
+        *"Raspberry Pi 4"*) RPIVER=4 ;;
+        *"Raspberry Pi"*)   RPIVER=3 ;;
+    esac
 fi
 
-UBUNTU=0; ROCKY=0; RASPBIAN=0; DEBIAN=0
+# Normalise ID_LIKE to space-separated lowercase
+ID_LIKE_LOWER=$(echo "${ID_LIKE:-}" | tr '[:upper:]' '[:lower:]')
 
-if [ -f /etc/os-release ]; then
-    UBUNTU=$(grep -c  'NAME="Ubuntu"'      /etc/os-release || true)
-    ROCKY=$(grep  -ci 'NAME="Rocky Linux"' /etc/os-release || true)
-    RASPBIAN=$(grep -c 'ID=raspbian'       /etc/os-release || true)
-    DEBIAN=$(grep  -c '^ID=debian$'        /etc/os-release || true)
-    # Raspbian ships with both ID=raspbian and ID_LIKE=debian; treat it as
-    # Raspbian only so it gets the correct Docker repo below.
-    [ "$RASPBIAN" -gt 0 ] && DEBIAN=0
-fi
+is_like() {
+    # Returns 0 if $ID or $ID_LIKE contains the given string
+    local needle="$1"
+    [ "${ID:-}" = "$needle" ] && return 0
+    echo "$ID_LIKE_LOWER" | grep -qw "$needle" && return 0
+    return 1
+}
 
-if   [ "$RASPBIAN" -gt 0 ]; then OS_LABEL="Raspbian"
-elif [ "$DEBIAN"   -gt 0 ]; then OS_LABEL="Debian"
-elif [ "$UBUNTU"   -gt 0 ]; then OS_LABEL="Ubuntu"
-elif [ "$ROCKY"    -gt 0 ]; then OS_LABEL="Rocky Linux"
-else
-    echo "ERROR: Unsupported operating system. Exiting."
-    exit 1
-fi
+PKG_FAMILY=""  # "deb", "rpm-rhel", or "rpm-amzn"
 
-echo "Detected: ${BOLD}${OS_LABEL}${NORMAL}"
-
-# ── System update ─────────────────────────────────────────────────────────────
-echo ""
-echo "${BOLD}### UPDATING SYSTEM PACKAGES ###${NORMAL}"
-if [ "$ROCKY" -gt 0 ]; then
-    dnf update -y && dnf upgrade -y
-else
-    apt-get update -y && apt-get upgrade -y && apt-get autoremove -y && apt-get clean -y
-fi
-
-# ── Remove any existing Docker installation ───────────────────────────────────
-echo ""
-echo "${BOLD}### REMOVING EXISTING DOCKER INSTALLATIONS AND CONTAINERS ###${NORMAL}"
-
-if [ "$ROCKY" -gt 0 ]; then
-    dnf remove -y docker-ce docker-ce-cli containerd.io 2>/dev/null || true
-    rm -rf /var/lib/docker /var/lib/containerd
-else
-    # Stop and remove all running containers before removing packages
-    docker stop  "$(docker ps -aq)" 2>/dev/null || true
-    docker rm    "$(docker ps -aq)" 2>/dev/null || true
-    docker images -q | xargs -r docker rmi -f    2>/dev/null || true
-
-    for pkg in docker.io docker-doc docker-compose docker-compose-v2 \
-               podman-docker containerd runc; do
-        apt-get remove -y "$pkg" 2>/dev/null || true
-    done
-fi
-
-# ── Install Docker ────────────────────────────────────────────────────────────
-echo ""
-echo "${BOLD}### INSTALLING DOCKER ###${NORMAL}"
-
-if [ "$ROCKY" -gt 0 ]; then
-    # Rocky Linux uses the CentOS Docker repo
-    dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
-    dnf update -y
-    dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-    systemctl enable --now docker
-else
-    # Debian-family: deduplicate APT sources, then install via the official Docker repo
-
-    # Remove duplicate/blank/comment-only lines from all APT source files.
-    # Processes /etc/apt/sources.list and every *.list in sources.list.d/.
-    # Uses only awk — no third-party tools required.
-    _cleanup_apt_sources() {
-        local f
-        local _dedup='
-            /^[[:space:]]*$/  { next }
-            /^[[:space:]]*#/  { next }
-            !seen[$0]++
-        '
-        if [ -f /etc/apt/sources.list ]; then
-            awk "$_dedup" /etc/apt/sources.list > /tmp/_apt_src_clean \
-                && mv /tmp/_apt_src_clean /etc/apt/sources.list
+case "${ID:-}" in
+    raspbian)
+        PKG_FAMILY="deb"
+        OS_LABEL="Raspbian (Pi ${RPIVER})"
+        ;;
+    ubuntu|linuxmint|pop)
+        PKG_FAMILY="deb"
+        OS_LABEL="${PRETTY_NAME:-Ubuntu-family}"
+        ;;
+    debian)
+        PKG_FAMILY="deb"
+        OS_LABEL="${PRETTY_NAME:-Debian}"
+        ;;
+    amzn)
+        PKG_FAMILY="rpm-amzn"
+        OS_LABEL="Amazon Linux ${VERSION_ID:-}"
+        ;;
+    fedora|rhel|rocky|almalinux|centos)
+        PKG_FAMILY="rpm-rhel"
+        OS_LABEL="${PRETTY_NAME:-RHEL-family}"
+        ;;
+    *)
+        # Fallback: try ID_LIKE
+        if is_like "debian" || is_like "ubuntu"; then
+            PKG_FAMILY="deb"
+            OS_LABEL="${PRETTY_NAME:-Debian-like}"
+        elif is_like "rhel" || is_like "fedora"; then
+            PKG_FAMILY="rpm-rhel"
+            OS_LABEL="${PRETTY_NAME:-RHEL-like}"
+        else
+            echo "ERROR: Unsupported OS (ID=${ID:-unknown}). Open an issue at https://github.com/jdibby/traffgen" >&2
+            exit 1
         fi
-        for f in /etc/apt/sources.list.d/*.list; do
-            [ -f "$f" ] || continue
-            awk "$_dedup" "$f" > /tmp/_apt_src_clean \
-                && mv /tmp/_apt_src_clean "$f"
-            [ -s "$f" ] || rm -f "$f"
-        done
-    }
-    _cleanup_apt_sources
+        ;;
+esac
 
-    # Install prerequisites for adding the Docker GPG key
-    apt-get install -y ca-certificates curl gnupg lsb-release
-    install -m 0755 -d /etc/apt/keyrings
+ok "Detected: ${OS_LABEL}"
 
-    ARCH=$(dpkg --print-architecture)
-    CODENAME=$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)
+# ── Docker install (idempotent) ───────────────────────────────────────────────
+step "Checking Docker"
 
-    # Select the correct Docker GPG key and repo URL for each distro variant
-    if [ "$RASPBIAN" -gt 0 ] && [ "${RPIVER:-0}" -eq 5 ]; then
-        # Raspberry Pi 5 runs a 64-bit Debian kernel — use the Debian repo
-        DOCKER_GPG="https://download.docker.com/linux/debian/gpg"
-        DOCKER_REPO="https://download.docker.com/linux/debian"
-    elif [ "$RASPBIAN" -gt 0 ]; then
-        # Raspberry Pi 4 (ARMv7) uses the dedicated Raspbian repo
-        DOCKER_GPG="https://download.docker.com/linux/raspbian/gpg"
-        DOCKER_REPO="https://download.docker.com/linux/raspbian"
-    elif [ "$UBUNTU" -gt 0 ]; then
-        DOCKER_GPG="https://download.docker.com/linux/ubuntu/gpg"
-        DOCKER_REPO="https://download.docker.com/linux/ubuntu"
-    else
-        # Pure Debian
-        DOCKER_GPG="https://download.docker.com/linux/debian/gpg"
-        DOCKER_REPO="https://download.docker.com/linux/debian"
+if docker info &>/dev/null 2>&1; then
+    ok "Docker is already running — skipping install"
+else
+    step "Installing Docker"
+
+    case "$PKG_FAMILY" in
+
+        deb)
+            export DEBIAN_FRONTEND=noninteractive
+            export NEEDRESTART_MODE=a
+
+            # Minimal APT source deduplication to avoid 'duplicate' warnings
+            _dedup_apt() {
+                local _awk='/^[[:space:]]*$/{next}/^[[:space:]]*#/{next}!seen[$0]++'
+                [ -f /etc/apt/sources.list ] && \
+                    awk "$_awk" /etc/apt/sources.list > /tmp/_src && \
+                    mv /tmp/_src /etc/apt/sources.list
+                for f in /etc/apt/sources.list.d/*.list; do
+                    [ -f "$f" ] || continue
+                    awk "$_awk" "$f" > /tmp/_src && mv /tmp/_src "$f"
+                    [ -s "$f" ] || rm -f "$f"
+                done
+            }
+            _dedup_apt
+
+            apt-get -qq update
+            apt-get -qq install -y ca-certificates curl gnupg lsb-release
+
+            install -m 0755 -d /etc/apt/keyrings
+
+            ARCH=$(dpkg --print-architecture)
+            # VERSION_CODENAME and UBUNTU_CODENAME are already set from the . /etc/os-release above.
+            # UBUNTU_CODENAME is the fallback for Mint/Pop!_OS which set it but not VERSION_CODENAME.
+            CODENAME="${VERSION_CODENAME:-${UBUNTU_CODENAME:-}}"
+
+            if [ "${ID:-}" = "raspbian" ] && [ "$RPIVER" -ge 5 ]; then
+                DOCKER_GPG="https://download.docker.com/linux/debian/gpg"
+                DOCKER_REPO="https://download.docker.com/linux/debian"
+            elif [ "${ID:-}" = "raspbian" ]; then
+                DOCKER_GPG="https://download.docker.com/linux/raspbian/gpg"
+                DOCKER_REPO="https://download.docker.com/linux/raspbian"
+            elif is_like "ubuntu" || [ "${ID:-}" = "ubuntu" ]; then
+                DOCKER_GPG="https://download.docker.com/linux/ubuntu/gpg"
+                DOCKER_REPO="https://download.docker.com/linux/ubuntu"
+            else
+                DOCKER_GPG="https://download.docker.com/linux/debian/gpg"
+                DOCKER_REPO="https://download.docker.com/linux/debian"
+            fi
+
+            curl -fsSL "$DOCKER_GPG" -o /etc/apt/keyrings/docker.asc
+            chmod a+r /etc/apt/keyrings/docker.asc
+            echo "deb [arch=${ARCH} signed-by=/etc/apt/keyrings/docker.asc] ${DOCKER_REPO} ${CODENAME} stable" \
+                > /etc/apt/sources.list.d/docker.list
+
+            apt-get -qq update
+            apt-get -qq install -y docker-ce docker-ce-cli containerd.io \
+                                   docker-buildx-plugin docker-compose-plugin
+            systemctl enable --now docker
+            ;;
+
+        rpm-rhel)
+            # Fedora uses dnf directly; others need the Docker CE repo
+            if [ "${ID:-}" = "fedora" ]; then
+                dnf -y -q install dnf-plugins-core
+                dnf config-manager --add-repo \
+                    https://download.docker.com/linux/fedora/docker-ce.repo
+            else
+                dnf -y -q install dnf-plugins-core
+                dnf config-manager --add-repo \
+                    https://download.docker.com/linux/centos/docker-ce.repo
+            fi
+            dnf -y -q install docker-ce docker-ce-cli containerd.io \
+                              docker-buildx-plugin docker-compose-plugin
+            systemctl enable --now docker
+            ;;
+
+        rpm-amzn)
+            if [ "${VERSION_ID:-}" = "2" ]; then
+                # Amazon Linux 2
+                amazon-linux-extras enable docker
+                yum -y -q install docker
+            else
+                # Amazon Linux 2023
+                dnf -y -q install docker
+            fi
+            systemctl enable --now docker
+            # Add ec2-user to docker group if present
+            id ec2-user &>/dev/null && usermod -aG docker ec2-user || true
+            ;;
+    esac
+
+    ok "Docker installed"
+fi
+
+# ── Container management (idempotent) ─────────────────────────────────────────
+step "Checking traffgen container"
+
+RUNNING=$(docker ps  --filter "name=^traffgen$" --filter "status=running" -q 2>/dev/null || true)
+STOPPED=$(docker ps -a --filter "name=^traffgen$" -q 2>/dev/null || true)
+
+if [ -n "$RUNNING" ]; then
+    ok "traffgen is already running — nothing to do"
+else
+    if [ -n "$STOPPED" ]; then
+        echo "Removing stopped traffgen container..."
+        docker rm traffgen
     fi
 
-    curl -fsSL "$DOCKER_GPG" -o /etc/apt/keyrings/docker.asc
-    chmod a+r /etc/apt/keyrings/docker.asc
-    echo "deb [arch=${ARCH} signed-by=/etc/apt/keyrings/docker.asc] ${DOCKER_REPO} ${CODENAME} stable" \
-        > /etc/apt/sources.list.d/docker.list
+    step "Starting traffgen container"
+    docker run \
+        --pull=always \
+        --detach \
+        --restart unless-stopped \
+        -p 7777:7777 \
+        --name traffgen \
+        jdibby/traffgen:latest \
+        --suite=all --size=XS --max-wait-secs=20 --loop
 
-    apt-get update -y
-    apt-get install -y docker-ce docker-ce-cli containerd.io \
-                       docker-buildx-plugin docker-compose-plugin
-
-    # Restart Docker and prune any leftover images/volumes from prior installs
-    systemctl restart docker
-    docker system prune -f
+    ok "Container started"
 fi
 
+# ── Done ──────────────────────────────────────────────────────────────────────
 echo ""
-echo "${BOLD}### DOCKER INSTALLATION COMPLETE ###${NORMAL}"
-
-# ── Start traffgen container ──────────────────────────────────────────────────
+echo "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+echo "${BOLD}  Install complete${RESET}"
 echo ""
-echo "${BOLD}### STARTING TRAFFGEN CONTAINER ###${NORMAL}"
-docker run \
-    --pull=always \
-    --detach \
-    --restart unless-stopped \
-    -p 7777:7777 \
-    jdibby/traffgen:latest \
-    --suite=all --size=XS --max-wait-secs=20 --loop
-
+docker ps --filter "name=^traffgen$" --format "  Container : {{.Names}}  ({{.Status}})"
+HOST_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")
 echo ""
-echo "${BOLD}### INSTALL COMPLETE ###${NORMAL}"
-echo ""
-docker ps -a --format "table {{.ID}}\t{{.Image}}\t{{.Names}}\t{{.Status}}"
+echo "  ${BOLD}Web dashboard : ${GREEN}https://${HOST_IP}:7777${RESET}"
+echo "  (Accept the self-signed certificate warning in your browser)"
+echo "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
 echo ""
