@@ -3,7 +3,7 @@ set -e
 
 cat <<'DISCLAIMER'
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                          ⚠  DISCLAIMER  ⚠                              │
+│                             ! DISCLAIMER !                              │
 │                                                                         │
 │  This tool is intended for AUTHORIZED SECURITY TESTING AND RESEARCH     │
 │  in controlled lab environments only.                                   │
