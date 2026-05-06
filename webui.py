@@ -1394,6 +1394,37 @@ wireTip('h-net-spark',10,6,()=>_hNetHist,p=>[
 ]);
 checkRole();
 connect();
+
+// ── Disclaimer modal (shown once per browser session) ─────────────────────
+(function(){
+  if(sessionStorage.getItem('disclaimer_ack'))return;
+  const overlay=document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:20px';
+  overlay.innerHTML=`
+<div style="background:var(--surf);border:1px solid var(--amber);border-radius:8px;max-width:540px;width:100%;padding:28px 32px;box-shadow:0 8px 40px rgba(0,0,0,.6)">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+    <span style="font-size:22px">⚠</span>
+    <span style="font-size:16px;font-weight:700;color:var(--amber)">Disclaimer</span>
+  </div>
+  <p style="color:var(--text);line-height:1.65;margin-bottom:12px">
+    This tool is intended for <strong>authorized security testing and research
+    in controlled lab environments only</strong>.
+  </p>
+  <ul style="color:var(--text);line-height:1.65;padding-left:18px;margin-bottom:20px">
+    <li style="margin-bottom:6px">You are solely responsible for obtaining explicit written permission before testing any systems or networks.</li>
+    <li style="margin-bottom:6px">The author(s) accept <strong>no liability</strong> for misuse, unauthorized access, damage, data loss, or legal consequences arising from use of this tool.</li>
+    <li>Use of this software constitutes acceptance of these terms.</li>
+  </ul>
+  <button id="disclaimer-ack" style="width:100%;padding:10px;background:var(--amber);color:#000;font-weight:700;font-size:13px;border:none;border-radius:6px;cursor:pointer">
+    I Understand — Continue
+  </button>
+</div>`;
+  document.body.appendChild(overlay);
+  document.getElementById('disclaimer-ack').addEventListener('click',function(){
+    sessionStorage.setItem('disclaimer_ack','1');
+    overlay.remove();
+  });
+})();
 </script>
 </body></html>"""
 _LOG_HTML = """<!DOCTYPE html>

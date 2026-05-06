@@ -15,6 +15,22 @@
 
 set -euo pipefail
 
+cat <<'DISCLAIMER'
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          ⚠  DISCLAIMER  ⚠                              │
+│                                                                         │
+│  This tool is intended for AUTHORIZED SECURITY TESTING AND RESEARCH     │
+│  in controlled lab environments only.                                   │
+│                                                                         │
+│  • You are solely responsible for obtaining explicit written            │
+│    permission before testing any systems or networks.                   │
+│  • The author(s) accept NO liability for misuse, unauthorized access,   │
+│    damage, data loss, or legal consequences arising from use of this    │
+│    tool.                                                                │
+│  • Use of this software constitutes acceptance of these terms.          │
+└─────────────────────────────────────────────────────────────────────────┘
+DISCLAIMER
+
 # ── Privilege check ───────────────────────────────────────────────────────────
 if [ "$(id -u)" -ne 0 ]; then
     echo "ERROR: Run as root or via sudo." >&2

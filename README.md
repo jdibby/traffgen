@@ -13,6 +13,16 @@ Runs as a Docker container with a built-in watchdog, per-test timeout guard, and
 
 ---
 
+## ⚠ Disclaimer
+
+This tool is intended for **authorized security testing and research in controlled lab environments only**.
+
+- You are solely responsible for obtaining explicit written permission before testing any systems or networks.
+- The author(s) accept **no liability** for misuse, unauthorized access, damage, data loss, or legal consequences arising from use of this tool.
+- Use of this software constitutes acceptance of these terms.
+
+---
+
 ## ⚡ Quick Start
 
 ```bash
