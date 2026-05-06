@@ -922,7 +922,7 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
         <div class="field" style="margin-bottom:10px"><label>Max Wait</label>
           <div class="rngw"><input type="range" id="modal-wait" min="5" max="300" step="5" value="20" oninput="$('modal-wv').textContent=this.value+'s'"><span class="rngv" id="modal-wv">20s</span></div>
         </div>
-        <div class="field"><div class="togrow"><span class="toglbl">Loop Mode</span><label class="tog"><input type="checkbox" id="modal-loop" checked><span class="tslider"></span></label></div></div>
+        <div class="field"><div class="togrow"><span class="toglbl">Loop Mode</span><label class="tog"><input type="checkbox" id="modal-loop"><span class="tslider"></span></label></div></div>
       </div>
     </div>
     <div class="modal-ftr">
