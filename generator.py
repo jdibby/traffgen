@@ -406,7 +406,7 @@ _WEB_STATE: dict = {
     "test_started_at": 0.0,
     "tests": {}, "suites": [],
     "totals": {"attempts": 0, "ok": 0, "fail": 0},
-    "history": [], "events": [],
+    "history": [{"t": int(__import__("time").time()), "ok": 0, "fail": 0}], "events": [],
     "_history_last_t": 0.0,
 }
 _WEB_STATE_LOCK  = threading.Lock()
@@ -478,12 +478,12 @@ def _web_record(name: str, ok: bool, dur_ms: int,
             _WEB_STATE["events"] = _WEB_STATE["events"][-100:]
 
         now = time.time()
-        if now - _WEB_STATE["_history_last_t"] >= 30:
+        if now - _WEB_STATE["_history_last_t"] >= 5:
             _WEB_STATE["history"].append(
                 {"t": int(now), "ok": tot["ok"], "fail": tot["fail"]}
             )
-            if len(_WEB_STATE["history"]) > 60:
-                _WEB_STATE["history"] = _WEB_STATE["history"][-60:]
+            if len(_WEB_STATE["history"]) > 120:
+                _WEB_STATE["history"] = _WEB_STATE["history"][-120:]
             _WEB_STATE["_history_last_t"] = now
 
         _web_flush()
