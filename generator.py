@@ -1980,36 +1980,92 @@ def dot_random() -> None:
 
 def http3_random() -> None:
     """
-    HTTP/3 (QUIC) HEAD requests via the httpx library (aioquic backend).
+    HTTP/3 (QUIC) HEAD requests via aioquic — native Python QUIC stack.
 
-    Uses native Python QUIC negotiation — no dependency on a curl build with
-    HTTP/3 compiled in.  Each request attempts HTTP/3 first; httpx falls back
-    to HTTP/2 or HTTP/1.1 if the server does not advertise h3 via Alt-Svc.
-    Validates whether the firewall's QUIC inspection layer handles UDP/443.
+    Establishes a real QUIC (UDP/443) connection to each endpoint and sends
+    an HTTP/3 HEAD request.  No dependency on curl build flags.  Validates
+    whether the firewall's QUIC inspection layer handles UDP/443 traffic.
     """
     import asyncio
+    import ssl as _ssl
     try:
-        import httpx
+        from aioquic.asyncio import connect as quic_connect
+        from aioquic.h3.connection import H3_ALPN, H3Connection
+        from aioquic.h3.events import HeadersReceived
+        from aioquic.quic.configuration import QuicConfiguration
+        from aioquic.asyncio.protocol import QuicConnectionProtocol
     except ImportError:
-        ui_warn("httpx not installed — skipping HTTP/3 test")
+        ui_warn("aioquic not installed — skipping HTTP/3 test")
         return
 
     n = _size_to_limits(ARGS.size, 5, 10, 20, len(https_endpoints))
     ui_banner("HTTP/3 (QUIC)", f"HEAD requests to {n} endpoints")
 
-    async def _probe(client: "httpx.AsyncClient", url: str, ua: str, idx: int) -> None:
+    class _H3Client(QuicConnectionProtocol):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._h3: H3Connection | None = None
+            self._status: str | None = None
+            self._done = asyncio.Event()
+
+        def quic_event_received(self, event) -> None:
+            if self._h3:
+                for h3ev in self._h3.handle_event(event):
+                    if isinstance(h3ev, HeadersReceived):
+                        for k, v in h3ev.headers:
+                            if k == b":status":
+                                self._status = v.decode()
+                        self._done.set()
+
+        async def head(self, url: str, ua: str) -> str | None:
+            from urllib.parse import urlparse
+            p = urlparse(url)
+            self._h3 = H3Connection(self._quic, enable_webtransport=False)
+            sid = self._quic.get_next_available_stream_id()
+            self._h3.send_headers(
+                stream_id=sid,
+                headers=[
+                    (b":method", b"HEAD"),
+                    (b":scheme", b"https"),
+                    (b":authority", (p.hostname or "").encode()),
+                    (b":path", (p.path or "/").encode()),
+                    (b"user-agent", ua.encode()),
+                ],
+                end_stream=True,
+            )
+            self.transmit()
+            try:
+                await asyncio.wait_for(self._done.wait(), timeout=5.0)
+            except asyncio.TimeoutError:
+                return None
+            return self._status
+
+    async def _probe(url: str, ua: str, idx: int) -> None:
+        from urllib.parse import urlparse
+        p = urlparse(url)
+        host = p.hostname or url
+        port = p.port or 443
+        cfg = QuicConfiguration(
+            alpn_protocols=H3_ALPN,
+            is_client=True,
+            verify_mode=_ssl.CERT_NONE,
+            server_name=host,
+        )
         try:
-            r = await client.head(url, headers={"User-Agent": ua})
-            code = str(r.status_code)
+            async with quic_connect(
+                host, port, configuration=cfg,
+                create_protocol=_H3Client,
+            ) as proto:
+                status = await proto.head(url, ua)
+            code = status or "000"
             console.log(f"HTTP3 ({idx}/{n}) {url}  → [{_status_style(code)}]{code}[/]")
             _stats.record(code)
-        except httpx.TimeoutException:
+        except asyncio.TimeoutError:
             console.log(f"[yellow]HTTP3 ({idx}/{n}) {url}  → timeout[/]")
             _stats.drop()
-        except httpx.ConnectError as e:
-            msg = str(e).lower()
+        except OSError as e:
             console.log(f"[yellow]HTTP3 ({idx}/{n}) {url}  → {e.__class__.__name__}[/]")
-            if "refused" in msg or "rst" in msg or "reset" in msg:
+            if "refused" in str(e).lower() or "rst" in str(e).lower():
                 _stats.block()
             else:
                 _stats.drop()
@@ -2018,15 +2074,11 @@ def http3_random() -> None:
             _stats.fail()
 
     async def _run_all(urls: list) -> None:
-        async with httpx.AsyncClient(
-            http3=True, verify=False,
-            timeout=httpx.Timeout(connect=3.0, read=6.0, write=6.0, pool=6.0),
-        ) as client:
-            for i, url in enumerate(urls, 1):
-                ua = random.choice(user_agents)
-                await _probe(client, url, ua, i)
-                if i < len(urls):
-                    await asyncio.sleep(random.uniform(0.1, 0.5))
+        for i, url in enumerate(urls, 1):
+            ua = random.choice(user_agents)
+            await _probe(url, ua, i)
+            if i < len(urls):
+                await asyncio.sleep(random.uniform(0.2, 1.0))
 
     try:
         random.shuffle(https_endpoints)
