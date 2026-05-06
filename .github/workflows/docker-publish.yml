@@ -26,6 +26,30 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      # Check whether jdibby/msf-base:latest already exists on Docker Hub.
+      # On the very first run (or after a registry wipe) it won't — the next
+      # step builds it.  All subsequent runs skip that step in under a second.
+      - name: Check if msf-base image exists
+        id: msf-check
+        run: |
+          if docker manifest inspect jdibby/msf-base:latest > /dev/null 2>&1; then
+            echo "exists=true"  >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and push msf-base (first-time bootstrap)
+        if: steps.msf-check.outputs.exists == 'false'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.msf-base
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: true
+          tags: jdibby/msf-base:latest
+          cache-from: type=registry,ref=docker.io/jdibby/msf-base:buildcache
+          cache-to: type=registry,ref=docker.io/jdibby/msf-base:buildcache,mode=max
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
