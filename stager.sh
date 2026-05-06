@@ -165,6 +165,7 @@ docker run \
     --pull=always \
     --detach \
     --restart unless-stopped \
+    -p 7777:7777 \
     jdibby/traffgen:latest \
     --suite=all --size=XS --max-wait-secs=20 --loop
 

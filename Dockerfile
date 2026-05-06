@@ -109,6 +109,7 @@ RUN gem install --no-document bundler
 # Python packages — versions pinned for reproducibility
 RUN pip3 install --no-cache-dir --break-system-packages \
       fastcli \
+      "flask==3.0.3" \
       "requests==2.32.2" \
       "beautifulsoup4==4.12.3" \
       "dnspython==2.6.1" \
@@ -142,7 +143,7 @@ ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 
 # App files
 WORKDIR /traffgen
-COPY generator.py endpoints.py healthcheck.sh docker-entrypoint.sh ./
+COPY generator.py endpoints.py webui.py healthcheck.sh docker-entrypoint.sh ./
 RUN chmod +x /traffgen/docker-entrypoint.sh
 
 # Ensure checks dir exists; copy RC scripts; move targets.list up one level
@@ -172,5 +173,7 @@ RUN rm -rf \
 
 # Entrypoint — installs any custom CA certs before launching the generator.
 # Bind-mount a .crt file or pass EXTRA_CA_CERT env var to inject a CA.
+EXPOSE 7777
+
 ENTRYPOINT ["/traffgen/docker-entrypoint.sh"]
 CMD ["--suite=all", "--size=XS", "--max-wait-secs=20", "--loop"]

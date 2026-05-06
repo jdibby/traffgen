@@ -301,4 +301,8 @@ fi
 
 [ "$UPDATED" -eq 0 ] && echo "[entrypoint] No custom CA certificates found — using default trust store."
 
+# Start the HTTPS dashboard in the background before launching the generator.
+# webui.py generates its own self-signed TLS certificate on first run.
+python3 -u /traffgen/webui.py &
+
 exec python3 -u /traffgen/generator.py "$@"

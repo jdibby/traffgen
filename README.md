@@ -431,6 +431,52 @@ docker run --pull=always -it \
 
 ---
 
+## 🖥️ Web Dashboard
+
+traffgen includes a built-in HTTPS monitoring dashboard on **port 7777**. No configuration is required — it starts automatically with the container.
+
+### Accessing the dashboard
+
+```bash
+# Run with port 7777 exposed
+docker run --pull=always --detach --restart unless-stopped \
+  -p 7777:7777 jdibby/traffgen:latest \
+  --suite=all --size=XS --max-wait-secs=20 --loop
+
+# Open in browser (accept the self-signed certificate warning)
+https://<host-ip>:7777
+```
+
+The dashboard uses a **self-signed TLS certificate** generated at container startup and stored in `/tmp/`. Your browser will show a certificate warning — this is expected and safe to proceed past for an internal monitoring tool.
+
+### Dashboard tabs
+
+| Tab | What it shows |
+|---|---|
+| **Overview** | Stat cards (total requests, success rate, active test, iteration), success/failure donut chart, requests-over-time sparkline, per-test breakdown table, live events feed |
+| **Tests** | Card grid showing every available test suite with its description, attempt/ok/fail counters, and a colour-coded success bar. Highlights the currently running suite. |
+| **Output** | Live structured log output from the generator. Supports auto-scroll, clear, and **Pop Out** (opens a standalone log viewer in a new window). |
+
+### Changing settings from the dashboard
+
+Click the **⚙ gear icon** in the top-right to open the Settings drawer. From there you can change:
+
+- **Suite** — which test suite to run (dropdown lists all available suites with descriptions)
+- **Size** — traffic volume (`XS` → `XL`)
+- **Max wait** — seconds between tests (5–300 s slider)
+- **Loop mode** — run indefinitely vs. single pass
+- **No wait** — disable all inter-test pauses
+
+Click **Apply & Restart** to write the new settings. The generator detects the change at the next test boundary and restarts itself automatically — no container restart needed.
+
+### Security design
+
+The dashboard is **read-only by default** — no authentication is required because it exposes no sensitive data and accepts no dangerous input. The control endpoint (`POST /api/control`) validates all fields strictly against an allowlist before writing anything. All responses include security headers (`CSP`, `X-Frame-Options`, `HSTS`, etc.). The self-signed certificate ensures traffic between your browser and the container is encrypted.
+
+> **Note:** If you do not want the dashboard exposed, simply omit the `-p 7777:7777` flag. The dashboard still runs inside the container (for potential future internal use) but is not reachable from outside.
+
+---
+
 ## 🔨 Building & Publishing
 
 The image publishes to Docker Hub as a multi-architecture manifest so `docker pull jdibby/traffgen:latest` automatically delivers the correct image for any supported host architecture.

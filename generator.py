@@ -32,6 +32,7 @@ import struct
 import random
 import threading
 import argparse
+import json
 import subprocess
 import shlex
 import urllib.request
@@ -328,6 +329,131 @@ class SuiteStats:
 _stats       = SuiteStats()   # per-function stats, reset before each function
 _suite_stats = SuiteStats()   # aggregate across all functions in a suite run
 
+# ── Web UI shared state ───────────────────────────────────────────────────────
+_WEB_STATE_FILE = "/tmp/traffgen_state.json"
+_WEB_LOG_FILE   = "/tmp/traffgen_log.jsonl"
+_WEB_CMD_FILE   = "/tmp/traffgen_cmd.json"
+
+_WEB_STATE: dict = {
+    "version": "", "started_at": 0.0, "suite": "all", "size": "XS",
+    "max_wait_secs": 20, "loop": True, "current_test": "", "iteration": 0,
+    "tests": {}, "suites": [],
+    "totals": {"attempts": 0, "ok": 0, "fail": 0},
+    "history": [], "events": [],
+    "_history_last_t": 0.0,
+}
+_WEB_STATE_LOCK = threading.Lock()
+_WEB_LOG_LOCK   = threading.Lock()
+_WEB_LOG_COUNT  = 0
+
+
+def _web_flush() -> None:
+    """Atomically write _WEB_STATE (minus private keys) to the state file."""
+    tmp = _WEB_STATE_FILE + ".tmp"
+    try:
+        snapshot = {k: v for k, v in _WEB_STATE.items() if not k.startswith("_")}
+        with open(tmp, "w") as f:
+            json.dump(snapshot, f, separators=(",", ":"))
+        os.replace(tmp, _WEB_STATE_FILE)
+    except Exception:
+        pass
+
+
+def _web_record(name: str, ok: bool, dur_ms: int) -> None:
+    """Record one completed test run into the web state and flush to disk."""
+    global _WEB_LOG_COUNT
+    with _WEB_STATE_LOCK:
+        t = _WEB_STATE["tests"].setdefault(
+            name, {"attempts": 0, "ok": 0, "fail": 0, "last_run_at": 0, "last_ok": True}
+        )
+        t["attempts"] += 1
+        if ok:
+            t["ok"] += 1
+        else:
+            t["fail"] += 1
+        t["last_run_at"] = int(time.time())
+        t["last_ok"]     = ok
+
+        tot = _WEB_STATE["totals"]
+        tot["attempts"] += 1
+        if ok:
+            tot["ok"]   += 1
+        else:
+            tot["fail"] += 1
+
+        _WEB_STATE["events"].append(
+            {"t": int(time.time()), "test": name, "ok": ok, "dur_ms": dur_ms}
+        )
+        if len(_WEB_STATE["events"]) > 100:
+            _WEB_STATE["events"] = _WEB_STATE["events"][-100:]
+
+        now = time.time()
+        if now - _WEB_STATE["_history_last_t"] >= 30:
+            _WEB_STATE["history"].append(
+                {"t": int(now), "ok": tot["ok"], "fail": tot["fail"]}
+            )
+            if len(_WEB_STATE["history"]) > 60:
+                _WEB_STATE["history"] = _WEB_STATE["history"][-60:]
+            _WEB_STATE["_history_last_t"] = now
+
+        _web_flush()
+
+
+def _web_log(msg: str, level: str = "info", test: str = "") -> None:
+    """Append one structured log line to the log file (JSONL format)."""
+    global _WEB_LOG_COUNT
+    entry: dict = {"t": int(time.time()), "level": level, "msg": msg}
+    if test:
+        entry["test"] = test
+    line = json.dumps(entry, separators=(",", ":"))
+    with _WEB_LOG_LOCK:
+        try:
+            with open(_WEB_LOG_FILE, "a") as f:
+                f.write(line + "\n")
+            _WEB_LOG_COUNT += 1
+            if _WEB_LOG_COUNT % 100 == 0:
+                try:
+                    with open(_WEB_LOG_FILE) as f:
+                        lines = f.readlines()
+                    if len(lines) > 500:
+                        with open(_WEB_LOG_FILE, "w") as f:
+                            f.writelines(lines[-500:])
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+
+def _argv_from_cmd(cmd: dict) -> list:
+    """Build a validated generator argv list from a web control command dict."""
+    valid_suites = {"all"} | set(_SUITE_MAP.keys())
+    valid_sizes  = {"XS", "S", "M", "L", "XL"}
+
+    suite = str(cmd.get("suite", "all"))
+    if suite not in valid_suites:
+        suite = "all"
+
+    size = str(cmd.get("size", "XS"))
+    if size not in valid_sizes:
+        size = "XS"
+
+    try:
+        wait = max(5, min(300, int(cmd.get("max_wait_secs", 20))))
+    except (TypeError, ValueError):
+        wait = 20
+
+    argv = [
+        "/traffgen/generator.py",
+        f"--suite={suite}",
+        f"--size={size}",
+        f"--max-wait-secs={wait}",
+    ]
+    if cmd.get("loop", True):
+        argv.append("--loop")
+    if cmd.get("nowait", False):
+        argv.append("--nowait")
+    return argv
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # UTILITIES
@@ -490,6 +616,10 @@ def _run_guarded(func) -> None:
     exc_box: list[BaseException] = []
 
     _stats.reset(func.__name__)
+    with _WEB_STATE_LOCK:
+        _WEB_STATE["current_test"] = func.__name__
+    _web_log(f"Starting {func.__name__}", level="info", test=func.__name__)
+    t0 = time.time()
 
     def _wrapper() -> None:
         try:
@@ -500,12 +630,27 @@ def _run_guarded(func) -> None:
     t = threading.Thread(target=_wrapper, daemon=True, name=func.__name__)
     t.start()
     t.join(timeout=limit)
+    dur_ms = int((time.time() - t0) * 1000)
+
     if t.is_alive():
         ui_warn(f"[guard] {func.__name__} exceeded {limit}s — advancing to next test")
+        _web_log(f"{func.__name__} exceeded timeout ({limit}s)", level="warn", test=func.__name__)
+        run_ok = False
     elif exc_box:
         ui_error(f"[{func.__name__}] {exc_box[0]}")
+        _web_log(f"{func.__name__} error: {exc_box[0]}", level="error", test=func.__name__)
+        run_ok = False
+    else:
+        run_ok = (_stats.attempts == 0) or (_stats.errors < _stats.attempts)
 
     _stats.print_summary()
+    _web_record(func.__name__, run_ok, dur_ms)
+    _web_log(
+        f"{func.__name__}: {_stats.attempts} attempts, "
+        f"{_stats.responses} ok, {_stats.errors} fail — {dur_ms}ms",
+        level="ok" if run_ok else "warn",
+        test=func.__name__,
+    )
 
 
 def _run_head_batch(urls: list[str], label: str,
@@ -2724,6 +2869,8 @@ def run_test(func_list: list) -> None:
     if ARGS.loop:
         while True:
             iteration += 1
+            with _WEB_STATE_LOCK:
+                _WEB_STATE["iteration"] = iteration
             console.rule(f"[dim]iteration {iteration}[/]")
             func = random.choice(func_list)
             _run_guarded(func)
@@ -2734,6 +2881,8 @@ def run_test(func_list: list) -> None:
         random.shuffle(func_list)
         for func in func_list:
             iteration += 1
+            with _WEB_STATE_LOCK:
+                _WEB_STATE["iteration"] = iteration
             console.rule(f"[dim]test {iteration}/{len(func_list)}[/]")
             _run_guarded(func)
             _suite_stats.merge(_stats)
@@ -2835,13 +2984,34 @@ def _start_heartbeat(path: str = "/tmp/traffgen.health", interval: int = 15) -> 
     """
     def _loop() -> None:
         tmp = path + ".tmp"
+        last_cmd_mtime = -1.0
         while True:
+            # Health heartbeat
             try:
                 with open(tmp, "w") as fh:
                     fh.write(str(int(time.time())))
                 os.replace(tmp, path)  # atomic on POSIX
             except Exception:
                 pass
+
+            # Web control command detection
+            try:
+                mtime = os.path.getmtime(_WEB_CMD_FILE)
+                if last_cmd_mtime < 0:
+                    # First check: record current mtime, don't act on existing file
+                    last_cmd_mtime = mtime
+                elif mtime > last_cmd_mtime:
+                    with open(_WEB_CMD_FILE) as f:
+                        cmd = json.load(f)
+                    new_argv = _argv_from_cmd(cmd)
+                    _web_log(f"Applying new settings: {cmd}", level="info")
+                    time.sleep(0.3)  # let log line flush
+                    os.execv(sys.executable, [sys.executable] + new_argv)
+            except FileNotFoundError:
+                last_cmd_mtime = -1.0
+            except Exception:
+                pass
+
             time.sleep(interval)
 
     t = threading.Thread(target=_loop, daemon=True, name="heartbeat")
@@ -2852,6 +3022,26 @@ if __name__ == "__main__":
     try:
         STARTTIME = time.time()
         ARGS      = parse_cli()
+
+        # Initialise web UI state with CLI arguments
+        with _WEB_STATE_LOCK:
+            _WEB_STATE.update({
+                "version":       VERSION,
+                "started_at":    STARTTIME,
+                "suite":         ARGS.suite,
+                "size":          ARGS.size,
+                "max_wait_secs": getattr(ARGS, "max_wait_secs", 20),
+                "loop":          getattr(ARGS, "loop", False),
+                "suites":        [{"name": n, "description": d}
+                                  for n, d in _SUITE_DESCRIPTIONS],
+            })
+        _web_flush()
+        _web_log(
+            f"traffgen v{VERSION} starting — "
+            f"suite={ARGS.suite} size={ARGS.size}",
+            level="info",
+        )
+
         _start_heartbeat()
         WATCHDOG  = Watchdog(timeout_seconds=600)
 
