@@ -19,71 +19,12 @@ RUN git clone --depth 1 --single-branch --branch ${GOBGP_VERSION} \
     go build -ldflags="-s -w" -o /tmp/gobgp-bin/gobgpd ./cmd/gobgpd && \
     strip /tmp/gobgp-bin/gobgp /tmp/gobgp-bin/gobgpd
 
-# ---------- Stage 2: build Metasploit (fat builder) ----------
-FROM debian:bookworm-slim AS msf-build
-ENV DEBIAN_FRONTEND=noninteractive
-
-# Build-time toolchain only — nothing from this layer ships to runtime
-RUN apt-get update && apt-get upgrade -y --no-install-recommends && \
-    apt-get install -y --no-install-recommends \
-    ca-certificates git ruby-full build-essential pkg-config \
-    libssl-dev libffi-dev libpcap-dev libreadline-dev zlib1g-dev \
-    libxml2-dev libxslt1-dev libyaml-dev libpq-dev sqlite3 libsqlite3-dev \
-  && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /opt
-# --depth 1 skips the full MSF git history (~1 GB uncompressed)
-RUN git clone --depth 1 \
-        https://github.com/rapid7/metasploit-framework.git metasploit-framework
-WORKDIR /opt/metasploit-framework
-
-# Install bundler + vendor gems (no dev/test), small fixes, then aggressive cleanup
-RUN gem install --no-document bundler && \
-    bundle config set --local without 'development test' && \
-    bundle config set --local path '/opt/metasploit-framework/vendor/bundle' && \
-    (grep -Eq "^\s*gem ['\"]stringio['\"]" Gemfile && \
-       sed -E -i "s|^\s*gem ['\"]stringio['\"].*|gem 'stringio', '3.1.1'|" Gemfile || \
-       echo "gem 'stringio', '3.1.1'" >> Gemfile) && \
-    (grep -Eq "^\s*gem ['\"]parallel['\"]" Gemfile || echo "gem 'parallel'" >> Gemfile) && \
-    NOKOGIRI_USE_SYSTEM_LIBRARIES=1 bundle install --jobs 4 --retry 3 && \
-    bundle update --conservative rack rexml webrick json addressable net-imap zlib && \
-    bundle clean --force && \
-    rm -rf ~/.gem ~/.bundle /root/.bundle vendor/bundle/ruby/*/cache tmp/cache && \
-    # Remove default stringio gemspec to avoid duplicate warnings
-    find / -name "stringio-3.0.4.gemspec" -delete 2>/dev/null || true
-
-# Aggressive post-install size reduction — everything below is safe for check-only use
-RUN \
-    # Drop .git — history not needed at runtime (~hundreds of MB)
-    rm -rf /opt/metasploit-framework/.git && \
-    # Remove MSF module directories not needed for check-only operation
-    rm -rf /opt/metasploit-framework/modules/payloads \
-           /opt/metasploit-framework/modules/post \
-           /opt/metasploit-framework/modules/encoders \
-           /opt/metasploit-framework/modules/nops \
-           /opt/metasploit-framework/modules/evasion && \
-    # Remove documentation, developer tools, and exploit data blobs
-    rm -rf /opt/metasploit-framework/documentation \
-           /opt/metasploit-framework/tools \
-           /opt/metasploit-framework/data/exploits \
-           /opt/metasploit-framework/data/meterpreter \
-           /opt/metasploit-framework/data/templates && \
-    # Strip debug symbols from native extension .so files in the vendor bundle
-    find /opt/metasploit-framework/vendor/bundle -name "*.so" \
-         -exec strip --strip-debug {} \; 2>/dev/null || true && \
-    # Remove gem spec/test directories (not needed at runtime)
-    find /opt/metasploit-framework/vendor/bundle -type d \
-         \( -name spec -o -name test -o -name tests -o -name "test-unit" \) \
-         -exec rm -rf {} + 2>/dev/null || true && \
-    # Remove C/C++ source and build artefacts used only during gem compilation
-    find /opt/metasploit-framework/vendor/bundle -name "*.c"       -delete 2>/dev/null; \
-    find /opt/metasploit-framework/vendor/bundle -name "*.h"       -delete 2>/dev/null; \
-    find /opt/metasploit-framework/vendor/bundle -name "Makefile"  -delete 2>/dev/null || true && \
-    # Remove cached .gem archives (already installed, wasting space)
-    find /opt/metasploit-framework/vendor/bundle -name "*.gem"     -delete 2>/dev/null || true && \
-    # Remove Ruby ri documentation from vendor bundle
-    find /opt/metasploit-framework/vendor/bundle -type d -name "ri" \
-         -exec rm -rf {} + 2>/dev/null || true
+# ---------- Stage 2: pre-built Metasploit base ----------
+# Rebuilt separately via .github/workflows/msf-base-publish.yml whenever
+# the Metasploit version or gem set changes.  Pulling this image is fast;
+# the 15-25 min bundle-install cost only runs during an msf-base rebuild.
+# COPY --from=msf-build below pulls only /opt/metasploit-framework.
+FROM jdibby/msf-base:latest AS msf-build
 
 # ---------- Stage 3: runtime ----------
 FROM debian:bookworm-slim
