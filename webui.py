@@ -37,6 +37,171 @@ app = Flask(__name__)
 _sse_count = 0
 _sse_lock  = threading.Lock()
 
+# ── Health monitoring ──────────────────────────────────────────────────────────
+_health_cache: dict = {}
+_health_lock2 = threading.Lock()
+
+
+def _sample_health() -> None:
+    """Background daemon: sample /proc metrics every 2 s and cache results."""
+    prev_cpu   = None
+    prev_disk  = None
+    prev_procs: dict = {}
+    prev_ts    = 0.0
+
+    while True:
+        time.sleep(2)
+        try:
+            now  = time.time()
+            data: dict = {}
+
+            # CPU
+            try:
+                with open("/proc/stat") as f:
+                    raw = f.readline().split()
+                total = sum(int(x) for x in raw[1:8])
+                idle  = int(raw[4]) + int(raw[5])   # idle + iowait
+                cur_c = (total, idle)
+                if prev_cpu:
+                    dt = cur_c[0] - prev_cpu[0]
+                    di = cur_c[1] - prev_cpu[1]
+                    data["cpu_pct"] = round((1 - di / dt) * 100, 1) if dt > 0 else 0.0
+                else:
+                    data["cpu_pct"] = 0.0
+                prev_cpu = cur_c
+            except Exception:
+                data["cpu_pct"] = 0.0
+
+            # Memory
+            total_kb = 0
+            try:
+                mem_kb: dict = {}
+                with open("/proc/meminfo") as f:
+                    for line in f:
+                        p = line.split()
+                        if len(p) >= 2:
+                            mem_kb[p[0].rstrip(":")] = int(p[1])
+                total_kb = mem_kb.get("MemTotal", 0)
+                avail_kb = mem_kb.get("MemAvailable", mem_kb.get("MemFree", 0))
+                used_kb  = total_kb - avail_kb
+                data["mem_total_mb"] = round(total_kb / 1024, 1)
+                data["mem_used_mb"]  = round(used_kb  / 1024, 1)
+                data["mem_pct"]      = round(used_kb / total_kb * 100, 1) if total_kb > 0 else 0.0
+            except Exception:
+                data.update({"mem_total_mb": 0, "mem_used_mb": 0, "mem_pct": 0.0})
+
+            # Disk I/O
+            try:
+                rd = wr = 0
+                with open("/proc/diskstats") as f:
+                    for line in f:
+                        p = line.split()
+                        if len(p) < 14:
+                            continue
+                        nm = p[2]
+                        # Skip partitions (sda1, vda1) but keep nvme0n1, mmcblk0
+                        if nm[-1].isdigit() and not (nm.startswith("nvme") or nm.startswith("mmcblk")):
+                            continue
+                        rd += int(p[5]);  wr += int(p[9])
+                cur_d = (rd, wr, now)
+                if prev_disk:
+                    dt2 = now - prev_disk[2]
+                    if dt2 > 0:
+                        data["disk_read_kbps"]  = round(max(0, (rd - prev_disk[0]) * 512 / 1024 / dt2), 1)
+                        data["disk_write_kbps"] = round(max(0, (wr - prev_disk[1]) * 512 / 1024 / dt2), 1)
+                    else:
+                        data["disk_read_kbps"] = data["disk_write_kbps"] = 0.0
+                else:
+                    data["disk_read_kbps"] = data["disk_write_kbps"] = 0.0
+                prev_disk = cur_d
+            except Exception:
+                data["disk_read_kbps"] = data["disk_write_kbps"] = 0.0
+
+            # Load average
+            try:
+                with open("/proc/loadavg") as f:
+                    p = f.read().split()
+                data["load_avg"] = [float(p[0]), float(p[1]), float(p[2])]
+            except Exception:
+                data["load_avg"] = [0.0, 0.0, 0.0]
+
+            # Top processes by CPU
+            try:
+                hz = 100
+                try:
+                    hz = os.sysconf("SC_CLK_TCK")
+                except Exception:
+                    pass
+                procs = []
+                for pid_s in os.listdir("/proc"):
+                    if not pid_s.isdigit():
+                        continue
+                    pid = int(pid_s)
+                    try:
+                        with open(f"/proc/{pid}/stat") as f:
+                            st = f.read().split()
+                        name  = st[1].strip("()")
+                        cpu_t = int(st[13]) + int(st[14])
+                        vmrss = 0
+                        with open(f"/proc/{pid}/status") as f:
+                            for ln in f:
+                                if ln.startswith("VmRSS:"):
+                                    vmrss = int(ln.split()[1])
+                                    break
+                        procs.append({"pid": pid, "name": name, "cpu_t": cpu_t,
+                                      "mem_mb": round(vmrss / 1024, 1)})
+                    except Exception:
+                        continue
+
+                dt3 = now - prev_ts if prev_ts else 2.0
+                for p in procs:
+                    prev_t   = prev_procs.get(p["pid"], p["cpu_t"])
+                    delta    = p["cpu_t"] - prev_t
+                    p["cpu_pct"] = round(delta / hz / dt3 * 100, 1) if dt3 > 0 else 0.0
+                    p["mem_pct"] = round(p["mem_mb"] * 1024 / total_kb * 100, 1) if total_kb > 0 else 0.0
+
+                prev_procs = {p["pid"]: p["cpu_t"] for p in procs}
+                for p in procs:
+                    del p["cpu_t"]
+                procs.sort(key=lambda x: (-x["cpu_pct"], -x["mem_mb"]))
+                data["processes"] = procs[:12]
+            except Exception:
+                data["processes"] = []
+
+            # Network I/O — read /proc/net/dev, sum across non-loopback interfaces
+            try:
+                net_rx = net_tx = 0
+                with open("/proc/net/dev") as f:
+                    for line in f:
+                        p = line.split()
+                        if len(p) < 10 or ":" not in p[0]:
+                            continue
+                        iface = p[0].rstrip(":")
+                        if iface == "lo":
+                            continue
+                        net_rx += int(p[1])   # bytes received
+                        net_tx += int(p[9])   # bytes transmitted
+                cur_net = (net_rx, net_tx, now)
+                prev_net = _health_cache.get("_net_raw")
+                if prev_net:
+                    dt4 = now - prev_net[2]
+                    if dt4 > 0:
+                        data["net_rx_kbps"] = round(max(0, (net_rx - prev_net[0]) / 1024 / dt4), 1)
+                        data["net_tx_kbps"] = round(max(0, (net_tx - prev_net[1]) / 1024 / dt4), 1)
+                    else:
+                        data["net_rx_kbps"] = data["net_tx_kbps"] = 0.0
+                else:
+                    data["net_rx_kbps"] = data["net_tx_kbps"] = 0.0
+                data["_net_raw"] = cur_net
+            except Exception:
+                data["net_rx_kbps"] = data["net_tx_kbps"] = 0.0
+
+            prev_ts = now
+            with _health_lock2:
+                _health_cache.update(data)
+        except Exception:
+            pass
+
 _SEC_HEADERS = {
     "X-Content-Type-Options":    "nosniff",
     "X-Frame-Options":           "SAMEORIGIN",
@@ -119,6 +284,13 @@ def log_view():
 @app.route("/api/state")
 def api_state():
     return jsonify(_read_state())
+
+
+@app.route("/api/health")
+def api_health():
+    with _health_lock2:
+        out = {k: v for k, v in _health_cache.items() if not k.startswith("_")}
+    return jsonify(out)
 
 
 @app.route("/api/control", methods=["POST"])
@@ -453,6 +625,14 @@ input:checked+.tslider:before{transform:translateX(17px)}
 .empty{padding:26px;text-align:center;color:var(--muted);font-size:12px}
 ::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--dim);border-radius:2px}
 .mono{font-family:'SF Mono',Consolas,monospace;font-size:11px}
+.h-gauges{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.h-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:700px){.h-gauges,.h-row{grid-template-columns:1fr}}
+.gauge-wrap{display:flex;flex-direction:column;align-items:center;padding-top:4px}
+.net-widget{display:flex;gap:16px;padding:6px 0;font-family:'SF Mono',Consolas,monospace;font-size:13px;align-items:center}
+.net-dir{display:flex;flex-direction:column;gap:1px}
+.net-lbl{font-size:9px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+.net-val{font-size:15px;font-weight:700}
 </style>
 </head>
 <body>
@@ -472,6 +652,8 @@ input:checked+.tslider:before{transform:translateX(17px)}
   <button class="nav-item active" data-tab="overview" onclick="showTab(this)"><span class="nav-ico">◈</span>Overview</button>
   <button class="nav-item" data-tab="tests" onclick="showTab(this)"><span class="nav-ico">⚗</span>Tests</button>
   <button class="nav-item" data-tab="output" onclick="showTab(this)"><span class="nav-ico">⬛</span>Output</button>
+  <div class="nav-lbl">System</div>
+  <button class="nav-item" data-tab="health" onclick="showTab(this)"><span class="nav-ico">&#9889;</span>Health</button>
   <div class="nav-lbl">Info</div>
   <button class="nav-item" data-tab="about" onclick="showTab(this)"><span class="nav-ico">◎</span>About</button>
   <div class="nav-lbl">Control</div>
@@ -501,6 +683,15 @@ input:checked+.tslider:before{transform:translateX(17px)}
         <div class="card"><div class="clbl">Success Rate</div><div class="cval" id="v-rate">&#8212;</div><div class="csub" id="s-rate">&#8212;</div></div>
         <div class="card hi"><div class="clbl">Active Test</div><div class="cval c-green" id="v-test" style="font-size:15px">&#8212;</div><div class="csub" id="s-test">&#8212;</div></div>
         <div class="card"><div class="clbl">Iteration</div><div class="cval c-amber" id="v-iter">&#8212;</div><div class="csub" id="s-iter">&#8212;</div></div>
+      </div>
+      <div class="cc" style="display:flex;flex-direction:column;gap:10px">
+        <div class="ctitle">Network I/O <span id="net-iface" style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim);font-size:10px"></span></div>
+        <div class="net-widget">
+          <div class="net-dir"><div class="net-lbl">&#9650; TX</div><div class="net-val c-blue" id="ov-tx">&#8212;</div></div>
+          <div style="width:1px;background:var(--border);align-self:stretch"></div>
+          <div class="net-dir"><div class="net-lbl">&#9660; RX</div><div class="net-val c-green" id="ov-rx">&#8212;</div></div>
+        </div>
+        <canvas id="net-spark" style="width:100%;height:50px"></canvas>
       </div>
       <div class="charts">
         <div class="cc"><div class="ctitle">Success / Failure</div>
@@ -547,6 +738,47 @@ input:checked+.tslider:before{transform:translateX(17px)}
         <button class="btn" id="btn-as" onclick="toggleAS()">Auto-scroll &#10003;</button>
       </div>
       <div class="obody" id="obody"></div>
+    </div>
+    <!-- Health -->
+    <div id="tab-health" class="panel">
+      <div class="h-gauges">
+        <div class="cc"><div class="ctitle">CPU Usage</div>
+          <div class="gauge-wrap"><canvas id="cpu-gauge" width="200" height="130"></canvas></div>
+        </div>
+        <div class="cc"><div class="ctitle">Memory Usage</div>
+          <div class="gauge-wrap">
+            <canvas id="mem-gauge" width="200" height="130"></canvas>
+            <div id="mem-detail" style="font-size:11px;color:var(--muted);margin-top:4px">&#8212; MB / &#8212; MB used</div>
+          </div>
+        </div>
+      </div>
+      <div class="h-row">
+        <div class="cc">
+          <div class="ctitle">Load Average <span style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim)">1m &middot; 5m &middot; 15m</span></div>
+          <div id="h-load" style="font-family:'SF Mono',Consolas,monospace;font-size:18px;color:var(--green);padding:8px 0 4px">&#8212; &middot; &#8212; &middot; &#8212;</div>
+        </div>
+        <div class="cc">
+          <div class="ctitle">Disk I/O</div>
+          <div style="display:flex;gap:16px;margin-bottom:8px;font-family:'SF Mono',Consolas,monospace;font-size:12px">
+            <span><span style="color:var(--muted)">Read: </span><span id="disk-read" style="color:var(--green)">&#8212;</span></span>
+            <span><span style="color:var(--muted)">Write: </span><span id="disk-write" style="color:var(--blue)">&#8212;</span></span>
+          </div>
+          <canvas id="disk-bars" width="300" height="58" style="width:100%"></canvas>
+        </div>
+      </div>
+      <div class="cc">
+        <div class="ctitle">Network I/O <span id="h-net-iface" style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim)"></span></div>
+        <div style="display:flex;gap:24px;font-family:'SF Mono',Consolas,monospace;font-size:13px;margin-top:6px">
+          <div><div style="font-size:9px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)">&#9660; Receive</div><div id="h-rx" class="c-green" style="font-size:20px;font-weight:700;margin-top:3px">&#8212;</div></div>
+          <div><div style="font-size:9px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)">&#9650; Transmit</div><div id="h-tx" class="c-blue" style="font-size:20px;font-weight:700;margin-top:3px">&#8212;</div></div>
+        </div>
+        <canvas id="h-net-spark" width="600" height="60" style="width:100%;margin-top:10px"></canvas>
+      </div>
+      <div class="tcard">
+        <div class="thdr">Top Processes <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:10px">sorted by CPU</span></div>
+        <table><thead><tr><th class="r">PID</th><th>Name</th><th class="r">CPU%</th><th class="r">Mem%</th><th class="r">RSS</th></tr></thead>
+        <tbody id="proc-body"><tr><td colspan="5" class="empty">Loading&#8230;</td></tr></tbody></table>
+      </div>
     </div>
     <!-- About -->
     <div id="tab-about" class="panel">
@@ -698,9 +930,10 @@ const RC=p=>p>=90?'var(--green)':p>=70?'var(--amber)':'var(--red)';
 let _start=null,_uptimer=null,_elTimer=null,_autoScroll=true;
 let _lastState=null,_logEs=null,_logFilter='all';
 let _xRows=new Set(),_xEvs=new Set(),_modalSuite=null,_isPaused=false,_lastTest=null;
+let _healthTimer=null,_lastHealth=null,_netHist=[],_hNetHist=[];
 function uptime(t){const s=Math.floor(Date.now()/1000-t);return[Math.floor(s/3600),Math.floor((s%3600)/60),s%60].map(v=>String(v).padStart(2,'0')).join(':');}
 function elapsed(t){if(!t)return'';const s=Math.floor(Date.now()/1000-t);if(s<60)return s+'s elapsed';if(s<3600)return Math.floor(s/60)+'m '+(s%60)+'s elapsed';return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m elapsed';}
-const PAGE_TITLES={overview:'Overview',tests:'Tests',output:'Output',about:'About'};
+const PAGE_TITLES={overview:'Overview',tests:'Tests',output:'Output',health:'Health',about:'About'};
 function showTab(btn){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -708,6 +941,8 @@ function showTab(btn){
   $('tab-'+btn.dataset.tab).classList.add('active');
   $('pg-title').textContent=PAGE_TITLES[btn.dataset.tab]||btn.dataset.tab;
   if(btn.dataset.tab==='output')connectLog();
+  clearInterval(_healthTimer);_healthTimer=null;
+  if(btn.dataset.tab==='health'){pollHealth();_healthTimer=setInterval(pollHealth,2500);}
 }
 function drawDonut(ok,fail){
   const c=$('donut'),ctx=c.getContext('2d'),W=c.width,H2=c.height,cx=W/2,cy=H2/2,r=66,ri=46;
@@ -891,7 +1126,91 @@ function runFromModal(){
     .then(r=>r.json()).then(d=>{if(d.ok){toast('Running '+_modalSuite+' — generator restarting…',true);closeModal();}else toast('Error: '+d.error,false);})
     .catch(()=>toast('Request failed',false));
 }
-window.addEventListener('resize',()=>{if(_lastState)drawSpark(_lastState.history||[]);});
+// ── Health / perf functions ────────────────────────────────────────────────────
+function fmtIO(v){if(v<1)return'<1 KB/s';if(v<1024)return v.toFixed(1)+' KB/s';return(v/1024).toFixed(2)+' MB/s';}
+function gaugeColor(p){return p>85?'var(--red)':p>65?'var(--amber)':'var(--green)';}
+function drawGauge(cid,pct,label,color){
+  const c=$(cid),ctx=c.getContext('2d'),W=c.width,H2=c.height,cx=W/2,cy=H2*0.72;
+  const r=Math.min(W,H2)*0.4,sa=0.75*Math.PI,span=1.5*Math.PI;
+  ctx.clearRect(0,0,W,H2);
+  ctx.beginPath();ctx.arc(cx,cy,r,sa,sa+span);ctx.strokeStyle='#1e2d3d';ctx.lineWidth=10;ctx.lineCap='round';ctx.stroke();
+  const va=sa+(Math.max(0,Math.min(100,pct))/100)*span;
+  if(pct>0){ctx.beginPath();ctx.arc(cx,cy,r,sa,va);ctx.strokeStyle=color;ctx.lineWidth=10;ctx.lineCap='round';ctx.stroke();}
+  ctx.fillStyle='#e2e8f0';ctx.font='bold 20px SF Mono,Consolas,monospace';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(pct.toFixed(1)+'%',cx,cy-6);
+  ctx.fillStyle='#64748b';ctx.font='10px system-ui';ctx.fillText(label,cx,cy+10);
+}
+function drawDiskBars(r,w){
+  const c=$('disk-bars'),rect=c.getBoundingClientRect();
+  c.width=Math.floor(rect.width)||300;c.height=58;
+  const ctx=c.getContext('2d'),W=c.width,bh=16,lw=48,gy=6;
+  ctx.clearRect(0,0,W,58);
+  const mx=Math.max(r,w,1);
+  const drawBar=(y,v,col,lbl)=>{
+    ctx.fillStyle='#64748b';ctx.font='9px SF Mono,Consolas,monospace';ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText(lbl,lw-4,y+bh/2);
+    ctx.fillStyle='#1e2d3d';ctx.fillRect(lw,y,W-lw-gy,bh);
+    const bw=Math.max(2,(v/mx)*(W-lw-gy));
+    ctx.fillStyle=col;ctx.fillRect(lw,y,bw,bh);
+    ctx.fillStyle='#e2e8f0';ctx.textAlign='left';ctx.font='9px SF Mono,Consolas,monospace';ctx.fillText(fmtIO(v),lw+bw+4,y+bh/2);
+  };
+  drawBar(4,r,'#22c55e','Read');drawBar(34,w,'#58a6ff','Write');
+}
+function drawNetSpark(cid,hist,rxColor,txColor){
+  const c=$(cid),rect=c.getBoundingClientRect();
+  c.width=Math.floor(rect.width)||400;c.height=Math.floor(rect.height)||60;
+  const ctx=c.getContext('2d'),W=c.width,H2=c.height,P={t:4,r:6,b:16,l:10};
+  const IW=W-P.l-P.r,IH=H2-P.t-P.b;
+  ctx.clearRect(0,0,W,H2);
+  if(!hist||hist.length<2){ctx.fillStyle='#374151';ctx.font='10px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('Accumulating…',W/2,H2/2);return;}
+  const mx=Math.max(...hist.map(p=>Math.max(p.rx||0,p.tx||0)),1);
+  const xOf=i=>P.l+(i/(hist.length-1))*IW,yOf=v=>P.t+IH-(v/mx)*IH;
+  const drawLine=(key,col)=>{
+    ctx.beginPath();hist.forEach((p,i)=>{const x=xOf(i),y=yOf(p[key]||0);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});
+    ctx.strokeStyle=col;ctx.lineWidth=1.5;ctx.lineJoin='round';ctx.stroke();
+  };
+  drawLine('rx','#22c55e');drawLine('tx','#58a6ff');
+  ctx.fillStyle='#374151';ctx.font='9px SF Mono,Consolas,monospace';ctx.textAlign='left';ctx.fillText(fmtIO(hist[hist.length-1].rx||0)+' rx',P.l,H2-3);
+  ctx.textAlign='right';ctx.fillText(fmtIO(hist[hist.length-1].tx||0)+' tx',P.l+IW,H2-3);
+}
+function applyHealth(d){
+  if(!d)return;
+  _lastHealth=d;
+  // Overview network widget
+  const rx=d.net_rx_kbps||0,tx=d.net_tx_kbps||0;
+  if($('ov-rx'))$('ov-rx').textContent=fmtIO(rx);
+  if($('ov-tx'))$('ov-tx').textContent=fmtIO(tx);
+  _netHist.push({rx,tx,t:Date.now()/1000});if(_netHist.length>60)_netHist.shift();
+  drawNetSpark('net-spark',_netHist,'#22c55e','#58a6ff');
+  // Health tab
+  drawGauge('cpu-gauge',d.cpu_pct||0,'CPU',gaugeColor(d.cpu_pct||0));
+  drawGauge('mem-gauge',d.mem_pct||0,'Memory',gaugeColor(d.mem_pct||0));
+  if($('mem-detail'))$('mem-detail').textContent=(d.mem_used_mb||0).toFixed(0)+' MB / '+(d.mem_total_mb||0).toFixed(0)+' MB used';
+  const la=d.load_avg||[0,0,0];
+  if($('h-load'))$('h-load').textContent=la.map(v=>v.toFixed(2)).join('  \xb7  ');
+  if($('disk-read'))$('disk-read').textContent=fmtIO(d.disk_read_kbps||0);
+  if($('disk-write'))$('disk-write').textContent=fmtIO(d.disk_write_kbps||0);
+  drawDiskBars(d.disk_read_kbps||0,d.disk_write_kbps||0);
+  if($('h-rx'))$('h-rx').textContent=fmtIO(rx);
+  if($('h-tx'))$('h-tx').textContent=fmtIO(tx);
+  _hNetHist.push({rx,tx,t:Date.now()/1000});if(_hNetHist.length>60)_hNetHist.shift();
+  drawNetSpark('h-net-spark',_hNetHist,'#22c55e','#58a6ff');
+  const procs=d.processes||[];
+  const tb=$('proc-body');
+  if(tb)tb.innerHTML=!procs.length?'<tr><td colspan="5" class="empty">No data</td></tr>':
+    procs.map(p=>{
+      const cpuC=p.cpu_pct>50?'var(--red)':p.cpu_pct>20?'var(--amber)':'var(--green)';
+      const memC=p.mem_pct>30?'var(--amber)':'var(--muted)';
+      return`<tr class="mrow"><td class="r" style="color:var(--muted)">${p.pid}</td><td class="nm">${H(p.name)}</td><td class="r"><span style="color:${cpuC}">${p.cpu_pct.toFixed(1)}%</span></td><td class="r"><span style="color:${memC}">${p.mem_pct.toFixed(1)}%</span></td><td class="r" style="color:var(--muted)">${p.mem_mb.toFixed(0)} MB</td></tr>`;
+    }).join('');
+}
+function pollHealth(){
+  fetch('/api/health').then(r=>r.json()).then(d=>applyHealth(d)).catch(()=>{});
+}
+// Kick off overview network widget immediately and keep it live
+setInterval(pollHealth,2500);
+window.addEventListener('resize',()=>{
+  if(_lastState)drawSpark(_lastState.history||[]);
+  if(_lastHealth){drawDiskBars(_lastHealth.disk_read_kbps||0,_lastHealth.disk_write_kbps||0);drawNetSpark('net-spark',_netHist);drawNetSpark('h-net-spark',_hNetHist);}
+});
 connect();
 </script>
 </body></html>"""
@@ -962,6 +1281,7 @@ es.onmessage=ev=>{
 
 # ── Entry point ────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
+    threading.Thread(target=_sample_health, daemon=True, name="health-sampler").start()
     ctx = _ensure_cert()
     print(f"[webui] Dashboard: https://0.0.0.0:{PORT}", flush=True)
     app.run(
