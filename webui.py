@@ -589,6 +589,12 @@ body{display:flex;background:var(--bg);color:var(--text);font-family:-apple-syst
 .legend{display:flex;gap:12px;font-size:11px}
 .leg{display:flex;align-items:center;gap:5px}
 .leg-dot{width:7px;height:7px;border-radius:50%}
+.sec-donut-wrap{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.sec-legend{display:flex;flex-direction:column;gap:8px;font-size:12px}
+.sec-signals{display:flex;flex-wrap:wrap;gap:10px;padding:12px 14px}
+.sec-sig{background:var(--surf2);border:1px solid var(--border);border-radius:6px;padding:8px 14px;font-family:'SF Mono',Consolas,monospace;font-size:12px;display:flex;flex-direction:column;gap:3px;min-width:120px}
+.sec-sig-val{font-size:20px;font-weight:700}
+.sec-sig-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
 .tcard{background:var(--surf);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
 .thdr{padding:10px 14px 8px;font-size:10px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
 table{width:100%;border-collapse:collapse;font-size:12px}
@@ -771,6 +777,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
   </div>
   <div class="nav-lbl">Monitor</div>
   <button class="nav-item active" data-tab="overview" onclick="showTab(this)"><span class="nav-ico">◈</span>Overview</button>
+  <button class="nav-item" data-tab="security" onclick="showTab(this)"><span class="nav-ico">&#128737;</span>Security</button>
   <button class="nav-item" data-tab="tests" onclick="showTab(this)"><span class="nav-ico">⚗</span>Tests</button>
   <button class="nav-item" data-tab="output" onclick="showTab(this)"><span class="nav-ico">⬛</span>Output</button>
   <div class="nav-lbl">System</div>
@@ -849,6 +856,47 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
       <div class="ecard">
         <div class="ehdr">Live Events <span id="ev-cnt" style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none"></span></div>
         <div class="ebody" id="ev-body"><div class="empty">Waiting&#8230;</div></div>
+      </div>
+    </div>
+    <!-- Security Summary -->
+    <div id="tab-security" class="panel">
+      <div class="cards">
+        <div class="card"><div class="clbl">Total Probes</div><div class="cval c-blue" id="sec-total">&#8212;</div><div class="csub" id="sec-total-sub">&#8212;</div></div>
+        <div class="card"><div class="clbl">Blocked</div><div class="cval" id="sec-blocked" style="color:var(--amber)">&#8212;</div><div class="csub" id="sec-blocked-sub">&#8212;</div></div>
+        <div class="card"><div class="clbl">Silently Dropped</div><div class="cval" id="sec-dropped" style="color:#818cf8">&#8212;</div><div class="csub" id="sec-dropped-sub">&#8212;</div></div>
+        <div class="card"><div class="clbl">Reached Destination</div><div class="cval c-green" id="sec-reached">&#8212;</div><div class="csub" id="sec-reached-sub">&#8212;</div></div>
+      </div>
+      <div class="charts">
+        <div class="cc">
+          <div class="ctitle">Outcome Distribution
+            <select class="net-interval" onchange="setSecInterval(+this.value)" title="Summary refresh interval" id="sec-interval-sel">
+              <option value="30000">30s</option><option value="60000" selected>1m</option>
+              <option value="120000">2m</option><option value="300000">5m</option>
+            </select>
+          </div>
+          <div class="sec-donut-wrap">
+            <canvas id="sec-donut" width="180" height="180"></canvas>
+            <div class="sec-legend">
+              <div class="leg"><div class="leg-dot" style="background:#22c55e"></div><span id="sec-leg-reached">&#8212; Reached</span></div>
+              <div class="leg"><div class="leg-dot" style="background:var(--amber)"></div><span id="sec-leg-blocked">&#8212; Blocked</span></div>
+              <div class="leg"><div class="leg-dot" style="background:#818cf8"></div><span id="sec-leg-dropped">&#8212; Dropped</span></div>
+              <div class="leg"><div class="leg-dot" style="background:var(--muted)"></div><span id="sec-leg-other">&#8212; Other</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="cc">
+          <div class="ctitle">Block &amp; Drop Trend</div>
+          <canvas id="sec-trend" style="width:100%;height:160px"></canvas>
+        </div>
+      </div>
+      <div class="tcard">
+        <div class="thdr">Per-Suite Security Breakdown <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:10px">sorted by blocked</span></div>
+        <table><thead><tr><th>Suite</th><th class="r">Probes</th><th class="r" style="color:#22c55e">Reached</th><th class="r" style="color:var(--amber)">Blocked</th><th class="r" style="color:#818cf8">Dropped</th><th class="r">Block%</th><th class="r">Drop%</th></tr></thead>
+        <tbody id="sec-tbl"><tr><td colspan="7" class="empty">Waiting for data&#8230;</td></tr></tbody></table>
+      </div>
+      <div class="tcard">
+        <div class="thdr">Block Signal Breakdown <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:10px">how security controls are signalling blocks</span></div>
+        <div id="sec-signals" class="sec-signals"><div class="empty">Waiting for data&#8230;</div></div>
       </div>
     </div>
     <!-- Tests -->
@@ -1116,7 +1164,7 @@ function attemptAuth(){
 let _healthTimer=null,_lastHealth=null,_netHist=[],_hNetHist=[],_netTimer=null,_netInterval=1000;
 function uptime(t){const s=Math.floor(Date.now()/1000-t);return[Math.floor(s/3600),Math.floor((s%3600)/60),s%60].map(v=>String(v).padStart(2,'0')).join(':');}
 function elapsed(t){if(!t)return'';const s=Math.floor(Date.now()/1000-t);if(s<60)return s+'s elapsed';if(s<3600)return Math.floor(s/60)+'m '+(s%60)+'s elapsed';return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m elapsed';}
-const PAGE_TITLES={overview:'Overview',tests:'Tests',output:'Output',health:'Health',about:'About'};
+const PAGE_TITLES={overview:'Overview',security:'Security',tests:'Tests',output:'Output',health:'Health',about:'About'};
 function showTab(btn){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -1125,7 +1173,9 @@ function showTab(btn){
   $('pg-title').textContent=PAGE_TITLES[btn.dataset.tab]||btn.dataset.tab;
   if(btn.dataset.tab==='output')connectLog();
   clearInterval(_healthTimer);_healthTimer=null;
+  clearInterval(_secTimer);_secTimer=null;
   if(btn.dataset.tab==='health'){pollHealth();_healthTimer=setInterval(pollHealth,2500);}
+  if(btn.dataset.tab==='security'){updateSecurityTab();_secTimer=setInterval(updateSecurityTab,_secInterval);}
 }
 function drawDonut(ok,fail){
   const c=$('donut'),ctx=c.getContext('2d'),W=c.width,H2=c.height,cx=W/2,cy=H2/2,r=66,ri=46;
@@ -1334,7 +1384,7 @@ function runFromModal(){
     .catch(()=>toast('Request failed',false));
 }
 // ── Health / perf functions ────────────────────────────────────────────────────
-function fmtIO(v){if(v<1)return'<1 KB/s';if(v<1024)return v.toFixed(1)+' KB/s';return(v/1024).toFixed(2)+' MB/s';}
+function fmtIO(v){const m=v*8/1000;if(m<0.01)return'<0.01 Mbps';if(m<10)return m.toFixed(2)+' Mbps';return m.toFixed(1)+' Mbps';}
 function gaugeColor(p){return p>85?'var(--red)':p>65?'var(--amber)':'var(--green)';}
 function drawGauge(cid,pct,label,color){
   const c=$(cid),ctx=c.getContext('2d'),W=c.width,H2=c.height,cx=W/2,cy=H2*0.72;
@@ -1420,6 +1470,96 @@ function setNetInterval(ms){
 // Kick off overview network widget immediately and keep it live at 1s default
 pollHealth();
 _netTimer=setInterval(pollHealth,_netInterval);
+// ── Security Summary ──────────────────────────────────────────────────────────
+let _secTimer=null,_secInterval=60000,_secHist=[];
+function drawSecDonut(reached,blocked,dropped,other){
+  const c=$('sec-donut');if(!c)return;
+  const ctx=c.getContext('2d'),W=c.width,H2=c.height,cx=W/2,cy=H2/2,r=66,ri=46;
+  const tot=reached+blocked+dropped+other;
+  ctx.clearRect(0,0,W,H2);
+  if(!tot){ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.arc(cx,cy,ri,0,Math.PI*2,true);ctx.fillStyle='#1e2d3d';ctx.fill('evenodd');ctx.fillStyle='#64748b';ctx.font='11px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('No data',cx,cy);return;}
+  const slices=[{v:reached,c:'#22c55e'},{v:blocked,c:'#f59e0b'},{v:dropped,c:'#818cf8'},{v:other,c:'#475569'}];
+  let angle=-Math.PI/2;
+  slices.forEach(sl=>{if(!sl.v)return;const a=(sl.v/tot)*Math.PI*2;ctx.beginPath();ctx.arc(cx,cy,r,angle,angle+a);ctx.arc(cx,cy,ri,angle+a,angle,true);ctx.fillStyle=sl.c;ctx.fill();angle+=a;});
+  const bpct=tot?(blocked/tot*100).toFixed(1)+'%':'—';
+  ctx.fillStyle='#e2e8f0';ctx.font='bold 16px SF Mono,Consolas,monospace';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(bpct,cx,cy-7);
+  ctx.fillStyle='#64748b';ctx.font='10px system-ui';ctx.fillText('blocked',cx,cy+8);
+}
+function drawSecTrend(hist){
+  const c=$('sec-trend');if(!c)return;
+  const rect=c.getBoundingClientRect();c.width=Math.floor(rect.width)||500;c.height=Math.floor(rect.height)||160;
+  const ctx=c.getContext('2d'),W=c.width,H2=c.height,P={t:10,r:10,b:22,l:36},IW=W-P.l-P.r,IH=H2-P.t-P.b;
+  ctx.clearRect(0,0,W,H2);
+  if(!hist||hist.length<2){ctx.fillStyle='#64748b';ctx.font='11px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('Accumulating data…',W/2,H2/2);return;}
+  const mx=100;
+  const xOf=i=>P.l+(i/(hist.length-1))*IW,yOf=v=>P.t+IH-(Math.max(0,Math.min(100,v))/mx)*IH;
+  ctx.strokeStyle='#1e2d3d';ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){const y=P.t+(i/4)*IH;ctx.beginPath();ctx.moveTo(P.l,y);ctx.lineTo(P.l+IW,y);ctx.stroke();ctx.fillStyle='#374151';ctx.font='9px SF Mono,Consolas,monospace';ctx.textAlign='right';ctx.fillText(Math.round(100*(1-i/4))+'%',P.l-4,y+3);}
+  const drawLine=(key,col,dash)=>{if(dash)ctx.setLineDash(dash);else ctx.setLineDash([]);ctx.beginPath();hist.forEach((p,i)=>{const x=xOf(i),y=yOf(p[key]||0);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});ctx.strokeStyle=col;ctx.lineWidth=2;ctx.lineJoin='round';ctx.stroke();ctx.setLineDash([]);};
+  drawLine('block_pct','#f59e0b');
+  drawLine('drop_pct','#818cf8',[4,3]);
+  ctx.fillStyle='#374151';ctx.font='9px SF Mono,Consolas,monospace';ctx.textAlign='left';ctx.fillText(Ts(hist[0].t),P.l,H2-3);ctx.textAlign='right';ctx.fillText(Ts(hist[hist.length-1].t),P.l+IW,H2-3);
+}
+function updateSecurityTab(){
+  if(!_lastState)return;
+  const tot=_lastState.totals||{};
+  const att=tot.attempts||0,blk=tot.blocked||0,drp=tot.dropped||0,rch=tot.reached||0;
+  const other=Math.max(0,att-blk-drp-rch);
+  const pct=(n,d)=>d?((n/d)*100).toFixed(1)+'%':'—';
+  $('sec-total').textContent=N(att);$('sec-total-sub').textContent=att?'probe attempts':'No data yet';
+  $('sec-blocked').textContent=N(blk);$('sec-blocked-sub').textContent=att?pct(blk,att)+' of probes':'—';
+  $('sec-dropped').textContent=N(drp);$('sec-dropped-sub').textContent=att?pct(drp,att)+' of probes':'—';
+  $('sec-reached').textContent=N(rch);$('sec-reached-sub').textContent=att?pct(rch,att)+' of probes':'—';
+  $('sec-leg-reached').textContent=N(rch)+' Reached';
+  $('sec-leg-blocked').textContent=N(blk)+' Blocked';
+  $('sec-leg-dropped').textContent=N(drp)+' Dropped';
+  $('sec-leg-other').textContent=N(other)+' Other';
+  drawSecDonut(rch,blk,drp,other);
+  // snapshot for trend
+  const now=Date.now()/1000;
+  if(!_secHist.length||now-_secHist[_secHist.length-1].t>=(_secInterval/1000)-1){
+    _secHist.push({t:now,block_pct:att?blk/att*100:0,drop_pct:att?drp/att*100:0,reach_pct:att?rch/att*100:0});
+    if(_secHist.length>120)_secHist.shift();
+  }
+  drawSecTrend(_secHist);
+  // per-suite table — sort by blocked desc
+  const tests=_lastState.tests||{};
+  const rows=Object.entries(tests).map(([n,t])=>({n,ta:t.attempts||0,rch:t.reached||0,blk:t.blocked||0,drp:t.dropped||0}));
+  rows.sort((a,b)=>b.blk-a.blk||(b.drp-a.drp));
+  const tb=$('sec-tbl');
+  if(!rows.length){tb.innerHTML='<tr><td colspan="7" class="empty">Waiting…</td></tr>';}
+  else tb.innerHTML=rows.map(r=>{
+    const bp=r.ta?r.blk/r.ta*100:0,dp=r.ta?r.drp/r.ta*100:0;
+    const bpC=bp>50?'var(--red)':bp>10?'var(--amber)':'var(--muted)';
+    const dpC=dp>50?'var(--red)':dp>10?'#818cf8':'var(--muted)';
+    return`<tr class="mrow"><td class="nm">${H(r.n.replace(/_/g,' '))}</td><td class="r">${N(r.ta)}</td><td class="r" style="color:#22c55e">${N(r.rch)}</td><td class="r" style="color:var(--amber)">${N(r.blk)}</td><td class="r" style="color:#818cf8">${N(r.drp)}</td><td class="r"><span style="color:${bpC}">${r.ta?bp.toFixed(1)+'%':'—'}</span></td><td class="r"><span style="color:${dpC}">${r.ta?dp.toFixed(1)+'%':'—'}</span></td></tr>`;
+  }).join('');
+  // block signal breakdown — aggregate codes across all tests
+  const codeTotals={};
+  Object.values(tests).forEach(t=>{Object.entries(t.codes||{}).forEach(([k,v])=>{codeTotals[k]=(codeTotals[k]||0)+v;});});
+  // also add pseudo-codes for TCP-level blocks (exit codes stored as exitN)
+  const signalDefs={
+    '4xx':'HTTP 4xx','exit7':'TCP RST (firewall block)','exit5':'Proxy refused',
+    'exit35':'TLS intercept','exit97':'SOCKS refused','exit6':'DNS sinkhole',
+    'exit28':'Timeout (silent drop)','2xx':'HTTP 2xx (reached)','3xx':'HTTP 3xx (redirect)',
+    '5xx':'HTTP 5xx (server error)',
+  };
+  const sigEl=$('sec-signals');
+  const entries=Object.entries(codeTotals).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+  if(!entries.length){sigEl.innerHTML='<div class="empty">No data yet</div>';return;}
+  const blockCodes=new Set(['4xx','exit7','exit5','exit35','exit97']);
+  const dropCodes=new Set(['exit6','exit28']);
+  sigEl.innerHTML=entries.map(([k,v])=>{
+    const lbl=signalDefs[k]||k;
+    const col=blockCodes.has(k)?'var(--amber)':dropCodes.has(k)?'#818cf8':k.startsWith('2')?'#22c55e':'var(--muted)';
+    return`<div class="sec-sig"><div class="sec-sig-val" style="color:${col}">${N(v)}</div><div class="sec-sig-lbl">${H(lbl)}</div></div>`;
+  }).join('');
+}
+function setSecInterval(ms){
+  _secInterval=ms||60000;
+  clearInterval(_secTimer);
+  if($('tab-security').classList.contains('active'))_secTimer=setInterval(updateSecurityTab,_secInterval);
+}
 function toggleTheme(){
   const on=document.documentElement.classList.toggle('light');
   $('btn-theme').innerHTML=on?'&#9788;':'&#9790;';
@@ -1428,7 +1568,7 @@ function toggleTheme(){
 // Restore saved theme preference
 try{if(localStorage.getItem('tg-theme')==='light'){document.documentElement.classList.add('light');$('btn-theme').innerHTML='&#9788;';}}catch(e){}
 window.addEventListener('resize',()=>{
-  if(_lastState)drawSpark(_lastState.history||[]);
+  if(_lastState){drawSpark(_lastState.history||[]);drawSecTrend(_secHist);}
   if(_lastHealth){drawDiskBars(_lastHealth.disk_read_kbps||0,_lastHealth.disk_write_kbps||0);drawNetSpark('net-spark',_netHist);drawNetSpark('h-net-spark',_hNetHist);}
 });
 // ── Canvas hover tooltips ──────────────────────────────────────────────────
