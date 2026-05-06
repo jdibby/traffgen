@@ -299,6 +299,11 @@ class Watchdog:
 # SUITE STATS
 # ══════════════════════════════════════════════════════════════════════════════
 
+_BLOCK_HTTP   = {"403", "407", "451", "511"}  # content filter / proxy auth / legal / captive portal
+_BLOCK_EXITS  = {5, 7, 35, 97}  # curl: proxy refused, conn refused/RST, SSL intercept, SOCKS refused
+_DROP_EXITS   = {6, 28}         # curl: DNS resolve failure (sinkhole), timeout (silent drop)
+
+
 class SuiteStats:
     """Thread-safe per-suite probe counters with HTTP response-code tracking."""
 
@@ -315,17 +320,35 @@ class SuiteStats:
         self.attempts   = 0
         self.responses  = 0   # got any response (HTTP or non-HTTP)
         self.errors     = 0   # no response: timeout, conn refused, exception
+        self.reached    = 0   # traffic got through (any non-block HTTP response)
+        self.blocked    = 0   # security control intercept
+        self.dropped    = 0   # silent drop / timeout / DNS sinkhole
         self.codes: dict[str, int] = {}
         self.start_time = time.time()
 
-    def record(self, code: str) -> None:
-        """Record an HTTP status code. '---' / '000' / '' counts as an error."""
+    def record(self, code, exit_code: int = 0) -> None:
+        """Record an HTTP status code (and optional curl exit code).
+        '---' / '000' / '' counts as a drop/error."""
         with self._lock:
             self.attempts += 1
             c = str(code).strip()
-            if not c or c in ("---", "000", "0"):
-                self.errors += 1
+            if exit_code in _BLOCK_EXITS:
+                self.blocked += 1
+                bucket = f"exit{exit_code}"
+                self.codes[bucket] = self.codes.get(bucket, 0) + 1
+            elif exit_code in _DROP_EXITS:
+                self.dropped += 1
+                self.errors  += 1   # keep errors count for backwards compat
+            elif not c or c in ("---", "000", "0"):
+                self.dropped += 1
+                self.errors  += 1
+            elif c in _BLOCK_HTTP:
+                self.blocked += 1
+                self.responses += 1
+                bucket = (c[0] + "xx") if c[:1].isdigit() else c[:3]
+                self.codes[bucket] = self.codes.get(bucket, 0) + 1
             else:
+                self.reached   += 1
                 self.responses += 1
                 bucket = (c[0] + "xx") if c[:1].isdigit() else c[:3]
                 self.codes[bucket] = self.codes.get(bucket, 0) + 1
@@ -342,12 +365,28 @@ class SuiteStats:
             self.attempts += 1
             self.errors   += 1
 
+    def block(self) -> None:
+        """Record an explicit non-HTTP block (RST, proxy refusal detected externally)."""
+        with self._lock:
+            self.attempts += 1
+            self.blocked  += 1
+
+    def drop(self) -> None:
+        """Record a silent drop (timeout, no route, DNS sinkhole)."""
+        with self._lock:
+            self.attempts += 1
+            self.dropped  += 1
+            self.errors   += 1
+
     def merge(self, other: "SuiteStats") -> None:
         """Accumulate counters from another SuiteStats instance into this one."""
         with self._lock:
             self.attempts  += other.attempts
             self.responses += other.responses
             self.errors    += other.errors
+            self.reached   += other.reached
+            self.blocked   += other.blocked
+            self.dropped   += other.dropped
             for bucket, cnt in other.codes.items():
                 self.codes[bucket] = self.codes.get(bucket, 0) + cnt
 
@@ -370,6 +409,15 @@ class SuiteStats:
         else:
             grid.add_row("attempted", f"[bold]{self.attempts}[/]")
             grid.add_row("responses", f"[bold green]{self.responses}[/]  ({pct_ok:.0f}%)")
+            grid.add_row("reached",
+                         (f"[bold green]{self.reached}[/]"
+                          if self.reached else "[dim]0[/]"))
+            grid.add_row("blocked",
+                         (f"[bold yellow]{self.blocked}[/]"
+                          if self.blocked else "[dim]0[/]"))
+            grid.add_row("dropped",
+                         (f"[bold blue]{self.dropped}[/]"
+                          if self.dropped else "[dim]0[/]"))
             grid.add_row("errors",
                          (f"[bold red]{self.errors}[/]  ({pct_err:.0f}%)"
                           if self.errors else "[dim]0[/]"))
@@ -590,9 +638,9 @@ def _size_to_limits(size: str, s, m, l, xl, *, xs=None):
 
 def _curl_head(url: str, user_agent: str,
                connect_timeout: int = 3, max_time: int = 5,
-               extra_flags: str = "") -> str:
+               extra_flags: str = "") -> tuple[str, int]:
     """
-    Issue a single HTTP HEAD request via curl and return the HTTP status code.
+    Issue a single HTTP HEAD request via curl and return (http_code, exit_code).
 
     Using curl (rather than requests) keeps the traffic realistic: it sends
     the same TLS fingerprint, header order, and timing patterns as a real
@@ -608,18 +656,18 @@ def _curl_head(url: str, user_agent: str,
     )
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True,
                             timeout=max_time + 5)
-    return result.stdout.strip() or "---"
+    return result.stdout.strip() or "---", result.returncode
 
 
 def _curl_download(url: str, rate_limit: str = "3M",
                    connect_timeout: int = 4, timeout: int = 20,
-                   user_agent: str = "") -> str:
+                   user_agent: str = "") -> tuple[str, int]:
     """
     Download a remote file via curl, discarding data to /dev/null.
 
     `rate_limit` caps bandwidth (e.g. "3M" = 3 MB/s) so the test doesn't
     saturate the uplink.  Use an empty string to remove the cap.
-    Returns the HTTP/FTP response code string.
+    Returns (http_code, curl_exit_code).
     """
     rate_flag = f"--limit-rate {rate_limit}" if rate_limit else ""
     ua_flag   = f"-A '{user_agent}'"          if user_agent  else ""
@@ -630,7 +678,7 @@ def _curl_download(url: str, rate_limit: str = "3M",
     )
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True,
                             timeout=timeout)
-    return result.stdout.strip() or "---"
+    return result.stdout.strip() or "---", result.returncode
 
 
 def _status_style(code: str) -> str:
@@ -768,10 +816,10 @@ def _run_head_batch(urls: list[str], label: str,
         def _worker(idx: int, url: str) -> None:
             ua = random.choice(user_agents_pool)
             try:
-                status = _curl_head(url, ua, connect_timeout, max_time, extra_flags)
+                status, exit_code = _curl_head(url, ua, connect_timeout, max_time, extra_flags)
                 style  = _status_style(status)
                 console.log(f"[{idx}/{len(urls)}] {url}  [{style}]HTTP {status}[/]")
-                _stats.record(status)
+                _stats.record(status, exit_code)
             except Exception as e:
                 console.log(f"[yellow][{idx}/{len(urls)}] {url}  {e.__class__.__name__}[/]")
                 _stats.fail()
@@ -1020,9 +1068,9 @@ def ftp_random() -> None:
         target = _size_to_limits(ARGS.size, "1MB", "10MB", "100MB", "1GB")
         url    = f"ftp://speedtest:speedtest@ftp.otenet.gr/test{target}.db"
         console.log(f"FTP → {url}  ({target}, rate-limited 3 MB/s)")
-        status = _curl_download(url, rate_limit="3M", connect_timeout=5, timeout=60)
+        status, exit_code = _curl_download(url, rate_limit="3M", connect_timeout=5, timeout=60)
         console.log(f"  ↳ FTP response {status}")
-        _stats.record(status)
+        _stats.record(status, exit_code)
         ui_ok("FTP test complete")
     except Exception as e:
         _stats.fail()
@@ -1055,9 +1103,9 @@ def http_download_zip() -> None:
     ua     = random.choice(user_agents)
     ui_banner("HTTP Download (ZIP)", f"{target} — {url}")
     try:
-        status = _curl_download(url, rate_limit="3M", connect_timeout=5, timeout=120, user_agent=ua)
+        status, exit_code = _curl_download(url, rate_limit="3M", connect_timeout=5, timeout=120, user_agent=ua)
         console.log(f"  ↳ [{_status_style(status)}]HTTP {status}[/]  ({target} ZIP)")
-        _stats.record(status)
+        _stats.record(status, exit_code)
         ui_ok("HTTP ZIP download complete")
     except Exception as e:
         _stats.fail()
@@ -1068,10 +1116,10 @@ def http_download_targz() -> None:
     """Download the WordPress latest.tar.gz archive (plain HTTP)."""
     ui_banner("HTTP Download (tar.gz)", "WordPress latest.tar.gz")
     try:
-        status = _curl_download("http://wordpress.org/latest.tar.gz",
+        status, exit_code = _curl_download("http://wordpress.org/latest.tar.gz",
                                 rate_limit="3M", connect_timeout=5, timeout=120)
         console.log(f"  ↳ [{_status_style(status)}]HTTP {status}[/]  (wordpress latest.tar.gz)")
-        _stats.record(status)
+        _stats.record(status, exit_code)
         ui_ok("HTTP tar.gz download complete")
     except Exception as e:
         _stats.fail()
@@ -1557,9 +1605,9 @@ def virus_sim() -> None:
         random.shuffle(virus_endpoints)
         for i, url in enumerate(virus_endpoints[:n], 1):
             try:
-                status = _curl_download(url, rate_limit="3M", connect_timeout=4, timeout=20)
+                status, exit_code = _curl_download(url, rate_limit="3M", connect_timeout=4, timeout=20)
                 console.log(f"virus-sim ({i}/{n}) {url}  [{_status_style(status)}]HTTP {status}[/]")
-                _stats.record(status)
+                _stats.record(status, exit_code)
             except Exception as e:
                 console.log(f"[yellow]virus-sim ({i}/{n}) {url}  {e.__class__.__name__}[/]")
                 _stats.fail()
@@ -1579,9 +1627,9 @@ def dlp_sim_https() -> None:
         random.shuffle(dlp_https_endpoints)
         for i, url in enumerate(dlp_https_endpoints[:n], 1):
             try:
-                status = _curl_download(url, rate_limit="3M", connect_timeout=4, timeout=20)
+                status, exit_code = _curl_download(url, rate_limit="3M", connect_timeout=4, timeout=20)
                 console.log(f"dlp-sim ({i}/{n}) {url}  [{_status_style(status)}]HTTP {status}[/]")
-                _stats.record(status)
+                _stats.record(status, exit_code)
             except Exception as e:
                 console.log(f"[yellow]dlp-sim ({i}/{n}) {url}  {e.__class__.__name__}[/]")
                 _stats.fail()
@@ -1612,7 +1660,7 @@ def s3_sim() -> None:
     _DLP_PAYLOADS = [
         b"name,ssn,dob\nJohn Doe,123-45-6789,1985-03-12\nJane Smith,987-65-4321,1990-07-22\n",
         b'{"employees":[{"id":1001,"name":"Alice","salary":95000,"ssn":"555-12-3456"}]}\n',
-        b"CONFIDENTIAL — Q4 Revenue: $4,320,000 — Do not distribute\n",
+        b"CONFIDENTIAL - Q4 Revenue: $4,320,000 - Do not distribute\n",
         b"aws_access_key_id=AKIAIOSFODNN7EXAMPLE\naws_secret_access_key=wJalrXUtnFEMI/K7MDENG\n",
         b"password=Tr0ub4dor&3\ndb_host=prod-db.internal\ndatabase=customers\n",
     ]
@@ -1671,9 +1719,9 @@ def malware_download() -> None:
         random.shuffle(malware_files)
         for i, url in enumerate(malware_files[:n], 1):
             try:
-                status = _curl_download(url, rate_limit="3M", connect_timeout=4, timeout=20)
+                status, exit_code = _curl_download(url, rate_limit="3M", connect_timeout=4, timeout=20)
                 console.log(f"malware-dl ({i}/{n}) {url}  [{_status_style(status)}]HTTP {status}[/]")
-                _stats.record(status)
+                _stats.record(status, exit_code)
             except Exception as e:
                 console.log(f"[yellow]malware-dl ({i}/{n}) {url}  {e.__class__.__name__}[/]")
                 _stats.fail()
