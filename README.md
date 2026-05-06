@@ -68,12 +68,14 @@ docker run --pull=always --detach --restart unless-stopped \
 
 The dashboard includes:
 
-- **Overview** — stat cards, live Network I/O sparkline (1s default refresh with selectable interval), requests-over-time chart, per-test breakdown table, and live events feed
+- **Overview** — stat cards, live Network I/O sparkline in Mbps (1 s default refresh with selectable interval), requests-over-time chart, per-test breakdown table, and live events feed
+- **Security** — dedicated security posture page modeled on NGFW/SASE dashboards: KPI cards (Total Probes / Blocked / Silently Dropped / Allowed), outcome-distribution donut, block & drop trend sparkline, per-suite security breakdown table sorted by blocked count, and a block-signal breakdown showing exactly how controls are signalling blocks (HTTP 403 block page, TCP RST, proxy refused, TLS intercept, DNS sinkhole, timeout). Refresh interval is configurable (default 1 m, 30 s–5 m).
 - **Tests** — card grid for every suite; click any card to launch it immediately with custom settings
 - **Output** — CLI-style live log with level coloring (✔ OK, ✗ Error, ⚠ Warn), section banners, and rule separators mirroring the terminal output; filterable by level
-- **Health** — CPU/memory gauges, load average, disk I/O bars, network sparkline, top-processes table
+- **Health** — CPU/memory gauges, load average, disk I/O bars, network sparkline in Mbps, top-processes table
 - **Dark / light mode** — toggle with the ☾ button in the topbar; preference saved across sessions
 - **Controls** — pause, resume, stop, and settings drawer to change suite/size/wait without restarting the container
+- **Multi-user:** first browser tab gets full control; additional tabs are read-only with a visible banner
 
 > **Full documentation:** [docs/web-dashboard.md](docs/web-dashboard.md)
 
@@ -355,9 +357,11 @@ After every suite completes, traffgen prints a **Suite Summary** panel directly 
 │  suite       https_random                          │
 │  elapsed     14.2s                                 │
 │  attempted   20                                    │
-│  responses   18  (90%)                             │
-│  errors       2  (10%)                             │
-│  http codes  2xx=12  3xx=3  4xx=3                  │
+│  allowed      12                                   │
+│  blocked       5                                   │
+│  dropped       2                                   │
+│  errors        1                                   │
+│  http codes  2xx=12  4xx=5                         │
 ╰────────────────────────────────────────────────────╯
 ```
 
@@ -368,31 +372,44 @@ After every suite completes, traffgen prints a **Suite Summary** panel directly 
 | **suite** | The internal function name for the suite that just ran |
 | **elapsed** | Wall-clock time the suite took to complete |
 | **attempted** | Total number of individual probes sent (HTTP requests, DNS queries, pings, etc.) |
-| **responses** | Probes that received any response — connection reached the destination |
-| **errors** | Probes that never got a response (connection refused, timeout, network error) |
+| **allowed** | Probes that reached the destination without being intercepted (2xx, 3xx, non-block 4xx/5xx) |
+| **blocked** | Probes explicitly intercepted by a security control — HTTP 403/407/451/511 block page, TCP RST (curl exit 7), proxy refused (exit 5), or TLS intercept (exit 35) |
+| **dropped** | Probes with no response — firewall silent-drop rule (timeout, exit 28) or DNS sinkhole (exit 6) |
+| **errors** | Genuine infrastructure failures — DNS resolution error, unexpected exception |
 | **http codes** | Breakdown of HTTP status code families for HTTP-based suites |
 
-### Reading the HTTP code breakdown
+### Three-outcome classification
 
-The color-coded HTTP code buckets tell you what your security stack is doing with the traffic:
+Every probe is classified into one of three security-relevant outcomes:
 
-| Code | Color | What it likely means |
+| Outcome | Signal | What it means |
 |:---:|:---:|---|
-| 🟢 `2xx` | Green | Traffic reached the server and got a normal response — **not blocked** |
-| 🔵 `3xx` | Cyan | Redirect — traffic is reaching the internet and being redirected |
-| 🟡 `4xx` | Yellow | Got a response but access was denied — could be a **firewall block page**, proxy auth challenge, or a legitimate 403/404 from the server |
-| 🔴 `5xx` | Red | Server-side error — traffic reached a destination but the server is unhappy |
-| — | — | **High error rate** — connections are being hard-dropped (TCP RST / no response) — your firewall may be silently blocking the traffic |
+| ✅ **Allowed** | 2xx, 3xx, non-block 4xx/5xx | Traffic reached its destination — **security control did not intervene** |
+| 🟡 **Blocked** | HTTP 403/407/451/511 · TCP RST · Proxy refused | A security control **explicitly intercepted** the traffic — block page served, firewall RST, proxy refusal |
+| 🟣 **Dropped** | Timeout · DNS NXDOMAIN | Traffic was **silently dropped** — firewall drop rule (no RST), DNS sinkhole, or no route |
+
+The distinction between **blocked** and **dropped** is critical for validating your policies:
+- **Blocked** means your control is active and returning a signal (block page, RST). This is the gold standard — users see an error, logs show the block, SIEM gets an event.
+- **Dropped** means the traffic disappears silently. Effective at stopping the threat, but harder to audit — no user-visible error, no SIEM event from the control itself.
 
 ### Interpreting results
 
-- **All `2xx`, low errors** → traffic is flowing through uninspected. Your firewall/proxy may not be examining this category of traffic.
-- **Mix of `4xx` and errors** → some traffic is being blocked (4xx = block page returned; errors = hard-drop). This is healthy for threat-simulation suites.
-- **High error rate on `dns`, `ntp`, `icmp`** → those protocols may be blocked at the perimeter — check your outbound policy for UDP/53, UDP/123, ICMP.
-- **High `4xx` on `llm-dlp`, `malware-agents`, `c2-beacon`** → your proxy/CASB is actively blocking and returning its own response — security controls are working.
-- **`2xx` on `malware-download`, `virus`, `dlp`** → the files downloaded without being blocked. Your inline AV/DLP may need attention.
+- **High `allowed` on `malware-download`, `virus`, `dlp`, `pornography`** → those suites are passing through uninspected. Your security controls need attention for those categories.
+- **High `blocked` on `llm-dlp`, `c2-beacon`, `malware-agents`** → your proxy/CASB is actively blocking and returning its own response — security controls are working correctly.
+- **High `dropped` on any suite** → traffic is being silently terminated. Your firewall has drop (not reject) rules — effective but produces no user-visible feedback and may be harder to audit in SIEM.
+- **High `errors` on `dns`, `ntp`, `icmp`** → those protocols may be perimeter-blocked at the infrastructure level — check outbound policies for UDP/53, UDP/123, and ICMP.
+- **Mix of `blocked` and `dropped` on the same suite** → your firewall has both block-and-log and drop rules. Common in layered security stacks (NGFW + SASE).
 
-> 💡 **Non-HTTP suites** (`dns`, `ping`, `traceroute`, `ssh`, `ntp`, `snmp`, `nmap`, `metasploit-check`, etc.) show `responses` and `errors` only — no HTTP code breakdown. An `ok` response means the probe ran to completion without an exception; an `error` means the subprocess timed out, the host was unreachable, or the command itself failed.
+### Security Summary dashboard tab
+
+The web dashboard's **Security** tab aggregates these outcomes across all suites in real time, displaying:
+- KPI cards: Total Probes · Blocked · Silently Dropped · Allowed
+- Outcome distribution donut (configurable refresh interval, default 1 m)
+- Block & drop trend sparkline over time
+- Per-suite breakdown table sorted by blocked count
+- Block signal breakdown — exactly how each control is signalling (HTTP 403, TCP RST, proxy refused, TLS intercept, DNS sinkhole, timeout)
+
+> 💡 **Non-HTTP suites** (`dns`, `ping`, `traceroute`, `ssh`, `ntp`, `snmp`, `nmap`, `metasploit-check`, etc.) show `allowed` and `errors` only — no HTTP code breakdown. An `allowed` response means the probe ran to completion without an exception; an `error` means the subprocess timed out, the host was unreachable, or the command itself failed.
 
 ---
 

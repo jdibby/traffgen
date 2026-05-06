@@ -864,7 +864,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div class="card"><div class="clbl">Total Probes</div><div class="cval c-blue" id="sec-total">&#8212;</div><div class="csub" id="sec-total-sub">&#8212;</div></div>
         <div class="card"><div class="clbl">Blocked</div><div class="cval" id="sec-blocked" style="color:var(--amber)">&#8212;</div><div class="csub" id="sec-blocked-sub">&#8212;</div></div>
         <div class="card"><div class="clbl">Silently Dropped</div><div class="cval" id="sec-dropped" style="color:#818cf8">&#8212;</div><div class="csub" id="sec-dropped-sub">&#8212;</div></div>
-        <div class="card"><div class="clbl">Reached Destination</div><div class="cval c-green" id="sec-reached">&#8212;</div><div class="csub" id="sec-reached-sub">&#8212;</div></div>
+        <div class="card"><div class="clbl">Allowed</div><div class="cval c-green" id="sec-allowed">&#8212;</div><div class="csub" id="sec-allowed-sub">&#8212;</div></div>
       </div>
       <div class="charts">
         <div class="cc">
@@ -877,7 +877,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
           <div class="sec-donut-wrap">
             <canvas id="sec-donut" width="180" height="180"></canvas>
             <div class="sec-legend">
-              <div class="leg"><div class="leg-dot" style="background:#22c55e"></div><span id="sec-leg-reached">&#8212; Reached</span></div>
+              <div class="leg"><div class="leg-dot" style="background:#22c55e"></div><span id="sec-leg-allowed">&#8212; Allowed</span></div>
               <div class="leg"><div class="leg-dot" style="background:var(--amber)"></div><span id="sec-leg-blocked">&#8212; Blocked</span></div>
               <div class="leg"><div class="leg-dot" style="background:#818cf8"></div><span id="sec-leg-dropped">&#8212; Dropped</span></div>
               <div class="leg"><div class="leg-dot" style="background:var(--muted)"></div><span id="sec-leg-other">&#8212; Other</span></div>
@@ -1472,13 +1472,13 @@ pollHealth();
 _netTimer=setInterval(pollHealth,_netInterval);
 // ── Security Summary ──────────────────────────────────────────────────────────
 let _secTimer=null,_secInterval=60000,_secHist=[];
-function drawSecDonut(reached,blocked,dropped,other){
+function drawSecDonut(allowed,blocked,dropped,other){
   const c=$('sec-donut');if(!c)return;
   const ctx=c.getContext('2d'),W=c.width,H2=c.height,cx=W/2,cy=H2/2,r=66,ri=46;
-  const tot=reached+blocked+dropped+other;
+  const tot=allowed+blocked+dropped+other;
   ctx.clearRect(0,0,W,H2);
   if(!tot){ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.arc(cx,cy,ri,0,Math.PI*2,true);ctx.fillStyle='#1e2d3d';ctx.fill('evenodd');ctx.fillStyle='#64748b';ctx.font='11px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('No data',cx,cy);return;}
-  const slices=[{v:reached,c:'#22c55e'},{v:blocked,c:'#f59e0b'},{v:dropped,c:'#818cf8'},{v:other,c:'#475569'}];
+  const slices=[{v:allowed,c:'#22c55e'},{v:blocked,c:'#f59e0b'},{v:dropped,c:'#818cf8'},{v:other,c:'#475569'}];
   let angle=-Math.PI/2;
   slices.forEach(sl=>{if(!sl.v)return;const a=(sl.v/tot)*Math.PI*2;ctx.beginPath();ctx.arc(cx,cy,r,angle,angle+a);ctx.arc(cx,cy,ri,angle+a,angle,true);ctx.fillStyle=sl.c;ctx.fill();angle+=a;});
   const bpct=tot?(blocked/tot*100).toFixed(1)+'%':'—';
@@ -1503,14 +1503,14 @@ function drawSecTrend(hist){
 function updateSecurityTab(){
   if(!_lastState)return;
   const tot=_lastState.totals||{};
-  const att=tot.attempts||0,blk=tot.blocked||0,drp=tot.dropped||0,rch=tot.reached||0;
+  const att=tot.attempts||0,blk=tot.blocked||0,drp=tot.dropped||0,rch=tot.allowed||0;
   const other=Math.max(0,att-blk-drp-rch);
   const pct=(n,d)=>d?((n/d)*100).toFixed(1)+'%':'—';
   $('sec-total').textContent=N(att);$('sec-total-sub').textContent=att?'probe attempts':'No data yet';
   $('sec-blocked').textContent=N(blk);$('sec-blocked-sub').textContent=att?pct(blk,att)+' of probes':'—';
   $('sec-dropped').textContent=N(drp);$('sec-dropped-sub').textContent=att?pct(drp,att)+' of probes':'—';
-  $('sec-reached').textContent=N(rch);$('sec-reached-sub').textContent=att?pct(rch,att)+' of probes':'—';
-  $('sec-leg-reached').textContent=N(rch)+' Reached';
+  $('sec-allowed').textContent=N(rch);$('sec-allowed-sub').textContent=att?pct(rch,att)+' of probes':'—';
+  $('sec-leg-reached').textContent=N(rch)+' Allowed';
   $('sec-leg-blocked').textContent=N(blk)+' Blocked';
   $('sec-leg-dropped').textContent=N(drp)+' Dropped';
   $('sec-leg-other').textContent=N(other)+' Other';
@@ -1524,7 +1524,7 @@ function updateSecurityTab(){
   drawSecTrend(_secHist);
   // per-suite table — sort by blocked desc
   const tests=_lastState.tests||{};
-  const rows=Object.entries(tests).map(([n,t])=>({n,ta:t.attempts||0,rch:t.reached||0,blk:t.blocked||0,drp:t.dropped||0}));
+  const rows=Object.entries(tests).map(([n,t])=>({n,ta:t.attempts||0,rch:t.allowed||0,blk:t.blocked||0,drp:t.dropped||0}));
   rows.sort((a,b)=>b.blk-a.blk||(b.drp-a.drp));
   const tb=$('sec-tbl');
   if(!rows.length){tb.innerHTML='<tr><td colspan="7" class="empty">Waiting…</td></tr>';}
@@ -1541,7 +1541,7 @@ function updateSecurityTab(){
   const signalDefs={
     '4xx':'HTTP 4xx','exit7':'TCP RST (firewall block)','exit5':'Proxy refused',
     'exit35':'TLS intercept','exit97':'SOCKS refused','exit6':'DNS sinkhole',
-    'exit28':'Timeout (silent drop)','2xx':'HTTP 2xx (reached)','3xx':'HTTP 3xx (redirect)',
+    'exit28':'Timeout (silent drop)','2xx':'HTTP 2xx (allowed)','3xx':'HTTP 3xx (redirect)',
     '5xx':'HTTP 5xx (server error)',
   };
   const sigEl=$('sec-signals');

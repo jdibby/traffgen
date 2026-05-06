@@ -320,7 +320,7 @@ class SuiteStats:
         self.attempts   = 0
         self.responses  = 0   # got any response (HTTP or non-HTTP)
         self.errors     = 0   # no response: timeout, conn refused, exception
-        self.reached    = 0   # traffic got through (any non-block HTTP response)
+        self.allowed    = 0   # traffic got through (any non-block HTTP response)
         self.blocked    = 0   # security control intercept
         self.dropped    = 0   # silent drop / timeout / DNS sinkhole
         self.codes: dict[str, int] = {}
@@ -348,7 +348,7 @@ class SuiteStats:
                 bucket = (c[0] + "xx") if c[:1].isdigit() else c[:3]
                 self.codes[bucket] = self.codes.get(bucket, 0) + 1
             else:
-                self.reached   += 1
+                self.allowed   += 1
                 self.responses += 1
                 bucket = (c[0] + "xx") if c[:1].isdigit() else c[:3]
                 self.codes[bucket] = self.codes.get(bucket, 0) + 1
@@ -384,7 +384,7 @@ class SuiteStats:
             self.attempts  += other.attempts
             self.responses += other.responses
             self.errors    += other.errors
-            self.reached   += other.reached
+            self.allowed   += other.allowed
             self.blocked   += other.blocked
             self.dropped   += other.dropped
             for bucket, cnt in other.codes.items():
@@ -409,9 +409,9 @@ class SuiteStats:
         else:
             grid.add_row("attempted", f"[bold]{self.attempts}[/]")
             grid.add_row("responses", f"[bold green]{self.responses}[/]  ({pct_ok:.0f}%)")
-            grid.add_row("reached",
-                         (f"[bold green]{self.reached}[/]"
-                          if self.reached else "[dim]0[/]"))
+            grid.add_row("allowed",
+                         (f"[bold green]{self.allowed}[/]"
+                          if self.allowed else "[dim]0[/]"))
             grid.add_row("blocked",
                          (f"[bold yellow]{self.blocked}[/]"
                           if self.blocked else "[dim]0[/]"))
@@ -458,7 +458,7 @@ _WEB_STATE: dict = {
     "status": "starting",   # running | between_tests | paused | stopped
     "test_started_at": 0.0,
     "tests": {}, "suites": [],
-    "totals": {"attempts": 0, "ok": 0, "fail": 0, "blocked": 0, "dropped": 0, "reached": 0},
+    "totals": {"attempts": 0, "ok": 0, "fail": 0, "blocked": 0, "dropped": 0, "allowed": 0},
     "history": [{"t": int(__import__("time").time()), "ok": 0, "fail": 0}], "events": [],
     "_history_last_t": 0.0,
 }
@@ -483,20 +483,20 @@ def _web_flush() -> None:
 
 def _web_record(name: str, ok: bool, dur_ms: int,
                 responses: int = 0, codes: "dict | None" = None,
-                blocked: int = 0, dropped: int = 0, reached: int = 0) -> None:
+                blocked: int = 0, dropped: int = 0, allowed: int = 0) -> None:
     """Record one completed test run into the web state and flush to disk."""
     with _WEB_STATE_LOCK:
         t = _WEB_STATE["tests"].setdefault(name, {
             "attempts": 0, "ok": 0, "fail": 0, "responses": 0,
             "last_run_at": 0, "last_ok": True,
             "last_dur_ms": 0, "avg_dur_ms": 0, "codes": {},
-            "blocked": 0, "dropped": 0, "reached": 0,
+            "blocked": 0, "dropped": 0, "allowed": 0,
         })
         t["attempts"]   += 1
         t["responses"]  += responses
         t["blocked"]    += blocked
         t["dropped"]    += dropped
-        t["reached"]    += reached
+        t["allowed"]    += allowed
         if ok:
             t["ok"]   += 1
         else:
@@ -525,7 +525,7 @@ def _web_record(name: str, ok: bool, dur_ms: int,
         tot["attempts"] += 1
         tot["blocked"]   = tot.get("blocked", 0) + blocked
         tot["dropped"]   = tot.get("dropped", 0) + dropped
-        tot["reached"]   = tot.get("reached", 0) + reached
+        tot["allowed"]   = tot.get("allowed", 0) + allowed
         if ok:
             tot["ok"]   += 1
         else:
@@ -535,7 +535,7 @@ def _web_record(name: str, ok: bool, dur_ms: int,
             "t": int(time.time()), "test": name, "ok": ok,
             "dur_ms": dur_ms, "responses": responses,
             "codes": {k: v for k, v in (codes or {}).items()},
-            "blocked": blocked, "dropped": dropped, "reached": reached,
+            "blocked": blocked, "dropped": dropped, "allowed": allowed,
         })
         if len(_WEB_STATE["events"]) > 100:
             _WEB_STATE["events"] = _WEB_STATE["events"][-100:]
@@ -789,7 +789,7 @@ def _run_guarded(func) -> None:
     dur_ms = int((time.time() - t0) * 1000)
     run_ok = not exc_box and not t.is_alive()
     _web_record(func.__name__, run_ok, dur_ms, _stats.responses, dict(_stats.codes),
-                blocked=_stats.blocked, dropped=_stats.dropped, reached=_stats.reached)
+                blocked=_stats.blocked, dropped=_stats.dropped, allowed=_stats.allowed)
     _web_log(
         f"{func.__name__}: {_stats.attempts} attempts, "
         f"{_stats.responses} ok, {_stats.errors} fail — {dur_ms}ms",
