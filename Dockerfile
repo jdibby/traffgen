@@ -111,9 +111,8 @@ RUN git clone --depth 1 --branch ${NIKTO_VERSION} \
     ln -s /opt/nikto/program/nikto.pl /usr/local/bin/nikto && \
     chmod +x /opt/nikto/program/nikto.pl
 
-# Bundler in runtime so wrappers can call `bundle exec`
-# Install latest versions of CVE-affected gems — "latest" is always >= the
-# fixed version, and avoids hard-coding versions that may not yet exist.
+# Bundler + CVE-patched gems. json has a C extension so build tools are
+# required; install and purge them in the same layer to keep image size down.
 # Gems covered: json (CVE-2026-33210), rexml (CVE-2024-35176 through -49761),
 # erb (CVE-2026-41316), webrick (CVE-2024-47220, CVE-2025-6442),
 # rack (CVE-2025-61780 through CVE-2026-34831, 13 CVEs),
@@ -121,19 +120,12 @@ RUN git clone --depth 1 --branch ${NIKTO_VERSION} \
 # cgi (CVE-2025-27219, CVE-2025-27220), resolv (CVE-2025-24294),
 # net-imap (CVE-2025-43857, CVE-2026-42256, CVE-2026-42258),
 # addressable (CVE-2026-35611)
-RUN gem install --no-document \
-      bundler \
-      json \
-      rexml \
-      erb \
-      webrick \
-      rack \
-      uri \
-      time \
-      cgi \
-      resolv \
-      net-imap \
-      addressable
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ruby-dev build-essential && \
+    gem install --no-document \
+      bundler json rexml erb webrick rack uri time cgi resolv net-imap addressable && \
+    apt-get purge -y --auto-remove ruby-dev build-essential && \
+    rm -rf /var/lib/apt/lists/*
 
 # Python packages — versions pinned for reproducibility
 # pip>=26.1          CVE-2023-5752 (Mercurial cmd injection), CVE-2025-8869
