@@ -871,46 +871,81 @@ def bgp_peering() -> None:
 
 def bigfile() -> None:
     """
-    Download a 5 GB ZIP file from Thinkbroadband's test server, streaming
-    content to /dev/null.  Designed to generate sustained high-bandwidth
-    traffic and trigger bandwidth-based policy rules.
+    Download a large file to /dev/null, streaming content to generate
+    sustained high-bandwidth traffic.  Multiple providers are tried in
+    random order so that IP blocks or outages at one host fall back
+    automatically to the next.
     """
-    # Scale file size with --size: XS=10MB, S=100MB, M=1GB, L=2GB, XL=5GB
-    _BIGFILE_URLS = {
-        "XS": "http://ipv4.download.thinkbroadband.com/10MB.zip",
-        "S":  "http://ipv4.download.thinkbroadband.com/100MB.zip",
-        "M":  "http://ipv4.download.thinkbroadband.com/1GB.zip",
-        "L":  "http://ipv4.download.thinkbroadband.com/2GB.zip",
-        "XL": "http://ipv4.download.thinkbroadband.com/5GB.zip",
+    _BIGFILE_PROVIDERS: dict[str, list[str]] = {
+        "XS": [
+            "http://ipv4.download.thinkbroadband.com/10MB.zip",
+            "https://speed.cloudflare.com/__down?bytes=10485760",
+            "http://speedtest.tele2.net/10MB.zip",
+            "http://proof.ovh.net/files/10Mb.dat",
+        ],
+        "S": [
+            "http://ipv4.download.thinkbroadband.com/100MB.zip",
+            "https://speed.cloudflare.com/__down?bytes=104857600",
+            "http://speedtest.tele2.net/100MB.zip",
+            "http://proof.ovh.net/files/100Mb.dat",
+        ],
+        "M": [
+            "http://ipv4.download.thinkbroadband.com/1GB.zip",
+            "https://speed.cloudflare.com/__down?bytes=1073741824",
+            "http://speedtest.tele2.net/1000MB.zip",
+            "http://proof.ovh.net/files/1Gio.dat",
+        ],
+        "L": [
+            "http://ipv4.download.thinkbroadband.com/2GB.zip",
+            "https://speed.cloudflare.com/__down?bytes=2147483648",
+        ],
+        "XL": [
+            "http://ipv4.download.thinkbroadband.com/5GB.zip",
+            "https://speed.cloudflare.com/__down?bytes=5368709120",
+        ],
     }
-    url = _BIGFILE_URLS.get(ARGS.size, _BIGFILE_URLS["M"])
-    ua  = random.choice(user_agents)
-    ui_banner("Big-file Download", f"{ARGS.size} → {url}")
-    try:
-        with requests.get(url, stream=True, verify=False, timeout=(5, 30)) as resp:
-            resp.raise_for_status()
-            total = int(resp.headers.get("content-length", 0))
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[cyan]Downloading[/]"),
-                BarColumn(),
-                TextColumn("[progress.percentage]{task.percentage:>3.1f}%"),
-                TimeElapsedColumn(),
-                TimeRemainingColumn(),
-                console=console,
-            ) as prog:
-                task = prog.add_task("dl", total=total or None)
-                for chunk in resp.iter_content(chunk_size=65536):
-                    if chunk:
-                        prog.update(task, advance=len(chunk))
-        _stats.ok()
-        ui_ok("Big-file download complete")
-    except (requests.exceptions.RequestException, socket.error, ssl.SSLError, OSError) as e:
-        _stats.fail()
-        ui_error(f"[bigfile] {e}")
-    except Exception as e:
-        _stats.fail()
-        ui_error(f"[bigfile] unexpected: {e}")
+    providers = list(_BIGFILE_PROVIDERS.get(ARGS.size, _BIGFILE_PROVIDERS["S"]))
+    random.shuffle(providers)
+    ua = random.choice(user_agents)
+    ui_banner("Big-file Download", f"{ARGS.size} — trying {len(providers)} provider(s)")
+
+    for url in providers:
+        ui_info(f"Trying {url}")
+        try:
+            with requests.get(
+                url, stream=True, verify=False, timeout=(10, 60),
+                headers={"User-Agent": ua},
+            ) as resp:
+                if resp.status_code in (403, 429, 451):
+                    ui_warn(f"HTTP {resp.status_code} from provider — skipping")
+                    continue
+                resp.raise_for_status()
+                total = int(resp.headers.get("content-length", 0))
+                with Progress(
+                    SpinnerColumn(),
+                    TextColumn("[cyan]Downloading[/]"),
+                    BarColumn(),
+                    TextColumn("[progress.percentage]{task.percentage:>3.1f}%"),
+                    TimeElapsedColumn(),
+                    TimeRemainingColumn(),
+                    console=console,
+                ) as prog:
+                    task = prog.add_task("dl", total=total or None)
+                    for chunk in resp.iter_content(chunk_size=65536):
+                        if chunk:
+                            prog.update(task, advance=len(chunk))
+            _stats.ok()
+            ui_ok(f"Big-file download complete ({url})")
+            return
+        except (requests.exceptions.ConnectionError,
+                requests.exceptions.Timeout,
+                requests.exceptions.HTTPError) as e:
+            ui_warn(f"Provider unavailable: {e} — trying next")
+        except Exception as e:
+            ui_warn(f"Provider error: {e} — trying next")
+
+    _stats.fail()
+    ui_error("[bigfile] all providers failed")
 
 
 def dig_random() -> None:
