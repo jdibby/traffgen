@@ -11,7 +11,7 @@
 #   Amazon Linux  : Amazon Linux 2 and Amazon Linux 2023
 #
 # Usage:
-#   curl -s https://raw.githubusercontent.com/jdibby/traffgen/refs/heads/main/stager.sh | sudo bash
+#   curl -sk https://raw.githubusercontent.com/jdibby/traffgen/refs/heads/main/stager.sh | sudo bash
 
 set -euo pipefail
 
