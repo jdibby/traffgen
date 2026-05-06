@@ -1993,22 +1993,21 @@ def http3_random() -> None:
     n = _size_to_limits(ARGS.size, 5, 10, 20, len(https_endpoints))
     ui_banner("HTTP/3 (QUIC)", f"HEAD requests to {n} endpoints")
     try:
-        # Probe curl build flags — skip gracefully if HTTP/3 is absent.
+        # Probe curl build flags — fall back to HTTPS if HTTP/3 is absent.
         ver = subprocess.run(
             ["curl", "--version"], capture_output=True, text=True, timeout=5
         )
-        if "HTTP3" not in ver.stdout and "http3" not in ver.stdout.lower():
-            ui_warn("curl build does not include HTTP/3 support — skipping")
-            return
+        has_h3 = "HTTP3" in ver.stdout or "http3" in ver.stdout.lower()
+        if not has_h3:
+            ui_warn("curl build does not include HTTP/3 support — falling back to HTTPS")
 
         random.shuffle(https_endpoints)
         _run_head_batch(
             https_endpoints[:n], "HTTP3", user_agents,
             connect_timeout=3, max_time=6,
-            # --http3 negotiates QUIC; curl falls back to TCP on failure.
-            extra_flags="--http3",
+            extra_flags="--http3" if has_h3 else "",
         )
-        ui_ok("HTTP/3 test complete")
+        ui_ok("HTTP/3 test complete" if has_h3 else "HTTPS fallback complete (no HTTP/3)")
     except Exception as e:
         ui_error(f"[http3_random] {e}")
 
