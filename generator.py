@@ -1980,34 +1980,58 @@ def dot_random() -> None:
 
 def http3_random() -> None:
     """
-    HTTP/3 (QUIC) HEAD requests via curl --http3.
+    HTTP/3 (QUIC) HEAD requests via the httpx library (aioquic backend).
 
-    Tries to negotiate HTTP/3 first; falls back to HTTP/2 or HTTP/1.1 if the
-    server does not advertise h3 via Alt-Svc.  Validates whether the firewall's
-    TLS/QUIC inspection layer handles QUIC (UDP/443) or whether it silently
-    falls back to TCP.
-
-    If the installed curl binary has no HTTP/3 support compiled in, this test
-    logs a warning and exits cleanly rather than failing.
+    Uses native Python QUIC negotiation — no dependency on a curl build with
+    HTTP/3 compiled in.  Each request attempts HTTP/3 first; httpx falls back
+    to HTTP/2 or HTTP/1.1 if the server does not advertise h3 via Alt-Svc.
+    Validates whether the firewall's QUIC inspection layer handles UDP/443.
     """
+    import asyncio
+    try:
+        import httpx
+    except ImportError:
+        ui_warn("httpx not installed — skipping HTTP/3 test")
+        return
+
     n = _size_to_limits(ARGS.size, 5, 10, 20, len(https_endpoints))
     ui_banner("HTTP/3 (QUIC)", f"HEAD requests to {n} endpoints")
-    try:
-        # Probe curl build flags — fall back to HTTPS if HTTP/3 is absent.
-        ver = subprocess.run(
-            ["curl", "--version"], capture_output=True, text=True, timeout=5
-        )
-        has_h3 = "HTTP3" in ver.stdout or "http3" in ver.stdout.lower()
-        if not has_h3:
-            ui_warn("curl build does not include HTTP/3 support — falling back to HTTPS")
 
+    async def _probe(client: "httpx.AsyncClient", url: str, ua: str, idx: int) -> None:
+        try:
+            r = await client.head(url, headers={"User-Agent": ua})
+            code = str(r.status_code)
+            console.log(f"HTTP3 ({idx}/{n}) {url}  → [{_status_style(code)}]{code}[/]")
+            _stats.record(code)
+        except httpx.TimeoutException:
+            console.log(f"[yellow]HTTP3 ({idx}/{n}) {url}  → timeout[/]")
+            _stats.drop()
+        except httpx.ConnectError as e:
+            msg = str(e).lower()
+            console.log(f"[yellow]HTTP3 ({idx}/{n}) {url}  → {e.__class__.__name__}[/]")
+            if "refused" in msg or "rst" in msg or "reset" in msg:
+                _stats.block()
+            else:
+                _stats.drop()
+        except Exception as e:
+            console.log(f"[yellow]HTTP3 ({idx}/{n}) {url}  → {e.__class__.__name__}[/]")
+            _stats.fail()
+
+    async def _run_all(urls: list) -> None:
+        async with httpx.AsyncClient(
+            http3=True, verify=False,
+            timeout=httpx.Timeout(connect=3.0, read=6.0, write=6.0, pool=6.0),
+        ) as client:
+            for i, url in enumerate(urls, 1):
+                ua = random.choice(user_agents)
+                await _probe(client, url, ua, i)
+                if i < len(urls):
+                    await asyncio.sleep(random.uniform(0.1, 0.5))
+
+    try:
         random.shuffle(https_endpoints)
-        _run_head_batch(
-            https_endpoints[:n], "HTTP3", user_agents,
-            connect_timeout=3, max_time=6,
-            extra_flags="--http3" if has_h3 else "",
-        )
-        ui_ok("HTTP/3 test complete" if has_h3 else "HTTPS fallback complete (no HTTP/3)")
+        asyncio.run(_run_all(https_endpoints[:n]))
+        ui_ok("HTTP/3 test complete")
     except Exception as e:
         ui_error(f"[http3_random] {e}")
 
