@@ -1,0 +1,49 @@
+name: Build and Push msf-base
+
+# Rebuild the pre-built Metasploit base image.  Run this manually whenever
+# the Metasploit version or gem set changes, or when triggered automatically
+# by a change to Dockerfile.msf-base.
+#
+# The main docker-publish.yml pulls jdibby/msf-base:latest rather than
+# running bundle install from scratch, cutting 15-25 min off every build.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'Dockerfile.msf-base'
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU (for multi-arch emulation)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push msf-base
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.msf-base
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: true
+          tags: |
+            jdibby/msf-base:latest
+            jdibby/msf-base:${{ github.sha }}
+          cache-from: type=registry,ref=docker.io/jdibby/msf-base:buildcache
+          cache-to: type=registry,ref=docker.io/jdibby/msf-base:buildcache,mode=max
