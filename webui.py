@@ -656,6 +656,7 @@ html.light .obody .ll:hover{background:rgba(0,0,0,.04)}html.light .cmd-blk{backg
 .net-dir{display:flex;flex-direction:column;gap:1px}
 .net-lbl{font-size:9px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
 .net-val{font-size:15px;font-weight:700}
+.tt{position:fixed;pointer-events:none;display:none;background:var(--surf2);border:1px solid var(--border2);border-radius:5px;padding:5px 9px;font-size:11px;font-family:'SF Mono',Consolas,monospace;line-height:1.8;z-index:200;color:var(--text);white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.4)}
 </style>
 </head>
 <body>
@@ -1275,6 +1276,46 @@ window.addEventListener('resize',()=>{
   if(_lastState)drawSpark(_lastState.history||[]);
   if(_lastHealth){drawDiskBars(_lastHealth.disk_read_kbps||0,_lastHealth.disk_write_kbps||0);drawNetSpark('net-spark',_netHist);drawNetSpark('h-net-spark',_hNetHist);}
 });
+// ── Canvas hover tooltips ──────────────────────────────────────────────────
+const _tt=document.createElement('div');_tt.className='tt';document.body.appendChild(_tt);
+function showTip(e,lines){
+  _tt.innerHTML=lines.filter(Boolean).join('<br>');_tt.style.display='block';
+  const r=_tt.getBoundingClientRect();
+  let x=e.clientX+14,y=e.clientY-r.height/2;
+  if(x+r.width>window.innerWidth-4)x=e.clientX-r.width-10;
+  if(y<4)y=4;if(y+r.height>window.innerHeight-4)y=window.innerHeight-r.height-4;
+  _tt.style.left=x+'px';_tt.style.top=y+'px';
+}
+function hideTip(){_tt.style.display='none';}
+function wireTip(cid,pl,pr,getHist,fmt){
+  const c=$(cid);if(!c)return;
+  c.style.cursor='crosshair';
+  c.addEventListener('mousemove',e=>{
+    const h=getHist();if(!h||h.length<2)return;
+    const rect=c.getBoundingClientRect();
+    const IW=rect.width-pl-pr;
+    const xi=e.clientX-rect.left-pl;
+    let i=Math.round(xi/IW*(h.length-1));
+    i=Math.max(0,Math.min(h.length-1,i));
+    showTip(e,fmt(h[i]));
+  });
+  c.addEventListener('mouseleave',hideTip);
+}
+wireTip('spark',36,10,()=>(_lastState&&_lastState.history)||[],p=>[
+  `<span style="color:var(--muted)">${Tc(p.t)}</span>`,
+  `<span style="color:var(--green)">✔ OK&nbsp;&nbsp;&nbsp;${N(p.ok)}</span>`,
+  p.fail?`<span style="color:var(--red)">✗ Fail&nbsp;&nbsp;${N(p.fail)}</span>`:''
+]);
+wireTip('net-spark',10,6,()=>_netHist,p=>[
+  `<span style="color:var(--muted)">${Tc(p.t)}</span>`,
+  `<span style="color:var(--green)">▼ RX&nbsp;&nbsp;${fmtIO(p.rx||0)}</span>`,
+  `<span style="color:var(--blue)">▲ TX&nbsp;&nbsp;${fmtIO(p.tx||0)}</span>`
+]);
+wireTip('h-net-spark',10,6,()=>_hNetHist,p=>[
+  `<span style="color:var(--muted)">${Tc(p.t)}</span>`,
+  `<span style="color:var(--green)">▼ RX&nbsp;&nbsp;${fmtIO(p.rx||0)}</span>`,
+  `<span style="color:var(--blue)">▲ TX&nbsp;&nbsp;${fmtIO(p.tx||0)}</span>`
+]);
 connect();
 </script>
 </body></html>"""

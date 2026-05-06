@@ -106,6 +106,10 @@ class _DualWriter:
             return
         if self._baronly.match(line):
             return
+        # Strip Rich console.log() auto-appended filename:lineno suffix
+        line = re.sub(r'\s{2,}\S+\.py:\d+\s*$', '', line).rstrip()
+        if not line:
+            return
         # Classify
         if line[0] in '╭╰│╔╚║├':
             lvl = 'banner'
@@ -123,7 +127,7 @@ class _DualWriter:
 
 
 _dual_writer = _DualWriter()
-console = Console(highlight=False, file=_dual_writer)
+console = Console(highlight=False, log_path=False, file=_dual_writer)
 
 # Suppress SSL warnings — this tool intentionally hits self-signed / expired certs.
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
