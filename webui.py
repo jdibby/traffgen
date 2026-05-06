@@ -30,6 +30,7 @@ _KEY         = "/tmp/webui.key"
 PORT         = 7777
 MAX_SSE      = 30
 _VALID_SIZES = {"XS", "S", "M", "L", "XL"}
+ADMIN_TOKEN  = os.environ.get("TRAFFGEN_ADMIN_TOKEN", "")
 
 # ── Flask ──────────────────────────────────────────────────────────────────────
 app = Flask(__name__)
@@ -293,8 +294,21 @@ def api_health():
     return jsonify(out)
 
 
+def _is_admin() -> bool:
+    if not ADMIN_TOKEN:
+        return True
+    return request.headers.get("X-Admin-Token", "") == ADMIN_TOKEN
+
+
+@app.route("/api/role")
+def api_role():
+    return jsonify({"auth_required": bool(ADMIN_TOKEN), "admin": _is_admin()})
+
+
 @app.route("/api/control", methods=["POST"])
 def api_control():
+    if ADMIN_TOKEN and not _is_admin():
+        return jsonify({"error": "Admin access required"}), 401
     if not request.is_json:
         return jsonify({"error": "Content-Type must be application/json"}), 400
 
@@ -656,6 +670,20 @@ html.light .obody .ll:hover{background:rgba(0,0,0,.04)}html.light .cmd-blk{backg
 .net-dir{display:flex;flex-direction:column;gap:1px}
 .net-lbl{font-size:9px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
 .net-val{font-size:15px;font-weight:700}
+.ro-banner{display:none;align-items:center;gap:10px;padding:7px 18px;background:rgba(245,158,11,.07);border-bottom:2px solid var(--amber);font-size:12px;color:var(--amber);flex-shrink:0}
+.ro-banner strong{font-weight:700}
+.ro-banner .ro-unlock{margin-left:auto;padding:2px 10px;border-radius:var(--r);border:1px solid var(--amber);background:transparent;color:var(--amber);font-size:11px;cursor:pointer}
+.ro-banner .ro-unlock:hover{background:rgba(245,158,11,.12)}
+body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
+.auth-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:500;align-items:center;justify-content:center}
+.auth-ov.open{display:flex}
+.auth-box{background:var(--surf);border:1px solid var(--border2);border-radius:8px;width:min(340px,92vw);display:flex;flex-direction:column;overflow:hidden}
+.auth-hdr{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;border-bottom:1px solid var(--border)}
+.auth-body{padding:16px;display:flex;flex-direction:column;gap:12px}
+.auth-note{font-size:12px;color:var(--muted);line-height:1.5}
+.auth-inp{width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-size:13px;font-family:'SF Mono',Consolas,monospace;outline:none}
+.auth-inp:focus{border-color:var(--green)}
+.auth-ftr{padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px}
 .tt{position:fixed;pointer-events:none;display:none;background:var(--surf2);border:1px solid var(--border2);border-radius:5px;padding:5px 9px;font-size:11px;font-family:'SF Mono',Consolas,monospace;line-height:1.8;z-index:200;color:var(--text);white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.4)}
 </style>
 </head>
@@ -694,11 +722,16 @@ html.light .obody .ll:hover{background:rgba(0,0,0,.04)}html.light .cmd-blk{backg
     <span id="cfg-s-pill" class="mono" style="color:var(--muted)">—</span>
     <span id="cfg-z-pill" class="mono" style="color:var(--muted)">—</span>
     <span id="status-pill" class="tp-pill tp-dim"><span class="pulse"></span>Starting</span>
-    <button id="btn-pause" class="ico-btn" onclick="togglePause()" title="Pause / Resume">&#9208;</button>
-    <button class="ico-btn danger" onclick="stopTests()" title="Stop all tests">&#9209;</button>
+    <button id="btn-pause" class="ico-btn ro-ctrl" onclick="togglePause()" title="Pause / Resume">&#9208;</button>
+    <button id="btn-stop" class="ico-btn danger ro-ctrl" onclick="stopTests()" title="Stop all tests">&#9209;</button>
     <button class="ico-btn" onclick="openDrawer()" title="Settings">&#9881;</button>
     <button class="ico-btn" id="btn-theme" onclick="toggleTheme()" title="Toggle dark / light mode">&#9790;</button>
-    <span id="pill-live" class="tp-pill tp-running" style="cursor:pointer" onclick="handleLiveClick()" title="Click to stop all tests"><span class="pulse"></span>LIVE</span>
+    <button class="ico-btn" id="btn-lock" onclick="showAuthModal()" title="Unlock admin access" style="display:none">&#128274;</button>
+    <span id="pill-live" class="tp-pill tp-running ro-ctrl" style="cursor:pointer" onclick="handleLiveClick()" title="Click to stop all tests"><span class="pulse"></span>LIVE</span>
+  </div>
+  <div class="ro-banner" id="ro-banner">
+    &#128274; <strong>Read-only</strong> &mdash; this system is under active admin control. You can monitor but cannot modify settings or control tests.
+    <button class="ro-unlock" onclick="showAuthModal()">Unlock</button>
   </div>
   <div class="content">
     <!-- Overview -->
@@ -914,7 +947,7 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
     </div>
     <div class="field"><div class="togrow"><span class="toglbl">Loop Mode</span><label class="tog"><input type="checkbox" id="cfg-loop" checked><span class="tslider"></span></label></div></div>
     <div class="field"><div class="togrow"><span class="toglbl">No Wait (skip pauses)</span><label class="tog"><input type="checkbox" id="cfg-nowait"><span class="tslider"></span></label></div></div>
-    <button class="btn-p" onclick="applySettings()">Apply &amp; Restart</button>
+    <button class="btn-p" id="drawer-apply" onclick="applySettings()">Apply &amp; Restart</button>
     <p class="fnote">New settings apply at the next test boundary without restarting the container.</p>
   </div>
 </div>
@@ -945,7 +978,20 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
     </div>
     <div class="modal-ftr">
       <button class="btn-cancel" onclick="closeModal()">Cancel</button>
-      <button class="btn-run" onclick="runFromModal()">&#9654; Run This Test</button>
+      <button class="btn-run" id="btn-run-modal" onclick="runFromModal()">&#9654; Run This Test</button>
+    </div>
+  </div>
+</div>
+<div class="auth-ov" id="auth-ov" onclick="if(event.target===this)closeAuthModal()">
+  <div class="auth-box">
+    <div class="auth-hdr"><span style="font-weight:700;font-size:14px">&#128274; Admin Access</span><button class="ico-btn" onclick="closeAuthModal()">&#10005;</button></div>
+    <div class="auth-body">
+      <p class="auth-note">Enter the admin token to unlock full control of this system.</p>
+      <input class="auth-inp" id="auth-inp" type="password" placeholder="Admin token" onkeydown="if(event.key==='Enter')attemptAuth()">
+    </div>
+    <div class="auth-ftr">
+      <button class="btn-cancel" onclick="closeAuthModal()">Cancel</button>
+      <button class="btn-run" onclick="attemptAuth()">&#128275; Unlock</button>
     </div>
   </div>
 </div>
@@ -961,6 +1007,36 @@ const RC=p=>p>=90?'var(--green)':p>=70?'var(--amber)':'var(--red)';
 let _start=null,_uptimer=null,_elTimer=null,_autoScroll=true;
 let _lastState=null,_logEs=null,_logFilter='all';
 let _xRows=new Set(),_xEvs=new Set(),_modalSuite=null,_isPaused=false,_lastTest=null;
+let _isAdmin=true,_authRequired=false,_adminToken='';
+function _getToken(){try{return localStorage.getItem('tg-admin-token')||'';}catch(e){return '';}}
+function _setToken(t){try{if(t)localStorage.setItem('tg-admin-token',t);else localStorage.removeItem('tg-admin-token');}catch(e){}}
+function _ctrl(body){
+  return fetch('/api/control',{method:'POST',headers:{'Content-Type':'application/json','X-Admin-Token':_adminToken},body:JSON.stringify(body)});
+}
+function checkRole(){
+  _adminToken=_getToken();
+  fetch('/api/role',{headers:{'X-Admin-Token':_adminToken}}).then(r=>r.json()).then(d=>{
+    _authRequired=d.auth_required;_isAdmin=d.admin;applyRoleUI();
+  }).catch(()=>{});
+}
+function applyRoleUI(){
+  if(!_authRequired){$('btn-lock').style.display='none';return;}
+  const ro=!_isAdmin;
+  $('ro-banner').style.display=ro?'flex':'none';
+  $('btn-lock').style.display=ro?'inline-grid':'none';
+  document.body.classList.toggle('ro-mode',ro);
+  $('btn-run-modal').disabled=ro;
+  $('drawer-apply').disabled=ro;
+}
+function showAuthModal(){$('auth-ov').classList.add('open');$('auth-inp').value='';setTimeout(()=>$('auth-inp').focus(),60);}
+function closeAuthModal(){$('auth-ov').classList.remove('open');}
+function attemptAuth(){
+  const t=$('auth-inp').value.trim();if(!t)return;
+  fetch('/api/role',{headers:{'X-Admin-Token':t}}).then(r=>r.json()).then(d=>{
+    if(d.admin){_adminToken=t;_setToken(t);_isAdmin=true;applyRoleUI();closeAuthModal();toast('Admin access granted',true);}
+    else toast('Invalid admin token',false);
+  }).catch(()=>toast('Request failed',false));
+}
 let _healthTimer=null,_lastHealth=null,_netHist=[],_hNetHist=[],_netTimer=null,_netInterval=1000;
 function uptime(t){const s=Math.floor(Date.now()/1000-t);return[Math.floor(s/3600),Math.floor((s%3600)/60),s%60].map(v=>String(v).padStart(2,'0')).join(':');}
 function elapsed(t){if(!t)return'';const s=Math.floor(Date.now()/1000-t);if(s<60)return s+'s elapsed';if(s<3600)return Math.floor(s/60)+'m '+(s%60)+'s elapsed';return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m elapsed';}
@@ -1144,21 +1220,21 @@ function openDrawer(){$('drawer').classList.add('open');$('overlay').classList.a
 function closeDrawer(){$('drawer').classList.remove('open');$('overlay').classList.remove('open');}
 function toast(msg,ok){const t=$('toast');t.textContent=msg;t.className='toast '+(ok?'ok':'err');t.style.display='block';setTimeout(()=>t.style.display='none',3500);}
 function applySettings(){
+  if(!_isAdmin){toast('Admin access required — click Unlock',false);return;}
   const body={suite:$('cfg-suite').value,size:$('cfg-size').value,max_wait_secs:parseInt($('cfg-wait').value),loop:$('cfg-loop').checked,nowait:$('cfg-nowait').checked};
-  fetch('/api/control',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
-    .then(r=>r.json()).then(d=>{if(d.ok){toast('Settings applied — restarting at next boundary…',true);closeDrawer();}else toast('Error: '+d.error,false);})
+  _ctrl(body).then(r=>r.json()).then(d=>{if(d.ok){toast('Settings applied — restarting at next boundary…',true);closeDrawer();}else toast('Error: '+d.error,false);})
     .catch(()=>toast('Request failed',false));
 }
 function togglePause(){
+  if(!_isAdmin){toast('Admin access required — click Unlock',false);return;}
   const action=_isPaused?'resume':'pause';
-  fetch('/api/control',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action})})
-    .then(r=>r.json()).then(d=>{if(d.ok)toast(action==='pause'?'Tests paused — will stop after current test':'Tests resuming…',true);else toast('Error: '+d.error,false);})
+  _ctrl({action}).then(r=>r.json()).then(d=>{if(d.ok)toast(action==='pause'?'Tests paused — will stop after current test':'Tests resuming…',true);else toast('Error: '+d.error,false);})
     .catch(()=>toast('Request failed',false));
 }
 function stopTests(){
+  if(!_isAdmin){toast('Admin access required — click Unlock',false);return;}
   if(!confirm('Stop all tests? Traffic generation will halt until the container is restarted.'))return;
-  fetch('/api/control',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'stop'})})
-    .then(r=>r.json()).then(d=>{if(d.ok)toast('Stop signal sent — tests will halt after current test',true);else toast('Error: '+d.error,false);})
+  _ctrl({action:'stop'}).then(r=>r.json()).then(d=>{if(d.ok)toast('Stop signal sent — tests will halt after current test',true);else toast('Error: '+d.error,false);})
     .catch(()=>toast('Request failed',false));
 }
 function handleLiveClick(){if(_lastState&&_lastState.status==='stopped'){toast('Tests are already stopped',false);return;}stopTests();}
@@ -1173,9 +1249,9 @@ function openModal(name,desc){
 function closeModal(){$('modal-ov').classList.remove('open');_modalSuite=null;}
 function runFromModal(){
   if(!_modalSuite)return;
+  if(!_isAdmin){toast('Admin access required — click Unlock',false);return;}
   const body={suite:_modalSuite,size:$('modal-size').value,max_wait_secs:parseInt($('modal-wait').value),loop:$('modal-loop').checked,nowait:false};
-  fetch('/api/control',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
-    .then(r=>r.json()).then(d=>{if(d.ok){toast('Running '+_modalSuite+' — generator restarting…',true);closeModal();}else toast('Error: '+d.error,false);})
+  _ctrl(body).then(r=>r.json()).then(d=>{if(d.ok){toast('Running '+_modalSuite+' — generator restarting…',true);closeModal();}else toast('Error: '+d.error,false);})
     .catch(()=>toast('Request failed',false));
 }
 // ── Health / perf functions ────────────────────────────────────────────────────
@@ -1316,6 +1392,7 @@ wireTip('h-net-spark',10,6,()=>_hNetHist,p=>[
   `<span style="color:var(--green)">▼ RX&nbsp;&nbsp;${fmtIO(p.rx||0)}</span>`,
   `<span style="color:var(--blue)">▲ TX&nbsp;&nbsp;${fmtIO(p.tx||0)}</span>`
 ]);
+checkRole();
 connect();
 </script>
 </body></html>"""
