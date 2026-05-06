@@ -22,11 +22,11 @@ docker run --pull=always -it jdibby/traffgen:latest --help
 # Run all suites in a continuous loop (background daemon)
 docker run --pull=always --detach --restart unless-stopped \
   --name traffgen jdibby/traffgen:latest \
-  --suite=all --size=XS --max-wait-secs=20 --loop
+  --suite=all --size=S --max-wait-secs=20 --loop
 
 # Run all suites interactively
 docker run --pull=always --restart unless-stopped -it \
-  jdibby/traffgen:latest --suite=all --size=XS --max-wait-secs=20 --loop
+  jdibby/traffgen:latest --suite=all --size=S --max-wait-secs=20 --loop
 
 # Run a single suite once
 docker run --pull=always -it jdibby/traffgen:latest --suite=nmap --size=L
@@ -53,7 +53,7 @@ Add `-p 7777:7777` to expose a live HTTPS monitoring dashboard at `https://<host
 ```bash
 docker run --pull=always --detach --restart unless-stopped \
   -p 7777:7777 --name traffgen jdibby/traffgen:latest \
-  --suite=all --size=XS --max-wait-secs=20 --loop
+  --suite=all --size=S --max-wait-secs=20 --loop
 ```
 
 The dashboard includes:
@@ -74,7 +74,7 @@ The dashboard includes:
 | Flag | Values | Default | Description |
 |---|---|---|---|
 | `--suite` | See suite names below | `all` | Test suite to run |
-| `--size` | `XS` `S` `M` `L` `XL` | `XS` | Traffic volume / intensity |
+| `--size` | `XS` `S` `M` `L` `XL` | `S` | Traffic volume / intensity |
 | `--loop` | — | off | Loop forever, picking tests at random each iteration |
 | `--max-wait-secs` | integer | `20` | Max random pause between iterations when looping |
 | `--nowait` | — | off | Disable all inter-test pauses (loop and single-run mode) |
@@ -260,7 +260,7 @@ Three-stage multi-arch build (`linux/amd64`, `linux/arm64`, `linux/arm/v7`):
 
 **❤️ Healthcheck:** `healthcheck.sh` uses `pgrep` to verify `generator.py` is running. Evaluated every 10 seconds with a 3-second timeout and 2 retries.
 
-**🚀 Entrypoint:** `docker-entrypoint.sh` auto-detects TLS-inspection proxies, installs any injected CA certificates, then launches `python3 -u /traffgen/generator.py`. Default `CMD` is `--suite=all --size=XS --max-wait-secs=20 --loop`.
+**🚀 Entrypoint:** `docker-entrypoint.sh` auto-detects TLS-inspection proxies, installs any injected CA certificates, then launches `python3 -u /traffgen/generator.py`. Default `CMD` is `--suite=all --size=S --max-wait-secs=20 --loop`.
 
 **📊 Suite Summary:** After every suite completes, a summary panel is printed to the CLI — see [Suite Summary](#-suite-summary) below.
 
@@ -315,7 +315,7 @@ Export your proxy's CA as a PEM file and mount it into the container:
 docker run --pull=always --detach --restart unless-stopped \
   -v /path/to/proxy-ca.crt:/usr/local/share/ca-certificates/proxy-ca.crt \
   --name traffgen jdibby/traffgen:latest \
-  --suite=all --size=XS --max-wait-secs=20 --loop
+  --suite=all --size=S --max-wait-secs=20 --loop
 ```
 
 ### Option 2 — Inline PEM via environment variable
@@ -326,7 +326,7 @@ Useful for Kubernetes secrets, Docker Swarm configs, or CI pipelines:
 docker run --pull=always --detach --restart unless-stopped \
   -e EXTRA_CA_CERT="$(cat /path/to/proxy-ca.crt)" \
   --name traffgen jdibby/traffgen:latest \
-  --suite=all --size=XS --max-wait-secs=20 --loop
+  --suite=all --size=S --max-wait-secs=20 --loop
 ```
 
 Options 1 and 2 are installed first; the auto-probe (Option 3) runs after, so if a manually-supplied cert already covers the proxy the probe will see a clean chain and skip.  All options can be combined, and multiple `.crt` files can be mounted simultaneously.
@@ -464,7 +464,7 @@ traffgen includes a built-in HTTPS monitoring dashboard on **port 7777**. No con
 # Run with port 7777 exposed
 docker run --pull=always --detach --restart unless-stopped \
   -p 7777:7777 jdibby/traffgen:latest \
-  --suite=all --size=XS --max-wait-secs=20 --loop
+  --suite=all --size=S --max-wait-secs=20 --loop
 
 # Open in browser (accept the self-signed certificate warning)
 https://<host-ip>:7777

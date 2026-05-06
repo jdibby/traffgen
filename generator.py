@@ -404,7 +404,7 @@ _WEB_PAUSE_FILE  = "/tmp/traffgen_pause"
 _WEB_STOP_FILE   = "/tmp/traffgen_stop"
 
 _WEB_STATE: dict = {
-    "version": "", "started_at": 0.0, "suite": "all", "size": "XS",
+    "version": "", "started_at": 0.0, "suite": "all", "size": "S",
     "max_wait_secs": 20, "loop": True, "current_test": "", "iteration": 0,
     "status": "starting",   # running | between_tests | paused | stopped
     "test_started_at": 0.0,
@@ -527,9 +527,9 @@ def _argv_from_cmd(cmd: dict) -> list:
     if suite not in valid_suites:
         suite = "all"
 
-    size = str(cmd.get("size", "XS"))
+    size = str(cmd.get("size", "S"))
     if size not in valid_sizes:
-        size = "XS"
+        size = "S"
 
     try:
         wait = max(5, min(300, int(cmd.get("max_wait_secs", 20))))

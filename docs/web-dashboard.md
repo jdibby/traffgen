@@ -18,7 +18,7 @@ Add `-p 7777:7777` to your `docker run` command:
 docker run --pull=always --detach --restart unless-stopped \
   -p 7777:7777 \
   --name traffgen jdibby/traffgen:latest \
-  --suite=all --size=XS --max-wait-secs=20 --loop
+  --suite=all --size=S --max-wait-secs=20 --loop
 ```
 
 If deployed via `stager.sh`, port 7777 is opened automatically and the dashboard URL is printed at the end of installation.
@@ -31,7 +31,7 @@ The dashboard has a **dark sidebar** on the left with navigation, and a main con
 
 ```
 ┌─────────────────┬──────────────────────────────────────────────────────────┐
-│  🚦 traffgen    │  [Page Title]   suite:all  size:XS  ● Running            │
+│  🚦 traffgen    │  [Page Title]   suite:all  size:S  ● Running            │
 │                 │                                       ⏸  ⏹  ⚙  ☾  LIVE │
 │  MONITOR        ├──────────────────────────────────────────────────────────┤
 │  ◈ Overview     │                                                          │

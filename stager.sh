@@ -224,7 +224,7 @@ docker run \
     -p 7777:7777 \
     --name traffgen \
     jdibby/traffgen:latest \
-    --suite=all --size=XS --max-wait-secs=20 --loop
+    --suite=all --size=S --max-wait-secs=20 --loop
 
 ok "Container started"
 

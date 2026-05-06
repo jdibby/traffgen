@@ -176,4 +176,4 @@ RUN rm -rf \
 EXPOSE 7777
 
 ENTRYPOINT ["/traffgen/docker-entrypoint.sh"]
-CMD ["--suite=all", "--size=XS", "--max-wait-secs=20", "--loop"]
+CMD ["--suite=all", "--size=S", "--max-wait-secs=20", "--loop"]
