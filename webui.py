@@ -38,6 +38,43 @@ app = Flask(__name__)
 _sse_count = 0
 _sse_lock  = threading.Lock()
 
+# ── Exclusive-control session tracking ────────────────────────────────────────
+# When ADMIN_TOKEN is not set, the first browser tab to open an SSE connection
+# becomes the controller; all other tabs are read-only.  If the controller tab
+# closes, its SSE stream ends and a 10-second timer starts.  If the same tab
+# reconnects within the grace period it reclaims control; otherwise the slot
+# opens for the next visitor.
+_controller_id:    str                          = ""
+_controller_lock:  threading.Lock               = threading.Lock()
+_controller_timer: "threading.Timer | None"     = None
+
+
+def _schedule_controller_release(sid: str, delay: float = 10.0) -> None:
+    global _controller_id, _controller_timer
+    with _controller_lock:
+        if _controller_timer is not None:
+            _controller_timer.cancel()
+
+        def _release():
+            global _controller_id, _controller_timer
+            with _controller_lock:
+                if _controller_id == sid:
+                    _controller_id = ""
+                _controller_timer = None
+
+        t = threading.Timer(delay, _release)
+        t.daemon = True
+        t.start()
+        _controller_timer = t
+
+
+def _cancel_controller_release() -> None:
+    global _controller_timer
+    with _controller_lock:
+        if _controller_timer is not None:
+            _controller_timer.cancel()
+            _controller_timer = None
+
 # ── Health monitoring ──────────────────────────────────────────────────────────
 _health_cache: dict = {}
 _health_lock2 = threading.Lock()
@@ -244,13 +281,28 @@ def _read_state() -> dict:
         }
 
 
-def _sse_wrap(gen_fn):
-    """Apply SSE connection limit and correct headers around a generator."""
-    global _sse_count
+def _sse_wrap(gen_fn, session_id: str = ""):
+    """Apply SSE connection limit and correct headers around a generator.
+
+    If session_id is provided and ADMIN_TOKEN is not set, the session-based
+    exclusive-control logic runs: the first SSE connection claims the
+    controller slot; when it drops a 10-second grace timer starts so a
+    reconnect from the same tab reclaims control without a gap.
+    """
+    global _sse_count, _controller_id
     with _sse_lock:
         if _sse_count >= MAX_SSE:
             return Response("Too many connections", status=429)
         _sse_count += 1
+
+    # Claim or renew the controller slot when no ADMIN_TOKEN is configured.
+    if not ADMIN_TOKEN and session_id:
+        with _controller_lock:
+            if not _controller_id:
+                _controller_id = session_id
+            is_ctrl = (_controller_id == session_id)
+        if is_ctrl:
+            _cancel_controller_release()
 
     def _guarded():
         global _sse_count
@@ -259,6 +311,12 @@ def _sse_wrap(gen_fn):
         finally:
             with _sse_lock:
                 _sse_count -= 1
+            # Start the release grace timer when the controller's stream ends.
+            if not ADMIN_TOKEN and session_id:
+                with _controller_lock:
+                    was_ctrl = (_controller_id == session_id)
+                if was_ctrl:
+                    _schedule_controller_release(session_id)
 
     return Response(
         _guarded(),
@@ -295,19 +353,30 @@ def api_health():
 
 
 def _is_admin() -> bool:
-    if not ADMIN_TOKEN:
-        return True
-    return request.headers.get("X-Admin-Token", "") == ADMIN_TOKEN
+    if ADMIN_TOKEN:
+        return request.headers.get("X-Admin-Token", "") == ADMIN_TOKEN
+    sid = request.headers.get("X-Session-ID", "")
+    if not sid:
+        return False
+    with _controller_lock:
+        return _controller_id == sid
 
 
 @app.route("/api/role")
 def api_role():
-    return jsonify({"auth_required": bool(ADMIN_TOKEN), "admin": _is_admin()})
+    is_ctrl = _is_admin()
+    has_ctrl = bool(_controller_id)
+    return jsonify({
+        "auth_required": bool(ADMIN_TOKEN),
+        "session_mode":  not bool(ADMIN_TOKEN),
+        "admin":         is_ctrl,
+        "has_controller": has_ctrl,
+    })
 
 
 @app.route("/api/control", methods=["POST"])
 def api_control():
-    if ADMIN_TOKEN and not _is_admin():
+    if not _is_admin():
         return jsonify({"error": "Admin access required"}), 401
     if not request.is_json:
         return jsonify({"error": "Content-Type must be application/json"}), 400
@@ -391,7 +460,7 @@ def sse_state():
             if time.time() - last_ka > 15:
                 yield ": ka\n\n"
                 last_ka = time.time()
-    return _sse_wrap(_gen)
+    return _sse_wrap(_gen, request.args.get("sid", ""))
 
 
 @app.route("/log")
@@ -1007,23 +1076,29 @@ const RC=p=>p>=90?'var(--green)':p>=70?'var(--amber)':'var(--red)';
 let _start=null,_uptimer=null,_elTimer=null,_autoScroll=true;
 let _lastState=null,_logEs=null,_logFilter='all';
 let _xRows=new Set(),_xEvs=new Set(),_modalSuite=null,_isPaused=false,_lastTest=null;
-let _isAdmin=true,_authRequired=false,_adminToken='';
+let _isAdmin=true,_authRequired=false,_adminToken='',_sessionMode=false,_hasController=false;
+let _sessionId=(()=>{try{let s=sessionStorage.getItem('tg-sid');if(!s){s=crypto.randomUUID();sessionStorage.setItem('tg-sid',s);}return s;}catch(e){return '';}})();
 function _getToken(){try{return localStorage.getItem('tg-admin-token')||'';}catch(e){return '';}}
 function _setToken(t){try{if(t)localStorage.setItem('tg-admin-token',t);else localStorage.removeItem('tg-admin-token');}catch(e){}}
 function _ctrl(body){
-  return fetch('/api/control',{method:'POST',headers:{'Content-Type':'application/json','X-Admin-Token':_adminToken},body:JSON.stringify(body)});
+  const hdrs={'Content-Type':'application/json','X-Admin-Token':_adminToken};
+  if(_sessionId)hdrs['X-Session-ID']=_sessionId;
+  return fetch('/api/control',{method:'POST',headers:hdrs,body:JSON.stringify(body)});
 }
 function checkRole(){
   _adminToken=_getToken();
-  fetch('/api/role',{headers:{'X-Admin-Token':_adminToken}}).then(r=>r.json()).then(d=>{
-    _authRequired=d.auth_required;_isAdmin=d.admin;applyRoleUI();
+  const hdrs={'X-Admin-Token':_adminToken};
+  if(_sessionId)hdrs['X-Session-ID']=_sessionId;
+  fetch('/api/role',{headers:hdrs}).then(r=>r.json()).then(d=>{
+    _authRequired=d.auth_required;_sessionMode=d.session_mode||false;_hasController=d.has_controller||false;_isAdmin=d.admin;applyRoleUI();
   }).catch(()=>{});
 }
 function applyRoleUI(){
-  if(!_authRequired){$('btn-lock').style.display='none';return;}
+  if(!_authRequired&&!_sessionMode){$('btn-lock').style.display='none';return;}
   const ro=!_isAdmin;
-  $('ro-banner').style.display=ro?'flex':'none';
-  $('btn-lock').style.display=ro?'inline-grid':'none';
+  const btext=_sessionMode&&ro&&!_hasController?'Waiting for control…':_sessionMode&&ro?'Another session is currently in control — you are read-only':'Read-only mode';
+  const bel=$('ro-banner');bel.style.display=ro?'flex':'none';if(ro)bel.textContent=btext;
+  $('btn-lock').style.display=(!_sessionMode&&ro)?'inline-grid':'none';
   document.body.classList.toggle('ro-mode',ro);
   $('btn-run-modal').disabled=ro;
   $('drawer-apply').disabled=ro;
@@ -1032,7 +1107,8 @@ function showAuthModal(){$('auth-ov').classList.add('open');$('auth-inp').value=
 function closeAuthModal(){$('auth-ov').classList.remove('open');}
 function attemptAuth(){
   const t=$('auth-inp').value.trim();if(!t)return;
-  fetch('/api/role',{headers:{'X-Admin-Token':t}}).then(r=>r.json()).then(d=>{
+  const hdrs={'X-Admin-Token':t};if(_sessionId)hdrs['X-Session-ID']=_sessionId;
+  fetch('/api/role',{headers:hdrs}).then(r=>r.json()).then(d=>{
     if(d.admin){_adminToken=t;_setToken(t);_isAdmin=true;applyRoleUI();closeAuthModal();toast('Admin access granted',true);}
     else toast('Invalid admin token',false);
   }).catch(()=>toast('Request failed',false));
@@ -1161,7 +1237,8 @@ function apply(s){
 function toggleRow(n){if(_xRows.has(n))_xRows.delete(n);else _xRows.add(n);if(_lastState)apply(_lastState);}
 function toggleEv(i){if(_xEvs.has(i))_xEvs.delete(i);else _xEvs.add(i);if(_lastState)apply(_lastState);}
 function connect(){
-  const es=new EventSource('/events');
+  const url='/events'+(_sessionId?'?sid='+encodeURIComponent(_sessionId):'');
+  const es=new EventSource(url);
   es.onmessage=ev=>{try{apply(JSON.parse(ev.data))}catch(e){}};
   es.onerror=()=>{es.close();$('pill-live').className='tp-pill tp-paused';$('pill-live').innerHTML='⚠ RECONNECT';setTimeout(connect,3000);};
 }
@@ -1394,6 +1471,7 @@ wireTip('h-net-spark',10,6,()=>_hNetHist,p=>[
 ]);
 checkRole();
 connect();
+setInterval(checkRole,5000);
 
 // ── Disclaimer modal (shown once per browser session) ─────────────────────
 (function(){
