@@ -3,9 +3,11 @@
 # so no extra apt install is needed in this stage.
 FROM golang:1.23-bookworm AS gobgp-build
 
+ARG GOBGP_VERSION=v3.36.0
+
 WORKDIR /tmp/gobgp
 # --depth 1 --single-branch fetches only the tagged commit, not the full history
-RUN git -c http.sslVerify=false clone --depth 1 --single-branch --branch v3.36.0 \
+RUN git clone --depth 1 --single-branch --branch ${GOBGP_VERSION} \
         https://github.com/osrg/gobgp.git . && \
     go build -ldflags="-s -w" -o /tmp/gobgp-bin/gobgp  ./cmd/gobgp  && \
     go build -ldflags="-s -w" -o /tmp/gobgp-bin/gobgpd ./cmd/gobgpd && \
@@ -24,7 +26,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /opt
 # --depth 1 skips the full MSF git history (~1 GB uncompressed)
-RUN git -c http.sslVerify=false clone --depth 1 \
+RUN git clone --depth 1 \
         https://github.com/rapid7/metasploit-framework.git metasploit-framework
 WORKDIR /opt/metasploit-framework
 
@@ -87,14 +89,16 @@ ENV BUNDLE_WITHOUT=development:test
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tzdata ca-certificates curl git \
     iproute2 traceroute iputils-ping netcat-openbsd dnsutils openssh-client \
-    nmap snmp openssl \
+    nmap snmp openssl procps \
     perl python3 python3-pip sqlite3 ruby bash \
   && ln -fs /usr/share/zoneinfo/$TZ /etc/localtime \
   && echo "$TZ" > /etc/timezone \
   && rm -rf /var/lib/apt/lists/*
 
+ARG NIKTO_VERSION=2.1.6
+
 # nikto is not in Debian repos — install from upstream (Perl script, no extra deps)
-RUN git -c http.sslVerify=false clone --depth 1 \
+RUN git clone --depth 1 --branch ${NIKTO_VERSION} \
         https://github.com/sullo/nikto.git /opt/nikto && \
     ln -s /opt/nikto/program/nikto.pl /usr/local/bin/nikto && \
     chmod +x /opt/nikto/program/nikto.pl
@@ -102,9 +106,15 @@ RUN git -c http.sslVerify=false clone --depth 1 \
 # Bundler in runtime so wrappers can call `bundle exec`
 RUN gem install --no-document bundler
 
-# Python packages
+# Python packages — versions pinned for reproducibility
 RUN pip3 install --no-cache-dir --break-system-packages \
-      fastcli requests beautifulsoup4 dnspython dnstwist rich && \
+      fastcli \
+      "flask==3.0.3" \
+      "requests==2.32.2" \
+      "beautifulsoup4==4.12.3" \
+      "dnspython==2.6.1" \
+      "dnstwist==20250130" \
+      "rich==13.7.1" && \
     find /usr -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 
 # Remove static/libtool artefacts BEFORE copying Metasploit so the find
@@ -133,7 +143,7 @@ ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 
 # App files
 WORKDIR /traffgen
-COPY generator.py endpoints.py healthcheck.sh docker-entrypoint.sh ./
+COPY generator.py endpoints.py webui.py healthcheck.sh docker-entrypoint.sh ./
 RUN chmod +x /traffgen/docker-entrypoint.sh
 
 # Ensure checks dir exists; copy RC scripts; move targets.list up one level
@@ -144,7 +154,7 @@ RUN mv /opt/metasploit-framework/ms_checks/checks/targets.list \
 
 # Healthcheck
 RUN chmod +x /traffgen/healthcheck.sh
-HEALTHCHECK --interval=10s --timeout=3s --retries=2 CMD /traffgen/healthcheck.sh
+HEALTHCHECK --interval=20s --timeout=3s --start-period=120s --retries=3 CMD /traffgen/healthcheck.sh
 
 # Final cleanup — docs, manpages, locale data, caches, i18n tables,
 # games/pixmaps, Python .pyc files, Ruby rdoc cache
@@ -163,5 +173,7 @@ RUN rm -rf \
 
 # Entrypoint — installs any custom CA certs before launching the generator.
 # Bind-mount a .crt file or pass EXTRA_CA_CERT env var to inject a CA.
+EXPOSE 7777
+
 ENTRYPOINT ["/traffgen/docker-entrypoint.sh"]
-CMD ["--suite=all", "--size=S", "--max-wait-secs=40", "--loop"]
+CMD ["--suite=all", "--size=XS", "--max-wait-secs=20", "--loop"]

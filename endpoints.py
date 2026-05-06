@@ -8,7 +8,7 @@ by generator.py are defined here as plain Python lists.  Keeping data
 separate from logic makes it easy to customise targets without touching
 test code.
 
-The reload_endpoints() function in generator.py can hot-swap this file
+The replace_all_endpoints() function in generator.py can hot-swap this file
 at runtime from a remote URL.
 
 Variable index (matches generator.py usage names 1-to-1):
@@ -629,14 +629,30 @@ https_endpoints = [
 
 # ── Malware / C2-category domains ─────────────────────────────────────────────
 malware_endpoints = [
+    # Classic IDS trigger sites — Snort/Suricata SID 1:2100498 and ET INFO rules
     "http://www.testmyids.com",
     "https://www.testmyids.com",
     "http://scanme.nmap.org",
     "https://scanme.nmap.org",
-    "https://http-evader.semantic-gap.de/-ECABSGAABwMOAAAAAAAAAKpBdDwPL2ZvYi9ub3ZpcnXZDnUwFA==",
-    "https://http-evader.semantic-gap.de/-ECABSGAABwMOAAAAAAAAAKpBdDwPanQsb2xsL3NldF_ZVWIrBXN0LWRz",
-    "https://http-evader.semantic-gap.de/-ECABSGAABwMOAAAAAAAAAKpBdDwPaWpkIWFsbC9vay7aTmY=",
-    "https://http-evader.semantic-gap.de/-ECABSGAABwMOAAAAAAAAAKpBdDwPaHNuYi9hbGwvcGHYRW88P3Nid1FzdWNjZXNzhEh1JQw=",
+
+    # WICAR — safe malware-behaviour test pages designed to trigger AV/IDS/NGFW
+    "https://www.wicar.org/test-malware.html",
+    "https://www.wicar.org/",
+    "https://malware.wicar.org/data/ms14_064_ole_not_xp.html",
+    "https://malware.wicar.org/data/java_jre17_exec.html",
+    "https://malware.wicar.org/data/eicar.com",
+
+    # AMTSO — Anti-Malware Testing Standards Organisation test features
+    "https://www.amtso.org/check-desktop-security-tools/",
+    "https://www.amtso.org/potentially-unwanted-application-detection/",
+    "https://www.amtso.org/phishing-test-page/",
+
+    # Google Safe Browsing test URLs (triggers SB API / URL-filter lookups)
+    "http://malware.testing.google.test/testing/malware/",
+    "http://phishing.testing.google.test/testing/phishing/",
+    "http://unwanted.testing.google.test/testing/unwanted/",
+
+    # HTTP evader — tests IDS/IPS evasion via malformed HTTP constructs
     "https://http-evader.semantic-gap.de/chunked",
     "https://http-evader.semantic-gap.de/compressed",
     "https://http-evader.semantic-gap.de/clen",
@@ -644,9 +660,24 @@ malware_endpoints = [
     "https://http-evader.semantic-gap.de/mime",
     "https://http-evader.semantic-gap.de/messagerfc822",
     "https://http-evader.semantic-gap.de/range",
+    "https://http-evader.semantic-gap.de/-ECABSGAABwMOAAAAAAAAAKpBdDwPL2ZvYi9ub3ZpcnXZDnUwFA==",
+    "https://http-evader.semantic-gap.de/-ECABSGAABwMOAAAAAAAAAKpBdDwPanQsb2xsL3NldF_ZVWIrBXN0LWRz",
+    "https://http-evader.semantic-gap.de/-ECABSGAABwMOAAAAAAAAAKpBdDwPaWpkIWFsbC9vay7aTmY=",
+    "https://http-evader.semantic-gap.de/-ECABSGAABwMOAAAAAAAAAKpBdDwPaHNuYi9hbGwvcGHYRW88P3Nid1FzdWNjZXNzhEh1JQw=",
     "https://noxxi.de/research/http-evader-testsite.html",
     "http://http-evader.semantic-gap.de",
     "https://http-evader.semantic-gap.de",
+
+    # Common C2-panel URL patterns — appended to echo/test services so requests
+    # match ET TROJAN and ET MALWARE Snort/Suricata signatures without hitting
+    # real infrastructure.  These paths are frequently blocked by URL-category
+    # feeds (gate.php, panel paths, update patterns used by Zbot/Zeus, njRAT, etc.)
+    "https://httpbin.org/post?r=gate.php",
+    "https://httpbin.org/anything/panel/gate.php",
+    "https://httpbin.org/anything/update.php",
+    "https://httpbin.org/post?action=checkin&id=1",
+    "https://postman-echo.com/post?cmd=ping&id=1",
+    "https://postman-echo.com/post?r=config.php",
 ]
 
 # ── AI service HTTPS endpoints ────────────────────────────────────────────────
@@ -2535,6 +2566,80 @@ malware_files = [
     "https://raw.githubusercontent.com/Cryakl/Ultimate-RAT-Collection/main/NjRat/Ziku/NJRat_0.7d_Ziku/NJRat_0.7d_Ziku.7z",
 ]
 
+# ── STUN servers — UDP/3478 targets for VoIP/video app-ID simulation ──────────
+# (host, port) tuples.  STUN magic cookie 0x2112A442 in the Binding Request
+# payload is the primary fingerprint used by NGFW app-ID engines.
+stun_servers = [
+    ("stun.l.google.com",           19302),
+    ("stun1.l.google.com",          19302),
+    ("stun2.l.google.com",          19302),
+    ("stun3.l.google.com",          19302),
+    ("stun4.l.google.com",          19302),
+    ("stun.cloudflare.com",          3478),
+    ("stun.zoom.us",                 3478),
+    ("stun.services.mozilla.com",    3478),
+    ("stunserver.stunprotocol.org",  3478),
+    ("stun.nextcloud.com",           3478),
+    ("stun.sipnet.net",              3478),
+    ("stun.ekiga.net",               3478),
+    ("stun.ideasip.com",             3478),
+    ("stun.antisip.com",             3478),
+    ("stun.voip.blackberry.com",     3478),
+]
+
+# ── UCaaS signaling endpoints — VoIP/video URL-category identification ─────────
+# HTTP requests to these URLs trigger "voice" / "video-conferencing" app-ID
+# on platforms like Cato Networks, Prisma Access, and Palo Alto NGFW.
+ucaas_endpoints = [
+    # Zoom
+    "https://zoom.us/",
+    "https://zoom.us/j/",
+    "https://api.zoom.us/v2/users/me",
+    "https://zoom.us/wc/join/",
+    # Microsoft Teams / Skype for Business
+    "https://teams.microsoft.com/",
+    "https://teams.microsoft.com/v2/",
+    "https://config.teams.microsoft.com/config/v1/MicrosoftTeams",
+    "https://presence.teams.microsoft.com/v1/me/forceavailability/",
+    # Cisco WebEx
+    "https://webex.com/",
+    "https://webexapis.com/v1/rooms",
+    "https://api.ciscospark.com/v1/rooms",
+    "https://webex.com/meet/",
+    # Google Meet / Duo
+    "https://meet.google.com/",
+    "https://meet.google.com/api/",
+    "https://duo.google.com/",
+    # Slack huddles / calls
+    "https://slack.com/",
+    "https://slack.com/api/calls.add",
+    "https://api.slack.com/methods/calls.add",
+    # RingCentral
+    "https://app.ringcentral.com/",
+    "https://platform.ringcentral.com/restapi/v1.0/account",
+    # 8x8
+    "https://app.8x8.com/",
+    "https://api.8x8.com/",
+    # GoTo Meeting
+    "https://global.gotomeeting.com/",
+    "https://api.getgo.com/G2M/rest/meetings",
+    # Discord (voice channels)
+    "https://discord.com/",
+    "https://discord.com/api/v10/voice/regions",
+    # WhatsApp / Meta Calls
+    "https://web.whatsapp.com/",
+    "https://www.whatsapp.com/download",
+    # Apple FaceTime
+    "https://facetime.apple.com/",
+    "https://vc.icloud.com/",
+    # Vonage / Twilio
+    "https://api.vonage.com/",
+    "https://api.twilio.com/2010-04-01/Accounts",
+    # Jitsi
+    "https://meet.jit.si/",
+    "https://8x8.vc/",
+]
+
 # ── BGP peering neighbors ─────────────────────────────────────────────────────
 bgp_neighbors = [
     "192.168.1.1",
@@ -2584,18 +2689,35 @@ dot_servers = [
 ]
 
 # ---------------------------------------------------------------------------
-# C2 beacon targets — public test/echo services used to simulate C2 check-ins
-# All targets are designed for security testing or accept arbitrary POSTs
+# C2 beacon targets — public test/echo services used to simulate C2 check-ins.
+# All targets accept arbitrary POSTs and return the payload (200/OK), making
+# them ideal for C2 detection rule validation without live infrastructure.
 # ---------------------------------------------------------------------------
 c2_beacon_targets = [
+    # Classic IDS trigger
     "http://www.testmyids.com",
     "https://www.testmyids.com",
-    "http://scanme.nmap.org",
+
+    # httpbin — full request echo (POST body, headers, JSON visible to DLP/IDS)
     "https://httpbin.org/post",
     "https://httpbin.org/anything",
-    "https://httpbin.org/status/200",
+    "https://httpbin.org/anything/gate.php",        # matches ET TROJAN path patterns
+    "https://httpbin.org/anything/update.php",
+    "https://httpbin.org/anything/checkin",
+    "https://httpbin.org/base64/dGVzdA==",          # base64 path — common in implants
+    "https://httpbin.org/delay/1",                  # slow response mimics staging server
+    "https://httpbin.org/uuid",                     # UUID response used as session token
+
+    # Postman echo — mirrors full request back
     "https://postman-echo.com/post",
-    "https://webhook.site/token",
+    "https://postman-echo.com/post?r=config.php",
+
+    # requestbin / pipedream — public webhook collectors
+    "https://public.requestbin.com/r/dummy",
+    "https://en2s9vxjkrn2.x.pipedream.net",
+
+    # Transfer.sh — free file-upload service abused by malware for staging
+    "https://transfer.sh/",
 ]
 
 # ---------------------------------------------------------------------------

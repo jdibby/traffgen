@@ -92,14 +92,29 @@ if [ "$ROCKY" -gt 0 ]; then
     systemctl enable --now docker
 else
     # Debian-family: deduplicate APT sources, then install via the official Docker repo
-    apt-get install -y python3-apt python3-regex
 
-    # Download and run the aptsources-cleanup tool to remove duplicate sources
-    wget -q -O /tmp/aptsources-cleanup.pyz \
-        https://github.com/davidfoerster/aptsources-cleanup/releases/download/v0.1.7.5.2/aptsources-cleanup.pyz
-    chmod +x /tmp/aptsources-cleanup.pyz
-    bash -c "echo all | python3 /tmp/aptsources-cleanup.pyz --yes" || true
-    rm -f /tmp/aptsources-cleanup.pyz
+    # Remove duplicate/blank/comment-only lines from all APT source files.
+    # Processes /etc/apt/sources.list and every *.list in sources.list.d/.
+    # Uses only awk — no third-party tools required.
+    _cleanup_apt_sources() {
+        local f
+        local _dedup='
+            /^[[:space:]]*$/  { next }
+            /^[[:space:]]*#/  { next }
+            !seen[$0]++
+        '
+        if [ -f /etc/apt/sources.list ]; then
+            awk "$_dedup" /etc/apt/sources.list > /tmp/_apt_src_clean \
+                && mv /tmp/_apt_src_clean /etc/apt/sources.list
+        fi
+        for f in /etc/apt/sources.list.d/*.list; do
+            [ -f "$f" ] || continue
+            awk "$_dedup" "$f" > /tmp/_apt_src_clean \
+                && mv /tmp/_apt_src_clean "$f"
+            [ -s "$f" ] || rm -f "$f"
+        done
+    }
+    _cleanup_apt_sources
 
     # Install prerequisites for adding the Docker GPG key
     apt-get install -y ca-certificates curl gnupg lsb-release
@@ -150,8 +165,9 @@ docker run \
     --pull=always \
     --detach \
     --restart unless-stopped \
+    -p 7777:7777 \
     jdibby/traffgen:latest \
-    --suite=all --size=S --max-wait-secs=20 --loop
+    --suite=all --size=XS --max-wait-secs=20 --loop
 
 echo ""
 echo "${BOLD}### INSTALL COMPLETE ###${NORMAL}"
