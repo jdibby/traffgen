@@ -365,18 +365,22 @@ class SuiteStats:
             self.attempts += 1
             self.errors   += 1
 
-    def block(self) -> None:
+    def block(self, exit_code: int = 7) -> None:
         """Record an explicit non-HTTP block (RST, proxy refusal detected externally)."""
         with self._lock:
             self.attempts += 1
             self.blocked  += 1
+            bucket = f"exit{exit_code}"
+            self.codes[bucket] = self.codes.get(bucket, 0) + 1
 
-    def drop(self) -> None:
+    def drop(self, exit_code: int = 28) -> None:
         """Record a silent drop (timeout, no route, DNS sinkhole)."""
         with self._lock:
             self.attempts += 1
             self.dropped  += 1
             self.errors   += 1
+            bucket = f"exit{exit_code}"
+            self.codes[bucket] = self.codes.get(bucket, 0) + 1
 
     def merge(self, other: "SuiteStats") -> None:
         """Accumulate counters from another SuiteStats instance into this one."""
@@ -2646,12 +2650,12 @@ def scrape_single_link(url: str) -> str | None:
         html = resp.text
         _stats.record(str(resp.status_code))
     except requests.exceptions.HTTPError as e:
-        # 404s are expected when following random links; log others.
-        if e.response is not None and e.response.status_code == 404:
-            _stats.record("404")
-            return None
-        _stats.fail()
-        ui_warn(f"HTTP error {url}: {e}")
+        if e.response is not None:
+            _stats.record(str(e.response.status_code))
+        else:
+            _stats.fail()
+        if e.response is None or e.response.status_code not in (404,):
+            ui_warn(f"HTTP error {url}: {e}")
         return None
     except (requests.exceptions.Timeout, requests.exceptions.ConnectTimeout,
             requests.exceptions.ReadTimeout) as e:
