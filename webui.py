@@ -891,7 +891,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
       </div>
       <div class="tcard">
         <div class="thdr">Per-Suite Security Breakdown <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:10px">sorted by blocked</span></div>
-        <table><thead><tr><th>Suite</th><th class="r">Probes</th><th class="r" style="color:#22c55e">Reached</th><th class="r" style="color:var(--amber)">Blocked</th><th class="r" style="color:#818cf8">Dropped</th><th class="r">Block%</th><th class="r">Drop%</th></tr></thead>
+        <table><thead><tr><th>Suite</th><th class="r">Probes</th><th class="r" style="color:#22c55e">Allowed</th><th class="r" style="color:var(--amber)">Blocked</th><th class="r" style="color:#818cf8">Dropped</th><th class="r">Block%</th><th class="r">Drop%</th></tr></thead>
         <tbody id="sec-tbl"><tr><td colspan="7" class="empty">Waiting for data&#8230;</td></tr></tbody></table>
       </div>
       <div class="tcard">
@@ -1285,6 +1285,7 @@ function apply(s){
     sel.value=s.suite||'all';$('cfg-size').value=s.size||'S';$('cfg-wait').value=s.max_wait_secs||20;$('wait-val').textContent=(s.max_wait_secs||20)+'s';$('cfg-loop').checked=!!s.loop;
   }
   $('cur-cfg').innerHTML=`<span class="cfg-chip">suite:${H(s.suite||'—')}</span><span class="cfg-chip">size:${H(s.size||'—')}</span><span class="cfg-chip">wait:${s.max_wait_secs||20}s</span><span class="cfg-chip">${s.loop?'loop':'single'}</span>`;
+  if($('tab-security').classList.contains('active'))updateSecurityTab();
 }
 function toggleRow(n){if(_xRows.has(n))_xRows.delete(n);else _xRows.add(n);if(_lastState)apply(_lastState);}
 function toggleEv(i){if(_xEvs.has(i))_xEvs.delete(i);else _xEvs.add(i);if(_lastState)apply(_lastState);}
@@ -1503,22 +1504,23 @@ function drawSecTrend(hist){
 function updateSecurityTab(){
   if(!_lastState)return;
   const tot=_lastState.totals||{};
-  const att=tot.attempts||0,blk=tot.blocked||0,drp=tot.dropped||0,rch=tot.allowed||0;
-  const other=Math.max(0,att-blk-drp-rch);
+  const blk=tot.blocked||0,drp=tot.dropped||0,rch=tot.allowed||0;
+  const totalProbes=rch+blk+drp;
+  const other=Math.max(0,(tot.attempts||0)-totalProbes);
   const pct=(n,d)=>d?((n/d)*100).toFixed(1)+'%':'—';
-  $('sec-total').textContent=N(att);$('sec-total-sub').textContent=att?'probe attempts':'No data yet';
-  $('sec-blocked').textContent=N(blk);$('sec-blocked-sub').textContent=att?pct(blk,att)+' of probes':'—';
-  $('sec-dropped').textContent=N(drp);$('sec-dropped-sub').textContent=att?pct(drp,att)+' of probes':'—';
-  $('sec-allowed').textContent=N(rch);$('sec-allowed-sub').textContent=att?pct(rch,att)+' of probes':'—';
-  $('sec-leg-reached').textContent=N(rch)+' Allowed';
+  $('sec-total').textContent=N(totalProbes);$('sec-total-sub').textContent=totalProbes?'total probes':'No data yet';
+  $('sec-blocked').textContent=N(blk);$('sec-blocked-sub').textContent=totalProbes?pct(blk,totalProbes)+' of probes':'—';
+  $('sec-dropped').textContent=N(drp);$('sec-dropped-sub').textContent=totalProbes?pct(drp,totalProbes)+' of probes':'—';
+  $('sec-allowed').textContent=N(rch);$('sec-allowed-sub').textContent=totalProbes?pct(rch,totalProbes)+' of probes':'—';
+  $('sec-leg-allowed').textContent=N(rch)+' Allowed';
   $('sec-leg-blocked').textContent=N(blk)+' Blocked';
   $('sec-leg-dropped').textContent=N(drp)+' Dropped';
   $('sec-leg-other').textContent=N(other)+' Other';
   drawSecDonut(rch,blk,drp,other);
-  // snapshot for trend
+  // snapshot for trend (rate-limited to configured interval)
   const now=Date.now()/1000;
   if(!_secHist.length||now-_secHist[_secHist.length-1].t>=(_secInterval/1000)-1){
-    _secHist.push({t:now,block_pct:att?blk/att*100:0,drop_pct:att?drp/att*100:0,reach_pct:att?rch/att*100:0});
+    _secHist.push({t:now,block_pct:totalProbes?blk/totalProbes*100:0,drop_pct:totalProbes?drp/totalProbes*100:0,reach_pct:totalProbes?rch/totalProbes*100:0});
     if(_secHist.length>120)_secHist.shift();
   }
   drawSecTrend(_secHist);
