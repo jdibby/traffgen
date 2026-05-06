@@ -5,7 +5,7 @@
 [![Docker Hub](https://img.shields.io/docker/pulls/jdibby/traffgen?logo=docker&label=Docker%20Hub)](https://hub.docker.com/r/jdibby/traffgen)
 [![Multi-arch](https://img.shields.io/badge/arch-amd64%20%7C%20arm64%20%7C%20arm%2Fv7-blue?logo=linux)](https://hub.docker.com/r/jdibby/traffgen)
 
-Traffgen simulates realistic network traffic across **47 test suites** — DNS, HTTP/S, FTP, SSH, BGP, ICMP, NTP, SNMP, DoH, DoT, C2 beacons, DNS exfiltration, AI/LLM DLP, Metasploit checks, malware downloads, phishing probes, web scanning, and more.
+Traffgen simulates realistic network traffic across **48 test suites** — DNS, HTTP/S, FTP, SSH, BGP, ICMP, NTP, SNMP, DoH, DoT, C2 beacons, DNS exfiltration, AI/LLM DLP, Metasploit checks, malware downloads, phishing probes, web scanning, and more.
 
 Purpose-built to stress-test **firewalls**, **IDS/IPS**, **URL filters**, **DLP engines**, **CASB platforms**, and **SIEM pipelines**.
 
@@ -116,6 +116,7 @@ The dashboard includes:
 | 🔒 `https` | HTTPS HEAD requests to a wide endpoint pool followed by an iterative TLS crawl. Tests TLS inspection policy, certificate validation enforcement, and HTTPS download logging. |
 | 🕷️ `crawl` | Iterative web crawl from a configurable seed URL (`--crawl-start`). Follows links up to a depth that scales with `--size`. Mimics a browser session for URL categorisation and user-activity analytics testing. |
 | ⏱️ `url-response` | Measures HTTPS response times across a diverse URL set using the Python `requests` library. Populates URL-filter logs and response-time dashboards. |
+| 🪣 `s3` | Simulates S3 bucket upload and download traffic. GET requests target a mix of public AWS datasets and private-style bucket paths (200 or 403 — both generate CASB-visible S3 traffic). PUT requests upload small synthetic payloads containing PII, credentials, and confidential strings to S3 paths — requests return 403 (no credentials) but are fully visible to DLP and CASB engines as cloud-upload/exfiltration attempts. Also targets Wasabi and Backblaze B2 S3-compatible endpoints. |
 | 💾 `bigfile` | Streams an HTTP download to `/dev/null` — file size scales with `--size` (XS=10 MB, S=100 MB, M=1 GB, L=2 GB, XL=5 GB). Tests large-file and bandwidth-cap policies across the full volume range without always hitting the ceiling. |
 | 📂 `ftp` | FTP file download via `curl` with rate limiting against a public test server. Validates FTP inspection, logging, and file-transfer policy enforcement. |
 

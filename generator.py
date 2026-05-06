@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-generator.py — Traffic Generator v2.4.0
+generator.py — Traffic Generator v2.5.0
 ========================================
 Simulates realistic network traffic across a wide range of protocols and
 behaviours: DNS, HTTP/HTTPS/HTTP3, FTP, SSH, NTP, BGP, ICMP, SNMP,
@@ -257,6 +257,7 @@ _SUITE_DESCRIPTIONS: list[tuple[str, str]] = [
     ("pornography",      "HTTPS crawl of adult-content endpoints"),
     ("snmp",             "SNMPv2c walks with rotating community strings"),
     ("squatting",        "dnstwist typosquatting generation for popular domains"),
+    ("s3",               "S3 upload/download simulation: GET public objects + PUT synthetic DLP payloads"),
     ("ssh",              "Non-interactive SSH connection attempts"),
     ("url-response",     "Measure HTTPS response times via requests library"),
     ("virus",            "Download known-virus samples (to /dev/null)"),
@@ -1589,6 +1590,75 @@ def dlp_sim_https() -> None:
         ui_error(f"[dlp_sim_https] {e}")
 
 
+def s3_sim() -> None:
+    """
+    Simulate S3 bucket upload and download traffic for CASB, DLP, and
+    cloud-access policy validation.
+
+    Download phase: GET requests to public and private S3 URLs.  Accepts
+    2xx, 403, and 404 as valid responses — all generate CASB-visible S3
+    traffic regardless of whether the bucket is publicly accessible.
+
+    Upload phase: PUT requests with small synthetic payloads (PII, creds,
+    confidential text) to S3 bucket paths.  Requests return 403 (no
+    credentials) but are visible to DLP/CASB engines as upload/exfil
+    attempts.
+    """
+    n_dl = _size_to_limits(ARGS.size, 2, 4, 6, len(s3_download_urls))
+    n_ul = _size_to_limits(ARGS.size, 1, 2, 3, len(s3_upload_targets))
+    ua   = random.choice(user_agents)
+    ui_banner("S3 Simulation", f"{n_dl} downloads + {n_ul} uploads")
+
+    _DLP_PAYLOADS = [
+        b"name,ssn,dob\nJohn Doe,123-45-6789,1985-03-12\nJane Smith,987-65-4321,1990-07-22\n",
+        b'{"employees":[{"id":1001,"name":"Alice","salary":95000,"ssn":"555-12-3456"}]}\n',
+        b"CONFIDENTIAL — Q4 Revenue: $4,320,000 — Do not distribute\n",
+        b"aws_access_key_id=AKIAIOSFODNN7EXAMPLE\naws_secret_access_key=wJalrXUtnFEMI/K7MDENG\n",
+        b"password=Tr0ub4dor&3\ndb_host=prod-db.internal\ndatabase=customers\n",
+    ]
+
+    # ── Download phase ────────────────────────────────────────────────────
+    urls_dl = random.sample(s3_download_urls, min(n_dl, len(s3_download_urls)))
+    for i, url in enumerate(urls_dl, 1):
+        try:
+            with requests.get(
+                url, stream=True, verify=False, timeout=(3, 3),
+                headers={"User-Agent": ua},
+                allow_redirects=True,
+            ) as resp:
+                resp.raw.read(65536)  # consume a small chunk then close
+            console.log(
+                f"s3-get ({i}/{n_dl}) {url}  [{_status_style(resp.status_code)}]HTTP {resp.status_code}[/]"
+            )
+            _stats.record(resp.status_code)
+        except Exception as e:
+            console.log(f"[yellow]s3-get ({i}/{n_dl}) {url}  {e.__class__.__name__}[/]")
+            _stats.fail()
+
+    # ── Upload phase ──────────────────────────────────────────────────────
+    targets_ul = random.sample(s3_upload_targets, min(n_ul, len(s3_upload_targets)))
+    payload = random.choice(_DLP_PAYLOADS)
+    for i, url in enumerate(targets_ul, 1):
+        try:
+            resp = requests.put(
+                url, data=payload, verify=False, timeout=(3, 5),
+                headers={
+                    "User-Agent":     ua,
+                    "Content-Type":   "application/octet-stream",
+                    "Content-Length": str(len(payload)),
+                },
+            )
+            console.log(
+                f"s3-put ({i}/{n_ul}) {url}  [{_status_style(resp.status_code)}]HTTP {resp.status_code}[/]"
+            )
+            _stats.record(resp.status_code)
+        except Exception as e:
+            console.log(f"[yellow]s3-put ({i}/{n_ul}) {url}  {e.__class__.__name__}[/]")
+            _stats.fail()
+
+    ui_ok("S3 simulation complete")
+
+
 def malware_download() -> None:
     """
     Download known-malware files (PE samples, archives) to /dev/null.
@@ -2547,6 +2617,7 @@ _SUITE_MAP: dict[str, list] = {
     "phishing-domains": [github_phishing_domain_check],
     "pornography":      [pornography_crawl],
     "snmp":             [snmp_random],
+    "s3":               [s3_sim],
     "squatting":        [squatting_domains],
     "ssh":              [ssh_random],
     "url-response":     [urlresponse_random],

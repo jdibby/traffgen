@@ -56,6 +56,10 @@ Variable index (matches generator.py usage names 1-to-1):
   LLM / AI APIs
     llm_api_endpoints   REST API paths for major AI providers (llm_dlp)
     llm_web_endpoints   Browser-facing AI app URLs (llm_dlp, ai_https)
+
+  S3 / cloud object storage
+    s3_download_urls    S3 bucket/object URLs for GET simulation (s3_sim)
+    s3_upload_targets   S3 bucket/key paths for PUT upload simulation (s3_sim)
 """
 
 # ── DNS resolvers ──────────────────────────────────────────────────────────────
@@ -2891,4 +2895,55 @@ llm_web_endpoints = [
     "https://einstein.salesforce.com",
     "https://aws.amazon.com/bedrock",
     "https://azure.microsoft.com/en-us/products/ai-services/openai-service",
+]
+
+# ── S3 / Cloud Object Storage ─────────────────────────────────────────────────
+#
+# s3_download_urls: GET targets — mix of public AWS datasets and private-bucket
+#   URLs.  Public ones return 200/XML; private ones return 403 AccessDenied.
+#   Both generate CASB-visible S3 GET traffic.
+#
+# s3_upload_targets: PUT targets — realistic bucket/key paths.  All return 403
+#   (no credentials) but the upload attempt + payload is visible to DLP/CASB.
+#   Payloads are chosen in generator.py from a set of synthetic PII / secret
+#   strings designed to trigger DLP content-inspection rules.
+
+s3_download_urls: list[str] = [
+    # Public AWS datasets — may return 200 with XML listing or object data
+    "https://commoncrawl.s3.amazonaws.com/crawl-data/CC-MAIN-2023-50/warc.paths.gz",
+    "https://noaa-goes16.s3.amazonaws.com/",
+    "https://sentinel-s2-l1c.s3.amazonaws.com/",
+    "https://s3.amazonaws.com/tripdata/",
+    "https://landsat-pds.s3.amazonaws.com/",
+    "https://aws-earth-mo-atmospheric-mogreps-uk-prd.s3.amazonaws.com/",
+    # Private / corporate-style buckets — 403 expected, S3 traffic generated
+    "https://s3.amazonaws.com/corporate-data-exports/report-2024-q4.csv",
+    "https://company-backups.s3.amazonaws.com/full-backup-latest.tar.gz",
+    "https://prod-db-snapshots.s3.us-west-2.amazonaws.com/snapshot-20241201.sql.gz",
+    "https://s3.us-east-1.amazonaws.com/hr-records/employees.xlsx",
+    "https://internal-docs.s3.amazonaws.com/architecture-overview.pdf",
+    "https://app-logs.s3.us-east-2.amazonaws.com/logs/2024/11/app.log.gz",
+    "https://my-website-assets.s3.amazonaws.com/images/banner.jpg",
+    "https://s3.eu-west-1.amazonaws.com/gdpr-exports/data-subject-export.zip",
+    # S3-compatible storage providers
+    "https://s3.wasabisys.com/",
+    "https://s3.us-west-002.backblazeb2.com/",
+]
+
+s3_upload_targets: list[str] = [
+    # AWS S3 — realistic bucket/key paths for PUT simulation
+    # All return 403 (no credentials) but the upload traffic is CASB/DLP visible
+    "https://s3.amazonaws.com/data-exfil-test/financial-records.csv",
+    "https://s3.amazonaws.com/backup-bucket-prod/sensitive-data.zip",
+    "https://s3.us-east-1.amazonaws.com/corp-uploads/employee-list.xlsx",
+    "https://uploads.s3.us-west-2.amazonaws.com/user-data/pii-export.json",
+    "https://company-archive.s3.amazonaws.com/2024/confidential.tar.gz",
+    "https://s3.amazonaws.com/cloud-sync/credentials.env",
+    "https://s3.eu-west-1.amazonaws.com/gdpr-data/personal-records.csv",
+    "https://s3.amazonaws.com/dev-artifacts/source-code.zip",
+    "https://data-lake.s3.us-east-2.amazonaws.com/raw/customer-dump.parquet",
+    "https://s3.ap-southeast-1.amazonaws.com/offshore-backup/db-export.sql.gz",
+    # S3-compatible storage providers
+    "https://s3.wasabisys.com/exfil-test-bucket/payload.bin",
+    "https://s3.us-west-002.backblazeb2.com/traffgen-test/upload.dat",
 ]
