@@ -1,17 +1,18 @@
 # ---------- Stage 1: build GoBGP ----------
-# golang:1.26-bookworm fixes Go stdlib CVEs:
-#   CVE-2025-68121 (crypto/tls), CVE-2026-32280 + CVE-2025-61729 (crypto/x509),
-#   CVE-2025-61725 (net/mail)
+# golang:1.26-bookworm fixes 20+ Go stdlib CVEs across crypto/tls, crypto/x509,
+#   net/mail, net/url, archive/tar, archive/zip, encoding/asn1, encoding/pem,
+#   html/template, and os (CVE-2025-58183 through CVE-2026-32289 series).
 FROM golang:1.26-bookworm AS gobgp-build
 
 ARG GOBGP_VERSION=v4.5.0
 
 WORKDIR /tmp/gobgp
 # --depth 1 --single-branch fetches only the tagged commit, not the full history
-# go get grpc >= 1.79.3 fixes CVE-2026-33186 (gRPC-Go auth bypass)
+# grpc@v1.79.3  fixes CVE-2026-33186 (gRPC-Go auth bypass via :path)
+# x/net@v0.45.0 fixes CVE-2025-22872, CVE-2025-47911, CVE-2025-58190 (html parser DoS/XSS)
 RUN git clone --depth 1 --single-branch --branch ${GOBGP_VERSION} \
         https://github.com/osrg/gobgp.git . && \
-    go get google.golang.org/grpc@v1.79.3 && \
+    go get google.golang.org/grpc@v1.79.3 golang.org/x/net@v0.45.0 && \
     go mod tidy && \
     go build -ldflags="-s -w" -o /tmp/gobgp-bin/gobgp  ./cmd/gobgp  && \
     go build -ldflags="-s -w" -o /tmp/gobgp-bin/gobgpd ./cmd/gobgpd && \
@@ -44,6 +45,7 @@ RUN gem install --no-document bundler && \
        echo "gem 'stringio', '3.1.1'" >> Gemfile) && \
     (grep -Eq "^\s*gem ['\"]parallel['\"]" Gemfile || echo "gem 'parallel'" >> Gemfile) && \
     NOKOGIRI_USE_SYSTEM_LIBRARIES=1 bundle install --jobs 4 --retry 3 && \
+    bundle update --conservative rack rexml webrick json addressable net-imap zlib && \
     bundle clean --force && \
     rm -rf ~/.gem ~/.bundle /root/.bundle vendor/bundle/ruby/*/cache tmp/cache && \
     # Remove default stringio gemspec to avoid duplicate warnings
@@ -110,17 +112,43 @@ RUN git clone --depth 1 --branch ${NIKTO_VERSION} \
     chmod +x /opt/nikto/program/nikto.pl
 
 # Bundler in runtime so wrappers can call `bundle exec`
-# json>=2.19.2  fixes CVE-2026-33210 (format string injection)
-# rexml>=3.3.6  fixes CVE-2024-43398  (DoS in tree parser)
-# erb>=6.0.4    fixes CVE-2026-41316  (deserialization RCE via def_method)
+# json>=2.19.2      CVE-2026-33210  (format string injection)
+# rexml>=3.3.9      CVE-2024-35176, CVE-2024-39908, CVE-2024-41123,
+#                   CVE-2024-41946, CVE-2024-43398, CVE-2024-49761 (DoS chain)
+# erb>=6.0.4        CVE-2026-41316  (deserialization RCE via def_method)
+# webrick>=1.9.1    CVE-2024-47220, CVE-2025-6442 (HTTP request smuggling)
+# rack>=3.2.6       CVE-2025-61780, CVE-2025-61919, CVE-2026-22860,
+#                   CVE-2026-25500, CVE-2026-26961, CVE-2026-34230,
+#                   CVE-2026-34763, CVE-2026-34785, CVE-2026-34786,
+#                   CVE-2026-34826, CVE-2026-34829, CVE-2026-34830, CVE-2026-34831
+# uri>=0.12.2       CVE-2023-28755, CVE-2023-36617 (ReDoS)
+# time>=0.2.2       CVE-2023-28756 (ReDoS)
+# cgi>=0.4.2        CVE-2025-27219, CVE-2025-27220 (ReDoS/DoS)
+# resolv>=0.6.2     CVE-2025-24294 (DNS decompression DoS)
+# net-imap>=0.6.4   CVE-2025-43857, CVE-2026-42256, CVE-2026-42258
+# zlib>=3.2.3       CVE-2026-27820 (buffer overflow in GzipReader)
+# addressable>=2.9.0 CVE-2026-35611 (ReDoS in URI template)
 RUN gem install --no-document bundler \
       "json:2.19.2" \
-      "rexml:3.3.6" \
-      "erb:6.0.4"
+      "rexml:3.3.9" \
+      "erb:6.0.4" \
+      "webrick:1.9.1" \
+      "rack:3.2.6" \
+      "uri:0.12.2" \
+      "time:0.2.2" \
+      "cgi:0.4.2" \
+      "resolv:0.6.2" \
+      "net-imap:0.6.4" \
+      "zlib:3.2.3" \
+      "addressable:2.9.0"
 
 # Python packages — versions pinned for reproducibility
-# setuptools>=78.1.1 fixes CVE-2025-47273 (path traversal in PackageIndex.download)
-RUN pip3 install --no-cache-dir --break-system-packages \
+# pip>=26.1          CVE-2023-5752 (Mercurial cmd injection), CVE-2025-8869
+#                    (symlink traversal), CVE-2026-3219, CVE-2026-6357
+# setuptools>=78.1.1 CVE-2024-6345 (RCE via crafted URLs), CVE-2025-47273
+#                    (path traversal in PackageIndex.download)
+RUN pip3 install --no-cache-dir --break-system-packages "pip>=26.1" && \
+    pip3 install --no-cache-dir --break-system-packages \
       "setuptools>=78.1.1" \
       fastcli \
       "flask==3.1.3" \
