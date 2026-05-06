@@ -112,35 +112,28 @@ RUN git clone --depth 1 --branch ${NIKTO_VERSION} \
     chmod +x /opt/nikto/program/nikto.pl
 
 # Bundler in runtime so wrappers can call `bundle exec`
-# Pure-Ruby gems only here — C-extension gems (zlib, json native) are handled
-# in the msf-build stage via bundle update where build tools are available.
-# json>=2.19.2      CVE-2026-33210  (format string injection)
-# rexml>=3.3.9      CVE-2024-35176, CVE-2024-39908, CVE-2024-41123,
-#                   CVE-2024-41946, CVE-2024-43398, CVE-2024-49761 (DoS chain)
-# erb>=6.0.4        CVE-2026-41316  (deserialization RCE via def_method)
-# webrick>=1.9.1    CVE-2024-47220, CVE-2025-6442 (HTTP request smuggling)
-# rack>=3.2.6       CVE-2025-61780, CVE-2025-61919, CVE-2026-22860,
-#                   CVE-2026-25500, CVE-2026-26961, CVE-2026-34230,
-#                   CVE-2026-34763, CVE-2026-34785, CVE-2026-34786,
-#                   CVE-2026-34826, CVE-2026-34829, CVE-2026-34830, CVE-2026-34831
-# uri>=0.12.2       CVE-2023-28755, CVE-2023-36617 (ReDoS)
-# time>=0.2.2       CVE-2023-28756 (ReDoS)
-# cgi>=0.4.2        CVE-2025-27219, CVE-2025-27220 (ReDoS/DoS)
-# resolv>=0.6.2     CVE-2025-24294 (DNS decompression DoS)
-# net-imap>=0.6.4   CVE-2025-43857, CVE-2026-42256, CVE-2026-42258
-# addressable>=2.9.0 CVE-2026-35611 (ReDoS in URI template)
-RUN gem install --no-document bundler \
-      "json:2.19.2" \
-      "rexml:3.3.9" \
-      "erb:6.0.4" \
-      "webrick:1.9.1" \
-      "rack:3.2.6" \
-      "uri:0.12.2" \
-      "time:0.2.2" \
-      "cgi:0.4.2" \
-      "resolv:0.6.2" \
-      "net-imap:0.6.4" \
-      "addressable:2.9.0"
+# Install latest versions of CVE-affected gems — "latest" is always >= the
+# fixed version, and avoids hard-coding versions that may not yet exist.
+# Gems covered: json (CVE-2026-33210), rexml (CVE-2024-35176 through -49761),
+# erb (CVE-2026-41316), webrick (CVE-2024-47220, CVE-2025-6442),
+# rack (CVE-2025-61780 through CVE-2026-34831, 13 CVEs),
+# uri (CVE-2023-28755, CVE-2023-36617), time (CVE-2023-28756),
+# cgi (CVE-2025-27219, CVE-2025-27220), resolv (CVE-2025-24294),
+# net-imap (CVE-2025-43857, CVE-2026-42256, CVE-2026-42258),
+# addressable (CVE-2026-35611)
+RUN gem install --no-document \
+      bundler \
+      json \
+      rexml \
+      erb \
+      webrick \
+      rack \
+      uri \
+      time \
+      cgi \
+      resolv \
+      net-imap \
+      addressable
 
 # Python packages — versions pinned for reproducibility
 # pip>=26.1          CVE-2023-5752 (Mercurial cmd injection), CVE-2025-8869
