@@ -1526,15 +1526,15 @@ function updateSecurityTab(){
   drawSecTrend(_secHist);
   // per-suite table — sort by blocked desc
   const tests=_lastState.tests||{};
-  const rows=Object.entries(tests).map(([n,t])=>({n,ta:t.attempts||0,rch:t.allowed||0,blk:t.blocked||0,drp:t.dropped||0}));
+  const rows=Object.entries(tests).map(([n,t])=>({n,ta:t.attempts||0,rch:t.allowed||0,blk:t.blocked||0,drp:t.dropped||0,tot:(t.allowed||0)+(t.blocked||0)+(t.dropped||0)}));
   rows.sort((a,b)=>b.blk-a.blk||(b.drp-a.drp));
   const tb=$('sec-tbl');
   if(!rows.length){tb.innerHTML='<tr><td colspan="7" class="empty">Waiting…</td></tr>';}
   else tb.innerHTML=rows.map(r=>{
-    const bp=r.ta?r.blk/r.ta*100:0,dp=r.ta?r.drp/r.ta*100:0;
+    const bp=r.tot?r.blk/r.tot*100:0,dp=r.tot?r.drp/r.tot*100:0;
     const bpC=bp>50?'var(--red)':bp>10?'var(--amber)':'var(--muted)';
     const dpC=dp>50?'var(--red)':dp>10?'#818cf8':'var(--muted)';
-    return`<tr class="mrow"><td class="nm">${H(r.n.replace(/_/g,' '))}</td><td class="r">${N(r.ta)}</td><td class="r" style="color:#22c55e">${N(r.rch)}</td><td class="r" style="color:var(--amber)">${N(r.blk)}</td><td class="r" style="color:#818cf8">${N(r.drp)}</td><td class="r"><span style="color:${bpC}">${r.ta?bp.toFixed(1)+'%':'—'}</span></td><td class="r"><span style="color:${dpC}">${r.ta?dp.toFixed(1)+'%':'—'}</span></td></tr>`;
+    return`<tr class="mrow"><td class="nm">${H(r.n.replace(/_/g,' '))}</td><td class="r">${N(r.tot)}</td><td class="r" style="color:#22c55e">${N(r.rch)}</td><td class="r" style="color:var(--amber)">${N(r.blk)}</td><td class="r" style="color:#818cf8">${N(r.drp)}</td><td class="r"><span style="color:${bpC}">${r.tot?bp.toFixed(1)+'%':'—'}</span></td><td class="r"><span style="color:${dpC}">${r.tot?dp.toFixed(1)+'%':'—'}</span></td></tr>`;
   }).join('');
   // block signal breakdown — aggregate codes across all tests
   const codeTotals={};
