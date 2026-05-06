@@ -112,6 +112,8 @@ RUN git clone --depth 1 --branch ${NIKTO_VERSION} \
     chmod +x /opt/nikto/program/nikto.pl
 
 # Bundler in runtime so wrappers can call `bundle exec`
+# Pure-Ruby gems only here — C-extension gems (zlib, json native) are handled
+# in the msf-build stage via bundle update where build tools are available.
 # json>=2.19.2      CVE-2026-33210  (format string injection)
 # rexml>=3.3.9      CVE-2024-35176, CVE-2024-39908, CVE-2024-41123,
 #                   CVE-2024-41946, CVE-2024-43398, CVE-2024-49761 (DoS chain)
@@ -126,7 +128,6 @@ RUN git clone --depth 1 --branch ${NIKTO_VERSION} \
 # cgi>=0.4.2        CVE-2025-27219, CVE-2025-27220 (ReDoS/DoS)
 # resolv>=0.6.2     CVE-2025-24294 (DNS decompression DoS)
 # net-imap>=0.6.4   CVE-2025-43857, CVE-2026-42256, CVE-2026-42258
-# zlib>=3.2.3       CVE-2026-27820 (buffer overflow in GzipReader)
 # addressable>=2.9.0 CVE-2026-35611 (ReDoS in URI template)
 RUN gem install --no-document bundler \
       "json:2.19.2" \
@@ -139,7 +140,6 @@ RUN gem install --no-document bundler \
       "cgi:0.4.2" \
       "resolv:0.6.2" \
       "net-imap:0.6.4" \
-      "zlib:3.2.3" \
       "addressable:2.9.0"
 
 # Python packages — versions pinned for reproducibility
