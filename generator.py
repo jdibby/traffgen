@@ -358,6 +358,7 @@ class SuiteStats:
         with self._lock:
             self.attempts  += 1
             self.responses += 1
+            self.allowed   += 1
 
     def fail(self) -> None:
         """Record a failed probe (exception, timeout, unreachable)."""
