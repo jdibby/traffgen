@@ -30,29 +30,37 @@ If deployed via `stager.sh`, port 7777 is opened automatically and the dashboard
 The dashboard has a **dark sidebar** on the left with navigation, and a main content area on the right.
 
 ```
-┌─────────────────┬──────────────────────────────────────────────────────┐
-│  🚦 traffgen    │  [Page Title]   suite:all  size:XS  ● Running        │
-│                 │                                         ⏸  ⏹  ⚙  LIVE│
-│  MONITOR        ├──────────────────────────────────────────────────────┤
-│  ◈ Overview     │                                                        │
-│  ⚗ Tests        │              Main content area                        │
-│  ⬛ Output       │                                                        │
-│                 │                                                        │
-│  SYSTEM         │                                                        │
-│  ⚡ Health       │                                                        │
-│                 │                                                        │
-│  INFO           │                                                        │
-│  ◎ About        │                                                        │
-│                 │                                                        │
-│  CONTROL        │                                                        │
-│  ⚙ Settings     │                                                        │
-│                 │                                                        │
-│  version 1.x.x  │                                                        │
-│  up 00:14:32    │                                                        │
-└─────────────────┴──────────────────────────────────────────────────────┘
+┌─────────────────┬──────────────────────────────────────────────────────────┐
+│  🚦 traffgen    │  [Page Title]   suite:all  size:XS  ● Running            │
+│                 │                                       ⏸  ⏹  ⚙  ☾  LIVE │
+│  MONITOR        ├──────────────────────────────────────────────────────────┤
+│  ◈ Overview     │                                                          │
+│  ⚗ Tests        │              Main content area                          │
+│  ⬛ Output       │                                                          │
+│                 │                                                          │
+│  SYSTEM         │                                                          │
+│  ⚡ Health       │                                                          │
+│                 │                                                          │
+│  INFO           │                                                          │
+│  ◎ About        │                                                          │
+│                 │                                                          │
+│  CONTROL        │                                                          │
+│  ⚙ Settings     │                                                          │
+│                 │                                                          │
+│  version 2.4.0  │                                                          │
+│  up 00:14:32    │                                                          │
+└─────────────────┴──────────────────────────────────────────────────────────┘
 ```
 
-The **topbar** shows the current suite and size configuration, a status pill (Running / Paused / Stopped), and control buttons.
+The **topbar** shows the current suite and size configuration, a status pill (Running / Paused / Stopped), and control buttons:
+
+| Button | Action |
+|--------|--------|
+| ⏸ | Pause / Resume tests |
+| ⏹ | Stop all tests |
+| ⚙ | Open Settings drawer |
+| ☾ / ☀ | Toggle dark / light mode (preference saved to browser localStorage) |
+| ● LIVE | Status indicator — click to stop all tests |
 
 ---
 
@@ -71,9 +79,9 @@ The default landing page. Shows at a glance:
 
 Below the cards:
 
-- **Network I/O widget** — live TX/RX throughput (KB/s or MB/s) with a rolling sparkline chart. Updates every 2.5 seconds regardless of which tab is active.
+- **Network I/O widget** — live TX/RX throughput (KB/s or MB/s) with a rolling sparkline chart. Defaults to **1-second refresh**. A dropdown in the widget title lets you choose 1s / 2s / 5s / 10s / 15s / 30s.
 - **Success / Failure donut chart** — proportion of OK vs failed requests since container start.
-- **Requests Over Time sparkline** — historical OK/fail counts per sample window.
+- **Requests Over Time sparkline** — historical OK/fail counts sampled every 5 seconds. Chart populates within ~10 seconds of the first completed test.
 - **Test Breakdown table** — per-test attempt/OK/fail counts, success rate bar, and average duration. Click any row to expand HTTP status code details and response counts.
 - **Live Events feed** — last 30 completed test results with timestamp, pass/fail indicator, and duration. Click an event row to expand code breakdown.
 
@@ -93,23 +101,25 @@ Click any card to open a **Run Modal** where you can launch that specific suite 
 
 ### Output
 
-Live terminal-style log stream, identical to what `docker logs` shows. Features:
+Live structured log stream mirroring the CLI output. Lines are classified and rendered by level:
 
-- **Level filters** — All / OK / Warn / Error / Debug buttons to hide noise
-- **Test boundary separators** — a horizontal rule with the suite name is inserted each time the active test changes
-- **Auto-scroll** toggle (on by default)
-- **Clear** button
-- **Pop Out** — opens the log in a separate browser window (`/log-view`)
+| Level | Appearance | Triggered by |
+|-------|-----------|--------------|
+| OK | ✔ green prefix | Test step succeeded |
+| ERROR | ✗ red prefix | Test step failed or threw an exception |
+| WARN | ⚠ amber prefix | Non-fatal warning |
+| INFO | blue label | Informational messages |
+| DEBUG | dark grey label | Verbose detail |
+| Rule | horizontal separator line | Rich rule dividers between sections |
+| Banner | green monospace block | Rich panel headers (suite start/end) |
 
-Log lines are color-coded by level:
+Features:
 
-| Level | Color |
-|-------|-------|
-| OK    | Green |
-| INFO  | Blue  |
-| WARN  | Amber |
-| ERROR | Red   |
-| DEBUG | Dark grey |
+- **Level filters** — All / OK / Warn / Error / Debug buttons. Rule and banner lines (structural context) remain visible regardless of the active filter.
+- **Test boundary separators** — a labeled horizontal rule is inserted each time the active test changes.
+- **Auto-scroll** toggle (on by default).
+- **Clear** button.
+- **Pop Out** — opens the log in a separate browser window (`/log-view`).
 
 ---
 
@@ -126,7 +136,7 @@ Real-time container resource metrics sampled every 2 seconds from `/proc`:
 | Network I/O | `/proc/net/dev` | Receive (green) and transmit (blue) with rolling sparkline |
 | Top Processes | `/proc/[pid]/stat` | 12 processes sorted by CPU%, showing PID, name, CPU%, Mem%, RSS |
 
-The Health tab starts polling the `/api/health` endpoint when opened and stops when you navigate away. The Network I/O widget on the Overview page runs continuously.
+The Health tab starts polling `/api/health` when opened and stops when you navigate away. The Network I/O widget on the Overview page runs continuously at the selected interval.
 
 ---
 
@@ -162,6 +172,12 @@ The topbar provides two control buttons:
 | ⏹ Stop | Sends a stop signal. After the current test finishes, the generator exits. Restart the container to resume. |
 
 The green **● LIVE** pill in the topbar is also clickable — it acts as a shortcut to stop all tests. It turns red and shows **⏹ STOPPED** when halted.
+
+---
+
+## Dark / Light Mode
+
+Click the **☾** button in the topbar to switch between dark mode (default) and light mode. The preference is saved to your browser's `localStorage` and restored automatically on future visits.
 
 ---
 

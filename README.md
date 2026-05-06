@@ -56,7 +56,14 @@ docker run --pull=always --detach --restart unless-stopped \
   --suite=all --size=XS --max-wait-secs=20 --loop
 ```
 
-The dashboard includes an Overview page with live network I/O, a Health tab with CPU/memory gauges and top-processes, a CLI-style Output log, and controls to pause, stop, or change settings without restarting the container.
+The dashboard includes:
+
+- **Overview** — stat cards, live Network I/O sparkline (1s default refresh with selectable interval), requests-over-time chart, per-test breakdown table, and live events feed
+- **Tests** — card grid for every suite; click any card to launch it immediately with custom settings
+- **Output** — CLI-style live log with level coloring (✔ OK, ✗ Error, ⚠ Warn), section banners, and rule separators mirroring the terminal output; filterable by level
+- **Health** — CPU/memory gauges, load average, disk I/O bars, network sparkline, top-processes table
+- **Dark / light mode** — toggle with the ☾ button in the topbar; preference saved across sessions
+- **Controls** — pause, resume, stop, and settings drawer to change suite/size/wait without restarting the container
 
 > **Full documentation:** [docs/web-dashboard.md](docs/web-dashboard.md)
 
@@ -469,13 +476,18 @@ The dashboard uses a **self-signed TLS certificate** generated at container star
 
 | Tab | What it shows |
 |---|---|
-| **Overview** | Stat cards (total requests, success rate, active test, iteration), success/failure donut chart, requests-over-time sparkline, per-test breakdown table, live events feed |
-| **Tests** | Card grid showing every available test suite with its description, attempt/ok/fail counters, and a colour-coded success bar. Highlights the currently running suite. |
-| **Output** | Live structured log output from the generator. Supports auto-scroll, clear, and **Pop Out** (opens a standalone log viewer in a new window). |
+| **Overview** | Stat cards (total requests, success rate, active test, iteration), Network I/O sparkline (1s default, selectable interval), success/failure donut chart, requests-over-time sparkline, per-test breakdown table, live events feed |
+| **Tests** | Card grid of every available suite with description, attempt/ok/fail counters, and a colour-coded success bar. Click any card to launch it immediately with custom settings. |
+| **Output** | CLI-style live log mirroring terminal output — ✔/✗/⚠ level icons, section banners, and rule separators. Filterable by level (OK / Warn / Error / Debug). Auto-scroll, clear, and **Pop Out** into a standalone window. |
+| **Health** | CPU/memory gauges, load average, disk I/O bars, network sparkline, and top-processes table sampled every 2 seconds. |
+
+### Dark / Light Mode
+
+Click the **☾** button in the topbar to switch between dark (default) and light themes. The preference is saved to `localStorage` and restored automatically.
 
 ### Changing settings from the dashboard
 
-Click the **⚙ gear icon** in the top-right to open the Settings drawer. From there you can change:
+Click the **⚙ gear icon** in the sidebar or topbar to open the Settings drawer. From there you can change:
 
 - **Suite** — which test suite to run (dropdown lists all available suites with descriptions)
 - **Size** — traffic volume (`XS` → `XL`)
