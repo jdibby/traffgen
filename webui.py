@@ -1292,8 +1292,12 @@ function toggleEv(i){if(_xEvs.has(i))_xEvs.delete(i);else _xEvs.add(i);if(_lastS
 function connect(){
   const url='/events'+(_sessionId?'?sid='+encodeURIComponent(_sessionId):'');
   const es=new EventSource(url);
-  es.onmessage=ev=>{try{apply(JSON.parse(ev.data))}catch(e){}};
-  es.onerror=()=>{es.close();$('pill-live').className='tp-pill tp-paused';$('pill-live').innerHTML='⚠ RECONNECT';setTimeout(connect,3000);};
+  let _roleChecked=false;
+  es.onmessage=ev=>{
+    try{apply(JSON.parse(ev.data))}catch(e){}
+    if(!_roleChecked){_roleChecked=true;checkRole();}
+  };
+  es.onerror=()=>{_roleChecked=false;es.close();$('pill-live').className='tp-pill tp-paused';$('pill-live').innerHTML='⚠ RECONNECT';setTimeout(connect,3000);};
 }
 function connectLog(){
   if(_logEs)return;
