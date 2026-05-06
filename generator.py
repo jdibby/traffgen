@@ -930,7 +930,7 @@ def bigfile() -> None:
         ui_info(f"Trying {url}")
         try:
             with requests.get(
-                url, stream=True, verify=False, timeout=(3, 60),
+                url, stream=True, verify=False, timeout=(3, 3),
                 headers={"User-Agent": ua},
             ) as resp:
                 if resp.status_code in (403, 429, 451):
