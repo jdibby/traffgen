@@ -9,10 +9,11 @@ ARG GOBGP_VERSION=v4.3.0
 WORKDIR /tmp/gobgp
 # --depth 1 --single-branch fetches only the tagged commit, not the full history
 # grpc@v1.79.3  fixes CVE-2026-33186 (gRPC-Go auth bypass via :path)
-# x/net@v0.45.0 fixes CVE-2025-22872, CVE-2025-47911, CVE-2025-58190 (html parser DoS/XSS)
+# x/net@v0.48.0 fixes CVE-2025-22872, CVE-2025-47911, CVE-2025-58190 (html parser DoS/XSS)
+#   (grpc v1.79.3 itself requires x/net >= v0.48.0; using v0.45.0 causes MVS conflicts)
 RUN git clone --depth 1 --single-branch --branch ${GOBGP_VERSION} \
         https://github.com/osrg/gobgp.git . && \
-    go get google.golang.org/grpc@v1.79.3 golang.org/x/net@v0.45.0 && \
+    go get google.golang.org/grpc@v1.79.3 golang.org/x/net@v0.48.0 && \
     go mod tidy && \
     go build -ldflags="-s -w" -o /tmp/gobgp-bin/gobgp  ./cmd/gobgp  && \
     go build -ldflags="-s -w" -o /tmp/gobgp-bin/gobgpd ./cmd/gobgpd && \
