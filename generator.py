@@ -22,6 +22,7 @@ Usage (Docker default):
 
 # ── Standard library ──────────────────────────────────────────────────────────
 import os
+import re
 import sys
 import ssl
 import json
@@ -58,7 +59,71 @@ from endpoints import *           # noqa: F401,F403  (large data file)
 
 # ── Globals ───────────────────────────────────────────────────────────────────
 VERSION = "2.4.0"
-console = Console(highlight=False)
+
+
+class _DualWriter:
+    """
+    File-like object used as Rich's console output target.
+    Writes every byte to the real stdout AND dispatches stripped, classified
+    lines to _web_log() so the web Output tab mirrors the CLI.
+    """
+    _ansi   = re.compile(r'\x1b\[[0-9;:]*[mKJHABCDEFGSTfsu]|\x1b[=>]')
+    _spin   = set('⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏')
+    _baronly = re.compile(r'^[━╸╺▓░ ─╌]+$')
+
+    def __init__(self) -> None:
+        self._out = sys.__stdout__ or sys.stdout
+        self._buf = ''
+
+    def write(self, data: str) -> int:
+        self._out.write(data)
+        clean = self._ansi.sub('', data)
+        for ch in clean:
+            if ch == '\r':
+                self._buf = ''          # carriage-return → overwrite
+            elif ch == '\n':
+                self._flush_line()
+            else:
+                self._buf += ch
+        return len(data)
+
+    def flush(self) -> None:
+        self._out.flush()
+
+    def isatty(self) -> bool:
+        return getattr(self._out, 'isatty', lambda: False)()
+
+    def fileno(self) -> int:
+        return self._out.fileno()
+
+    def _flush_line(self) -> None:
+        line = self._buf.strip()
+        self._buf = ''
+        if not line:
+            return
+        # Skip spinner/progress lines
+        if any(c in line for c in self._spin):
+            return
+        if self._baronly.match(line):
+            return
+        # Classify
+        if line[0] in '╭╰│╔╚║├':
+            lvl = 'banner'
+        elif line.startswith('✔') or line.startswith('✓'):
+            lvl = 'ok'
+        elif line.startswith('✗'):
+            lvl = 'error'
+        elif line.startswith('⚠'):
+            lvl = 'warn'
+        elif re.match(r'^[─━]{4,}', line):
+            lvl = 'rule'
+        else:
+            lvl = 'info'
+        _web_log(line, level=lvl)
+
+
+_dual_writer = _DualWriter()
+console = Console(highlight=False, file=_dual_writer)
 
 # Suppress SSL warnings — this tool intentionally hits self-signed / expired certs.
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
