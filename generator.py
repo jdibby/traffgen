@@ -326,6 +326,158 @@ class SuiteStats:
 _stats       = SuiteStats()   # per-function stats, reset before each function
 _suite_stats = SuiteStats()   # aggregate across all functions in a suite run
 
+# ── Web UI shared state ───────────────────────────────────────────────────────
+_WEB_STATE_FILE  = "/tmp/traffgen_state.json"
+_WEB_LOG_FILE    = "/tmp/traffgen_log.jsonl"
+_WEB_CMD_FILE    = "/tmp/traffgen_cmd.json"
+_WEB_PAUSE_FILE  = "/tmp/traffgen_pause"
+_WEB_STOP_FILE   = "/tmp/traffgen_stop"
+
+_WEB_STATE: dict = {
+    "version": "", "started_at": 0.0, "suite": "all", "size": "XS",
+    "max_wait_secs": 20, "loop": True, "current_test": "", "iteration": 0,
+    "status": "starting",   # running | between_tests | paused | stopped
+    "test_started_at": 0.0,
+    "tests": {}, "suites": [],
+    "totals": {"attempts": 0, "ok": 0, "fail": 0},
+    "history": [], "events": [],
+    "_history_last_t": 0.0,
+}
+_WEB_STATE_LOCK  = threading.Lock()
+_WEB_LOG_LOCK    = threading.Lock()
+_WEB_LOG_COUNT   = 0
+_WEB_TEST_DURS: dict = {}   # name -> list[int] of last 10 dur_ms (not serialised)
+
+
+def _web_flush() -> None:
+    """Atomically write _WEB_STATE (minus private keys) to the state file."""
+    tmp = _WEB_STATE_FILE + ".tmp"
+    try:
+        snapshot = {k: v for k, v in _WEB_STATE.items() if not k.startswith("_")}
+        with open(tmp, "w") as f:
+            json.dump(snapshot, f, separators=(",", ":"))
+        os.replace(tmp, _WEB_STATE_FILE)
+    except Exception:
+        pass
+
+
+def _web_record(name: str, ok: bool, dur_ms: int,
+                responses: int = 0, codes: "dict | None" = None) -> None:
+    """Record one completed test run into the web state and flush to disk."""
+    with _WEB_STATE_LOCK:
+        t = _WEB_STATE["tests"].setdefault(name, {
+            "attempts": 0, "ok": 0, "fail": 0, "responses": 0,
+            "last_run_at": 0, "last_ok": True,
+            "last_dur_ms": 0, "avg_dur_ms": 0, "codes": {},
+        })
+        t["attempts"]   += 1
+        t["responses"]  += responses
+        if ok:
+            t["ok"]   += 1
+        else:
+            t["fail"] += 1
+        t["last_run_at"] = int(time.time())
+        t["last_ok"]     = ok
+        t["last_dur_ms"] = dur_ms
+
+        # Rolling average of last 10 durations (stored outside state dict)
+        durs = _WEB_TEST_DURS.setdefault(name, [])
+        durs.append(dur_ms)
+        if len(durs) > 10:
+            durs.pop(0)
+        t["avg_dur_ms"] = int(sum(durs) / len(durs))
+
+        # Accumulate HTTP response-code buckets
+        for code, cnt in (codes or {}).items():
+            t["codes"][code] = t["codes"].get(code, 0) + cnt
+
+        # Clear running indicators
+        _WEB_STATE["test_started_at"] = 0.0
+        _WEB_STATE["current_test"]    = ""
+        _WEB_STATE["status"]          = "between_tests"
+
+        tot = _WEB_STATE["totals"]
+        tot["attempts"] += 1
+        if ok:
+            tot["ok"]   += 1
+        else:
+            tot["fail"] += 1
+
+        _WEB_STATE["events"].append({
+            "t": int(time.time()), "test": name, "ok": ok,
+            "dur_ms": dur_ms, "responses": responses,
+            "codes": {k: v for k, v in (codes or {}).items()},
+        })
+        if len(_WEB_STATE["events"]) > 100:
+            _WEB_STATE["events"] = _WEB_STATE["events"][-100:]
+
+        now = time.time()
+        if now - _WEB_STATE["_history_last_t"] >= 30:
+            _WEB_STATE["history"].append(
+                {"t": int(now), "ok": tot["ok"], "fail": tot["fail"]}
+            )
+            if len(_WEB_STATE["history"]) > 60:
+                _WEB_STATE["history"] = _WEB_STATE["history"][-60:]
+            _WEB_STATE["_history_last_t"] = now
+
+        _web_flush()
+
+
+def _web_log(msg: str, level: str = "info", test: str = "") -> None:
+    """Append one structured log line to the log file (JSONL format)."""
+    global _WEB_LOG_COUNT
+    entry: dict = {"t": int(time.time()), "level": level, "msg": msg}
+    if test:
+        entry["test"] = test
+    line = json.dumps(entry, separators=(",", ":"))
+    with _WEB_LOG_LOCK:
+        try:
+            with open(_WEB_LOG_FILE, "a") as f:
+                f.write(line + "\n")
+            _WEB_LOG_COUNT += 1
+            if _WEB_LOG_COUNT % 100 == 0:
+                try:
+                    with open(_WEB_LOG_FILE) as f:
+                        lines = f.readlines()
+                    if len(lines) > 500:
+                        with open(_WEB_LOG_FILE, "w") as f:
+                            f.writelines(lines[-500:])
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+
+def _argv_from_cmd(cmd: dict) -> list:
+    """Build a validated generator argv list from a web control command dict."""
+    valid_suites = {"all"} | set(_SUITE_MAP.keys())
+    valid_sizes  = {"XS", "S", "M", "L", "XL"}
+
+    suite = str(cmd.get("suite", "all"))
+    if suite not in valid_suites:
+        suite = "all"
+
+    size = str(cmd.get("size", "XS"))
+    if size not in valid_sizes:
+        size = "XS"
+
+    try:
+        wait = max(5, min(300, int(cmd.get("max_wait_secs", 20))))
+    except (TypeError, ValueError):
+        wait = 20
+
+    argv = [
+        "/traffgen/generator.py",
+        f"--suite={suite}",
+        f"--size={size}",
+        f"--max-wait-secs={wait}",
+    ]
+    if cmd.get("loop", True):
+        argv.append("--loop")
+    if cmd.get("nowait", False):
+        argv.append("--nowait")
+    return argv
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # UTILITIES
@@ -482,6 +634,13 @@ def _run_guarded(func) -> None:
     exc_box: list[BaseException] = []
 
     _stats.reset(func.__name__)
+    with _WEB_STATE_LOCK:
+        _WEB_STATE["current_test"]    = func.__name__
+        _WEB_STATE["test_started_at"] = time.time()
+        _WEB_STATE["status"]          = "running"
+    _web_flush()
+    _web_log(f"Starting {func.__name__}", level="info", test=func.__name__)
+    t0 = time.time()
 
     def _wrapper() -> None:
         try:
@@ -498,6 +657,13 @@ def _run_guarded(func) -> None:
         ui_error(f"[{func.__name__}] {exc_box[0]}")
 
     _stats.print_summary()
+    _web_record(func.__name__, run_ok, dur_ms, _stats.responses, dict(_stats.codes))
+    _web_log(
+        f"{func.__name__}: {_stats.attempts} attempts, "
+        f"{_stats.responses} ok, {_stats.errors} fail — {dur_ms}ms",
+        level="ok" if run_ok else "warn",
+        test=func.__name__,
+    )
 
 
 def _run_head_batch(urls: list[str], label: str,
@@ -2279,13 +2445,34 @@ def build_testsuite() -> list:
 
 def finish_test() -> None:
     """
-    Called after each test completes.  Inserts a random pause (unless
-    --nowait) so traffic looks natural rather than wall-to-wall.
-
-    Loop mode: longer pause governed by --max-wait-secs.
-    Single-run mode: short 2-5 s pause between consecutive test functions so
-    back-to-back suites (e.g. 'all') don't hammer targets without breathing room.
+    Called after each test completes.  Checks for stop/pause signals from
+    the web UI, then inserts a random pause (unless --nowait).
     """
+    # Stop signal: halt all traffic generation
+    if os.path.exists(_WEB_STOP_FILE):
+        try:
+            os.remove(_WEB_STOP_FILE)
+        except Exception:
+            pass
+        _web_log("Stop signal received — halting tests", level="warn")
+        with _WEB_STATE_LOCK:
+            _WEB_STATE["status"] = "stopped"
+        _web_flush()
+        sys.exit(0)
+
+    # Pause signal: block until resume file is removed
+    if os.path.exists(_WEB_PAUSE_FILE):
+        with _WEB_STATE_LOCK:
+            _WEB_STATE["status"] = "paused"
+        _web_flush()
+        _web_log("Tests paused — waiting for resume", level="info")
+        while os.path.exists(_WEB_PAUSE_FILE):
+            time.sleep(1)
+        with _WEB_STATE_LOCK:
+            _WEB_STATE["status"] = "between_tests"
+        _web_flush()
+        _web_log("Tests resumed", level="info")
+
     if not ARGS.nowait:
         if ARGS.loop:
             wait = random.randint(2, max(3, int(ARGS.max_wait_secs)))
@@ -2414,10 +2601,81 @@ def parse_cli() -> argparse.Namespace:
 # ENTRY POINT
 # ══════════════════════════════════════════════════════════════════════════════
 
+def _start_heartbeat(path: str = "/tmp/traffgen.health", interval: int = 15) -> None:
+    """Write a Unix timestamp to *path* every *interval* seconds.
+
+    The Docker healthcheck reads this file and fails if it is stale, giving a
+    reliable liveness signal that does not depend on pgrep or process naming.
+    """
+    def _loop() -> None:
+        tmp = path + ".tmp"
+        last_cmd_mtime = -1.0
+        while True:
+            # Health heartbeat
+            try:
+                with open(tmp, "w") as fh:
+                    fh.write(str(int(time.time())))
+                os.replace(tmp, path)  # atomic on POSIX
+            except Exception:
+                pass
+
+            # Stop file as safety net (in case a long test is blocking finish_test)
+            if os.path.exists(_WEB_STOP_FILE):
+                _web_log("Stop signal detected — exiting", level="warn")
+                with _WEB_STATE_LOCK:
+                    _WEB_STATE["status"] = "stopped"
+                _web_flush()
+                sys.exit(0)
+
+            # Web control command detection
+            try:
+                mtime = os.path.getmtime(_WEB_CMD_FILE)
+                if last_cmd_mtime < 0:
+                    # First check: record current mtime, don't act on existing file
+                    last_cmd_mtime = mtime
+                elif mtime > last_cmd_mtime:
+                    with open(_WEB_CMD_FILE) as f:
+                        cmd = json.load(f)
+                    new_argv = _argv_from_cmd(cmd)
+                    _web_log(f"Applying new settings: {cmd}", level="info")
+                    time.sleep(0.3)  # let log line flush
+                    os.execv(sys.executable, [sys.executable] + new_argv)
+            except FileNotFoundError:
+                last_cmd_mtime = -1.0
+            except Exception:
+                pass
+
+            time.sleep(interval)
+
+    t = threading.Thread(target=_loop, daemon=True, name="heartbeat")
+    t.start()
+
+
 if __name__ == "__main__":
     try:
         STARTTIME = time.time()
         ARGS      = parse_cli()
+
+        # Initialise web UI state from CLI arguments
+        with _WEB_STATE_LOCK:
+            _WEB_STATE.update({
+                "version":       VERSION,
+                "started_at":    STARTTIME,
+                "suite":         ARGS.suite,
+                "size":          ARGS.size,
+                "max_wait_secs": getattr(ARGS, "max_wait_secs", 20),
+                "loop":          getattr(ARGS, "loop", False),
+                "suites":        [{"name": n, "description": d}
+                                  for n, d in _SUITE_DESCRIPTIONS],
+            })
+        _web_flush()
+        _web_log(
+            f"traffgen v{VERSION} starting — "
+            f"suite={ARGS.suite} size={ARGS.size}",
+            level="info",
+        )
+
+        _start_heartbeat()
         WATCHDOG  = Watchdog(timeout_seconds=600)
 
         suite = build_testsuite()
