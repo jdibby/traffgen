@@ -999,6 +999,7 @@ def bigfile() -> None:
             ) as resp:
                 if resp.status_code in (403, 429, 451):
                     ui_warn(f"HTTP {resp.status_code} from provider — skipping")
+                    _stats.record(str(resp.status_code))
                     continue
                 resp.raise_for_status()
                 total = int(resp.headers.get("content-length", 0))
@@ -1018,14 +1019,24 @@ def bigfile() -> None:
             _stats.ok()
             ui_ok(f"Big-file download complete ({url})")
             return
-        except (requests.exceptions.ConnectionError,
-                requests.exceptions.Timeout,
-                requests.exceptions.HTTPError) as e:
+        except (requests.exceptions.Timeout,
+                requests.exceptions.ConnectTimeout) as e:
+            ui_warn(f"Provider timed out: {e} — trying next")
+            _stats.drop()
+        except requests.exceptions.ConnectionError as e:
             ui_warn(f"Provider unavailable: {e} — trying next")
+            if "Connection refused" in str(e) or "ECONNREFUSED" in str(e) or "Reset" in str(e):
+                _stats.block()
+            else:
+                _stats.drop()
+        except requests.exceptions.HTTPError as e:
+            ui_warn(f"Provider HTTP error: {e} — trying next")
+            if e.response is not None:
+                _stats.record(str(e.response.status_code))
         except Exception as e:
             ui_warn(f"Provider error: {e} — trying next")
+            _stats.fail()
 
-    _stats.fail()
     ui_error("[bigfile] all providers failed")
 
 
@@ -1429,7 +1440,7 @@ def speedtest_fast() -> None:
                     _stats.ok()
                 except subprocess.TimeoutExpired:
                     console.log(f"[yellow]Round {i} timed out[/]")
-                    _stats.fail()
+                    _stats.drop()
                 except subprocess.CalledProcessError as e:
                     console.log(f"[red]Round {i} failed: {e}[/]")
                     if e.stderr:
@@ -1564,12 +1575,14 @@ def ssh_random() -> None:
                 # rc=0: logged in; rc=255: network unreachable; other: TCP ok, auth rejected
                 if result.returncode == 0:
                     outcome = "[green]connected[/]"
+                    _stats.ok()
                 elif result.returncode == 255:
                     outcome = "[dim]unreachable[/]"
+                    _stats.drop()
                 else:
                     outcome = "[green]reachable[/] [dim](auth rejected — TCP/22 open)[/]"
+                    _stats.ok()
                 console.log(f"ssh ({i}/{n}) {ip}  → {outcome}")
-                _stats.ok()
             except Exception as e:
                 console.log(f"[yellow]ssh ({i}/{n}) {ip}  → {e.__class__.__name__}[/]")
                 _stats.fail()
@@ -1812,7 +1825,6 @@ def webcrawl() -> None:
         for attempt in range(1, attempts + 1):
             console.log(f"Crawl attempt {attempt}/{attempts}")
             scrape_iterative(ARGS.crawl_start, iterations)
-            _stats.ok()
         ui_ok("Web crawl complete")
     except Exception as e:
         ui_error(f"[webcrawl] {e}")
@@ -1948,10 +1960,10 @@ def dot_random() -> None:
                 first_line = (result.stdout.strip().split("\n")[0]
                               if result.stdout.strip() else "no response")
                 console.log(f"DoT ({i}/{n}) {ip}:853  SNI={servername}  → {first_line[:70]}")
-                if "CONNECTED" in first_line or "verify" in first_line.lower():
+                if result.returncode == 0:
                     _stats.ok()
                 else:
-                    _stats.fail()
+                    _stats.drop()
             except Exception as e:
                 console.log(f"[yellow]DoT ({i}/{n}) {ip}:853  → {e.__class__.__name__}[/]")
                 _stats.fail()
