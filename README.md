@@ -51,7 +51,7 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=nmap --size=L
 `stager.sh` installs Docker and starts the container on a fresh host. Supports Ubuntu, Debian, Rocky Linux, and Raspberry Pi 4/5.
 
 ```bash
-sudo bash < <(curl -s https://raw.githubusercontent.com/jdibby/traffgen/refs/heads/main/stager.sh)
+curl -s https://raw.githubusercontent.com/jdibby/traffgen/refs/heads/main/stager.sh | sudo bash
 ```
 
 ---
