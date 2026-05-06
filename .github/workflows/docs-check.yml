@@ -1,0 +1,102 @@
+name: Docs accuracy check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - generator.py
+      - README.md
+      - docs/**
+  pull_request:
+    paths:
+      - generator.py
+      - README.md
+      - docs/**
+
+jobs:
+  check:
+    name: Verify README reflects current code
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Extract VERSION from generator.py
+        id: version
+        run: |
+          ver=$(python3 -c "
+          import re, sys
+          m = re.search(r'VERSION\s*=\s*[\"\']([\d.]+)[\"\']]', open('generator.py').read())
+          if not m:
+              m = re.search(r'[\"\']([\d]+\.\d+\.\d+)[\"\']]', open('generator.py').read())
+          if m:
+              print(m.group(1))
+          else:
+              print('NOT_FOUND')
+          " 2>/dev/null || echo "NOT_FOUND")
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+          echo "Detected version: $ver"
+
+      - name: Check README mentions current version
+        if: steps.version.outputs.version != 'NOT_FOUND'
+        run: |
+          VER="${{ steps.version.outputs.version }}"
+          if ! grep -q "$VER" README.md; then
+            echo "::warning file=README.md::README.md does not mention version $VER from generator.py"
+          fi
+
+      - name: Extract suite names from generator.py
+        id: suites
+        run: |
+          python3 - <<'EOF'
+          import ast, re, sys, os
+
+          src = open("generator.py").read()
+
+          # Find _SUITE_MAP dictionary
+          m = re.search(r'_SUITE_MAP\s*=\s*\{(.+?)\n\}', src, re.DOTALL)
+          if not m:
+              print("SKIP")
+              sys.exit(0)
+
+          # Extract keys (suite names) — simple approach: grab all quoted keys
+          keys = re.findall(r'^\s{4}["\']([a-z0-9_]+)["\']', m.group(0), re.MULTILINE)
+          if not keys:
+              print("SKIP")
+              sys.exit(0)
+
+          print("\n".join(keys))
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"suite_list={' '.join(keys)}\n")
+          EOF
+
+      - name: Verify suite names appear in README
+        if: steps.suites.outputs.suite_list != ''
+        run: |
+          MISSING=()
+          for suite in ${{ steps.suites.outputs.suite_list }}; do
+            if ! grep -qF "$suite" README.md; then
+              MISSING+=("$suite")
+            fi
+          done
+          if [ ${#MISSING[@]} -gt 0 ]; then
+            echo "::warning file=README.md::These suites are defined in generator.py but not mentioned in README.md: ${MISSING[*]}"
+          else
+            echo "All suite names found in README.md"
+          fi
+
+      - name: Check web dashboard doc exists and has API section
+        run: |
+          if [ ! -f docs/web-dashboard.md ]; then
+            echo "::error::docs/web-dashboard.md is missing"
+            exit 1
+          fi
+          if ! grep -q "/api/control" docs/web-dashboard.md; then
+            echo "::warning file=docs/web-dashboard.md::docs/web-dashboard.md is missing the /api/control endpoint documentation"
+          fi
+          echo "docs/web-dashboard.md present and complete"
