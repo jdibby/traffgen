@@ -1167,8 +1167,8 @@ function apply(s){
   _isPaused=(st==='paused');$('btn-pause').innerHTML=_isPaused?'&#9654;':'&#9208;';$('btn-pause').title=_isPaused?'Resume tests':'Pause tests';
   const lp=$('pill-live');if(st==='stopped'){lp.className='tp-pill tp-stopped';lp.innerHTML='&#9209; STOPPED';}else{lp.className='tp-pill tp-running';lp.innerHTML='<span class="pulse"></span>LIVE';}
   $('cfg-s-pill').textContent='suite:'+(s.suite||'—');$('cfg-z-pill').textContent='size:'+(s.size||'—');
-  const tot=s.totals||{},ok=tot.ok||0,fail=tot.fail||0,att=tot.attempts||0,p=att?ok/att*100:0;
-  $('v-total').textContent=N(att);$('s-total').textContent=N(ok)+' ok \xb7 '+N(fail)+' fail';
+  const tot=s.totals||{},ok=tot.ok||0,fail=tot.fail||0,att=tot.attempts||0,p=att?ok/att*100:0,blk=tot.blocked||0,drp=tot.dropped||0;
+  $('v-total').textContent=N(att);$('s-total').textContent=N(ok)+' ok \xb7 '+N(fail)+' fail'+(blk?' \xb7 '+N(blk)+' blocked':'')+(drp?' \xb7 '+N(drp)+' dropped':'');
   $('v-rate').textContent=att?p.toFixed(1)+'%':'—';$('v-rate').style.color=att?RC(p):'var(--muted)';$('s-rate').textContent=att?N(att)+' total requests':'No data yet';
   const cur=s.current_test||'',tsa=s.test_started_at||0;
   $('v-test').textContent=cur?cur.replace(/_/g,' '):'—';
@@ -1198,6 +1198,8 @@ function apply(s){
       <div class="xi"><div class="xl">Avg Dur</div>${t.avg_dur_ms?Dur(t.avg_dur_ms):'—'}</div>
       <div class="xi"><div class="xl">Responses</div>${N(t.responses||0)}</div>
       <div class="xi"><div class="xl">HTTP Codes</div><div class="ctags">${ctags||'<span style="color:var(--dim)">none yet</span>'}</div></div>
+      <div class="xi"><div class="xl">Blocked</div>${N(t.blocked||0)}</div>
+      <div class="xi"><div class="xl">Dropped</div>${N(t.dropped||0)}</div>
     </div></td></tr>`;
   }).join('');
   const evs=(s.events||[]).slice().reverse().slice(0,30),eb=$('ev-body');
@@ -1212,7 +1214,7 @@ function apply(s){
       <span class="edur">${e.dur_ms!=null?Dur(e.dur_ms):'—'}</span>
       <span class="echev${exp?' open':''}">&#8250;</span>
     </div>
-    <div class="evdet${exp?' open':''}">suite: ${H(e.test||'—')} \xb7 result: ${e.ok?'OK':'FAIL'} \xb7 dur: ${e.dur_ms!=null?Dur(e.dur_ms):'—'} \xb7 responses: ${e.responses||0}${codes?' \xb7 codes: '+H(codes):''}</div>
+    <div class="evdet${exp?' open':''}">suite: ${H(e.test||'—')} \xb7 result: ${e.ok?'OK':'FAIL'} \xb7 dur: ${e.dur_ms!=null?Dur(e.dur_ms):'—'} \xb7 responses: ${e.responses||0}${e.blocked?' \xb7 blocked: '+N(e.blocked):''}${e.dropped?' \xb7 dropped: '+N(e.dropped):''}${codes?' \xb7 codes: '+H(codes):''}</div>
     </div>`;
   }).join('');
   const suites=s.suites||[],tg=$('test-grid');

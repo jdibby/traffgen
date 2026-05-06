@@ -458,7 +458,7 @@ _WEB_STATE: dict = {
     "status": "starting",   # running | between_tests | paused | stopped
     "test_started_at": 0.0,
     "tests": {}, "suites": [],
-    "totals": {"attempts": 0, "ok": 0, "fail": 0},
+    "totals": {"attempts": 0, "ok": 0, "fail": 0, "blocked": 0, "dropped": 0},
     "history": [{"t": int(__import__("time").time()), "ok": 0, "fail": 0}], "events": [],
     "_history_last_t": 0.0,
 }
@@ -482,16 +482,20 @@ def _web_flush() -> None:
 
 
 def _web_record(name: str, ok: bool, dur_ms: int,
-                responses: int = 0, codes: "dict | None" = None) -> None:
+                responses: int = 0, codes: "dict | None" = None,
+                blocked: int = 0, dropped: int = 0) -> None:
     """Record one completed test run into the web state and flush to disk."""
     with _WEB_STATE_LOCK:
         t = _WEB_STATE["tests"].setdefault(name, {
             "attempts": 0, "ok": 0, "fail": 0, "responses": 0,
             "last_run_at": 0, "last_ok": True,
             "last_dur_ms": 0, "avg_dur_ms": 0, "codes": {},
+            "blocked": 0, "dropped": 0,
         })
         t["attempts"]   += 1
         t["responses"]  += responses
+        t["blocked"]    += blocked
+        t["dropped"]    += dropped
         if ok:
             t["ok"]   += 1
         else:
@@ -518,6 +522,8 @@ def _web_record(name: str, ok: bool, dur_ms: int,
 
         tot = _WEB_STATE["totals"]
         tot["attempts"] += 1
+        tot["blocked"]   = tot.get("blocked", 0) + blocked
+        tot["dropped"]   = tot.get("dropped", 0) + dropped
         if ok:
             tot["ok"]   += 1
         else:
@@ -527,6 +533,7 @@ def _web_record(name: str, ok: bool, dur_ms: int,
             "t": int(time.time()), "test": name, "ok": ok,
             "dur_ms": dur_ms, "responses": responses,
             "codes": {k: v for k, v in (codes or {}).items()},
+            "blocked": blocked, "dropped": dropped,
         })
         if len(_WEB_STATE["events"]) > 100:
             _WEB_STATE["events"] = _WEB_STATE["events"][-100:]
@@ -779,7 +786,8 @@ def _run_guarded(func) -> None:
     _stats.print_summary()
     dur_ms = int((time.time() - t0) * 1000)
     run_ok = not exc_box and not t.is_alive()
-    _web_record(func.__name__, run_ok, dur_ms, _stats.responses, dict(_stats.codes))
+    _web_record(func.__name__, run_ok, dur_ms, _stats.responses, dict(_stats.codes),
+                blocked=_stats.blocked, dropped=_stats.dropped)
     _web_log(
         f"{func.__name__}: {_stats.attempts} attempts, "
         f"{_stats.responses} ok, {_stats.errors} fail — {dur_ms}ms",
@@ -1584,6 +1592,16 @@ def urlresponse_random() -> None:
                     t = r.elapsed.total_seconds()
                     console.log(f"({i}/{n}) {url}  {t:.3f}s")
                     _stats.record(str(r.status_code))
+                except requests.exceptions.ConnectionError as e:
+                    console.log(f"[yellow]skip[/] {url}")
+                    if "Connection refused" in str(e) or "ECONNREFUSED" in str(e) or "Reset" in str(e):
+                        _stats.block()
+                    else:
+                        _stats.drop()
+                except (requests.exceptions.Timeout, requests.exceptions.ConnectTimeout,
+                        requests.exceptions.ReadTimeout):
+                    console.log(f"[yellow]skip[/] {url}")
+                    _stats.drop()
                 except Exception:
                     console.log(f"[yellow]skip[/] {url}")
                     _stats.fail()
@@ -1679,6 +1697,16 @@ def s3_sim() -> None:
                 f"s3-get ({i}/{n_dl}) {url}  [{_status_style(resp.status_code)}]HTTP {resp.status_code}[/]"
             )
             _stats.record(resp.status_code)
+        except requests.exceptions.ConnectionError as e:
+            console.log(f"[yellow]s3-get ({i}/{n_dl}) {url}  {e.__class__.__name__}[/]")
+            if "Connection refused" in str(e) or "ECONNREFUSED" in str(e) or "Reset" in str(e):
+                _stats.block()
+            else:
+                _stats.drop()
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectTimeout,
+                requests.exceptions.ReadTimeout):
+            console.log(f"[yellow]s3-get ({i}/{n_dl}) {url}  timeout[/]")
+            _stats.drop()
         except Exception as e:
             console.log(f"[yellow]s3-get ({i}/{n_dl}) {url}  {e.__class__.__name__}[/]")
             _stats.fail()
@@ -1700,6 +1728,16 @@ def s3_sim() -> None:
                 f"s3-put ({i}/{n_ul}) {url}  [{_status_style(resp.status_code)}]HTTP {resp.status_code}[/]"
             )
             _stats.record(resp.status_code)
+        except requests.exceptions.ConnectionError as e:
+            console.log(f"[yellow]s3-put ({i}/{n_ul}) {url}  {e.__class__.__name__}[/]")
+            if "Connection refused" in str(e) or "ECONNREFUSED" in str(e) or "Reset" in str(e):
+                _stats.block()
+            else:
+                _stats.drop()
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectTimeout,
+                requests.exceptions.ReadTimeout):
+            console.log(f"[yellow]s3-put ({i}/{n_ul}) {url}  timeout[/]")
+            _stats.drop()
         except Exception as e:
             console.log(f"[yellow]s3-put ({i}/{n_ul}) {url}  {e.__class__.__name__}[/]")
             _stats.fail()
@@ -2004,6 +2042,14 @@ def c2_beacon() -> None:
                         allow_redirects=True,
                     )
                     _stats.record(str(resp.status_code))
+                except requests.exceptions.ConnectionError as e:
+                    if "Connection refused" in str(e) or "ECONNREFUSED" in str(e) or "Reset" in str(e):
+                        _stats.block()
+                    else:
+                        _stats.drop()  # Unreachable targets are expected / normal
+                except (requests.exceptions.Timeout, requests.exceptions.ConnectTimeout,
+                        requests.exceptions.ReadTimeout):
+                    _stats.drop()  # Unreachable targets are expected / normal
                 except Exception:
                     _stats.fail()  # Unreachable targets are expected / normal
                 time.sleep(jitter)
@@ -2404,10 +2450,16 @@ def llm_dlp_sim() -> None:
                         f"({'expected' if resp.status_code in (401, 403, 422) else 'check'})"
                     )
                     _stats.record(str(resp.status_code))
-                except (requests.exceptions.ConnectionError,
-                        requests.exceptions.Timeout):
+                except requests.exceptions.ConnectionError as e:
                     console.log("  ↳ unreachable (expected)")
-                    _stats.fail()
+                    if "Connection refused" in str(e) or "ECONNREFUSED" in str(e) or "Reset" in str(e):
+                        _stats.block()
+                    else:
+                        _stats.drop()
+                except (requests.exceptions.Timeout, requests.exceptions.ConnectTimeout,
+                        requests.exceptions.ReadTimeout):
+                    console.log("  ↳ timeout (expected)")
+                    _stats.drop()
                 except Exception as e:
                     console.log(f"[yellow]  ↳ {e.__class__.__name__}[/]")
                     _stats.fail()
@@ -2477,6 +2529,16 @@ def _probe_domain_list(local_path: str, n: int = 10) -> None:
                 r = requests.get(url, timeout=1, verify=False, allow_redirects=True)
                 console.log(f"({i}/{len(sample)}) {url}  →  {r.status_code}")
                 _stats.record(str(r.status_code))
+            except requests.exceptions.ConnectionError as e:
+                console.log(f"({i}/{len(sample)}) {url}  →  {e.__class__.__name__}")
+                if "Connection refused" in str(e) or "ECONNREFUSED" in str(e) or "Reset" in str(e):
+                    _stats.block()
+                else:
+                    _stats.drop()
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectTimeout,
+                    requests.exceptions.ReadTimeout):
+                console.log(f"({i}/{len(sample)}) {url}  →  timeout")
+                _stats.drop()
             except Exception as e:
                 console.log(f"({i}/{len(sample)}) {url}  →  {e.__class__.__name__}")
                 _stats.fail()
@@ -2589,8 +2651,19 @@ def scrape_single_link(url: str) -> str | None:
         _stats.fail()
         ui_warn(f"HTTP error {url}: {e}")
         return None
+    except (requests.exceptions.Timeout, requests.exceptions.ConnectTimeout,
+            requests.exceptions.ReadTimeout) as e:
+        _stats.drop()
+        ui_warn(f"Request failed {url}: {e}")
+        return None
+    except requests.exceptions.ConnectionError as e:
+        if "Connection refused" in str(e) or "ECONNREFUSED" in str(e) or "Reset" in str(e):
+            _stats.block()
+        else:
+            _stats.drop()
+        ui_warn(f"Request failed {url}: {e}")
+        return None
     except (requests.exceptions.SSLError,
-            requests.exceptions.Timeout,
             requests.exceptions.TooManyRedirects,
             requests.exceptions.RequestException) as e:
         _stats.fail()
