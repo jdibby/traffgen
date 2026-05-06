@@ -4,7 +4,7 @@
 #   html/template, and os (CVE-2025-58183 through CVE-2026-32289 series).
 FROM golang:1.26-bookworm AS gobgp-build
 
-ARG GOBGP_VERSION=v4.5.0
+ARG GOBGP_VERSION=v4.3.0
 
 WORKDIR /tmp/gobgp
 # --depth 1 --single-branch fetches only the tagged commit, not the full history
