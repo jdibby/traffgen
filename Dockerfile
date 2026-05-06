@@ -3,9 +3,11 @@
 # so no extra apt install is needed in this stage.
 FROM golang:1.23-bookworm AS gobgp-build
 
+ARG GOBGP_VERSION=v3.36.0
+
 WORKDIR /tmp/gobgp
 # --depth 1 --single-branch fetches only the tagged commit, not the full history
-RUN git -c http.sslVerify=false clone --depth 1 --single-branch --branch v3.36.0 \
+RUN git clone --depth 1 --single-branch --branch ${GOBGP_VERSION} \
         https://github.com/osrg/gobgp.git . && \
     go build -ldflags="-s -w" -o /tmp/gobgp-bin/gobgp  ./cmd/gobgp  && \
     go build -ldflags="-s -w" -o /tmp/gobgp-bin/gobgpd ./cmd/gobgpd && \
@@ -24,7 +26,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /opt
 # --depth 1 skips the full MSF git history (~1 GB uncompressed)
-RUN git -c http.sslVerify=false clone --depth 1 \
+RUN git clone --depth 1 \
         https://github.com/rapid7/metasploit-framework.git metasploit-framework
 WORKDIR /opt/metasploit-framework
 
@@ -93,8 +95,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && echo "$TZ" > /etc/timezone \
   && rm -rf /var/lib/apt/lists/*
 
+ARG NIKTO_VERSION=2.1.6
+
 # nikto is not in Debian repos — install from upstream (Perl script, no extra deps)
-RUN git -c http.sslVerify=false clone --depth 1 \
+RUN git clone --depth 1 --branch ${NIKTO_VERSION} \
         https://github.com/sullo/nikto.git /opt/nikto && \
     ln -s /opt/nikto/program/nikto.pl /usr/local/bin/nikto && \
     chmod +x /opt/nikto/program/nikto.pl
@@ -102,9 +106,14 @@ RUN git -c http.sslVerify=false clone --depth 1 \
 # Bundler in runtime so wrappers can call `bundle exec`
 RUN gem install --no-document bundler
 
-# Python packages
+# Python packages — versions pinned for reproducibility
 RUN pip3 install --no-cache-dir --break-system-packages \
-      fastcli requests beautifulsoup4 dnspython dnstwist rich && \
+      fastcli \
+      "requests==2.32.2" \
+      "beautifulsoup4==4.12.3" \
+      "dnspython==2.6.1" \
+      "dnstwist==20240812" \
+      "rich==13.7.1" && \
     find /usr -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 
 # Remove static/libtool artefacts BEFORE copying Metasploit so the find

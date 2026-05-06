@@ -33,7 +33,7 @@ import random
 import threading
 import argparse
 import subprocess
-import traceback
+import shlex
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urljoin
@@ -377,14 +377,17 @@ def _curl_head(url: str, user_agent: str,
     browser-side tool.  The response body is discarded; only the status code
     is returned for logging.
     """
-    cmd = (
-        f"curl -k -s --show-error "
-        f"--connect-timeout {connect_timeout} "
-        f"-I -o /dev/null -w '%{{http_code}}' --max-time {max_time} "
-        f"{extra_flags} "
-        f"-A '{user_agent}' {url}"
-    )
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True,
+    cmd = [
+        "curl", "-k", "-s", "--show-error",
+        "--connect-timeout", str(connect_timeout),
+        "-I", "-o", "/dev/null", "-w", "%{http_code}",
+        "--max-time", str(max_time),
+        "-A", user_agent,
+    ]
+    if extra_flags:
+        cmd.extend(shlex.split(extra_flags))
+    cmd.append(url)
+    result = subprocess.run(cmd, capture_output=True, text=True,
                             timeout=max_time + 5)
     return result.stdout.strip() or "---"
 
@@ -399,14 +402,17 @@ def _curl_download(url: str, rate_limit: str = "3M",
     saturate the uplink.  Use an empty string to remove the cap.
     Returns the HTTP/FTP response code string.
     """
-    rate_flag = f"--limit-rate {rate_limit}" if rate_limit else ""
-    ua_flag   = f"-A '{user_agent}'"          if user_agent  else ""
-    cmd = (
-        f"curl {rate_flag} -k --show-error "
-        f"--connect-timeout {connect_timeout} "
-        f"-L -o /dev/null -w '%{{response_code}}' {ua_flag} {url}"
-    )
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True,
+    cmd = [
+        "curl", "-k", "--show-error",
+        "--connect-timeout", str(connect_timeout),
+        "-L", "-o", "/dev/null", "-w", "%{response_code}",
+    ]
+    if rate_limit:
+        cmd += ["--limit-rate", rate_limit]
+    if user_agent:
+        cmd += ["-A", user_agent]
+    cmd.append(url)
+    result = subprocess.run(cmd, capture_output=True, text=True,
                             timeout=timeout)
     return result.stdout.strip() or "---"
 
@@ -2828,10 +2834,12 @@ def _start_heartbeat(path: str = "/tmp/traffgen.health", interval: int = 15) -> 
     reliable liveness signal that does not depend on pgrep or process naming.
     """
     def _loop() -> None:
+        tmp = path + ".tmp"
         while True:
             try:
-                with open(path, "w") as fh:
+                with open(tmp, "w") as fh:
                     fh.write(str(int(time.time())))
+                os.replace(tmp, path)  # atomic on POSIX
             except Exception:
                 pass
             time.sleep(interval)
