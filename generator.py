@@ -2620,7 +2620,7 @@ def _probe_domain_list(local_path: str, n: int = 10) -> None:
         for i, domain in enumerate(sample, 1):
             url = f"https://{domain}"
             try:
-                r = requests.get(url, timeout=1, verify=False, allow_redirects=True)
+                r = requests.get(url, timeout=3, verify=False, allow_redirects=True)
                 console.log(f"({i}/{len(sample)}) {url}  →  {r.status_code}")
                 _stats.record(str(r.status_code))
             except requests.exceptions.ConnectionError as e:
@@ -2645,7 +2645,8 @@ def github_domain_check() -> None:
     Download (or reuse a cached copy of) the Hagezi multi-category DNS
     blocklist from GitHub, then probe a random sample of domains from it.
     """
-    ui_banner("GitHub Domain Check", "Hagezi blocklist sample")
+    n = _size_to_limits(ARGS.size, 20, 50, 100, 200)
+    ui_banner("GitHub Domain Check", f"Hagezi blocklist — {n} domains")
     local = "git-domains-list"
     url   = "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/domains/multi.txt"
     try:
@@ -2655,7 +2656,7 @@ def github_domain_check() -> None:
                 return
         else:
             console.log(f"Using cached: {local}")
-        _probe_domain_list(local, n=10)
+        _probe_domain_list(local, n=n)
         ui_ok("GitHub domain check complete")
     except Exception as e:
         ui_error(f"[github_domain_check] {e}")
@@ -2666,7 +2667,8 @@ def github_phishing_domain_check() -> None:
     Download (or reuse a cached copy of) the Phishing.Database active
     phishing domain list from GitHub, then probe a random sample.
     """
-    ui_banner("Phishing Domain Check", "Phishing.Database active list")
+    n = _size_to_limits(ARGS.size, 20, 50, 100, 200)
+    ui_banner("Phishing Domain Check", f"Phishing.Database active list — {n} domains")
     local = "git-phishing-list"
     url   = (
         "https://raw.githubusercontent.com/Phishing-Database/Phishing.Database"
@@ -2679,7 +2681,7 @@ def github_phishing_domain_check() -> None:
                 return
         else:
             console.log(f"Using cached: {local}")
-        _probe_domain_list(local, n=10)
+        _probe_domain_list(local, n=n)
         ui_ok("Phishing domain check complete")
     except Exception as e:
         ui_error(f"[github_phishing_domain_check] {e}")
