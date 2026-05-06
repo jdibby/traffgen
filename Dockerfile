@@ -112,7 +112,7 @@ RUN pip3 install --no-cache-dir --break-system-packages \
       "requests==2.32.2" \
       "beautifulsoup4==4.12.3" \
       "dnspython==2.6.1" \
-      "dnstwist==20240812" \
+      "dnstwist==20250130" \
       "rich==13.7.1" && \
     find /usr -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 
