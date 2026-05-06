@@ -1,14 +1,18 @@
 # ---------- Stage 1: build GoBGP ----------
-# golang:1.23-bookworm already ships git, build-essential, and ca-certificates
-# so no extra apt install is needed in this stage.
-FROM golang:1.24-bookworm AS gobgp-build
+# golang:1.26-bookworm fixes Go stdlib CVEs:
+#   CVE-2025-68121 (crypto/tls), CVE-2026-32280 + CVE-2025-61729 (crypto/x509),
+#   CVE-2025-61725 (net/mail)
+FROM golang:1.26-bookworm AS gobgp-build
 
-ARG GOBGP_VERSION=v3.36.0
+ARG GOBGP_VERSION=v4.5.0
 
 WORKDIR /tmp/gobgp
 # --depth 1 --single-branch fetches only the tagged commit, not the full history
+# go get grpc >= 1.79.3 fixes CVE-2026-33186 (gRPC-Go auth bypass)
 RUN git clone --depth 1 --single-branch --branch ${GOBGP_VERSION} \
         https://github.com/osrg/gobgp.git . && \
+    go get google.golang.org/grpc@v1.79.3 && \
+    go mod tidy && \
     go build -ldflags="-s -w" -o /tmp/gobgp-bin/gobgp  ./cmd/gobgp  && \
     go build -ldflags="-s -w" -o /tmp/gobgp-bin/gobgpd ./cmd/gobgpd && \
     strip /tmp/gobgp-bin/gobgp /tmp/gobgp-bin/gobgpd
@@ -106,10 +110,18 @@ RUN git clone --depth 1 --branch ${NIKTO_VERSION} \
     chmod +x /opt/nikto/program/nikto.pl
 
 # Bundler in runtime so wrappers can call `bundle exec`
-RUN gem install --no-document bundler
+# json>=2.19.2  fixes CVE-2026-33210 (format string injection)
+# rexml>=3.3.6  fixes CVE-2024-43398  (DoS in tree parser)
+# erb>=6.0.4    fixes CVE-2026-41316  (deserialization RCE via def_method)
+RUN gem install --no-document bundler \
+      "json:2.19.2" \
+      "rexml:3.3.6" \
+      "erb:6.0.4"
 
 # Python packages — versions pinned for reproducibility
+# setuptools>=78.1.1 fixes CVE-2025-47273 (path traversal in PackageIndex.download)
 RUN pip3 install --no-cache-dir --break-system-packages \
+      "setuptools>=78.1.1" \
       fastcli \
       "flask==3.1.3" \
       "requests==2.33.1" \
