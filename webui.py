@@ -368,15 +368,22 @@ def api_control():
 @app.route("/events")
 def sse_state():
     def _gen():
+        yield "retry: 2000\n\n"
+        last_ka = time.time()
         while True:
             yield f"data: {json.dumps(_read_state(), separators=(',', ':'))}\n\n"
             time.sleep(2)
+            # keepalive comment so proxies/browsers don't close idle connections
+            if time.time() - last_ka > 15:
+                yield ": ka\n\n"
+                last_ka = time.time()
     return _sse_wrap(_gen)
 
 
 @app.route("/log")
 def sse_log():
     def _gen():
+        yield "retry: 2000\n\n"
         try:
             with open(_LOG_FILE) as f:
                 seed = f.readlines()[-100:]
@@ -395,6 +402,7 @@ def sse_log():
         except FileNotFoundError:
             pass
 
+        last_ka = time.time()
         while True:
             try:
                 with open(_LOG_FILE) as f:
@@ -405,8 +413,13 @@ def sse_log():
                     ln = ln.strip()
                     if ln:
                         yield f"data: {ln}\n\n"
+                        last_ka = time.time()
             except FileNotFoundError:
                 pass
+            # keepalive when log is quiet
+            if time.time() - last_ka > 15:
+                yield ": ka\n\n"
+                last_ka = time.time()
             time.sleep(1)
 
     return _sse_wrap(_gen)
