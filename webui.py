@@ -652,8 +652,8 @@ td.nm{font-family:inherit;font-weight:500;font-size:12px}
 .tcbar{width:100%;height:2px;background:var(--border2);border-radius:1px;overflow:hidden;margin-top:1px}
 .tcbf{height:100%;border-radius:1px;transition:width .4s}
 .otb{display:flex;gap:6px;padding:8px 12px;background:var(--surf);border-bottom:1px solid var(--border);align-items:center;flex-shrink:0;flex-wrap:wrap}
-.otlbl{font-size:10px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-right:auto}
-.btn{padding:3px 10px;border-radius:var(--r);border:1px solid var(--border2);background:var(--surf2);color:var(--muted);font-size:11px;cursor:pointer;transition:all .12s}
+.otlbl{font-size:12px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-right:auto}
+.btn{padding:5px 12px;border-radius:var(--r);border:1px solid var(--border2);background:var(--surf2);color:var(--muted);font-size:13px;cursor:pointer;transition:all .12s}
 .btn:hover{border-color:var(--green);color:var(--green)}
 .btn.af{border-color:var(--green);color:var(--green);background:var(--gdim)}
 .fgrp{display:flex;gap:4px}
@@ -738,7 +738,7 @@ input:checked+.tslider:before{transform:translateX(17px)}
 .footer a{color:var(--dim);text-decoration:none}.footer a:hover{color:var(--muted)}
 .empty{padding:26px;text-align:center;color:var(--muted);font-size:12px}
 ::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--dim);border-radius:2px}
-.mono{font-family:'SF Mono',Consolas,monospace;font-size:11px}
+.mono{font-family:'SF Mono',Consolas,monospace;font-size:13px}
 .ll.banner{padding:1px 14px}
 .ll.banner .llm{color:#22c55e;white-space:pre;font-size:12px}
 .ll.rule{padding:3px 0;gap:0}
@@ -1685,7 +1685,7 @@ html,body{height:100%;overflow:hidden}
 body{background:var(--bg);color:var(--text);font-family:'SF Mono',Consolas,monospace;font-size:12px;display:flex;flex-direction:column}
 .hdr{display:flex;align-items:center;gap:8px;padding:7px 12px;background:var(--surf);border-bottom:1px solid var(--border);flex-shrink:0}
 .title{font-weight:700;font-size:13px;margin-right:auto;color:var(--text)}
-.btn{padding:3px 10px;border-radius:5px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:11px;cursor:pointer}
+.btn{padding:5px 12px;border-radius:5px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:13px;cursor:pointer}
 .btn:hover{border-color:var(--green);color:var(--green)}
 .btn.af{border-color:var(--green);color:var(--green)}
 .fgrp{display:flex;gap:3px}
