@@ -28,8 +28,10 @@ Variable index (matches generator.py usage names 1-to-1):
     ntp_endpoints       NTP server hostnames (ntp_probe)
     ssh_endpoints       IPs / hostnames for SSH probes (ssh_probe)
     nmap_endpoints      IPs for nmap port scans (nmap_scan, nmap_vuln)
-    snmp_endpoints      IPs for SNMPv2c walks (snmp_walk)
-    snmp_strings        SNMP community strings (snmp_walk)
+    snmp_endpoints      IPs / hostnames for SNMP probes (snmp_v1/v2c/v3)
+    snmp_v1_strings     SNMPv1 community strings
+    snmp_v2c_strings    SNMPv2c community strings
+    snmp_v3_creds       SNMPv3 credential tuples (user, level, auth-proto, auth-pass, priv-proto, priv-pass)
 
   Web / HTTPS traffic
     http_endpoints      Plain HTTP hostnames (http_random)
@@ -2261,21 +2263,52 @@ pornography_endpoints = [
 ]
 
 # ── SNMP community strings and probe targets ───────────────────────────────────
-snmp_strings = [
-    "public",
-    "private",
-    "trap",
-    "system",
-    "access",
-    "agent",
-    "monitor",
-    "secret",
+snmp_v1_strings = [
+    "public", "private", "community", "default", "manager",
+    "admin", "cisco", "monitor", "trap", "access", "secret",
+    "write", "read", "snmp", "ILMI", "guest", "password", "0",
+]
+
+snmp_v2c_strings = [
+    "public", "private", "community", "default", "admin",
+    "cisco", "router", "switch", "network", "manager",
+    "monitor", "core", "access", "test", "security",
+    "system", "read", "write", "readonly", "readwrite",
+    "all", "temp", "snmpd", "agent", "trap", "secret",
+]
+
+# (username, security-level, auth-proto, auth-pass, priv-proto, priv-pass)
+# Covers noAuthNoPriv, authNoPriv, and authPriv — common defaults found in the wild
+snmp_v3_creds = [
+    ("initial",    "noAuthNoPriv", "",     "",              "",     ""),
+    ("public",     "noAuthNoPriv", "",     "",              "",     ""),
+    ("admin",      "noAuthNoPriv", "",     "",              "",     ""),
+    ("readonly",   "noAuthNoPriv", "",     "",              "",     ""),
+    ("monitor",    "noAuthNoPriv", "",     "",              "",     ""),
+    ("default",    "noAuthNoPriv", "",     "",              "",     ""),
+    ("guest",      "noAuthNoPriv", "",     "",              "",     ""),
+    ("cisco",      "authNoPriv",   "MD5",  "cisco123",      "",     ""),
+    ("admin",      "authNoPriv",   "MD5",  "admin123",      "",     ""),
+    ("admin",      "authNoPriv",   "SHA",  "admin123",      "",     ""),
+    ("netadmin",   "authNoPriv",   "SHA",  "netadmin",      "",     ""),
+    ("snmpv3",     "authNoPriv",   "MD5",  "snmpv3pass",    "",     ""),
+    ("v3user",     "authNoPriv",   "SHA",  "password",      "",     ""),
+    ("operator",   "authNoPriv",   "MD5",  "operator",      "",     ""),
+    ("snmpuser",   "authNoPriv",   "SHA",  "authpass12",    "",     ""),
+    ("cisco",      "authPriv",     "MD5",  "cisco123",      "DES",  "cisco123"),
+    ("admin",      "authPriv",     "SHA",  "admin123",      "AES",  "admin123"),
+    ("snmpuser",   "authPriv",     "SHA",  "authpass12",    "AES",  "privpass12"),
+    ("operator",   "authPriv",     "MD5",  "operator",      "DES",  "operator"),
+    ("netadmin",   "authPriv",     "SHA",  "netadmin",      "AES",  "netadmin"),
 ]
 
 snmp_endpoints = [
     "192.168.1.1",
     "172.16.0.1",
     "10.0.0.1",
+    "10.0.0.254",
+    "192.168.0.1",
+    "192.168.1.254",
     "test.net-snmp.org",
     "demo.snmplabs.com",
     "snmp.inetdaemon.com",

@@ -255,7 +255,7 @@ _SUITE_DESCRIPTIONS: list[tuple[str, str]] = [
     ("ntp",              "NTP UDP probes to a pool of public time servers"),
     ("phishing-domains", "Probe random samples from active phishing domain list"),
     ("pornography",      "HTTPS crawl of adult-content endpoints"),
-    ("snmp",             "SNMPv2c walks with rotating community strings"),
+    ("snmp",             "SNMPv1/v2c/v3 walks with common community strings and credentials"),
     ("squatting",        "dnstwist typosquatting generation for popular domains"),
     ("s3",               "S3 upload/download simulation: GET public objects + PUT synthetic DLP payloads"),
     ("ssh",              "Non-interactive SSH connection attempts"),
@@ -1366,40 +1366,123 @@ def metasploit_check() -> None:
         ui_error(f"[metasploit_check] {e}")
 
 
-def snmp_random() -> None:
+def _snmp_record(returncode: int, ip: str, label: str) -> None:
+    """Classify an snmpwalk result into allowed / dropped / fail."""
+    if returncode == 0:
+        _stats.ok()
+    elif returncode == 1:
+        # rc=1: no response (timeout/filtered) — treat as dropped
+        _stats.drop()
+    else:
+        _stats.fail()
+
+
+def snmp_v1() -> None:
     """
-    SNMPv2c walks on `snmp_endpoints` using community strings from
-    `snmp_strings`.  Low retry counts (-r1 -t1) avoid long waits on
-    non-responsive hosts.
+    SNMPv1 GET-NEXT walks using common community strings seen in the wild.
+    Walks the system MIB (1.3.6.1.2.1.1) only — fast and enough to exercise
+    IDS SNMP-community signatures.
     """
-    n = _size_to_limits(ARGS.size, 1, 2, 5, len(snmp_endpoints))
-    ui_banner("SNMP Walk", f"{n} hosts")
+    n = _size_to_limits(ARGS.size, 1, 2, 4, len(snmp_endpoints))
+    ui_banner("SNMP v1", f"{n} hosts × rotating community strings")
     try:
-        random.shuffle(snmp_endpoints)
-        random.shuffle(snmp_strings)
-        with Progress(SpinnerColumn(), TextColumn("[cyan]SNMP[/]"),
-                      MofNCompleteColumn(), BarColumn(), TimeElapsedColumn(),
-                      console=console) as prog:
-            task = prog.add_task("snmp", total=n)
-            for i, ip in enumerate(snmp_endpoints[:n], 1):
-                community = snmp_strings[i % len(snmp_strings)]
-                console.log(f"snmpwalk ({i}/{n}) {ip}  community={community}")
-                try:
-                    subprocess.run(
-                        ["snmpwalk", "-v2c", "-t1", "-r1", "-c", community, ip, "1.3.6"],
-                        stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
-                        timeout=15,
-                    )
-                    _stats.ok()
-                except Exception as e:
-                    console.log(f"[yellow]snmp {ip}: {e}[/]")
-                    _stats.fail()
-                finally:
-                    prog.update(task, advance=1)
-        ui_ok("SNMP complete")
+        hosts = random.sample(snmp_endpoints, min(n, len(snmp_endpoints)))
+        for i, ip in enumerate(hosts, 1):
+            community = random.choice(snmp_v1_strings)
+            console.log(f"snmpwalk v1 ({i}/{n}) {ip}  community={community!r}")
+            try:
+                result = subprocess.run(
+                    ["snmpwalk", "-v1", "-t2", "-r1", "-c", community,
+                     ip, "1.3.6.1.2.1.1"],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
+                    timeout=8,
+                )
+                _snmp_record(result.returncode, ip, "v1")
+            except subprocess.TimeoutExpired:
+                _stats.drop()
+            except Exception as e:
+                console.log(f"[yellow]snmp v1 {ip}: {e}[/]")
+                _stats.fail()
+        ui_ok("SNMP v1 complete")
     except Exception as e:
         _stats.fail()
-        ui_error(f"[snmp_random] {e}")
+        ui_error(f"[snmp_v1] {e}")
+
+
+def snmp_v2c() -> None:
+    """
+    SNMPv2c GET-BULK walks using an expanded set of common community strings.
+    Exercises SNMP community-brute and policy-violation signatures.
+    """
+    n = _size_to_limits(ARGS.size, 1, 2, 5, len(snmp_endpoints))
+    ui_banner("SNMP v2c", f"{n} hosts × rotating community strings")
+    try:
+        hosts = random.sample(snmp_endpoints, min(n, len(snmp_endpoints)))
+        for i, ip in enumerate(hosts, 1):
+            community = random.choice(snmp_v2c_strings)
+            console.log(f"snmpwalk v2c ({i}/{n}) {ip}  community={community!r}")
+            try:
+                result = subprocess.run(
+                    ["snmpwalk", "-v2c", "-t2", "-r1", "-c", community,
+                     ip, "1.3.6.1.2.1.1"],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
+                    timeout=8,
+                )
+                _snmp_record(result.returncode, ip, "v2c")
+            except subprocess.TimeoutExpired:
+                _stats.drop()
+            except Exception as e:
+                console.log(f"[yellow]snmp v2c {ip}: {e}[/]")
+                _stats.fail()
+        ui_ok("SNMP v2c complete")
+    except Exception as e:
+        _stats.fail()
+        ui_error(f"[snmp_v2c] {e}")
+
+
+def snmp_v3() -> None:
+    """
+    SNMPv3 probes cycling through common default credentials at all three
+    security levels: noAuthNoPriv, authNoPriv (MD5/SHA), and authPriv
+    (DES/AES).  Exercises SNMPv3 weak-credential and brute-force signatures.
+    """
+    n = _size_to_limits(ARGS.size, 1, 2, 4, len(snmp_endpoints))
+    ui_banner("SNMP v3", f"{n} hosts × rotating credentials")
+    try:
+        hosts  = random.sample(snmp_endpoints, min(n, len(snmp_endpoints)))
+        creds  = random.sample(snmp_v3_creds, min(len(snmp_v3_creds), max(n, 3)))
+        pairs  = [(hosts[i % len(hosts)], creds[i % len(creds)])
+                  for i in range(max(n, len(creds)))]
+        random.shuffle(pairs)
+        for i, (ip, cred) in enumerate(pairs[:max(n, len(creds))], 1):
+            user, level, auth_proto, auth_pass, priv_proto, priv_pass = cred
+            console.log(
+                f"snmpwalk v3 ({i}) {ip}  user={user!r} level={level}"
+                + (f" auth={auth_proto}" if auth_proto else "")
+                + (f" priv={priv_proto}" if priv_proto else "")
+            )
+            cmd = ["snmpwalk", "-v3", "-t2", "-r1", "-l", level, "-u", user]
+            if auth_proto:
+                cmd += ["-a", auth_proto, "-A", auth_pass]
+            if priv_proto:
+                cmd += ["-x", priv_proto, "-X", priv_pass]
+            cmd += [ip, "1.3.6.1.2.1.1"]
+            try:
+                result = subprocess.run(
+                    cmd,
+                    stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
+                    timeout=8,
+                )
+                _snmp_record(result.returncode, ip, "v3")
+            except subprocess.TimeoutExpired:
+                _stats.drop()
+            except Exception as e:
+                console.log(f"[yellow]snmp v3 {ip}: {e}[/]")
+                _stats.fail()
+        ui_ok("SNMP v3 complete")
+    except Exception as e:
+        _stats.fail()
+        ui_error(f"[snmp_v3] {e}")
 
 
 def traceroute_random() -> None:
@@ -2885,7 +2968,7 @@ _SUITE_MAP: dict[str, list] = {
     "ntp":              [ntp_random],
     "phishing-domains": [github_phishing_domain_check],
     "pornography":      [pornography_crawl],
-    "snmp":             [snmp_random],
+    "snmp":             [snmp_v1, snmp_v2c, snmp_v3],
     "s3":               [s3_sim],
     "squatting":        [squatting_domains],
     "ssh":              [ssh_random],
