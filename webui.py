@@ -1043,6 +1043,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
 <div class="main" id="main-scroll">
   <div class="topbar">
     <span class="pg-title" id="pg-title">Overview</span>
+    <span id="tb-host-ip" style="display:none;font-family:'SF Mono',Consolas,monospace;font-size:13px;font-weight:600;color:var(--blue);background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);border-radius:16px;padding:2px 10px;white-space:nowrap" title="Host LAN IP"></span>
     <span class="tb-test" id="tb-test"><span class="pulse"></span><span id="tb-test-ico"></span><span class="tb-test-name" id="tb-test-name">—</span></span>
     <span id="cfg-s-pill" class="mono" style="color:var(--muted)">—</span>
     <span id="cfg-z-pill" class="mono" style="color:var(--muted)">—</span>
@@ -1944,6 +1945,7 @@ function applyNetInfo(d){
   if(!d)return;
   if($('h-pub-ip'))$('h-pub-ip').textContent=d.public_ip||'—';
   if($('h-lan-ip')){const lip=d.host_lan_ip||'';$('h-lan-ip').textContent=lip||'—';if($('h-lan-ip-wrap'))$('h-lan-ip-wrap').style.display=lip?'':'none';}
+  const tbip=$('tb-host-ip');if(tbip){const lip=d.host_lan_ip||'';tbip.textContent=lip;tbip.style.display=lip?'':'none';}
   const tb=$('netinfo-body');if(!tb)return;
   const ifaces=d.interfaces||[];
   if(!ifaces.length){tb.innerHTML='<tr><td colspan="6" class="empty">No interfaces</td></tr>';return;}
