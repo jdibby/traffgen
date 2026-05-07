@@ -58,7 +58,7 @@ from rich import box
 from endpoints import *           # noqa: F401,F403  (large data file)
 
 # ── Globals ───────────────────────────────────────────────────────────────────
-VERSION = "2.6.0"
+VERSION = "3.0.0"
 
 
 class _DualWriter:
