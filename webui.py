@@ -1114,7 +1114,7 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
         <table class="st-table">
           <tr><th>Flag</th><th>Values</th><th>Default</th><th>Description</th></tr>
           <tr><td>--suite</td><td style="color:var(--text)">any suite name</td><td>all</td><td>Test suite to run</td></tr>
-          <tr><td>--size</td><td style="color:var(--text)">XS S M L XL</td><td>XS</td><td>Traffic volume / intensity</td></tr>
+          <tr><td>--size</td><td style="color:var(--text)">XS S M L XL</td><td>S</td><td>Traffic volume / intensity</td></tr>
           <tr><td>--loop</td><td style="color:var(--text)">flag</td><td>off</td><td>Loop forever, random suite each iteration</td></tr>
           <tr><td>--max-wait-secs</td><td style="color:var(--text)">integer</td><td>20</td><td>Max pause between iterations</td></tr>
           <tr><td>--nowait</td><td style="color:var(--text)">flag</td><td>off</td><td>Skip all inter-test pauses</td></tr>
@@ -1176,7 +1176,7 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
       <div>
         <div class="modal-sep" style="margin-bottom:10px">Run Configuration</div>
         <div class="field" style="margin-bottom:10px"><label>Size</label>
-          <select id="modal-size"><option value="XS">XS</option><option value="S">S</option><option value="M">M</option><option value="L">L</option><option value="XL">XL</option></select>
+          <select id="modal-size"><option value="XS">XS</option><option value="S" selected>S</option><option value="M">M</option><option value="L">L</option><option value="XL">XL</option></select>
         </div>
         <div class="field" style="margin-bottom:10px"><label>Max Wait</label>
           <div class="rngw"><input type="range" id="modal-wait" min="5" max="300" step="5" value="20" oninput="$('modal-wv').textContent=this.value+'s'"><span class="rngv" id="modal-wv">20s</span></div>
