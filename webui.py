@@ -1585,9 +1585,9 @@ function apply(s){
   $('v-total').textContent=N(att);$('s-total').textContent=N(ok)+' ok \xb7 '+N(fail)+' fail'+(blk?' \xb7 '+N(blk)+' blocked':'')+(drp?' \xb7 '+N(drp)+' dropped':'');
   $('v-rate').textContent=att?p.toFixed(1)+'%':'—';$('v-rate').style.color=att?RC(p):'var(--muted)';$('s-rate').textContent=att?N(att)+' total requests':'No data yet';
   const cur=s.current_test||'',tsa=s.test_started_at||0;
-  $('v-test').textContent=cur?cur.replace(/-/g,' '):'—';
+  $('v-test').textContent=cur?cur:'—';
   const tbt=$('tb-test'),tbn=$('tb-test-name'),tbi=$('tb-test-ico');
-  if(tbt&&tbn&&tbi){if(cur&&st==='running'){tbt.classList.add('visible');tbn.textContent=cur.replace(/-/g,' ');tbi.textContent=suiteIco(cur);}else{tbt.classList.remove('visible');}}
+  if(tbt&&tbn&&tbi){if(cur&&st==='running'){tbt.classList.add('visible');tbn.textContent=cur;tbi.textContent=suiteIco(cur);}else{tbt.classList.remove('visible');}}
   if(tsa&&cur){clearInterval(_elTimer);const upEl=()=>$('s-test').textContent=elapsed(tsa);upEl();_elTimer=setInterval(upEl,1000);}
   else{clearInterval(_elTimer);$('s-test').textContent=s.loop?'Loop mode':'Single-run';}
   $('v-iter').textContent=s.iteration?'#'+N(s.iteration):'—';$('s-iter').textContent='Suite: '+(s.suite||'—')+' \xb7 Size: '+(s.size||'—');
@@ -1603,7 +1603,7 @@ function apply(s){
     const ctags=Object.entries(codes).sort().map(([k,v])=>`<span class="ctag">${H(k)}: ${N(v)}</span>`).join('');
     return`<tr class="mrow${act?' style="background:rgba(34,197,94,.04)"':''}" onclick="toggleRow('${n}')">
       <td><span class="chev${exp?' open':''}">&#8250;</span></td>
-      <td class="nm" title="${_SD[n]||''}" style="cursor:default"><span class="s-ico">${suiteIco(n)}</span>${act?'<span style="color:var(--green)">&#9654; </span>':''}${H(n.replace(/-/g,' '))}</td>
+      <td class="nm" title="${_SD[n]||''}" style="cursor:default"><span class="s-ico">${suiteIco(n)}</span>${act?'<span style="color:var(--green)">&#9654; </span>':''}${H(n)}</td>
       <td class="r">${N(ta)}</td><td class="r" style="color:var(--green)">${N(tok)}</td>
       <td class="r" style="color:${tf?'var(--red)':'var(--muted)'}">${N(tf)}</td>
       <td class="r"><div class="rw"><span style="color:${bc}">${ta?tp.toFixed(1)+'%':'—'}</span><div class="bt"><div class="bf" style="width:${tp}%;background:${bc}"></div></div></div></td>
@@ -1626,7 +1626,7 @@ function apply(s){
     const codes=e.codes&&Object.keys(e.codes).length?Object.entries(e.codes).sort().map(([k,v])=>k+':'+v).join(' \xb7 '):'';
     return`<div class="ev-wrap" onclick="toggleEv(${i})"><div class="evrow">
       <span class="et">${Tc(e.t)}</span>
-      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${_SD[e.test||'']||''}">${H((e.test||'').replace(/-/g,' '))}</span>
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${_SD[e.test||'']||''}">${H((e.test||''))}</span>
       <span class="${e.ok?'eok':'efail'}">${e.ok?'✓ OK':'✗ FAIL'}</span>
       <span class="edur">${e.dur_ms!=null?Dur(e.dur_ms):'—'}</span>
       <span class="echev${exp?' open':''}">&#8250;</span>
@@ -1640,7 +1640,7 @@ function apply(s){
     const td=tests[su.name]||{},ta=td.attempts||0,tok=td.ok||0,tf=td.fail||0,tp=ta?tok/ta*100:0;
     const bc=RC(tp),act=su.name===cur;
     return`<div class="tcard2${act?' running':''}" data-suite="${H(su.name)}" data-desc="${H(su.description||'')}" onclick="openModal(this.dataset.suite,this.dataset.desc)">
-      <div class="tcn" title="${H(su.description||'')}"><span class="s-ico">${suiteIco(su.name)}</span>${H(su.name.replace(/-/g,' '))}${act?'<span class="badge">RUNNING</span>':''}</div>
+      <div class="tcn" title="${H(su.description||'')}"><span class="s-ico">${suiteIco(su.name)}</span>${H(su.name)}${act?'<span class="badge">RUNNING</span>':''}</div>
       <div class="tcd">${H(su.description||'—')}</div>
       <div class="tcs"><span style="color:var(--muted)">${N(ta)} attempts</span><span style="color:var(--green)">${N(tok)} ok</span><span style="color:${tf?'var(--red)':'var(--muted)'}">${N(tf)} fail</span>${ta?'<span style="color:'+bc+'">'+tp.toFixed(1)+'%</span>':''}</div>
       ${ta?`<div class="tcbar"><div class="tcbf" style="width:${tp}%;background:${bc}"></div></div>`:''}
@@ -1689,7 +1689,7 @@ function appendLog(d){
   if(test&&test!==_lastTest){
     _lastTest=test;
     const sep=document.createElement('div');sep.className='ll ll-sep';
-    sep.innerHTML=`<div class="sep-line"></div><div class="sep-txt">${H(test.replace(/-/g,' '))}</div><div class="sep-line"></div>`;
+    sep.innerHTML=`<div class="sep-line"></div><div class="sep-txt">${H(test)}</div><div class="sep-line"></div>`;
     b.appendChild(sep);
   }
   const div=document.createElement('div');
@@ -1777,7 +1777,7 @@ function stopTests(){
 }
 function handleLiveClick(){if(_lastState&&_lastState.status==='stopped'){toast('Tests are already stopped',false);return;}stopTests();}
 function openModal(name,desc){
-  _modalSuite=name;$('modal-name').textContent=name.replace(/-/g,' ');$('modal-desc').textContent=desc||'No description available.';
+  _modalSuite=name;$('modal-name').textContent=name;$('modal-desc').textContent=desc||'No description available.';
   const td=(_lastState&&_lastState.tests&&_lastState.tests[name])||{};
   const ta=td.attempts||0,tok=td.ok||0,tf=td.fail||0;
   $('ms-att').textContent=ta?N(ta):'—';$('ms-ok').textContent=tok?N(tok):'—';$('ms-fail').textContent=tf?N(tf):'—';
@@ -2015,7 +2015,7 @@ function updateSecurityTab(){
     const bp=r.tot?r.blk/r.tot*100:0,dp=r.tot?r.drp/r.tot*100:0;
     const bpC=bp>50?'var(--red)':bp>10?'var(--amber)':'var(--muted)';
     const dpC=dp>50?'var(--red)':dp>10?'#818cf8':'var(--muted)';
-    return`<tr class="mrow"><td class="nm" title="${_SD[r.n]||''}" style="cursor:default"><span class="s-ico">${suiteIco(r.n)}</span>${H(r.n.replace(/-/g,' '))}</td><td class="r">${N(r.tot)}</td><td class="r" style="color:#22c55e">${N(r.rch)}</td><td class="r" style="color:var(--amber)">${N(r.blk)}</td><td class="r" style="color:#818cf8">${N(r.drp)}</td><td class="r"><span style="color:${bpC}">${r.tot?bp.toFixed(1)+'%':'—'}</span></td><td class="r"><span style="color:${dpC}">${r.tot?dp.toFixed(1)+'%':'—'}</span></td></tr>`;
+    return`<tr class="mrow"><td class="nm" title="${_SD[r.n]||''}" style="cursor:default"><span class="s-ico">${suiteIco(r.n)}</span>${H(r.n)}</td><td class="r">${N(r.tot)}</td><td class="r" style="color:#22c55e">${N(r.rch)}</td><td class="r" style="color:var(--amber)">${N(r.blk)}</td><td class="r" style="color:#818cf8">${N(r.drp)}</td><td class="r"><span style="color:${bpC}">${r.tot?bp.toFixed(1)+'%':'—'}</span></td><td class="r"><span style="color:${dpC}">${r.tot?dp.toFixed(1)+'%':'—'}</span></td></tr>`;
   }).join('');
   // block signal breakdown — aggregate codes across all tests
   const codeTotals={};
@@ -2192,7 +2192,7 @@ es.onmessage=ev=>{
   try{
     const d=JSON.parse(ev.data),lvl=d.level||'info';
     const test=d.test||'';
-    if(test&&test!==lt){lt=test;const sep=document.createElement('div');sep.className='ll ll-sep';sep.innerHTML='<div class="sep-line"></div><div class="sep-txt">'+H(test.replace(/-/g,' '))+'</div><div class="sep-line"></div>';b.appendChild(sep);}
+    if(test&&test!==lt){lt=test;const sep=document.createElement('div');sep.className='ll ll-sep';sep.innerHTML='<div class="sep-line"></div><div class="sep-txt">'+H(test)+'</div><div class="sep-line"></div>';b.appendChild(sep);}
     const div=document.createElement('div');div.className='ll '+lvl;
     div.innerHTML='<span class="llt">'+Tc(d.t||Date.now()/1000)+'</span><span class="llv">'+H(lvl.toUpperCase().slice(0,5).padEnd(5))+'</span><span class="llm">'+H(d.msg||'')+'</span>';
     if(lf!=='all'&&!div.classList.contains(lf))div.style.display='none';
