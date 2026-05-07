@@ -156,7 +156,40 @@ The dashboard includes:
 | 🏢 `shadow-it` | HEAD requests to **27 unsanctioned cloud applications** across five CASB app-control categories: personal file sharing (Dropbox, Box, MEGA, WeTransfer, OneDrive consumer, iCloud), personal messaging (Discord, Telegram, WhatsApp Web), privacy/anonymising mail (ProtonMail, Tutanota, Guerrilla Mail), paste/file hosting (Pastebin, Filebin, GoFile), and crypto/blockchain (Coinbase, Etherscan, Binance). Tests CASB app-control and SSE category blocking policies for unsanctioned cloud usage. |
 | 📤 `data-exfil-http` | POSTs **synthetic PII and credential payloads** to public paste and file-drop services (Pastebin, Hastebin, Paste2, transfer.sh, Filebin). Payload types: US Social Security Number lists, payment card numbers (Luhn-valid), RSA private key blocks, password hashes, and CSV PII. Tests DLP outbound content-inspection (Zscaler DLP, Netskope DLP, Palo Alto Enterprise DLP) and CASB upload policies — all destinations return 4xx but the outbound POST bodies are visible to inline inspection. |
 | 🔐 `tls-check` | Connects to **20 diverse HTTPS endpoints** (CDN, cloud, social, developer tools, finance, government) and reports the presented TLS certificate for each: Subject CN, Issuer CN + Org, expiry, SHA-256 fingerprint, and verification status. Classifies each host as **CLEAN** (original cert received), **INTERCEPTED** (issuer matches a known SASE/SSE/proxy vendor CA — Zscaler, Netskope, Palo Alto, Fortinet, Cato, Cisco, Blue Coat, Forcepoint, iboss, and others), **UNVERIFIED** (proxy is re-signing but the CA is not installed in the container), or **UNREACHABLE**. Also detects shared-CA fingerprints across unrelated sites (a reliable proxy signal even when the vendor name is unrecognised). Reports selective bypass: if finance/government hosts are CLEAN while social/developer hosts are INTERCEPTED, the proxy has category or ASN bypass rules active. Use `EXTRA_CA_CERT` or a bind-mounted `.crt` file to install the proxy CA if seeing UNVERIFIED results. |
-| 🔀 `lateral-movement` | Two-phase east-west reconnaissance against the Docker host's **physical LAN** (not the Docker bridge). The real LAN is detected automatically: first by scanning the routing table for non-bridge RFC1918 connected subnets, then via traceroute — skipping 172.16–31.x docker hops — to find the actual LAN gateway. **Phase 1:** nmap `-sn` ping sweep of the entire **/24** — enumerates all live hosts. **Phase 2:** port scan every discovered host on **12 lateral-movement ports**: SSH (22), Kerberos (88), WMI/RPC (135), NetBIOS (137-139), LDAP (389), SMB (445), LDAPS (636), RDP (3389), WinRM HTTP/HTTPS (5985/5986). Per-host results are classified and recorded for the security dashboard — `open` ports → `allowed`, TCP RST → `blocked`, silently dropped → `dropped`. Tests east-west NGFW policies (Palo Alto, Fortinet), SIEM lateral-movement correlation rules, and network IDS SMB/RDP recon signatures. |
+| 🔀 `lateral-movement` | Two-phase east-west reconnaissance against the Docker **host's physical LAN**. ⚠️ **Requires one of the two methods below** to reach the real LAN — see [Lateral Movement networking](#-lateral-movement-networking) for details. **Phase 1:** nmap `-sn` ping sweep of the entire **/24** — enumerates all live hosts. **Phase 2:** port scan every discovered host on **12 lateral-movement ports**: SSH (22), Kerberos (88), WMI/RPC (135), NetBIOS (137-139), LDAP (389), SMB (445), LDAPS (636), RDP (3389), WinRM HTTP/HTTPS (5985/5986). Per-host results classified and recorded — `open` → `allowed`, TCP RST → `blocked`, silently dropped → `dropped`. Tests east-west NGFW policies (Palo Alto, Fortinet), SIEM lateral-movement correlation rules, and network IDS SMB/RDP recon signatures. |
+
+---
+
+### 🔀 Lateral Movement Networking
+
+The `lateral-movement` suite scans the **host's physical LAN**, not the Docker bridge (`172.17.x.x`). A standard Docker container runs in its own network namespace and cannot see the host's physical interfaces. One of the following two methods is required:
+
+#### Method 1 — stager.sh (recommended)
+
+`stager.sh` captures the host's LAN IP **and subnet prefix** with `hostname -I` and `ip addr` **before** the container starts and passes them as `-e HOST_LAN_CIDR=<ip>/<prefix>`. The suite reads this and scans the correct network:
+
+| Host prefix | Scan target | Notes |
+|---|---|---|
+| `/24` | `x.x.x.0/24` | Normal LAN |
+| `/25` – `/31` | Actual subnet | Smaller segment |
+| `/32` | `x.x.x.0/24` | **Microsegmentation detected** — suite logs a warning and scans the containing /24 to probe east-west policy |
+| `/8` – `/23` | `x.x.x.0/24` | Large subnet capped at /24 to keep scan time reasonable |
+
+No extra flags needed — just use stager.sh.
+
+#### Method 2 — `--network=host`
+
+Run the container with `--network=host` to share the host's network namespace. The container can then see and scan the host's physical interfaces directly.
+
+```bash
+docker run --pull=always --detach --restart unless-stopped \
+  -p 7777:7777 --network=host --name traffgen jdibby/traffgen:latest \
+  --suite=all --size=S --max-wait-secs=20 --loop
+```
+
+> **Note:** `--network=host` is Linux-only. It does not work on Docker Desktop for Mac or Windows.
+
+If neither method is used, the suite logs a warning and falls back to scanning the container's own subnet (useful only for inter-container east-west testing).
 
 ---
 

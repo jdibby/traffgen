@@ -3711,27 +3711,47 @@ def _detect_host_lan() -> "tuple[str, str] | None":
     """Return (gateway_ip, subnet/24) for the physical LAN the Docker host uses.
 
     Strategies (tried in order):
-      1. Parse /proc/net/route — no external tools required. Finds connected
-         routes (gateway=0.0.0.0, flags RTF_UP) on non-loopback interfaces,
-         skipping docker bridge (172.16-31.x) and loopback (127.x).
-         Falls back to the default-route gateway's /24 if no connected
-         non-docker subnet is found.
+      0. HOST_LAN_IP env var — set by stager.sh before the container starts
+         using ``hostname -I`` on the host.  Most reliable: the host resolves
+         its own IP before Docker networking is involved at all.
+      1. Parse /proc/net/route — no external tools required.
       2. ``ip route show`` — for environments where ip(8) is available.
-      3. Traceroute to 8.8.8.8, take first non-docker hop (no RFC1918 filter
-         since lab environments may use non-standard ranges).
+      3. Traceroute to 8.8.8.8, take first non-docker hop.
     """
+    import os as _os
     import socket as _socket
     import struct as _struct
     import re as _re
 
     _LOOPBACK = _re.compile(r"^127\.")
     _DOCKER_BRIDGE = _re.compile(r"^172\.(1[6-9]|2[0-9]|3[01])\.")
+    _IP_RE = _re.compile(r"^\d{1,3}(?:\.\d{1,3}){3}$")
 
     def _hex_to_ip(h: str) -> str:
         return _socket.inet_ntoa(_struct.pack("<I", int(h, 16)))
 
     def _to_24(ip: str) -> str:
         return ".".join(ip.split(".")[:3]) + ".0/24"
+
+    # Strategy 0 — HOST_LAN_CIDR env var injected by stager.sh before container start
+    _env_cidr = _os.environ.get("HOST_LAN_CIDR", "").strip()
+    if _env_cidr and "/" in _env_cidr:
+        _eip, _epfx = _env_cidr.split("/", 1)
+        if _IP_RE.match(_eip) and _epfx.isdigit():
+            _prefix = int(_epfx)
+            if _prefix == 32:
+                # Every host is its own /32 — microsegmentation is on.
+                # Scan the containing /24 to probe east-west policy.
+                return _eip, _to_24(_eip)
+            elif _prefix >= 24:
+                # Use actual subnet (/24, /25, /26, /28, etc.)
+                import ipaddress as _ipaddress
+                _net = str(_ipaddress.ip_network(f"{_eip}/{_prefix}", strict=False))
+                return _eip, _net
+            else:
+                # Subnet larger than /24 (/16, /8, etc.) — cap at /24 to keep
+                # scan time reasonable (a /16 is 65535 hosts).
+                return _eip, _to_24(_eip)
 
     # Strategy 1 — /proc/net/route (no tools needed, works in any container)
     try:
@@ -3838,9 +3858,15 @@ def lateral_movement_sim() -> None:
         _stats.fail()
         return
     gw_ip, subnet = lan
+    _cidr = os.environ.get("HOST_LAN_CIDR", "").strip()
+    _src = "stager.sh" if _cidr else "auto-detected"
+    _microseg = _cidr.endswith("/32")
+
+    if _microseg:
+        ui_warn("Microsegmentation detected (host prefix /32) — scanning /24 to probe east-west policy")
 
     ui_banner("Lateral Movement Simulation",
-              f"gateway={gw_ip}  subnet={subnet}  ports={_LATERAL_PORTS}")
+              f"gateway={gw_ip}  subnet={subnet}  source={_src}  ports={_LATERAL_PORTS}")
 
     # ── Phase 1: ping sweep ──────────────────────────────────────────────────
     console.log(f"[cyan]Phase 1[/] ping sweep → {subnet}")

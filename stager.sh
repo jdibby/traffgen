@@ -297,10 +297,32 @@ step "Pulling latest traffgen image"
 docker pull jdibby/traffgen:latest
 
 step "Starting traffgen container"
+
+# Capture the host's LAN IP and subnet prefix before the container starts.
+# This lets the lateral-movement suite scan the real physical network.
+# We grab both the IP and the prefix length (/24, /32, etc.) so the scanner
+# knows the actual network size.  If the prefix is /32 (microsegmentation),
+# the suite will assume /24 and note that microsegmentation is detected.
+HOST_LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+HOST_LAN_CIDR=""
+if [ -n "$HOST_LAN_IP" ]; then
+    _PREFIX=24  # safe default
+    if command -v ip >/dev/null 2>&1; then
+        _P=$(ip -o -f inet addr 2>/dev/null \
+             | awk -v h="$HOST_LAN_IP" 'index($4, h"/")>0 {split($4,a,"/"); print a[2]; exit}')
+        [ -n "$_P" ] && _PREFIX="$_P"
+    fi
+    HOST_LAN_CIDR="${HOST_LAN_IP}/${_PREFIX}"
+    ok "Host LAN detected: ${HOST_LAN_CIDR} (passed to container for lateral movement)"
+else
+    echo "WARNING: could not detect host LAN — lateral-movement suite will fall back to container network"
+fi
+
 docker run \
     --detach \
     --restart unless-stopped \
     -p 7777:7777 \
+    ${HOST_LAN_CIDR:+-e HOST_LAN_CIDR="$HOST_LAN_CIDR"} \
     --name traffgen \
     jdibby/traffgen:latest \
     --suite=all --size=S --max-wait-secs=20 --loop
