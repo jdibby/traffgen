@@ -778,7 +778,7 @@ body{display:flex;background:var(--bg);color:var(--text);font-family:-apple-syst
 .ico-btn{width:33px;height:33px;border-radius:var(--r);border:1px solid var(--border2);background:var(--surf);color:var(--muted);cursor:pointer;display:grid;place-items:center;font-size:20px;transition:all .12s;flex-shrink:0}
 .ico-btn:hover{border-color:var(--green);color:var(--green)}
 .ico-btn.danger:hover{border-color:var(--red);color:var(--red)}
-.content{flex:1;display:flex;flex-direction:column}
+.content{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
 .panel{display:none;flex-direction:column;gap:14px;padding:18px;flex:1;min-height:0;overflow-y:auto}
 .panel.active{display:flex}
 #tab-output.panel{padding:0;gap:0;overflow:hidden}
@@ -1673,18 +1673,25 @@ function toggleAS(){_autoScroll=!_autoScroll;$('btn-as').innerHTML='Auto-scroll 
 function _initDrag(gridId){
   const grid=$(gridId);if(!grid)return;
   let dragged=null;
-  function refresh(){
-    grid.querySelectorAll('[data-widget]').forEach(card=>{
-      if(card.getAttribute('draggable'))return;
-      card.setAttribute('draggable','true');
-      card.addEventListener('dragstart',e=>{dragged=card;setTimeout(()=>card.classList.add('dragging'),0);e.dataTransfer.effectAllowed='move';});
-      card.addEventListener('dragend',()=>{card.classList.remove('dragging');grid.querySelectorAll('[data-widget]').forEach(c=>c.classList.remove('drag-over'));_saveWidgetOrder(gridId);dragged=null;});
-      card.addEventListener('dragover',e=>{e.preventDefault();if(card!==dragged)card.classList.add('drag-over');});
-      card.addEventListener('dragleave',()=>card.classList.remove('drag-over'));
-      card.addEventListener('drop',e=>{e.preventDefault();card.classList.remove('drag-over');if(dragged&&dragged!==card){const els=[...grid.querySelectorAll('[data-widget]')];const di=els.indexOf(dragged),ci=els.indexOf(card);if(di<ci)card.after(dragged);else card.before(dragged);}});
-    });
-  }
-  refresh();
+  // Inject drag handles into the first .ctitle/.thdr/.ehdr found in each widget
+  grid.querySelectorAll('[data-widget]').forEach(card=>{
+    if(card.querySelector('.drag-handle'))return;
+    const hdr=card.querySelector('.ctitle,.thdr,.ehdr,.clbl');
+    const h=document.createElement('span');
+    h.className='drag-handle';h.title='Drag to reorder';h.innerHTML='&#8942;&#8942;';
+    h.setAttribute('draggable','false');
+    if(hdr)hdr.prepend(h);else card.prepend(h);
+    // mousedown on handle activates draggable on parent then drag fires naturally
+    h.addEventListener('mousedown',()=>{card.setAttribute('draggable','true');});
+    h.addEventListener('mouseup',()=>{card.removeAttribute('draggable');});
+  });
+  grid.querySelectorAll('[data-widget]').forEach(card=>{
+    card.addEventListener('dragstart',e=>{if(!card.getAttribute('draggable'))return;dragged=card;setTimeout(()=>card.classList.add('dragging'),0);e.dataTransfer.effectAllowed='move';});
+    card.addEventListener('dragend',()=>{card.removeAttribute('draggable');card.classList.remove('dragging');grid.querySelectorAll('[data-widget]').forEach(c=>c.classList.remove('drag-over'));_saveWidgetOrder(gridId);dragged=null;});
+    card.addEventListener('dragover',e=>{e.preventDefault();if(card!==dragged)card.classList.add('drag-over');});
+    card.addEventListener('dragleave',e=>{if(!card.contains(e.relatedTarget))card.classList.remove('drag-over');});
+    card.addEventListener('drop',e=>{e.preventDefault();card.classList.remove('drag-over');if(dragged&&dragged!==card){const els=[...grid.querySelectorAll('[data-widget]')];const di=els.indexOf(dragged),ci=els.indexOf(card);if(di<ci)card.after(dragged);else card.before(dragged);}});
+  });
   _restoreWidgetOrder(gridId);
 }
 function _saveWidgetOrder(gridId){
