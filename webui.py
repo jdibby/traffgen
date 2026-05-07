@@ -503,8 +503,8 @@ def sse_log():
                 with open(_LOG_FILE) as f:
                     f.seek(0, 2)
                     size = f.tell()
-                    if pos > size:  # file was truncated — reset to start
-                        pos = 0
+                    if pos > size:  # file was truncated — jump to current end
+                        pos = size  # skip re-sending already-delivered lines
                     f.seek(pos)
                     new = f.readlines()
                     pos = f.tell()
@@ -1140,6 +1140,36 @@ const RC=p=>p>=90?'var(--green)':p>=70?'var(--amber)':'var(--red)';
 let _start=null,_uptimer=null,_elTimer=null,_autoScroll=true,_scrollLock=false;
 let _lastState=null,_logEs=null,_logFilter='all';
 let _xRows=new Set(),_xEvs=new Set(),_modalSuite=null,_isPaused=false,_lastTest=null;
+let _waitBannerEl=null,_waitBannerTimer=null,_waitBannerUntil=0;
+function _showWaitBanner(until){
+  const b=$('obody');if(!b)return;
+  if(_waitBannerEl&&_waitBannerUntil===until)return;
+  _hideWaitBanner();
+  _waitBannerUntil=until;
+  const el=document.createElement('div');
+  el.id='_wait-banner';
+  el.style.cssText='padding:10px 0;display:flex;align-items:center;position:sticky;bottom:0;background:#080c10;z-index:3;border-top:1px solid rgba(245,158,11,.25);margin-top:4px;';
+  b.appendChild(el);
+  _waitBannerEl=el;
+  function tick(){
+    const rem=Math.max(0,until-Math.floor(Date.now()/1000));
+    el.innerHTML='<div style="flex:1;height:1px;background:rgba(245,158,11,.25)"></div>'
+      +'<div style="padding:0 14px;font-size:13px;font-weight:600;color:var(--amber);white-space:nowrap;letter-spacing:.3px">'
+      +'&#8987; Pausing between tests — next test in '+rem+'s'
+      +'</div>'
+      +'<div style="flex:1;height:1px;background:rgba(245,158,11,.25)"></div>';
+    if(rem<=0){_hideWaitBanner();return;}
+    const ob=$('obody');
+    if(_autoScroll&&ob){_scrollLock=true;ob.scrollTop=ob.scrollHeight;requestAnimationFrame(()=>{_scrollLock=false;});}
+  }
+  tick();
+  _waitBannerTimer=setInterval(tick,1000);
+}
+function _hideWaitBanner(){
+  if(_waitBannerTimer){clearInterval(_waitBannerTimer);_waitBannerTimer=null;}
+  if(_waitBannerEl){_waitBannerEl.remove();_waitBannerEl=null;}
+  _waitBannerUntil=0;
+}
 let _isAdmin=true,_authRequired=false,_adminToken='',_sessionMode=false,_hasController=false;
 let _sessionId=(()=>{try{let s=sessionStorage.getItem('tg-sid');if(!s){s=crypto.randomUUID();sessionStorage.setItem('tg-sid',s);}return s;}catch(e){return '';}})();
 function _getToken(){try{return localStorage.getItem('tg-admin-token')||'';}catch(e){return '';}}
@@ -1229,6 +1259,8 @@ function apply(s){
   $('s-ver').textContent=ver;$('about-ver').textContent=ver;
   if(s.started_at&&!_start){_start=s.started_at;clearInterval(_uptimer);_uptimer=setInterval(()=>$('s-uptime').textContent='up '+uptime(_start),1000);}
   const st=s.status||'starting';
+  const wu=s.wait_until||0,now=Math.floor(Date.now()/1000);
+  if(st==='between_tests'&&wu>now){_showWaitBanner(wu);}else{_hideWaitBanner();}
   const pill=$('status-pill');pill.className='tp-pill '+(ST_CLS[st]||'tp-dim');
   const dot=st==='running'||st==='starting';pill.innerHTML=(dot?'<span class="pulse"></span>':'')+(ST_LBL[st]||st);
   _isPaused=(st==='paused');$('btn-pause').innerHTML=_isPaused?'&#9654;':'&#9208;';$('btn-pause').title=_isPaused?'Resume tests':'Pause tests';
@@ -1364,14 +1396,14 @@ function appendLog(d){
   if(!structural&&_logFilter!=='all'&&!div.classList.contains(_logFilter))div.style.display='none';
   b.appendChild(div);
   if(_autoScroll) requestAnimationFrame(()=>{
-    const ms=$('main-scroll');
-    if(ms){_scrollLock=true;ms.scrollTop=ms.scrollHeight;requestAnimationFrame(()=>{_scrollLock=false;});}
+    const ob=$('obody');
+    if(ob){_scrollLock=true;ob.scrollTop=ob.scrollHeight;requestAnimationFrame(()=>{_scrollLock=false;});}
   });
   while(b.children.length>800)b.removeChild(b.firstChild);
 }
 function toggleAS(){_autoScroll=!_autoScroll;$('btn-as').innerHTML='Auto-scroll '+(_autoScroll?'&#10003;':'&#10007;');}
 // Auto-manage auto-scroll: disable when user scrolls up, re-enable at bottom
-(()=>{const ms=$('main-scroll');if(!ms)return;ms.addEventListener('scroll',()=>{if(_scrollLock)return;const atBot=ms.scrollHeight-ms.scrollTop-ms.clientHeight<80;if(atBot&&!_autoScroll){_autoScroll=true;const b=$('btn-as');if(b)b.innerHTML='Auto-scroll &#10003;';}else if(!atBot&&_autoScroll){_autoScroll=false;const b=$('btn-as');if(b)b.innerHTML='Auto-scroll &#10007;';}},{passive:true});})();
+(()=>{const ob=$('obody');if(!ob)return;ob.addEventListener('scroll',()=>{if(_scrollLock)return;const atBot=ob.scrollHeight-ob.scrollTop-ob.clientHeight<80;if(atBot&&!_autoScroll){_autoScroll=true;const b=$('btn-as');if(b)b.innerHTML='Auto-scroll &#10003;';}else if(!atBot&&_autoScroll){_autoScroll=false;const b=$('btn-as');if(b)b.innerHTML='Auto-scroll &#10007;';}},{passive:true});})();
 function openDrawer(){$('drawer').classList.add('open');$('overlay').classList.add('open');}
 function closeDrawer(){$('drawer').classList.remove('open');$('overlay').classList.remove('open');}
 function toast(msg,ok){const t=$('toast');t.textContent=msg;t.className='toast '+(ok?'ok':'err');t.style.display='block';setTimeout(()=>t.style.display='none',3500);}

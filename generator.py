@@ -175,6 +175,9 @@ def progress_wait(seconds: int, label: str = "Waiting") -> None:
     """Animated countdown bar used between loop iterations."""
     if seconds <= 0:
         return
+    with _WEB_STATE_LOCK:
+        _WEB_STATE["wait_until"] = int(time.time()) + seconds
+    _web_flush()
     with Progress(
         SpinnerColumn(),
         TextColumn(f"[cyan]{label}[/]"),
@@ -189,6 +192,9 @@ def progress_wait(seconds: int, label: str = "Waiting") -> None:
         while not prog.finished:
             prog.update(task, completed=min(time.time() - start, seconds))
             time.sleep(0.1)
+    with _WEB_STATE_LOCK:
+        _WEB_STATE["wait_until"] = 0
+    _web_flush()
 
 
 def ui_startup_banner() -> None:
@@ -461,7 +467,7 @@ _WEB_STATE: dict = {
     "version": "", "started_at": 0.0, "suite": "all", "size": "S",
     "max_wait_secs": 20, "loop": True, "current_test": "", "iteration": 0,
     "status": "starting",   # running | between_tests | paused | stopped
-    "test_started_at": 0.0,
+    "test_started_at": 0.0, "wait_until": 0,
     "tests": {}, "suites": [],
     "totals": {"attempts": 0, "ok": 0, "fail": 0, "blocked": 0, "dropped": 0, "allowed": 0},
     "history": [{"t": int(__import__("time").time()), "ok": 0, "fail": 0}], "events": [],
