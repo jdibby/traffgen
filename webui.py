@@ -913,6 +913,8 @@ td.nm{font-family:inherit;font-weight:500;font-size:16px}
 .a-sub{color:var(--muted);font-size:14px;margin-top:6px;line-height:1.55}
 .a-section{background:var(--surf);border:1px solid var(--border);border-radius:var(--r);padding:18px}
 .a-h{font-size:14px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--green);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.cl-feat{display:inline-block;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:700;background:#1e3a5f;color:#60a5fa;letter-spacing:.4px}
+.cl-fix{display:inline-block;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:700;background:#3d1f1f;color:#f87171;letter-spacing:.4px}
 .lk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
 .lk{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--r);background:var(--surf2);text-decoration:none;color:var(--text);transition:border-color .15s}
 .lk:hover{border-color:var(--green)}
@@ -1035,6 +1037,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
   <button class="nav-item" data-tab="health" onclick="showTab(this)"><span class="nav-ico">&#9889;</span>Health</button>
   <div class="nav-lbl">Info</div>
   <button class="nav-item" data-tab="about" onclick="showTab(this)"><span class="nav-ico">◎</span>About</button>
+  <button class="nav-item" data-tab="changelog" onclick="showTab(this)"><span class="nav-ico">📋</span>Changelog</button>
   <div class="nav-lbl">Control</div>
   <button class="nav-item" onclick="openDrawer()"><span class="nav-ico">⚙</span>Settings</button>
   <div class="sb-foot">
@@ -1360,6 +1363,77 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
         </div>
       </div>
     </div>
+
+    <!-- Changelog -->
+    <div id="tab-changelog" class="panel" style="display:none">
+      <div style="max-width:860px">
+        <div class="a-section">
+          <div class="a-h">v3.1.0 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
+          <table class="st-table" style="margin-top:10px">
+            <tr><th style="width:80px">Type</th><th style="width:120px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>VoIP</strong> suite — STUN binding requests (UDP/3478) and SIP OPTIONS (UDP/5060) against public registrars</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>UCaaS</strong> suite — HEAD probes to 34 UCaaS endpoints (Zoom, Teams, Webex, Google Meet, Slack, RingCentral, 8x8, and more)</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Changelog page added to the web UI</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Topbar redesigned as a 3-column flex layout — host LAN IP pinned left, active test centered, controls pinned right</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Host LAN IP displayed in topbar and Network Info widget (populated from <code>HOST_LAN_CIDR</code>)</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>TLS Check</td><td>Expanded SASE/SSE vendor detection map — added Cloudflare Gateway, Menlo Security, Akamai SIA, Microsoft Defender, Lookout, Aryaka, Versa Networks, Perimeter 81, Proofpoint, F5, Juniper</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Deployment</td><td>macOS support in <code>stager.sh</code> — Homebrew, Docker Desktop, <code>en0/en1</code> IP detection, hex netmask → CIDR via python3</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Dashboard</td><td>Stop and Pause buttons were sometimes locked in read-only mode on first page load due to a race between <code>checkRole()</code> and the SSE connection establishing the controller session</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Dashboard</td><td>Toast messages in read-only mode now correctly say &ldquo;Another session has control&rdquo; in multi-user mode instead of &ldquo;click Unlock&rdquo; (no Unlock button exists in that mode)</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Generator</td><td>Heartbeat stop safety net now uses <code>os._exit()</code> instead of <code>sys.exit()</code> — the old call only killed the daemon thread, leaving the main process running mid-test</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>TLS Check</td><td>Cato Networks intercepted traffic was reported as &ldquo;CLEAN&rdquo; because the CN used hyphens (<code>Cato-Networks-Server-…</code>) — fixed by normalising hyphens to spaces before token matching</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Deployment</td><td>Duplicate Docker apt/yum sources no longer cause <code>apt-get update</code> failures on hosts that previously added Docker repos via a different method</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Deployment</td><td>Quick Start Docker examples now use <code>-p 7777:7777</code> instead of <code>--network=host</code> for cross-platform compatibility</td></tr>
+          </table>
+        </div>
+        <div class="a-section">
+          <div class="a-h">v3.0.0 &mdash; <span style="color:var(--muted);font-weight:400">April 2026</span></div>
+          <table class="st-table" style="margin-top:10px">
+            <tr><th style="width:80px">Type</th><th style="width:120px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Live HTTPS web dashboard on port 7777 with SSE state streaming</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Overview, Security, Tests, Live View, Health, and About pages</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Draggable widget layout on Overview, Security, and Health pages</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Multi-user session mode — first SSE tab gets admin control, others are read-only</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Sparkline charts for security trend, network I/O, CPU, and memory</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Per-test statistics (attempts, pass, fail) with block/drop/allow percentage breakdown</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Settings drawer — change suite, size, wait time and loop mode without restarting the container</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>tls-check</strong> — detects TLS inspection proxies by comparing intercepted cert chains to originals; identifies SASE/SSE vendor from issuer CN/O</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>ids-trigger</strong> — sends known IDS/IPS signatures (Shellshock, Heartbleed, SQL injection, XSS, EICAR) over HTTP</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>snmp</strong> v1/v2c/v3 — GET and WALK requests against public SNMP test agents</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>kyber</strong> — TLS 1.3 handshakes with X25519Kyber768 (post-quantum) key exchange</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>ai-browse</strong> — simulates AI assistant API calls (OpenAI, Anthropic, Gemini, Mistral) and LLM-heavy web browsing</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>lateral-movement</strong> — nmap host discovery and port scanning against LAN subnet; uses HOST_LAN_CIDR or --network=host</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>shadow-it</strong>, <strong>tor-anonymizer</strong>, <strong>waf-attack</strong>, <strong>log4shell</strong>, <strong>metasploit-check</strong>, <strong>web-scanner</strong></td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Deployment</td><td>Multi-arch Docker image (linux/amd64, linux/arm64, linux/arm/v7)</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Deployment</td><td>Auto TLS proxy detection at container startup — probes 15 hosts, identifies proxy CA by voting, installs it automatically</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Deployment</td><td><code>stager.sh</code> for one-command deployment on Ubuntu, Debian, Rocky Linux, AlmaLinux, Amazon Linux, and Raspberry Pi</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Generator</td><td>600-second inactivity watchdog — force-exits and relies on Docker restart policy to recover</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Generator</td><td>Per-suite wall-clock timeout guard prevents a single stuck test from blocking the loop</td></tr>
+          </table>
+        </div>
+        <div class="a-section">
+          <div class="a-h">v2.5.0 &mdash; <span style="color:var(--muted);font-weight:400">January 2026</span></div>
+          <table class="st-table" style="margin-top:10px">
+            <tr><th style="width:80px">Type</th><th style="width:120px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>bgp</strong> — GoBGP-based BGP session simulation with OPEN/KEEPALIVE/UPDATE messages</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>doh</strong> (DNS-over-HTTPS) and <strong>dot</strong> (DNS-over-TLS) suites</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>llm-dlp</strong> — exfiltrates synthetic PII/card/SSN data via prompts to public LLM APIs to test CASB DLP controls</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>http3</strong> — QUIC/HTTP3 requests using <code>curl --http3-only</code></td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>data-exfil-http</strong> — simulates data exfiltration patterns via POST/PUT with synthetic sensitive payloads</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Deployment</td><td>Metasploit Framework pre-bundled in image via multi-stage build with vendored gems</td></tr>
+          </table>
+        </div>
+        <div class="a-section">
+          <div class="a-h">v2.0.0 &mdash; <span style="color:var(--muted);font-weight:400">September 2025</span></div>
+          <table class="st-table" style="margin-top:10px">
+            <tr><th style="width:80px">Type</th><th style="width:120px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Initial suite set: dns, icmp, http, https, ftp, ssh, ntp, nmap, crawl, bigfile, speedtest, c2-beacon, phishing-domains, malware-download, virus, dlp, dns-exfil, domain-check, squatting, ads, pornography, url-response, s3</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Generator</td><td>--suite, --size (XS/S/M/L/XL), --loop, --max-wait-secs, --nowait CLI flags</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Deployment</td><td>Single Docker image with healthcheck and restart policy</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
   </div><!-- /.content -->
   <div class="footer">traffgen &middot; HTTPS :7777 &middot; <a href="https://github.com/jdibby/traffgen" target="_blank" rel="noopener">github.com/jdibby/traffgen</a> &middot; <a href="https://hub.docker.com/r/jdibby/traffgen" target="_blank" rel="noopener">hub.docker.com/r/jdibby/traffgen</a></div>
 </div><!-- /.main -->
@@ -1513,7 +1587,7 @@ let _healthTimer=null,_netInfoTimer=null,_lastHealth=null,_netHist=[],_hNetHist=
 let _cpuHist=[],_memHist=[];
 function uptime(t){const s=Math.floor(Date.now()/1000-t);return[Math.floor(s/3600),Math.floor((s%3600)/60),s%60].map(v=>String(v).padStart(2,'0')).join(':');}
 function elapsed(t){if(!t)return'';const s=Math.floor(Date.now()/1000-t);if(s<60)return s+'s elapsed';if(s<3600)return Math.floor(s/60)+'m '+(s%60)+'s elapsed';return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m elapsed';}
-const PAGE_TITLES={overview:'Overview',security:'Security',tests:'Tests',output:'Live View',health:'Health',about:'About'};
+const PAGE_TITLES={overview:'Overview',security:'Security',tests:'Tests',output:'Live View',health:'Health',about:'About',changelog:'Changelog'};
 const SUITE_ICONS={
   'ads':'🎯','ai-browse':'🤖','bgp':'🌐','bigfile':'💾',
   'c2-beacon':'📡','llm-dlp':'🧠','crawl':'🕷️','dlp':'🔒',
@@ -1783,19 +1857,19 @@ function openDrawer(){$('drawer').classList.add('open');$('overlay').classList.a
 function closeDrawer(){$('drawer').classList.remove('open');$('overlay').classList.remove('open');}
 function toast(msg,ok){const t=$('toast');t.textContent=msg;t.className='toast '+(ok?'ok':'err');t.style.display='block';setTimeout(()=>t.style.display='none',3500);}
 function applySettings(){
-  if(!_isAdmin){toast('Admin access required — click Unlock',false);return;}
+  if(!_isAdmin){toast(_sessionMode?'Another session has control — you are read-only':'Admin access required — click Unlock',false);return;}
   const body={suite:$('cfg-suite').value,size:$('cfg-size').value,max_wait_secs:parseInt($('cfg-wait').value),loop:$('cfg-loop').checked,nowait:$('cfg-nowait').checked};
   _ctrl(body).then(r=>r.json()).then(d=>{if(d.ok){toast('Settings applied — restarting at next boundary…',true);closeDrawer();}else toast('Error: '+d.error,false);})
     .catch(()=>toast('Request failed',false));
 }
 function togglePause(){
-  if(!_isAdmin){toast('Admin access required — click Unlock',false);return;}
+  if(!_isAdmin){toast(_sessionMode?'Another session has control — you are read-only':'Admin access required — click Unlock',false);return;}
   const action=_isPaused?'resume':'pause';
   _ctrl({action}).then(r=>r.json()).then(d=>{if(d.ok)toast(action==='pause'?'Tests paused — will stop after current test':'Tests resuming…',true);else toast('Error: '+d.error,false);})
     .catch(()=>toast('Request failed',false));
 }
 function stopTests(){
-  if(!_isAdmin){toast('Admin access required — click Unlock',false);return;}
+  if(!_isAdmin){toast(_sessionMode?'Another session has control — you are read-only':'Admin access required — click Unlock',false);return;}
   if(!confirm('Stop all tests? Traffic generation will halt until the container is restarted.'))return;
   _ctrl({action:'stop'}).then(r=>r.json()).then(d=>{if(d.ok)toast('Stop signal sent — tests will halt after current test',true);else toast('Error: '+d.error,false);})
     .catch(()=>toast('Request failed',false));
@@ -1812,7 +1886,7 @@ function openModal(name,desc){
 function closeModal(){$('modal-ov').classList.remove('open');_modalSuite=null;}
 function runFromModal(){
   if(!_modalSuite)return;
-  if(!_isAdmin){toast('Admin access required — click Unlock',false);return;}
+  if(!_isAdmin){toast(_sessionMode?'Another session has control — you are read-only':'Admin access required — click Unlock',false);return;}
   const body={suite:_modalSuite,size:$('modal-size').value,max_wait_secs:parseInt($('modal-wait').value),loop:$('modal-loop').checked,nowait:false};
   _ctrl(body).then(r=>r.json()).then(d=>{if(d.ok){toast('Running '+_modalSuite+' — generator restarting…',true);closeModal();navTo('output');}else toast('Error: '+d.error,false);})
     .catch(()=>toast('Request failed',false));
@@ -2126,7 +2200,6 @@ wireTip('sec-trend',36,10,()=>_secHist,p=>[
   `<span style="color:#818cf8">╌ Drop&nbsp;&nbsp;&nbsp;${p.drop_pct!=null?p.drop_pct.toFixed(1)+'%':'—'}</span>`,
   p.reach_pct!=null?`<span style="color:#22c55e">✔ Allow&nbsp;&nbsp;${p.reach_pct.toFixed(1)+'%'}</span>`:''
 ]);
-checkRole();
 connect();
 setInterval(checkRole,5000);
 _initDrag('ov-grid');

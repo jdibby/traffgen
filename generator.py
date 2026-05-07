@@ -3169,6 +3169,24 @@ def tls_inspection_check() -> None:
         ("charles",          "Charles Proxy"),
         ("proxyman",         "Proxyman"),
         ("squid",            "Squid Proxy"),
+        ("cloudflare",       "Cloudflare Gateway"),
+        ("menlo security",   "Menlo Security"),
+        ("menlo",            "Menlo Security"),
+        ("akamai",           "Akamai SIA"),
+        ("microsoft",        "Microsoft Defender"),
+        ("defender",         "Microsoft Defender"),
+        ("lookout",          "Lookout"),
+        ("ciphercloud",      "Lookout/CipherCloud"),
+        ("aryaka",           "Aryaka"),
+        ("versa",            "Versa Networks"),
+        ("perimeter 81",     "Perimeter 81"),
+        ("harmony",          "Check Point Harmony"),
+        ("open systems",     "Open Systems"),
+        ("trellix",          "McAfee/Trellix"),
+        ("proofpoint",       "Proofpoint"),
+        ("f5",               "F5 BIG-IP"),
+        ("a10 networks",     "A10 Networks"),
+        ("juniper",          "Juniper Networks"),
     ]
 
     def _detect_vendor(issuer_cn: str, issuer_org: str) -> str:
@@ -4377,7 +4395,7 @@ def _start_heartbeat(path: str = "/tmp/traffgen.health", interval: int = 2) -> N
                 with _WEB_STATE_LOCK:
                     _WEB_STATE["status"] = "stopped"
                 _web_flush()
-                sys.exit(0)
+                os._exit(0)  # sys.exit() only kills this daemon thread; os._exit() kills the process
 
             # Web control: consume command file if present, then execv
             try:
