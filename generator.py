@@ -4113,11 +4113,37 @@ def parse_cli() -> argparse.Namespace:
     """
     suite_choices = ["all"] + sorted(_SUITE_MAP.keys())
 
+    _epilog = (
+        "────────────────────────────────────────────────────────────────────\n"
+        "  EXAMPLES\n"
+        "────────────────────────────────────────────────────────────────────\n"
+        "  # Run all suites once at small volume:\n"
+        "  traffgen\n\n"
+        "  # Run only the DNS suite at medium volume:\n"
+        "  traffgen --suite dns --size M\n\n"
+        "  # Loop all suites at large volume, pause up to 30 s between runs:\n"
+        "  traffgen --loop --size L --max-wait-secs 30\n\n"
+        "  # Run C2 beacon test continuously with no pauses:\n"
+        "  traffgen --suite c2-beacon --loop --nowait\n\n"
+        "  # Run lateral-movement at XL volume once:\n"
+        "  traffgen --suite lateral-movement --size XL\n\n"
+        "  # List all available suites with descriptions:\n"
+        "  traffgen --list\n"
+        "────────────────────────────────────────────────────────────────────\n"
+        "  Dashboard: http://localhost:8000   (when running via container)\n"
+        "────────────────────────────────────────────────────────────────────"
+    )
+
     parser = argparse.ArgumentParser(
+        prog="traffgen",
         description=(
-            "Traffic Generator — multi-protocol network traffic simulator.\n"
-            "Run with --list to see all available suites and their descriptions."
+            f"Traffic Generator v{VERSION} — multi-protocol network traffic simulator.\n\n"
+            "  Generates realistic network traffic across DNS, HTTP/S, FTP, SSH,\n"
+            "  ICMP, SNMP, TLS, and security-simulation suites.  Designed for\n"
+            "  testing firewalls, IDS/IPS, SASE, DLP, and web-filtering policies.\n\n"
+            "  Run  --list  to see all available test suites."
         ),
+        epilog=_epilog,
         formatter_class=argparse.RawTextHelpFormatter,
         add_help=True,
     )
@@ -4135,25 +4161,37 @@ def parse_cli() -> argparse.Namespace:
     traffic.add_argument(
         "--suite", type=str.lower, choices=suite_choices, default="all",
         metavar="SUITE",
-        help=f"Test suite to run (default: all).  Choices:\n  {', '.join(suite_choices)}",
+        help=(
+            "Test suite to run (default: all).\n"
+            "Use --list to see all suites and their descriptions.\n"
+            f"Choices: {', '.join(suite_choices)}"
+        ),
     )
     traffic.add_argument(
         "--size", type=str.upper, choices=["XS", "S", "M", "L", "XL"], default="S",
-        help="Volume of traffic: XS=tiny  S=small  M=medium  L=large  XL=extra-large (default: S)",
+        metavar="SIZE",
+        help=(
+            "Volume / intensity of generated traffic (default: S).\n"
+            "  XS  tiny      — minimal requests, fast completion\n"
+            "  S   small     — light traffic, good for quick checks\n"
+            "  M   medium    — moderate traffic load\n"
+            "  L   large     — heavy traffic, longer runtime\n"
+            "  XL  extra-lg  — maximum traffic, extended runtime"
+        ),
     )
 
     timing = parser.add_argument_group("Timing & Loop")
     timing.add_argument(
         "--loop", action="store_true",
-        help="Loop forever, picking tests at random each iteration",
+        help="Loop indefinitely, re-running the selected suite each iteration",
     )
     timing.add_argument(
         "--max-wait-secs", type=int, default=20, metavar="N",
-        help="Max random pause between loop iterations in seconds (default: 20)",
+        help="Maximum random pause between loop iterations in seconds (default: 20)",
     )
     timing.add_argument(
         "--nowait", action="store_true",
-        help="Disable inter-test pauses when looping",
+        help="Skip the random inter-test pause when looping (implies --loop pacing is 0)",
     )
 
     specific = parser.add_argument_group("Suite-Specific Options")
