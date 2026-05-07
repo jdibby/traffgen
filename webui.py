@@ -348,19 +348,34 @@ def _sample_net_info() -> None:
         time.sleep(60)
 
 
+_VIRTUAL_IFACE_PREFIXES = (
+    "lo", "veth", "br-", "docker", "virbr", "vnet", "tap", "tun", "dummy",
+    "flannel", "cni", "weave", "calico",
+)
+
+
+def _is_virtual_iface(name: str) -> bool:
+    """Return True for loopback and known virtual/container bridge interfaces."""
+    return any(name == p or name.startswith(p) for p in _VIRTUAL_IFACE_PREFIXES)
+
+
 def _collect_ifaces() -> list:
-    """Return a list of interface dicts, using 'ip -j addr' with /sys fallback."""
+    """Return a list of interface dicts, using 'ip -j addr' with /sys fallback.
+
+    Virtual/overlay interfaces (veth*, br-*, docker*, etc.) are excluded so
+    that --network=host deployments don't flood the table with internal bridges.
+    """
     # Primary: ip -j addr produces reliable JSON without ioctl or file-permission issues
     try:
         r = subprocess.run(
             ["ip", "-j", "addr"],
             capture_output=True, text=True, timeout=5,
         )
-        if r.returncode == 0:
+        if r.returncode == 0 and r.stdout.strip():
             result = []
             for iface in json.loads(r.stdout):
                 name = iface.get("ifname", "")
-                if not name or name == "lo":
+                if not name or _is_virtual_iface(name):
                     continue
                 ip4 = next(
                     (a.get("local", "") for a in iface.get("addr_info", [])
@@ -389,7 +404,7 @@ def _collect_ifaces() -> list:
     # Fallback: /sys/class/net + SIOCGIFADDR ioctl
     result = []
     for name in sorted(os.listdir("/sys/class/net")):
-        if name == "lo":
+        if _is_virtual_iface(name):
             continue
         try:
             base = f"/sys/class/net/{name}"
@@ -1462,7 +1477,7 @@ function attemptAuth(){
     else toast('Invalid admin token',false);
   }).catch(()=>toast('Request failed',false));
 }
-let _healthTimer=null,_lastHealth=null,_netHist=[],_hNetHist=[],_netTimer=null,_netInterval=1000;
+let _healthTimer=null,_netInfoTimer=null,_lastHealth=null,_netHist=[],_hNetHist=[],_netTimer=null,_netInterval=1000;
 let _cpuHist=[],_memHist=[];
 function uptime(t){const s=Math.floor(Date.now()/1000-t);return[Math.floor(s/3600),Math.floor((s%3600)/60),s%60].map(v=>String(v).padStart(2,'0')).join(':');}
 function elapsed(t){if(!t)return'';const s=Math.floor(Date.now()/1000-t);if(s<60)return s+'s elapsed';if(s<3600)return Math.floor(s/60)+'m '+(s%60)+'s elapsed';return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m elapsed';}
@@ -1491,8 +1506,9 @@ function showTab(btn){
   $('pg-title').textContent=PAGE_TITLES[btn.dataset.tab]||btn.dataset.tab;
   if(btn.dataset.tab==='output')connectLog();
   clearInterval(_healthTimer);_healthTimer=null;
+  clearInterval(_netInfoTimer);_netInfoTimer=null;
   clearInterval(_secTimer);_secTimer=null;
-  if(btn.dataset.tab==='health'){pollHealth();pollNetInfo();_healthTimer=setInterval(pollHealth,2500);_initDrag('health-grid');}
+  if(btn.dataset.tab==='health'){pollHealth();pollNetInfo();_healthTimer=setInterval(()=>{pollHealth();},2500);_netInfoTimer=setInterval(pollNetInfo,15000);_initDrag('health-grid');}
   if(btn.dataset.tab==='security'){updateSecurityTab();_secTimer=setInterval(updateSecurityTab,_secInterval);_initDrag('sec-grid');}
 }
 function navTo(tab){const btn=document.querySelector('.nav-item[data-tab="'+tab+'"]');if(btn)showTab(btn);}
