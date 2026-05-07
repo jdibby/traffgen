@@ -438,7 +438,7 @@ All network targets are defined as plain Python lists in `endpoints.py` — DNS 
 | `snmp_v3_creds` | `snmp` | SNMPv3 credential tuples (user, level, auth-proto, auth-pass, priv-proto, priv-pass) |
 | `http_endpoints` | `http` | Plain HTTP hostnames |
 | `https_endpoints` | `https`, `crawl`, `http3`, `speedtest`, `web-scanner` | General HTTPS URLs |
-| *(Hagezi pro blocklist)* | `ads` | 300k+ domains fetched at runtime from `cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/pro.txt`; no static list in `endpoints.py` |
+| *(Hagezi pro blocklist)* | `ads` | 300k+ domains fetched at runtime from [`cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/pro.txt`](https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/pro.txt); falls back to `ad_endpoints` in `endpoints.py` if unreachable |
 | `ai_endpoints` | `ai-browse` | AI-service HTTPS endpoints |
 | `webscan_endpoints` | `web-scanner` | Intentionally-vulnerable web app targets |
 | `kyber_endpoints` | `kyber` | Post-quantum TLS server URLs |
