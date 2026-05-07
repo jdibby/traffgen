@@ -16,19 +16,22 @@
 set -euo pipefail
 
 cat <<'DISCLAIMER'
-┌─────────────────────────────────────────────────────────────────────────┐
-│                             ! DISCLAIMER !                              │
-│                                                                         │
-│  This tool is intended for AUTHORIZED SECURITY TESTING AND RESEARCH     │
-│  in controlled lab environments only.                                   │
-│                                                                         │
-│  • You are solely responsible for obtaining explicit written            │
-│    permission before testing any systems or networks.                   │
-│  • The author(s) accept NO liability for misuse, unauthorized access,   │
-│    damage, data loss, or legal consequences arising from use of this    │
-│    tool.                                                                │
-│  • Use of this software constitutes acceptance of these terms.          │
-└─────────────────────────────────────────────────────────────────────────┘
+
+==========================================================================
+                            ! DISCLAIMER !
+==========================================================================
+
+  This tool is intended for AUTHORIZED SECURITY TESTING AND RESEARCH
+  in controlled lab environments only.
+
+  * You are solely responsible for obtaining explicit written
+    permission before testing any systems or networks.
+  * The author(s) accept NO liability for misuse, unauthorized access,
+    damage, data loss, or legal consequences arising from use of this
+    tool.
+  * Use of this software constitutes acceptance of these terms.
+
+==========================================================================
 DISCLAIMER
 
 # ── Privilege check ───────────────────────────────────────────────────────────
@@ -237,7 +240,7 @@ step "Starting traffgen container"
 docker run \
     --detach \
     --restart unless-stopped \
-    -p 7777:7777 \
+    --network=host \
     --name traffgen \
     jdibby/traffgen:latest \
     --suite=all --size=S --max-wait-secs=20 --loop
