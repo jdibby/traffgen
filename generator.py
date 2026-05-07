@@ -450,6 +450,53 @@ class SuiteStats:
 _stats       = SuiteStats()   # per-function stats, reset before each function
 _suite_stats = SuiteStats()   # aggregate across all functions in a suite run
 
+# ── Ads blocklist pool ────────────────────────────────────────────────────────
+_ADS_BLOCKLIST_URL = (
+    "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/pro.txt"
+)
+# Fallback is the original static ad_endpoints list from endpoints.py
+_ads_pool: list  = []
+_ads_pool_lock   = threading.Lock()
+
+
+def _load_ads_pool() -> list:
+    """
+    Fetch Hagezi pro blocklist and parse all ||domain^ entries into a flat
+    list.  Result is cached for the lifetime of the process.  Falls back to
+    a small inline list if the CDN is unreachable.
+    """
+    global _ads_pool
+    with _ads_pool_lock:
+        if _ads_pool:
+            return _ads_pool
+        try:
+            console.log(f"[cyan]ads:[/] fetching Hagezi pro blocklist…")
+            resp = requests.get(_ADS_BLOCKLIST_URL, timeout=(5, 30), verify=True)
+            resp.raise_for_status()
+            domains: list = []
+            for line in resp.text.splitlines():
+                line = line.strip()
+                if not line or line[0] in ("!", "[", "@"):
+                    continue
+                if line.startswith("||"):
+                    domain = line[2:].split("^")[0].split("/")[0].lower()
+                    if domain and "." in domain and " " not in domain:
+                        domains.append(domain)
+            if domains:
+                _ads_pool = domains
+                console.log(
+                    f"[cyan]ads:[/] loaded {len(_ads_pool):,} domains "
+                    f"from Hagezi pro blocklist"
+                )
+            else:
+                _ads_pool = ad_endpoints[:]
+                console.log("[yellow]ads:[/] blocklist parse returned 0 domains — using original static list")
+        except Exception as exc:
+            _ads_pool = ad_endpoints[:]
+            console.log(f"[yellow]ads:[/] blocklist fetch failed ({exc}) — using original static list")
+        return _ads_pool
+
+
 # ── Web UI shared state ───────────────────────────────────────────────────────
 _WEB_STATE_FILE  = "/tmp/traffgen_state.json"
 _WEB_LOG_FILE    = "/tmp/traffgen_log.jsonl"
@@ -1227,15 +1274,17 @@ def ai_https_random() -> None:
 
 def ads_random() -> None:
     """
-    HEAD requests to ad-network, analytics, and tracker endpoints.
+    HEAD requests to a random sample of domains from the Hagezi pro blocklist
+    (300k+ ad/tracker/malware domains).  Fetched once at first call and cached
+    for the process lifetime; falls back to a small inline list on failure.
     Exercises ad-blocking and tracker-blocking URL filter categories.
     """
-    ui_banner("Ad / Tracker HEAD", "Ad & analytics endpoint pool")
+    pool = _load_ads_pool()
+    n    = _size_to_limits(ARGS.size, 10, 25, 50, 200)
+    sample = random.sample(pool, min(n, len(pool)))
+    ui_banner("Ad / Tracker HEAD", f"{n} domains sampled from {len(pool):,}-entry Hagezi pro blocklist")
     try:
-        n = _size_to_limits(ARGS.size, 10, 20, 50, len(ad_endpoints))
-        random.shuffle(ad_endpoints)
-        _run_head_batch(ad_endpoints[:n], "ADS", user_agents,
-                        connect_timeout=3, max_time=5)
+        _run_head_batch(sample, "ADS", user_agents, connect_timeout=3, max_time=5)
         ui_ok("Ads test complete")
     except Exception as e:
         _stats.fail()

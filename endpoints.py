@@ -36,7 +36,7 @@ Variable index (matches generator.py usage names 1-to-1):
   Web / HTTPS traffic
     http_endpoints      Plain HTTP hostnames (http_random)
     https_endpoints     General HTTPS URLs (https_random, https_crawl, http3, webscan_nikto, speed_test)
-    ad_endpoints        Ad-network URLs (ad_tracker)
+    ad_endpoints        Ad-network URLs — fallback when Hagezi blocklist is unreachable
     ai_endpoints        AI-service HTTPS URLs (ai_https)
     webscan_endpoints   Intentionally-vulnerable web apps (webscan_nikto)
     kyber_endpoints     Post-quantum TLS endpoints (kyber_tls)
@@ -401,7 +401,7 @@ ad_endpoints = [
     "analytics-sg.tiktok.com",
     "analytics.pointdrive.linkedin.com",
     "careers.hotjar.com",
-    ]
+]
 
 # ── General HTTPS endpoints ───────────────────────────────────────────────────
 https_endpoints = [

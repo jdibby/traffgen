@@ -193,7 +193,7 @@ All requests use a fake `sk-DLPTEST-…` token — responses are HTTP 401/403. T
 
 | Suite | Description |
 |---|---|
-| 📢 `ads` | HEAD requests to advertising networks, analytics trackers, and telemetry endpoints. Tests ad-blocker and tracker-block URL filter categories. |
+| 📢 `ads` | HEAD requests to a random sample of domains from the [Hagezi pro blocklist](https://github.com/hagezi/dns-blocklists) (300k+ ad, tracker, telemetry, and malware domains). The list is fetched at first run and cached for the process lifetime; falls back to a small inline set if the CDN is unreachable. Tests ad-blocker and tracker-block URL filter categories at scale. |
 | 🤖 `ai-browse` | HEAD requests to AI and LLM service endpoints (API gateways, model-serving hosts). Tests the AI-category URL filter independently from browser-facing chat UIs. Useful for testing API-level AI access policies. |
 | 🔞 `pornography` | HTTPS crawl of adult-content endpoints. Tests the adult-content URL filter category and confirms policy enforcement is logging correctly. |
 | 🗂️ `dlp` | Downloads DLP test files over HTTPS containing structured PII and PCI data patterns (SSNs, credit card numbers, bank account numbers). Tests inline DLP file-scanning and download-inspection policies. |
@@ -438,7 +438,7 @@ All network targets are defined as plain Python lists in `endpoints.py` — DNS 
 | `snmp_v3_creds` | `snmp` | SNMPv3 credential tuples (user, level, auth-proto, auth-pass, priv-proto, priv-pass) |
 | `http_endpoints` | `http` | Plain HTTP hostnames |
 | `https_endpoints` | `https`, `crawl`, `http3`, `speedtest`, `web-scanner` | General HTTPS URLs |
-| `ad_endpoints` | `ads` | Ad-network and tracker URLs |
+| *(Hagezi pro blocklist)* | `ads` | 300k+ domains fetched at runtime from `cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/pro.txt`; no static list in `endpoints.py` |
 | `ai_endpoints` | `ai-browse` | AI-service HTTPS endpoints |
 | `webscan_endpoints` | `web-scanner` | Intentionally-vulnerable web app targets |
 | `kyber_endpoints` | `kyber` | Post-quantum TLS server URLs |
