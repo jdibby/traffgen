@@ -3733,10 +3733,25 @@ def _detect_host_lan() -> "tuple[str, str] | None":
     def _to_24(ip: str) -> str:
         return ".".join(ip.split(".")[:3]) + ".0/24"
 
-    # Strategy 0 — HOST_LAN_IP env var injected by stager.sh before container start
-    _env_ip = _os.environ.get("HOST_LAN_IP", "").strip()
-    if _env_ip and _IP_RE.match(_env_ip):
-        return _env_ip, _to_24(_env_ip)
+    # Strategy 0 — HOST_LAN_CIDR env var injected by stager.sh before container start
+    _env_cidr = _os.environ.get("HOST_LAN_CIDR", "").strip()
+    if _env_cidr and "/" in _env_cidr:
+        _eip, _epfx = _env_cidr.split("/", 1)
+        if _IP_RE.match(_eip) and _epfx.isdigit():
+            _prefix = int(_epfx)
+            if _prefix == 32:
+                # Every host is its own /32 — microsegmentation is on.
+                # Scan the containing /24 to probe east-west policy.
+                return _eip, _to_24(_eip)
+            elif _prefix >= 24:
+                # Use actual subnet (/24, /25, /26, /28, etc.)
+                import ipaddress as _ipaddress
+                _net = str(_ipaddress.ip_network(f"{_eip}/{_prefix}", strict=False))
+                return _eip, _net
+            else:
+                # Subnet larger than /24 (/16, /8, etc.) — cap at /24 to keep
+                # scan time reasonable (a /16 is 65535 hosts).
+                return _eip, _to_24(_eip)
 
     # Strategy 1 — /proc/net/route (no tools needed, works in any container)
     try:
@@ -3843,7 +3858,12 @@ def lateral_movement_sim() -> None:
         _stats.fail()
         return
     gw_ip, subnet = lan
-    _src = "HOST_LAN_IP env" if os.environ.get("HOST_LAN_IP", "").strip() else "auto-detected"
+    _cidr = os.environ.get("HOST_LAN_CIDR", "").strip()
+    _src = "stager.sh" if _cidr else "auto-detected"
+    _microseg = _cidr.endswith("/32")
+
+    if _microseg:
+        ui_warn("Microsegmentation detected (host prefix /32) — scanning /24 to probe east-west policy")
 
     ui_banner("Lateral Movement Simulation",
               f"gateway={gw_ip}  subnet={subnet}  source={_src}  ports={_LATERAL_PORTS}")

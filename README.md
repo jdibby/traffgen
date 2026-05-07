@@ -166,7 +166,16 @@ The `lateral-movement` suite scans the **host's physical LAN**, not the Docker b
 
 #### Method 1 — stager.sh (recommended)
 
-`stager.sh` captures the host's LAN IP with `hostname -I` **before** the container starts and passes it in via `-e HOST_LAN_IP=<ip>`. The suite reads this env var and derives the /24 to scan. No extra flags needed — just use stager.sh.
+`stager.sh` captures the host's LAN IP **and subnet prefix** with `hostname -I` and `ip addr` **before** the container starts and passes them as `-e HOST_LAN_CIDR=<ip>/<prefix>`. The suite reads this and scans the correct network:
+
+| Host prefix | Scan target | Notes |
+|---|---|---|
+| `/24` | `x.x.x.0/24` | Normal LAN |
+| `/25` – `/31` | Actual subnet | Smaller segment |
+| `/32` | `x.x.x.0/24` | **Microsegmentation detected** — suite logs a warning and scans the containing /24 to probe east-west policy |
+| `/8` – `/23` | `x.x.x.0/24` | Large subnet capped at /24 to keep scan time reasonable |
+
+No extra flags needed — just use stager.sh.
 
 #### Method 2 — `--network=host`
 
