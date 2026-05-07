@@ -782,7 +782,10 @@ body{display:flex;background:var(--bg);color:var(--text);font-family:-apple-syst
 .sb-foot div{font-size:16px;color:var(--dim);margin-top:2px}
 .main{flex:1;display:flex;flex-direction:column;min-width:0;height:100vh;overflow:hidden}
 .topbar{height:52px;display:flex;align-items:center;gap:8px;padding:0 18px;border-bottom:1px solid var(--border);background:var(--sidebar);flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.35);position:sticky;top:0;z-index:10}
-.pg-title{font-size:20px;font-weight:700;color:var(--text);letter-spacing:-.2px;margin-right:auto}
+.pg-title{font-size:20px;font-weight:700;color:var(--text);letter-spacing:-.2px;margin-right:4px}
+.tb-test{display:none;align-items:center;gap:6px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.35);border-radius:20px;padding:3px 12px 3px 8px;margin-right:auto;min-width:0;overflow:hidden}
+.tb-test.visible{display:inline-flex}
+.tb-test-name{font-size:14px;font-weight:600;color:var(--green);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;font-family:'SF Mono',Consolas,monospace;letter-spacing:.2px}
 .tp-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 11px;border-radius:20px;font-size:17px;font-weight:500;border:1px solid;white-space:nowrap}
 .tp-running{border-color:var(--green);color:var(--green)}
 .tp-paused{border-color:var(--amber);color:var(--amber)}
@@ -1026,6 +1029,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
 <div class="main" id="main-scroll">
   <div class="topbar">
     <span class="pg-title" id="pg-title">Overview</span>
+    <span class="tb-test" id="tb-test"><span class="pulse"></span><span id="tb-test-ico"></span><span class="tb-test-name" id="tb-test-name">—</span></span>
     <span id="cfg-s-pill" class="mono" style="color:var(--muted)">—</span>
     <span id="cfg-z-pill" class="mono" style="color:var(--muted)">—</span>
     <span id="status-pill" class="tp-pill tp-dim"><span class="pulse"></span>Starting</span>
@@ -1565,6 +1569,8 @@ function apply(s){
   $('v-rate').textContent=att?p.toFixed(1)+'%':'—';$('v-rate').style.color=att?RC(p):'var(--muted)';$('s-rate').textContent=att?N(att)+' total requests':'No data yet';
   const cur=s.current_test||'',tsa=s.test_started_at||0;
   $('v-test').textContent=cur?cur.replace(/-/g,' '):'—';
+  const tbt=$('tb-test'),tbn=$('tb-test-name'),tbi=$('tb-test-ico');
+  if(tbt&&tbn&&tbi){if(cur&&st==='running'){tbt.classList.add('visible');tbn.textContent=cur.replace(/-/g,' ');tbi.textContent=suiteIco(cur);}else{tbt.classList.remove('visible');}}
   if(tsa&&cur){clearInterval(_elTimer);const upEl=()=>$('s-test').textContent=elapsed(tsa);upEl();_elTimer=setInterval(upEl,1000);}
   else{clearInterval(_elTimer);$('s-test').textContent=s.loop?'Loop mode':'Single-run';}
   $('v-iter').textContent=s.iteration?'#'+N(s.iteration):'—';$('s-iter').textContent='Suite: '+(s.suite||'—')+' \xb7 Size: '+(s.size||'—');
