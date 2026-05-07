@@ -3140,6 +3140,7 @@ def tls_inspection_check() -> None:
         ("fortigate",        "Fortinet (FortiGate)"),
         ("fortinet",         "Fortinet"),
         ("cato networks",    "Cato Networks"),
+        ("cato-networks",    "Cato Networks"),
         ("cato ",            "Cato Networks"),
         ("cisco umbrella",   "Cisco Umbrella"),
         ("cisco",            "Cisco"),
@@ -3171,9 +3172,12 @@ def tls_inspection_check() -> None:
     ]
 
     def _detect_vendor(issuer_cn: str, issuer_org: str) -> str:
-        combined = (issuer_cn + " " + issuer_org).lower()
+        # Normalise hyphens → spaces so "Cato-Networks-Server-xyz" matches
+        # the token "cato networks", and similarly for other hyphenated CAs.
+        raw = (issuer_cn + " " + issuer_org).lower()
+        combined = raw.replace("-", " ")
         for token, display in _PROXY_VENDOR_MAP:
-            if token in combined:
+            if token in combined or token in raw:
                 return display
         return ""
 
