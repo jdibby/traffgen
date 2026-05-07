@@ -1630,6 +1630,25 @@ def speedtest_fast() -> None:
         ui_error(f"[speedtest_fast] {e}")
 
 
+def _nmap_classify(stdout: str) -> tuple[int, int, int]:
+    """Parse nmap grepable output and return (open, closed, filtered) port counts."""
+    open_c = closed_c = filtered_c = 0
+    for line in stdout.splitlines():
+        if not (line.startswith("Host:") and "Ports:" in line):
+            continue
+        for entry in line.split("Ports:", 1)[1].split(","):
+            parts = entry.strip().split("/")
+            if len(parts) >= 2:
+                state = parts[1]
+                if state == "open":
+                    open_c += 1
+                elif state == "closed":
+                    closed_c += 1
+                elif "filtered" in state:
+                    filtered_c += 1
+    return open_c, closed_c, filtered_c
+
+
 def nmap_1024os() -> None:
     """
     Nmap port scan covering ports 1-1024 on sampled `nmap_endpoints`.
@@ -1641,15 +1660,24 @@ def nmap_1024os() -> None:
         random.shuffle(nmap_endpoints)
         for i, ip in enumerate(nmap_endpoints[:n], 1):
             console.log(f"nmap 1-1024 ({i}/{n}) {ip}")
-            cmd = (
-                f"nmap -Pn -p 1-1024 {ip} -T4 "
-                f"--max-retries 0 --max-parallelism 2 "
-                f"--randomize-hosts --host-timeout 1m --script-timeout 1m "
-                f'--script-args http.useragent="Mozilla/5.0" -debug'
-            )
             try:
-                _popen_kill_group(cmd, timeout=120, stdout=None, stderr=None)
-                _stats.ok()
+                result = subprocess.run(
+                    ["nmap", "-Pn", "-p", "1-1024", ip, "-T4",
+                     "--max-retries", "0", "--max-parallelism", "2",
+                     "--randomize-hosts", "--host-timeout", "1m",
+                     "--script-timeout", "1m", "-oG", "-"],
+                    capture_output=True, text=True, timeout=120,
+                )
+                open_c, closed_c, filtered_c = _nmap_classify(result.stdout)
+                console.log(f"  ↳ {ip}  open:{open_c}  closed:{closed_c}  filtered:{filtered_c}")
+                if open_c:
+                    _stats.ok()
+                elif closed_c and not filtered_c:
+                    _stats.block()
+                elif filtered_c:
+                    _stats.drop()
+                else:
+                    _stats.fail()
             except Exception as e:
                 console.log(f"[yellow]nmap {ip}: {e}[/]")
                 _stats.fail()
@@ -1672,15 +1700,24 @@ def nmap_cve() -> None:
         random.shuffle(nmap_endpoints)
         for i, ip in enumerate(nmap_endpoints[:n], 1):
             console.log(f"nmap --script=ALL ({i}/{n}) {ip}")
-            cmd = (
-                f"nmap -sV --script=ALL {ip} -T4 "
-                f"--max-retries 0 --max-parallelism 2 "
-                f"--randomize-hosts --host-timeout 1m --script-timeout 1m "
-                f'--script-args http.useragent="Mozilla/5.0" -debug'
-            )
             try:
-                _popen_kill_group(cmd, timeout=120, stdout=None, stderr=None)
-                _stats.ok()
+                result = subprocess.run(
+                    ["nmap", "-sV", "--script=ALL", ip, "-T4",
+                     "--max-retries", "0", "--max-parallelism", "2",
+                     "--randomize-hosts", "--host-timeout", "1m",
+                     "--script-timeout", "1m", "-oG", "-"],
+                    capture_output=True, text=True, timeout=120,
+                )
+                open_c, closed_c, filtered_c = _nmap_classify(result.stdout)
+                console.log(f"  ↳ {ip}  open:{open_c}  closed:{closed_c}  filtered:{filtered_c}")
+                if open_c:
+                    _stats.ok()
+                elif closed_c and not filtered_c:
+                    _stats.block()
+                elif filtered_c:
+                    _stats.drop()
+                else:
+                    _stats.fail()
             except Exception as e:
                 console.log(f"[yellow]nmap {ip}: {e}[/]")
                 _stats.fail()
