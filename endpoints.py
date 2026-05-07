@@ -220,22 +220,14 @@ ssh_endpoints = [
     ]
 
 # ── Nmap scan targets ─────────────────────────────────────────────────────────
+# Only publicly routable hosts that explicitly authorise scanning.
+# scanme.nmap.org / 45.33.32.156 — Nmap's official scan-me service (nmap.org/book/legal-issues.html)
+# testmyids.com              — Emerging Threats IDS test service
+# juice-shop.herokuapp.com   — OWASP Juice Shop intentionally-vulnerable demo app
 nmap_endpoints = [
-    '192.168.2.2',
-    '10.188.188.9',
-    '45.33.32.156',
-    '176.28.50.165',
-    '192.168.1.1',
-    '172.16.0.1',
-    '10.10.10.1',
-    '192.168.2.100',
-    '192.168.2.200',
-    '12.12.12.12',
-    '172.30.0.1',
-    '172.30.0.21',
-    '192.168.2.3',
-    'www.testmyids.com',
+    '45.33.32.156',            # scanme.nmap.org (IPv4)
     'scanme.nmap.org',
+    'www.testmyids.com',
     'juice-shop.herokuapp.com',
 ]
 
