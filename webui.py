@@ -795,9 +795,12 @@ body{display:flex;background:var(--bg);color:var(--text);font-family:-apple-syst
 .sb-foot{margin-top:auto;padding:12px 16px;border-top:1px solid var(--border)}
 .sb-foot div{font-size:16px;color:var(--dim);margin-top:2px}
 .main{flex:1;display:flex;flex-direction:column;min-width:0;height:100vh;overflow:hidden}
-.topbar{height:52px;display:flex;align-items:center;gap:8px;padding:0 18px;border-bottom:1px solid var(--border);background:var(--sidebar);flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.35);position:sticky;top:0;z-index:10}
-.pg-title{font-size:20px;font-weight:700;color:var(--text);letter-spacing:-.2px;margin-right:4px}
-.tb-test{display:none;align-items:center;gap:6px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.35);border-radius:20px;padding:3px 12px 3px 8px;margin-right:auto;min-width:0;overflow:hidden}
+.topbar{height:52px;display:flex;align-items:center;padding:0 18px;border-bottom:1px solid var(--border);background:var(--sidebar);flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.35);position:sticky;top:0;z-index:10}
+.tb-left{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
+.tb-center{display:flex;align-items:center;justify-content:center;flex:0 1 auto;padding:0 12px}
+.tb-right{display:flex;align-items:center;gap:8px;flex:1;justify-content:flex-end;min-width:0}
+.pg-title{font-size:20px;font-weight:700;color:var(--text);letter-spacing:-.2px}
+.tb-test{display:none;align-items:center;gap:6px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.35);border-radius:20px;padding:3px 12px 3px 8px;min-width:0;overflow:hidden}
 .tb-test.visible{display:inline-flex}
 .tb-test-name{font-size:14px;font-weight:600;color:var(--green);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;font-family:'SF Mono',Consolas,monospace;letter-spacing:.2px}
 .tp-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 11px;border-radius:20px;font-size:17px;font-weight:500;border:1px solid;white-space:nowrap}
@@ -1042,18 +1045,24 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
 <!-- Main -->
 <div class="main" id="main-scroll">
   <div class="topbar">
-    <span class="pg-title" id="pg-title">Overview</span>
-    <span id="tb-host-ip" style="display:none;font-family:'SF Mono',Consolas,monospace;font-size:13px;font-weight:600;color:var(--blue);background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);border-radius:16px;padding:2px 10px;white-space:nowrap" title="Host LAN IP"></span>
-    <span class="tb-test" id="tb-test"><span class="pulse"></span><span id="tb-test-ico"></span><span class="tb-test-name" id="tb-test-name">—</span></span>
-    <span id="cfg-s-pill" class="mono" style="color:var(--muted)">—</span>
-    <span id="cfg-z-pill" class="mono" style="color:var(--muted)">—</span>
-    <span id="status-pill" class="tp-pill tp-dim"><span class="pulse"></span>Starting</span>
-    <button id="btn-pause" class="ico-btn ro-ctrl" onclick="togglePause()" title="Pause / Resume">&#9208;</button>
-    <button id="btn-stop" class="ico-btn danger ro-ctrl" onclick="stopTests()" title="Stop all tests">&#9209;</button>
-    <button class="ico-btn" onclick="openDrawer()" title="Settings">&#9881;</button>
-    <button class="ico-btn" id="btn-theme" onclick="toggleTheme()" title="Toggle dark / light mode">&#9790;</button>
-    <button class="ico-btn" id="btn-lock" onclick="showAuthModal()" title="Unlock admin access" style="display:none">&#128274;</button>
-    <span id="pill-live" class="tp-pill tp-running ro-ctrl" style="cursor:pointer" onclick="handleLiveClick()" title="Click to stop all tests"><span class="pulse"></span>LIVE</span>
+    <div class="tb-left">
+      <span class="pg-title" id="pg-title">Overview</span>
+      <span id="tb-host-ip" style="display:none;font-family:'SF Mono',Consolas,monospace;font-size:13px;font-weight:600;color:var(--blue);background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);border-radius:16px;padding:2px 10px;white-space:nowrap" title="Host LAN IP"></span>
+    </div>
+    <div class="tb-center">
+      <span class="tb-test" id="tb-test"><span class="pulse"></span><span id="tb-test-ico"></span><span class="tb-test-name" id="tb-test-name">—</span></span>
+    </div>
+    <div class="tb-right">
+      <span id="cfg-s-pill" class="mono" style="color:var(--muted)">—</span>
+      <span id="cfg-z-pill" class="mono" style="color:var(--muted)">—</span>
+      <span id="status-pill" class="tp-pill tp-dim"><span class="pulse"></span>Starting</span>
+      <button id="btn-pause" class="ico-btn ro-ctrl" onclick="togglePause()" title="Pause / Resume">&#9208;</button>
+      <button id="btn-stop" class="ico-btn danger ro-ctrl" onclick="stopTests()" title="Stop all tests">&#9209;</button>
+      <button class="ico-btn" onclick="openDrawer()" title="Settings">&#9881;</button>
+      <button class="ico-btn" id="btn-theme" onclick="toggleTheme()" title="Toggle dark / light mode">&#9790;</button>
+      <button class="ico-btn" id="btn-lock" onclick="showAuthModal()" title="Unlock admin access" style="display:none">&#128274;</button>
+      <span id="pill-live" class="tp-pill tp-running ro-ctrl" style="cursor:pointer" onclick="handleLiveClick()" title="Click to stop all tests"><span class="pulse"></span>LIVE</span>
+    </div>
   </div>
   <div class="ro-banner" id="ro-banner">
     &#128274; <strong>Read-only</strong> &mdash; this system is under active admin control. You can monitor but cannot modify settings or control tests.
