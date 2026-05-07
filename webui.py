@@ -316,6 +316,18 @@ def _fetch_public_ip() -> str:
     return "unavailable"
 
 
+def _host_lan_ip() -> str:
+    """Return the Docker host's LAN IP from the HOST_LAN_CIDR env var injected
+    by stager.sh (e.g. '192.168.1.100/24' → '192.168.1.100'), or '' if unset."""
+    cidr = os.environ.get("HOST_LAN_CIDR", "").strip()
+    if cidr and "/" in cidr:
+        ip = cidr.split("/")[0]
+        import re as _re
+        if _re.match(r"^\d{1,3}(?:\.\d{1,3}){3}$", ip):
+            return ip
+    return ""
+
+
 def _sample_net_info() -> None:
     """Background daemon: gather interface metadata and public IP every 60 s."""
     public_ip = ""
@@ -326,6 +338,7 @@ def _sample_net_info() -> None:
         try:
             now = time.time()
             ifaces = _collect_ifaces()
+            lan_ip = _host_lan_ip()
 
             # Push interfaces immediately so the widget has data before the
             # public IP curl completes (which can take several seconds).
@@ -333,6 +346,7 @@ def _sample_net_info() -> None:
                 _net_info_cache.update({
                     "interfaces": ifaces,
                     "public_ip":  public_ip or "resolving…",
+                    "host_lan_ip": lan_ip,
                 })
 
             # Refresh public IP on first run and every TTL seconds — done
@@ -1173,7 +1187,10 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
       <div id="health-grid" style="display:flex;flex-direction:column;gap:14px">
       <div class="tcard" data-widget="h-netinfo">
         <div class="thdr">Network Interfaces
-          <span style="color:var(--muted);font-weight:400;letter-spacing:0;text-transform:none;font-size:15px">Public IP: <span id="h-pub-ip" style="color:var(--green);font-family:'SF Mono',Consolas,monospace;font-size:17px;font-weight:600">&#8212;</span></span>
+          <span style="display:flex;gap:20px;align-items:center;font-weight:400;letter-spacing:0;text-transform:none;font-size:15px;color:var(--muted)">
+            <span id="h-lan-ip-wrap">Host LAN IP: <span id="h-lan-ip" style="color:var(--blue);font-family:'SF Mono',Consolas,monospace;font-size:17px;font-weight:600">&#8212;</span></span>
+            <span>Public IP: <span id="h-pub-ip" style="color:var(--green);font-family:'SF Mono',Consolas,monospace;font-size:17px;font-weight:600">&#8212;</span></span>
+          </span>
         </div>
         <table><thead><tr><th>Interface</th><th>IPv4 Address</th><th>MAC Address</th><th class="r">Speed</th><th class="r">MTU</th><th class="r">Link</th></tr></thead>
         <tbody id="netinfo-body"><tr><td colspan="6" class="empty">Loading&#8230;</td></tr></tbody></table>
@@ -1913,6 +1930,7 @@ _netTimer=setInterval(pollHealth,_netInterval);
 function applyNetInfo(d){
   if(!d)return;
   if($('h-pub-ip'))$('h-pub-ip').textContent=d.public_ip||'—';
+  if($('h-lan-ip')){const lip=d.host_lan_ip||'';$('h-lan-ip').textContent=lip||'—';if($('h-lan-ip-wrap'))$('h-lan-ip-wrap').style.display=lip?'':'none';}
   const tb=$('netinfo-body');if(!tb)return;
   const ifaces=d.interfaces||[];
   if(!ifaces.length){tb.innerHTML='<tr><td colspan="6" class="empty">No interfaces</td></tr>';return;}
