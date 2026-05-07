@@ -1078,8 +1078,8 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div class="cc">
           <div class="ctitle">Outcome Distribution
             <select class="net-interval" onchange="setSecInterval(+this.value)" title="Summary refresh interval" id="sec-interval-sel">
-              <option value="30000">30s</option><option value="60000" selected>1m</option>
-              <option value="120000">2m</option><option value="300000">5m</option>
+              <option value="1000" selected>1s</option><option value="5000">5s</option>
+              <option value="30000">30s</option><option value="60000">1m</option>
             </select>
           </div>
           <div class="sec-donut-wrap">
@@ -1817,7 +1817,7 @@ function pollNetInfo(){
 pollNetInfo();
 setInterval(pollNetInfo,30000);
 // ── Security Summary ──────────────────────────────────────────────────────────
-let _secTimer=null,_secInterval=60000,_secHist=[];
+let _secTimer=null,_secInterval=1000,_secHist=[];
 function drawSecDonut(allowed,blocked,dropped,other){
   const c=$('sec-donut');if(!c)return;
   const ctx=c.getContext('2d'),W=c.width,H2=c.height,cx=W/2,cy=H2/2,r=66,ri=46;
