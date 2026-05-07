@@ -626,31 +626,33 @@ https_endpoints = [
 ]
 
 # ── Malware / C2-category domains ─────────────────────────────────────────────
+# These URLs are specifically designed to trigger URL-category blocks in
+# SASE/NGFW/AV platforms.  testmyids.com and scanme.nmap.org are intentionally
+# excluded: they are categorised as "security testing tools", not malware.
+# httpbin.org / postman-echo paths are also excluded: the domain is trusted
+# and SASE URL-category lookups are domain-based, so the path is irrelevant
+# — those belong in c2_beacon_targets for POST-based behavioural testing.
 malware_endpoints = [
-    # Classic IDS trigger sites — Snort/Suricata SID 1:2100498 and ET INFO rules
-    "http://www.testmyids.com",
-    "https://www.testmyids.com",
-    "http://scanme.nmap.org",
-    "https://scanme.nmap.org",
-
-    # WICAR — safe malware-behaviour test pages designed to trigger AV/IDS/NGFW
+    # WICAR — safe malware-behaviour test pages designed to trigger AV/NGFW/SASE
     "https://www.wicar.org/test-malware.html",
     "https://www.wicar.org/",
     "https://malware.wicar.org/data/ms14_064_ole_not_xp.html",
     "https://malware.wicar.org/data/java_jre17_exec.html",
     "https://malware.wicar.org/data/eicar.com",
 
-    # AMTSO — Anti-Malware Testing Standards Organisation test features
+    # AMTSO — Anti-Malware Testing Standards Organisation (cross-vendor standard)
     "https://www.amtso.org/check-desktop-security-tools/",
     "https://www.amtso.org/potentially-unwanted-application-detection/",
     "https://www.amtso.org/phishing-test-page/",
 
-    # Google Safe Browsing test URLs (triggers SB API / URL-filter lookups)
+    # Google Safe Browsing test URLs — categorised as malware/phishing/unwanted
+    # by every SASE vendor that integrates the GSB API
     "http://malware.testing.google.test/testing/malware/",
     "http://phishing.testing.google.test/testing/phishing/",
     "http://unwanted.testing.google.test/testing/unwanted/",
 
-    # HTTP evader — tests IDS/IPS evasion via malformed HTTP constructs
+    # HTTP-evader — tests whether the NGFW/IPS decodes evasion tricks
+    # (chunked TE, compressed body, broken headers, multipart, etc.)
     "https://http-evader.semantic-gap.de/chunked",
     "https://http-evader.semantic-gap.de/compressed",
     "https://http-evader.semantic-gap.de/clen",
@@ -665,18 +667,66 @@ malware_endpoints = [
     "https://noxxi.de/research/http-evader-testsite.html",
     "http://http-evader.semantic-gap.de",
     "https://http-evader.semantic-gap.de",
-
-    # Common C2-panel URL patterns — appended to echo/test services so requests
-    # match ET TROJAN and ET MALWARE Snort/Suricata signatures without hitting
-    # real infrastructure.  These paths are frequently blocked by URL-category
-    # feeds (gate.php, panel paths, update patterns used by Zbot/Zeus, njRAT, etc.)
-    "https://httpbin.org/post?r=gate.php",
-    "https://httpbin.org/anything/panel/gate.php",
-    "https://httpbin.org/anything/update.php",
-    "https://httpbin.org/post?action=checkin&id=1",
-    "https://postman-echo.com/post?cmd=ping&id=1",
-    "https://postman-echo.com/post?r=config.php",
 ]
+
+# ── C2 framework / malware family user-agents ─────────────────────────────────
+# Default UAs shipped with C2 frameworks and known malware families.
+# SASE/SSE, NGFW, and EDR vendors maintain threat-intel signatures for these
+# specific strings — they are far more effective at triggering C2 detection
+# rules than generic bad-bot / scraper UAs.
+#
+# Used by: malware_random (HEAD) and c2_beacon (POST)
+c2_user_agents = [
+    # ── Cobalt Strike beacon defaults ────────────────────────────────────────
+    # Stock jQuery malleable-C2 profile (3.x / 4.x) — in every major vendor feed
+    "Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; Trident/6.0)",
+    # CS IE11 malleable profile
+    "Mozilla/5.0 (Windows NT 6.3; Trident/7.0; rv:11.0) like Gecko",
+    # CS stock pre-profile MSIE Trident UA
+    "Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 5.1; Trident/4.0; SLCC2; .NET CLR 2.0.50727)",
+
+    # ── Metasploit Meterpreter HTTP/HTTPS reverse handler ────────────────────
+    "Mozilla/4.0 (compatible; MSIE 6.1; Windows NT)",
+    "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)",
+
+    # ── PowerShell Empire HTTP stager ────────────────────────────────────────
+    "Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko",
+
+    # ── Sliver C2 default HTTPS implant ──────────────────────────────────────
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.1 Safari/605.1.15",
+
+    # ── DarkComet RAT — extremely distinctive, present in every vendor feed ──
+    "DarkComets/0.1",
+
+    # ── QuasarRAT default HTTP listener ──────────────────────────────────────
+    "Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/29.0.1547.2 Safari/537.36",
+
+    # ── Emotet / TrickBot family — old IE UA pattern common to both families ─
+    "Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.1; Trident/4.0; SLCC2)",
+
+    # ── AgentTesla / OriginLogger exfil HTTP POST ────────────────────────────
+    "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1)",
+
+    # ── njRAT / Bladabindi minimal UA ────────────────────────────────────────
+    "Mozilla/5.0 (compatible)",
+
+    # ── Generic script / implant frameworks ─────────────────────────────────
+    # Python requests — extremely common in commodity malware and downloaders
+    "python-requests/2.28.2",
+    # Go HTTP client — Sliver, Havoc, Mythic, and custom Go implants
+    "Go-http-client/1.1",
+    # Java — jRAT, Adwind, STRRAT, and many commodity Java RATs
+    "Java/11.0.16",
+    # curl — dropper and staging scripts
+    "curl/7.74.0",
+    # PowerShell Invoke-WebRequest default
+    "Mozilla/5.0 (Windows NT; Windows NT 10.0; en-US) WindowsPowerShell/5.1.19041.1682",
+]
+
+# ── Bad-bot / scraper user-agents ─────────────────────────────────────────────
+# Large list of web scrapers, SEO crawlers, and aggressive bots.
+# Useful for testing WAF bot-detection rules and rate-limiting policies.
+# For C2 / SASE threat-detection testing use c2_user_agents above instead.
 
 # ── AI service HTTPS endpoints ────────────────────────────────────────────────
 ai_endpoints = [
