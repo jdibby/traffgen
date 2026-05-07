@@ -1491,6 +1491,7 @@ function runFromModal(){
 // ── Health / perf functions ────────────────────────────────────────────────────
 function fmtIO(v){const m=v*8/1000;if(m<0.01)return'<0.01 Mbps';if(m<10)return m.toFixed(2)+' Mbps';return m.toFixed(1)+' Mbps';}
 function gaugeColor(p){return p>85?'var(--red)':p>65?'var(--amber)':'var(--green)';}
+function gaugeHex(p){return p>85?'#f85149':p>65?'#f59e0b':'#22c55e';}
 function drawLineSpark(cid,vals,color){
   const c=$(cid);if(!c)return;
   const rect=c.getBoundingClientRect();
@@ -1571,8 +1572,8 @@ function applyHealth(d){
   drawGauge('mem-gauge',memPct,'Memory',gaugeColor(memPct));
   _cpuHist.push(cpuPct);if(_cpuHist.length>60)_cpuHist.shift();
   _memHist.push(memPct);if(_memHist.length>60)_memHist.shift();
-  drawLineSpark('cpu-spark',_cpuHist,gaugeColor(cpuPct));
-  drawLineSpark('mem-spark',_memHist,gaugeColor(memPct));
+  drawLineSpark('cpu-spark',_cpuHist,gaugeHex(cpuPct));
+  drawLineSpark('mem-spark',_memHist,gaugeHex(memPct));
   if($('cpu-cur'))$('cpu-cur').textContent=cpuPct.toFixed(1)+'%';
   if($('mem-cur'))$('mem-cur').textContent=memPct.toFixed(1)+'%';
   if($('mem-detail'))$('mem-detail').textContent=(d.mem_used_mb||0).toFixed(0)+' MB / '+(d.mem_total_mb||0).toFixed(0)+' MB used';
