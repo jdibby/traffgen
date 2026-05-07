@@ -846,7 +846,7 @@ td.nm{font-family:inherit;font-weight:500;font-size:12px}
 .tcs{display:flex;gap:10px;font-size:11px;font-family:'SF Mono',Consolas,monospace}
 .tcbar{width:100%;height:2px;background:var(--border2);border-radius:1px;overflow:hidden;margin-top:1px}
 .tcbf{height:100%;border-radius:1px;transition:width .4s}
-.otb{display:flex;gap:6px;padding:8px 12px;background:var(--surf);border-bottom:1px solid var(--border);align-items:center;flex-shrink:0;flex-wrap:wrap}
+.otb{display:flex;gap:6px;padding:8px 12px;background:var(--surf);border-bottom:1px solid var(--border);align-items:center;flex-shrink:0;flex-wrap:wrap;position:sticky;top:0;z-index:5}
 .otlbl{font-size:12px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-right:auto}
 .btn{padding:5px 12px;border-radius:var(--r);border:1px solid var(--border2);background:var(--surf2);color:var(--muted);font-size:13px;cursor:pointer;transition:all .12s}
 .btn:hover{border-color:var(--green);color:var(--green)}
