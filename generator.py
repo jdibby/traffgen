@@ -3670,12 +3670,73 @@ def tor_anonymizer() -> None:
         ui_error(f"[tor_anonymizer] {e}")
 
 
+def _detect_host_lan() -> "tuple[str, str] | None":
+    """Return (gateway_ip, subnet/24) for the physical LAN the Docker host uses.
+
+    Two strategies:
+      1. Parse ``ip route show`` for non-docker RFC1918 connected subnets.
+         Works when the container has a secondary interface on the host LAN or
+         runs with --network=host.
+      2. Traceroute to 8.8.8.8 (max 4 hops); the first RFC1918 hop that is NOT
+         the Docker bridge (172.16-31.x) is the real LAN gateway.
+    """
+    import re as _re
+
+    _DOCKER_BRIDGE = _re.compile(r"^172\.(1[6-9]|2[0-9]|3[01])\.")
+    _RFC1918 = _re.compile(r"^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)")
+
+    def _to_24(ip: str) -> str:
+        return ".".join(ip.split(".")[:3]) + ".0/24"
+
+    # Strategy 1 — connected routes that are not docker-bridge interfaces
+    try:
+        r = subprocess.run(["ip", "route", "show"],
+                           capture_output=True, text=True, timeout=5)
+        for line in r.stdout.splitlines():
+            m = _re.match(r"^(\d+\.\d+\.\d+\.\d+)/(\d+)\s+dev\s+(\S+)", line)
+            if not m:
+                continue
+            ip_base, iface = m.group(1), m.group(3)
+            if iface in ("lo",):
+                continue
+            if iface.startswith(("docker", "br-", "veth")):
+                continue
+            if _DOCKER_BRIDGE.match(ip_base):
+                continue
+            if _RFC1918.match(ip_base):
+                gw = ".".join(ip_base.split(".")[:3]) + ".1"
+                return gw, ip_base + "/24"
+    except Exception:
+        pass
+
+    # Strategy 2 — traceroute: skip docker bridge hops, take first real RFC1918 hop
+    try:
+        tr = subprocess.run(
+            ["traceroute", "-n", "-m", "4", "-w", "2", "-q", "1", "8.8.8.8"],
+            capture_output=True, text=True, timeout=25,
+        )
+        for line in tr.stdout.splitlines()[1:]:
+            m = _re.search(r"(\d+\.\d+\.\d+\.\d+)", line)
+            if not m:
+                continue
+            ip = m.group(1)
+            if _DOCKER_BRIDGE.match(ip):
+                continue  # skip docker bridge gateway
+            if _RFC1918.match(ip):
+                return ip, _to_24(ip)
+    except Exception:
+        pass
+
+    return None
+
+
 def lateral_movement_sim() -> None:
     """
     Simulate east-west lateral movement:
 
-      Phase 1 — Ping sweep (nmap -sn) the entire /24 containing the container's
-        default gateway to enumerate live hosts.
+      Phase 1 — Ping sweep (nmap -sn) the entire /24 of the Docker host's
+        physical LAN gateway (detected via routing table or traceroute,
+        skipping the Docker bridge 172.17.x.x) to enumerate live hosts.
       Phase 2 — Port scan every discovered host (up to 20) on common
         lateral-movement ports:
         22 (SSH), 88 (Kerberos), 135 (WMI/RPC), 137-139 (NetBIOS),
@@ -3695,27 +3756,13 @@ def lateral_movement_sim() -> None:
     """
     _LATERAL_PORTS = "22,88,135,137,138,139,389,445,636,3389,5985,5986"
 
-    # ── Detect default gateway and derive /24 subnet ─────────────────────────
-    try:
-        gw_result = subprocess.run(
-            ["ip", "route", "show", "default"],
-            capture_output=True, text=True, timeout=5,
-        )
-        gw_ip = None
-        for token in gw_result.stdout.split():
-            if re.match(r"^\d{1,3}(?:\.\d{1,3}){3}$", token):
-                gw_ip = token
-                break
-        if not gw_ip:
-            ui_warn("lateral_movement_sim: cannot determine default gateway — skipping")
-            _stats.fail()
-            return
-        octets = gw_ip.split(".")
-        subnet = ".".join(octets[:3]) + ".0/24"
-    except Exception as e:
-        ui_warn(f"lateral_movement_sim: gateway detection failed: {e}")
+    # ── Detect host LAN (not Docker bridge) and derive /24 subnet ────────────
+    lan = _detect_host_lan()
+    if not lan:
+        ui_warn("lateral_movement_sim: cannot determine host LAN subnet — skipping")
         _stats.fail()
         return
+    gw_ip, subnet = lan
 
     ui_banner("Lateral Movement Simulation",
               f"gateway={gw_ip}  subnet={subnet}  ports={_LATERAL_PORTS}")
