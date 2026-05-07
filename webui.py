@@ -361,16 +361,21 @@ def _sample_net_info() -> None:
                     "link":  link,
                 })
 
-            # Refresh public IP on first run and every TTL seconds
-            if not public_ip or now - public_ip_ts >= PUBLIC_IP_TTL:
-                public_ip    = _fetch_public_ip()
-                public_ip_ts = now
-
+            # Push interfaces immediately so the widget has data before the
+            # public IP curl completes (which can take several seconds).
             with _net_info_lock:
                 _net_info_cache.update({
                     "interfaces": ifaces,
-                    "public_ip":  public_ip,
+                    "public_ip":  public_ip or "resolving…",
                 })
+
+            # Refresh public IP on first run and every TTL seconds — done
+            # after the cache update so it doesn't block interface display.
+            if not public_ip or now - public_ip_ts >= PUBLIC_IP_TTL:
+                public_ip    = _fetch_public_ip()
+                public_ip_ts = now
+                with _net_info_lock:
+                    _net_info_cache["public_ip"] = public_ip
         except Exception:
             pass
 
