@@ -1137,6 +1137,35 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <table><thead><tr><th>Interface</th><th>IPv4 Address</th><th>MAC Address</th><th class="r">Speed</th><th class="r">MTU</th><th class="r">Link</th></tr></thead>
         <tbody id="netinfo-body"><tr><td colspan="6" class="empty">Loading&#8230;</td></tr></tbody></table>
       </div>
+      <div class="h-row">
+        <div class="cc">
+          <div class="ctitle">Swap Usage <span id="swap-pct" style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim)"></span></div>
+          <div id="swap-detail" style="font-family:'SF Mono',Consolas,monospace;font-size:12px;color:var(--muted);margin-top:4px">&#8212; MB / &#8212; MB used</div>
+          <div style="background:#1e2d3d;border-radius:4px;height:8px;margin-top:8px;overflow:hidden">
+            <div id="swap-bar" style="height:100%;background:var(--amber);width:0%;transition:width .4s ease"></div>
+          </div>
+        </div>
+        <div class="cc">
+          <div class="ctitle">Cumulative Disk I/O <span style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim);font-size:10px">since start</span></div>
+          <div style="display:flex;gap:16px;margin-top:6px;font-family:'SF Mono',Consolas,monospace;font-size:12px">
+            <span><span style="color:var(--muted)">Read: </span><span id="cum-drd" style="color:var(--green)">&#8212;</span></span>
+            <span><span style="color:var(--muted)">Write: </span><span id="cum-dwr" style="color:var(--blue)">&#8212;</span></span>
+          </div>
+        </div>
+      </div>
+      <div class="h-row">
+        <div class="cc">
+          <div class="ctitle">System Uptime</div>
+          <div id="sys-uptime" style="font-family:'SF Mono',Consolas,monospace;font-size:18px;color:var(--green);padding:8px 0 4px">&#8212;</div>
+        </div>
+        <div class="cc">
+          <div class="ctitle">Process Internals</div>
+          <div style="display:flex;gap:20px;margin-top:6px;font-family:'SF Mono',Consolas,monospace;font-size:12px">
+            <span><span style="color:var(--muted)">Threads: </span><span id="h-threads" style="color:var(--text)">&#8212;</span></span>
+            <span><span style="color:var(--muted)">Open FDs: </span><span id="h-fds" style="color:var(--text)">&#8212;</span></span>
+          </div>
+        </div>
+      </div>
       <div class="h-gauges">
         <div class="cc"><div class="ctitle">CPU Usage <span id="cpu-cur" style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim)"></span></div>
           <div class="gauge-wrap"><canvas id="cpu-gauge" width="200" height="130"></canvas></div>
@@ -1174,35 +1203,6 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div style="display:flex;gap:24px;margin-top:10px;font-family:'SF Mono',Consolas,monospace;font-size:12px;color:var(--muted)">
           <span>&#8595; cumulative: <span id="cum-rx" style="color:var(--green)">&#8212;</span></span>
           <span>&#8593; cumulative: <span id="cum-tx" style="color:var(--blue)">&#8212;</span></span>
-        </div>
-      </div>
-      <div class="h-row">
-        <div class="cc">
-          <div class="ctitle">Swap Usage <span id="swap-pct" style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim)"></span></div>
-          <div id="swap-detail" style="font-family:'SF Mono',Consolas,monospace;font-size:12px;color:var(--muted);margin-top:4px">&#8212; MB / &#8212; MB used</div>
-          <div style="background:#1e2d3d;border-radius:4px;height:8px;margin-top:8px;overflow:hidden">
-            <div id="swap-bar" style="height:100%;background:var(--amber);width:0%;transition:width .4s ease"></div>
-          </div>
-        </div>
-        <div class="cc">
-          <div class="ctitle">Cumulative Disk I/O <span style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim);font-size:10px">since start</span></div>
-          <div style="display:flex;gap:16px;margin-top:6px;font-family:'SF Mono',Consolas,monospace;font-size:12px">
-            <span><span style="color:var(--muted)">Read: </span><span id="cum-drd" style="color:var(--green)">&#8212;</span></span>
-            <span><span style="color:var(--muted)">Write: </span><span id="cum-dwr" style="color:var(--blue)">&#8212;</span></span>
-          </div>
-        </div>
-      </div>
-      <div class="h-row">
-        <div class="cc">
-          <div class="ctitle">System Uptime</div>
-          <div id="sys-uptime" style="font-family:'SF Mono',Consolas,monospace;font-size:18px;color:var(--green);padding:8px 0 4px">&#8212;</div>
-        </div>
-        <div class="cc">
-          <div class="ctitle">Process Internals</div>
-          <div style="display:flex;gap:20px;margin-top:6px;font-family:'SF Mono',Consolas,monospace;font-size:12px">
-            <span><span style="color:var(--muted)">Threads: </span><span id="h-threads" style="color:var(--text)">&#8212;</span></span>
-            <span><span style="color:var(--muted)">Open FDs: </span><span id="h-fds" style="color:var(--text)">&#8212;</span></span>
-          </div>
         </div>
       </div>
       <div class="tcard">
