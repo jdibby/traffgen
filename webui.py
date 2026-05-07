@@ -1324,6 +1324,7 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
           <tr><td>Threat Simulation</td><td style="color:var(--text)">c2-beacon &middot; malware-download &middot; malware-agents &middot; phishing-domains &middot; squatting &middot; virus &middot; ads &middot; pornography</td></tr>
           <tr><td>Data Exfiltration</td><td style="color:var(--text)">dns-exfil &middot; data-exfil-http &middot; dlp &middot; llm-dlp</td></tr>
           <tr><td>IDS / IPS / WAF</td><td style="color:var(--text)">ids-trigger &middot; waf-attack &middot; log4shell &middot; nmap &middot; metasploit-check &middot; web-scanner</td></tr>
+          <tr><td>VoIP / UCaaS</td><td style="color:var(--text)">voip &middot; ucaas</td></tr>
           <tr><td>SASE / SSE / CASB</td><td style="color:var(--text)">shadow-it &middot; tor-anonymizer &middot; tls-check &middot; lateral-movement</td></tr>
           <tr><td>Security Tools</td><td style="color:var(--text)">snmp &middot; kyber &middot; ai-browse</td></tr>
           <tr><td>all</td><td style="color:var(--text)">Shuffled rotation of every suite above</td></tr>
@@ -1517,6 +1518,7 @@ const SUITE_ICONS={
   'speedtest':'🚀','nmap':'🗺️','ntp':'🕐','phishing-domains':'🎣',
   'pornography':'🔞','snmp':'📊','squatting':'🔤','s3':'🪣',
   'ssh':'💻','url-response':'⏱️','virus':'☣️','web-scanner':'🔬',
+  'voip':'📞','ucaas':'🎥',
   'all':'✨',
 };
 function suiteIco(n){const k=n.replace(/_/g,'-');return(SUITE_ICONS[k]||SUITE_ICONS[n]||'◈')+' ';}

@@ -2672,6 +2672,26 @@ stun_servers = [
     ("stun.voip.blackberry.com",     3478),
 ]
 
+# ── Public SIP servers — used for SIP OPTIONS probes (UDP/5060) ──────────────
+# These are publicly-reachable SIP servers used for VoIP app-ID / UCaaS
+# classification testing.  A SIP OPTIONS request is the standard "ping" used by
+# SIP UAs to check if a server is alive and triggers SIP/VoIP signatures on
+# NGFW and IDS platforms.
+sip_servers = [
+    ("sip.linphone.org",          5060),
+    ("sip2.linphone.org",         5060),
+    ("sip.sipgate.co.uk",         5060),
+    ("sip.antisip.com",           5060),
+    ("sip.zadarma.com",           5060),
+    ("sip.freephoneline.ca",      5060),
+    ("sip.voip.ms",               5060),
+    ("sip.callcentric.com",       5060),
+    ("sip.1und1.de",              5060),
+    ("sip.blueface.com",          5060),
+    ("pbx.myvoipapp.com",         5060),
+    ("registrar.sip2sip.info",    5060),
+]
+
 # ── UCaaS signaling endpoints — VoIP/video URL-category identification ─────────
 # HTTP requests to these URLs trigger "voice" / "video-conferencing" app-ID
 # on platforms like Cato Networks, Prisma Access, and Palo Alto NGFW.
