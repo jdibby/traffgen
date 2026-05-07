@@ -7,10 +7,13 @@ Accepts validated control commands via POST /api/control.
 Generates a self-signed TLS certificate on first start (stored in /tmp/).
 """
 
+import fcntl
 import json
 import logging
 import os
+import socket as _socket
 import ssl
+import struct
 import subprocess
 import time
 import threading
@@ -80,6 +83,8 @@ def _cancel_controller_release() -> None:
 # ── Health monitoring ──────────────────────────────────────────────────────────
 _health_cache: dict = {}
 _health_lock2 = threading.Lock()
+_net_info_cache: dict = {}
+_net_info_lock = threading.Lock()
 
 
 def _sample_health() -> None:
@@ -280,6 +285,98 @@ def _sample_health() -> None:
         except Exception:
             pass
 
+
+def _iface_ip4(iface: str) -> str:
+    """Return the IPv4 address of an interface via SIOCGIFADDR, or ''."""
+    try:
+        s = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
+        raw = fcntl.ioctl(s.fileno(), 0x8915,
+                          struct.pack("256s", iface[:15].encode()))
+        s.close()
+        return _socket.inet_ntoa(raw[20:24])
+    except Exception:
+        return ""
+
+
+def _fetch_public_ip() -> str:
+    """Resolve the public/WAN IP using external lookup services."""
+    for url in ("https://api.ipify.org",
+                "https://checkip.amazonaws.com",
+                "https://icanhazip.com"):
+        try:
+            r = subprocess.run(
+                ["curl", "-s", "-4", "--max-time", "6", url],
+                capture_output=True, text=True, timeout=8,
+            )
+            ip = r.stdout.strip()
+            if ip and len(ip) <= 45:
+                return ip
+        except Exception:
+            continue
+    return "unavailable"
+
+
+def _sample_net_info() -> None:
+    """Background daemon: gather interface metadata and public IP every 60 s."""
+    public_ip = ""
+    public_ip_ts = 0.0
+    PUBLIC_IP_TTL = 300.0   # re-query WAN IP every 5 minutes
+
+    while True:
+        try:
+            now = time.time()
+            ifaces = []
+
+            for name in sorted(os.listdir("/sys/class/net")):
+                if name == "lo":
+                    continue
+                base = f"/sys/class/net/{name}"
+
+                def _rd(path: str) -> str:
+                    try:
+                        return open(path).read().strip()
+                    except Exception:
+                        return ""
+
+                mac   = _rd(f"{base}/address")
+                mtu   = _rd(f"{base}/mtu")
+                try:
+                    spd_raw = int(_rd(f"{base}/speed") or "-1")
+                    speed = f"{spd_raw} Mbps" if spd_raw > 0 else "unknown"
+                except Exception:
+                    speed = "unknown"
+                try:
+                    link = "up" if int(_rd(f"{base}/carrier") or "0") else "down"
+                except Exception:
+                    link = "unknown"
+
+                ip4 = _iface_ip4(name)
+
+                ifaces.append({
+                    "name":  name,
+                    "ip":    ip4,
+                    "mac":   mac,
+                    "speed": speed,
+                    "mtu":   int(mtu) if mtu.isdigit() else 0,
+                    "link":  link,
+                })
+
+            # Refresh public IP on first run and every TTL seconds
+            if not public_ip or now - public_ip_ts >= PUBLIC_IP_TTL:
+                public_ip    = _fetch_public_ip()
+                public_ip_ts = now
+
+            with _net_info_lock:
+                _net_info_cache.update({
+                    "interfaces": ifaces,
+                    "public_ip":  public_ip,
+                })
+        except Exception:
+            pass
+
+        time.sleep(60)
+
+
 _SEC_HEADERS = {
     "X-Content-Type-Options":    "nosniff",
     "X-Frame-Options":           "SAMEORIGIN",
@@ -398,6 +495,12 @@ def api_health():
     with _health_lock2:
         out = {k: v for k, v in _health_cache.items() if not k.startswith("_")}
     return jsonify(out)
+
+
+@app.route("/api/netinfo")
+def api_netinfo():
+    with _net_info_lock:
+        return jsonify(dict(_net_info_cache))
 
 
 def _is_admin() -> bool:
@@ -1047,6 +1150,13 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         </div>
       </div>
       <div class="tcard">
+        <div class="thdr">Network Interfaces
+          <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:10px">Public IP: <span id="h-pub-ip" style="color:var(--green);font-family:'SF Mono',Consolas,monospace">&#8212;</span></span>
+        </div>
+        <table><thead><tr><th>Interface</th><th>IPv4 Address</th><th>MAC Address</th><th class="r">Speed</th><th class="r">MTU</th><th class="r">Link</th></tr></thead>
+        <tbody id="netinfo-body"><tr><td colspan="6" class="empty">Loading&#8230;</td></tr></tbody></table>
+      </div>
+      <div class="tcard">
         <div class="thdr">Top Processes <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:10px">sorted by CPU</span></div>
         <table><thead><tr><th class="r">PID</th><th>Name</th><th class="r">CPU%</th><th class="r">Mem%</th><th class="r">RSS</th></tr></thead>
         <tbody id="proc-body"><tr><td colspan="5" class="empty">Loading&#8230;</td></tr></tbody></table>
@@ -1619,6 +1729,25 @@ function setNetInterval(ms){
 // Kick off overview network widget immediately and keep it live at 1s default
 pollHealth();
 _netTimer=setInterval(pollHealth,_netInterval);
+// ── Network info widget ───────────────────────────────────────────────────────
+function applyNetInfo(d){
+  if(!d)return;
+  if($('h-pub-ip'))$('h-pub-ip').textContent=d.public_ip||'—';
+  const tb=$('netinfo-body');if(!tb)return;
+  const ifaces=d.interfaces||[];
+  if(!ifaces.length){tb.innerHTML='<tr><td colspan="6" class="empty">No interfaces</td></tr>';return;}
+  tb.innerHTML=ifaces.map(i=>{
+    const linkC=i.link==='up'?'var(--green)':i.link==='down'?'var(--red)':'var(--muted)';
+    const ipStr=i.ip||'<span style="color:var(--muted)">—</span>';
+    const macStr=i.mac||'<span style="color:var(--muted)">—</span>';
+    return`<tr class="mrow"><td class="nm">${H(i.name)}</td><td style="font-family:'SF Mono',Consolas,monospace;font-size:12px">${ipStr}</td><td style="font-family:'SF Mono',Consolas,monospace;font-size:12px">${macStr}</td><td class="r" style="color:var(--muted)">${H(i.speed||'—')}</td><td class="r" style="color:var(--muted)">${i.mtu||'—'}</td><td class="r"><span style="color:${linkC}">${H(i.link||'—')}</span></td></tr>`;
+  }).join('');
+}
+function pollNetInfo(){
+  fetch('/api/netinfo').then(r=>r.json()).then(d=>applyNetInfo(d)).catch(()=>{});
+}
+pollNetInfo();
+setInterval(pollNetInfo,60000);
 // ── Security Summary ──────────────────────────────────────────────────────────
 let _secTimer=null,_secInterval=60000,_secHist=[];
 function drawSecDonut(allowed,blocked,dropped,other){
@@ -1864,7 +1993,8 @@ es.onmessage=ev=>{
 
 # ── Entry point ────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    threading.Thread(target=_sample_health, daemon=True, name="health-sampler").start()
+    threading.Thread(target=_sample_health,   daemon=True, name="health-sampler").start()
+    threading.Thread(target=_sample_net_info, daemon=True, name="net-info-sampler").start()
     ctx = _ensure_cert()
     print(f"[webui] Dashboard: https://0.0.0.0:{PORT}", flush=True)
     app.run(
