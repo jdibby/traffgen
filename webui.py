@@ -1491,6 +1491,7 @@ function showTab(btn){
   if(btn.dataset.tab==='health'){pollHealth();pollNetInfo();_healthTimer=setInterval(pollHealth,2500);_initDrag('health-grid');}
   if(btn.dataset.tab==='security'){updateSecurityTab();_secTimer=setInterval(updateSecurityTab,_secInterval);_initDrag('sec-grid');}
 }
+function navTo(tab){const btn=document.querySelector('.nav-item[data-tab="'+tab+'"]');if(btn)showTab(btn);}
 function drawDonut(ok,fail){
   const c=$('donut'),ctx=c.getContext('2d'),W=c.width,H2=c.height,cx=W/2,cy=H2/2,r=66,ri=46;
   const tot=ok+fail;ctx.clearRect(0,0,W,H2);
@@ -1744,7 +1745,7 @@ function runFromModal(){
   if(!_modalSuite)return;
   if(!_isAdmin){toast('Admin access required — click Unlock',false);return;}
   const body={suite:_modalSuite,size:$('modal-size').value,max_wait_secs:parseInt($('modal-wait').value),loop:$('modal-loop').checked,nowait:false};
-  _ctrl(body).then(r=>r.json()).then(d=>{if(d.ok){toast('Running '+_modalSuite+' — generator restarting…',true);closeModal();}else toast('Error: '+d.error,false);})
+  _ctrl(body).then(r=>r.json()).then(d=>{if(d.ok){toast('Running '+_modalSuite+' — generator restarting…',true);closeModal();navTo('output');}else toast('Error: '+d.error,false);})
     .catch(()=>toast('Request failed',false));
 }
 // ── Health / perf functions ────────────────────────────────────────────────────
