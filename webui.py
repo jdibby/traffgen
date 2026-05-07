@@ -1133,7 +1133,7 @@ const Tc=ts=>new Date(ts*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-d
 const Ts=ts=>new Date(ts*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
 const Dur=ms=>ms<1000?ms+'ms':(ms/1000).toFixed(1)+'s';
 const RC=p=>p>=90?'var(--green)':p>=70?'var(--amber)':'var(--red)';
-let _start=null,_uptimer=null,_elTimer=null,_autoScroll=true;
+let _start=null,_uptimer=null,_elTimer=null,_pauseTimer=null,_autoScroll=true;
 let _lastState=null,_logEs=null,_logFilter='all';
 let _xRows=new Set(),_xEvs=new Set(),_modalSuite=null,_isPaused=false,_lastTest=null;
 let _isAdmin=true,_authRequired=false,_adminToken='',_sessionMode=false,_hasController=false;
@@ -1226,7 +1226,13 @@ function apply(s){
   if(s.started_at&&!_start){_start=s.started_at;clearInterval(_uptimer);_uptimer=setInterval(()=>$('s-uptime').textContent='up '+uptime(_start),1000);}
   const st=s.status||'starting';
   const pill=$('status-pill');pill.className='tp-pill '+(ST_CLS[st]||'tp-dim');
-  const dot=st==='running'||st==='starting';pill.innerHTML=(dot?'<span class="pulse"></span>':'')+(ST_LBL[st]||st);
+  clearInterval(_pauseTimer);_pauseTimer=null;
+  if(st==='between_tests'&&s.pause_until){
+    const renderCD=()=>{const rem=Math.max(0,Math.ceil(s.pause_until-Date.now()/1000));pill.textContent='Between Tests ('+rem+'s)';if(rem<=0){clearInterval(_pauseTimer);_pauseTimer=null;}};
+    renderCD();_pauseTimer=setInterval(renderCD,250);
+  } else {
+    const dot=st==='running'||st==='starting';pill.innerHTML=(dot?'<span class="pulse"></span>':'')+(ST_LBL[st]||st);
+  }
   _isPaused=(st==='paused');$('btn-pause').innerHTML=_isPaused?'&#9654;':'&#9208;';$('btn-pause').title=_isPaused?'Resume tests':'Pause tests';
   const lp=$('pill-live');if(st==='stopped'){lp.className='tp-pill tp-stopped';lp.innerHTML='&#9209; STOPPED';}else{lp.className='tp-pill tp-running';lp.innerHTML='<span class="pulse"></span>LIVE';}
   $('cfg-s-pill').textContent='suite:'+(s.suite||'—');$('cfg-z-pill').textContent='size:'+(s.size||'—');

@@ -461,6 +461,7 @@ _WEB_STATE: dict = {
     "version": "", "started_at": 0.0, "suite": "all", "size": "S",
     "max_wait_secs": 20, "loop": True, "current_test": "", "iteration": 0,
     "status": "starting",   # running | between_tests | paused | stopped
+    "pause_until": 0.0,     # epoch seconds when current inter-test pause ends (0 = not pausing)
     "test_started_at": 0.0,
     "tests": {}, "suites": [],
     "totals": {"attempts": 0, "ok": 0, "fail": 0, "blocked": 0, "dropped": 0, "allowed": 0},
@@ -3023,10 +3024,15 @@ def finish_test() -> None:
     if not ARGS.nowait:
         if ARGS.loop:
             wait = random.randint(2, max(3, int(ARGS.max_wait_secs)))
-            progress_wait(wait, label="Pause between iterations")
         else:
             wait = random.randint(2, 5)
-            progress_wait(wait, label="Pause between tests")
+        with _WEB_STATE_LOCK:
+            _WEB_STATE["pause_until"] = time.time() + wait
+        _web_flush()
+        progress_wait(wait, label="Pause between iterations" if ARGS.loop else "Pause between tests")
+        with _WEB_STATE_LOCK:
+            _WEB_STATE["pause_until"] = 0.0
+        _web_flush()
     console.print("")   # visual separator in output
 
 
