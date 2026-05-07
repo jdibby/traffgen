@@ -813,6 +813,8 @@ body{display:flex;background:var(--bg);color:var(--text);font-family:-apple-syst
 .ico-btn{width:33px;height:33px;border-radius:var(--r);border:1px solid var(--border2);background:var(--surf);color:var(--muted);cursor:pointer;display:grid;place-items:center;font-size:20px;transition:all .12s;flex-shrink:0}
 .ico-btn:hover{border-color:var(--green);color:var(--green)}
 .ico-btn.danger:hover{border-color:var(--red);color:var(--red)}
+.ico-btn.ok{width:auto;padding:0 12px;font-size:14px;font-weight:600;color:var(--green);border-color:var(--green)}
+.ico-btn.ok:hover{background:var(--green);color:#000}
 .content{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
 .panel{display:none;flex-direction:column;gap:14px;padding:18px;flex:1;min-height:0;overflow-y:auto}
 .panel.active{display:flex}
@@ -1059,6 +1061,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
       <span id="cfg-s-pill" class="mono" style="color:var(--muted)">—</span>
       <span id="cfg-z-pill" class="mono" style="color:var(--muted)">—</span>
       <span id="status-pill" class="tp-pill tp-dim"><span class="pulse"></span>Starting</span>
+      <button id="btn-restart" class="ico-btn ok ro-ctrl" onclick="restartTests()" title="Restart tests (same settings)" style="display:none">&#9654; Restart</button>
       <button id="btn-pause" class="ico-btn ro-ctrl" onclick="togglePause()" title="Pause / Resume">&#9208;</button>
       <button id="btn-stop" class="ico-btn danger ro-ctrl" onclick="stopTests()" title="Stop all tests">&#9209;</button>
       <button class="ico-btn" onclick="openDrawer()" title="Settings">&#9881;</button>
@@ -1670,7 +1673,11 @@ function apply(s){
     const dot=st==='running'||st==='starting';pill.innerHTML=(dot?'<span class="pulse"></span>':'')+(ST_LBL[st]||st);
   }
   _isPaused=(st==='paused');$('btn-pause').innerHTML=_isPaused?'&#9654;':'&#9208;';$('btn-pause').title=_isPaused?'Resume tests':'Pause tests';
-  const lp=$('pill-live');if(st==='stopped'){lp.className='tp-pill tp-stopped';lp.innerHTML='&#9209; STOPPED';}else{lp.className='tp-pill tp-running';lp.innerHTML='<span class="pulse"></span>LIVE';}
+  const isStopped=(st==='stopped');
+  $('btn-restart').style.display=isStopped?'inline-flex':'none';
+  $('btn-pause').style.display=isStopped?'none':'inline-grid';
+  $('btn-stop').style.display=isStopped?'none':'inline-grid';
+  const lp=$('pill-live');if(isStopped){lp.className='tp-pill tp-stopped';lp.innerHTML='&#9654; RESTART';lp.title='Click to restart tests';}else{lp.className='tp-pill tp-running';lp.innerHTML='<span class="pulse"></span>LIVE';lp.title='Click to stop all tests';}
   $('cfg-s-pill').textContent='suite:'+(s.suite||'—');$('cfg-z-pill').textContent='size:'+(s.size||'—');
   const tot=s.totals||{},ok=tot.ok||0,fail=tot.fail||0,att=tot.attempts||0,p=att?ok/att*100:0,blk=tot.blocked||0,drp=tot.dropped||0;
   $('v-total').textContent=N(att);$('s-total').textContent=N(ok)+' ok \xb7 '+N(fail)+' fail'+(blk?' \xb7 '+N(blk)+' blocked':'')+(drp?' \xb7 '+N(drp)+' dropped':'');
@@ -1875,11 +1882,18 @@ function togglePause(){
 }
 function stopTests(){
   if(!_isAdmin){toast(_sessionMode?'Another session has control — you are read-only':'Admin access required — click Unlock',false);return;}
-  if(!confirm('Stop all tests? Traffic generation will halt until the container is restarted.'))return;
+  if(!confirm('Stop all tests? Use Settings ⚙ to restart with new parameters, or click Restart Tests when stopped.'))return;
   _ctrl({action:'stop'}).then(r=>r.json()).then(d=>{if(d.ok)toast('Stop signal sent — tests will halt after current test',true);else toast('Error: '+d.error,false);})
     .catch(()=>toast('Request failed',false));
 }
-function handleLiveClick(){if(_lastState&&_lastState.status==='stopped'){toast('Tests are already stopped',false);return;}stopTests();}
+function restartTests(){
+  if(!_isAdmin){toast(_sessionMode?'Another session has control — you are read-only':'Admin access required — click Unlock',false);return;}
+  const st=_lastState||{};
+  const body={suite:st.suite||'all',size:st.size||'S',max_wait_secs:st.max_wait_secs||20,loop:st.loop!==false,nowait:false};
+  _ctrl(body).then(r=>r.json()).then(d=>{if(d.ok)toast('Restarting tests…',true);else toast('Error: '+d.error,false);})
+    .catch(()=>toast('Request failed',false));
+}
+function handleLiveClick(){if(_lastState&&_lastState.status==='stopped'){restartTests();return;}stopTests();}
 function openModal(name,desc){
   _modalSuite=name;$('modal-name').textContent=name;$('modal-desc').textContent=desc||'No description available.';
   const td=(_lastState&&_lastState.tests&&_lastState.tests[name])||{};

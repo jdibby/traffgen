@@ -4169,7 +4169,12 @@ def finish_test() -> None:
     Called after each test completes.  Checks for stop/pause signals from
     the web UI, then inserts a random pause (unless --nowait).
     """
-    # Stop signal: halt all traffic generation
+    # Stop signal: halt all traffic generation without exiting the process.
+    # Exiting here would cause Docker's restart policy to relaunch the
+    # container, immediately resuming tests.  Instead, enter an idle loop so
+    # the container stays alive and tests stay halted.  The heartbeat thread
+    # continues running and will pick up any cmd file written by the Settings
+    # drawer, triggering an execv() restart with the new configuration.
     if os.path.exists(_WEB_STOP_FILE):
         try:
             os.remove(_WEB_STOP_FILE)
@@ -4179,7 +4184,10 @@ def finish_test() -> None:
         with _WEB_STATE_LOCK:
             _WEB_STATE["status"] = "stopped"
         _web_flush()
-        sys.exit(0)
+        _web_log("Idle — use Settings to restart with new configuration", level="info")
+        while True:
+            WATCHDOG.kick()
+            time.sleep(5)
 
     # Pause signal: block until resume file is removed
     if os.path.exists(_WEB_PAUSE_FILE):
@@ -4389,13 +4397,18 @@ def _start_heartbeat(path: str = "/tmp/traffgen.health", interval: int = 2) -> N
             except Exception:
                 pass
 
-            # Stop file as safety net (in case a long test is blocking finish_test)
+            # Stop file as safety net (in case a long test is blocking finish_test).
+            # Raise KeyboardInterrupt in the main thread so it breaks out of
+            # whatever blocking call is in progress; main() catches this and
+            # enters the same idle stopped loop used by finish_test(), keeping
+            # the container alive so Docker does not restart and resume tests.
             if os.path.exists(_WEB_STOP_FILE):
-                _web_log("Stop signal detected — exiting", level="warn")
+                _web_log("Stop signal detected mid-test — interrupting", level="warn")
                 with _WEB_STATE_LOCK:
                     _WEB_STATE["status"] = "stopped"
                 _web_flush()
-                os._exit(0)  # sys.exit() only kills this daemon thread; os._exit() kills the process
+                import _thread
+                _thread.interrupt_main()
 
             # Web control: consume command file if present, then execv
             try:
@@ -4459,7 +4472,20 @@ if __name__ == "__main__":
             border_style="blue",
         ))
     except KeyboardInterrupt:
-        sys.exit(0)
+        # Raised by the heartbeat thread when a stop signal arrives mid-test.
+        # Enter the same idle loop as finish_test() so the container stays alive
+        # and Docker does not restart and immediately resume tests.
+        try:
+            os.remove(_WEB_STOP_FILE)
+        except Exception:
+            pass
+        _web_log("Tests halted — use Settings to restart with new configuration", level="warn")
+        with _WEB_STATE_LOCK:
+            _WEB_STATE["status"] = "stopped"
+        _web_flush()
+        while True:
+            WATCHDOG.kick()
+            time.sleep(5)
     except Exception as e:
         ui_error(f"Fatal: {e}\n{traceback.format_exc()}")
         sys.exit(1)
