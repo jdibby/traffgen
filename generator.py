@@ -454,13 +454,7 @@ _suite_stats = SuiteStats()   # aggregate across all functions in a suite run
 _ADS_BLOCKLIST_URL = (
     "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/pro.txt"
 )
-_ADS_FALLBACK = [
-    "pagead2.googlesyndication.com", "ad.doubleclick.net", "ads.youtube.com",
-    "adservice.google.com", "analytics.google.com", "pixel.facebook.com",
-    "an.facebook.com", "ads.linkedin.com", "ads.tiktok.com", "ads.yahoo.com",
-    "static.ads-twitter.com", "samsungads.com", "appmetrica.yandex.ru",
-    "metrika.yandex.ru", "adtech.yahooinc.com", "analytics.tiktok.com",
-]
+# Fallback is the original static ad_endpoints list from endpoints.py
 _ads_pool: list  = []
 _ads_pool_lock   = threading.Lock()
 
@@ -495,11 +489,11 @@ def _load_ads_pool() -> list:
                     f"from Hagezi pro blocklist"
                 )
             else:
-                _ads_pool = _ADS_FALLBACK[:]
-                console.log("[yellow]ads:[/] blocklist parse returned 0 domains — using fallback")
+                _ads_pool = ad_endpoints[:]
+                console.log("[yellow]ads:[/] blocklist parse returned 0 domains — using original static list")
         except Exception as exc:
-            _ads_pool = _ADS_FALLBACK[:]
-            console.log(f"[yellow]ads:[/] blocklist fetch failed ({exc}) — using fallback")
+            _ads_pool = ad_endpoints[:]
+            console.log(f"[yellow]ads:[/] blocklist fetch failed ({exc}) — using original static list")
         return _ads_pool
 
 
