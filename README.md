@@ -60,7 +60,7 @@ curl -sk https://raw.githubusercontent.com/jdibby/traffgen/refs/heads/main/stage
 | [Test Suites](docs/suites.md) | All 44 suites — what each tests, how to interpret results, outcome classification |
 | [Deployment Guide](docs/deployment.md) | Docker commands, stager.sh, network modes, TLS proxy setup, architecture, building |
 | [Configuration](docs/configuration.md) | CLI flags, `--size`, traffic pacing, custom endpoints |
-| [Web Dashboard](docs/dashboard.md) | Dashboard tabs, controls, draggable widgets, chart hover, multi-user mode |
+| [Web Dashboard](docs/web-dashboard.md) | Dashboard tabs, controls, draggable widgets, chart hover, multi-user mode |
 
 ---
 
