@@ -1238,7 +1238,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div>
           <div class="a-title">traffgen</div>
           <div class="a-ver">v<span id="about-ver">&#8212;</span> &middot; Multi-Protocol Network Traffic Generator</div>
-          <div class="a-sub">Simulates realistic network traffic across 47+ test suites &#8212; DNS, HTTP/S, BGP, SSH, C2 beacons, DLP, Metasploit checks, and more.<br>Purpose-built to stress-test firewalls, IDS/IPS, URL filters, DLP engines, CASB platforms, and SIEM pipelines.</div>
+          <div class="a-sub">Simulates realistic network traffic across 50+ test suites &#8212; DNS, HTTP/S, BGP, SSH, C2 beacons, DLP, IDS/WAF triggers, lateral movement, TLS inspection checks, and more.<br>Purpose-built to stress-test firewalls, IDS/IPS, URL filters, DLP engines, CASB/SASE/SSE platforms, and SIEM pipelines.</div>
         </div>
       </div>
       <div class="a-section">
@@ -1273,13 +1273,14 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
         <div class="a-h">Test Suite Categories</div>
         <table class="st-table">
           <tr><th>Category</th><th>Suites</th></tr>
-          <tr><td>Connectivity</td><td style="color:var(--text)">dns &middot; icmp &middot; bgp &middot; ntp &middot; ssh</td></tr>
-          <tr><td>Web &amp; HTTP</td><td style="color:var(--text)">https_random &middot; crawl &middot; ftp &middot; web_scanning</td></tr>
-          <tr><td>Threat Simulation</td><td style="color:var(--text)">c2_beacons &middot; malware_download &middot; ransomware_sim &middot; phishing_probes</td></tr>
-          <tr><td>Data Exfiltration</td><td style="color:var(--text)">dns_exfil &middot; dns_tunneling &middot; doh &middot; dot</td></tr>
-          <tr><td>DLP / AI</td><td style="color:var(--text)">ai_llm_dlp &middot; dlp_http</td></tr>
-          <tr><td>Security Tools</td><td style="color:var(--text)">nmap &middot; metasploit &middot; nikto &middot; snmp</td></tr>
-          <tr><td>all</td><td style="color:var(--text)">Shuffled rotation of every suite</td></tr>
+          <tr><td>Connectivity</td><td style="color:var(--text)">dns &middot; icmp &middot; bgp &middot; ntp &middot; ssh &middot; doh &middot; dot &middot; domain-check</td></tr>
+          <tr><td>Web &amp; HTTP</td><td style="color:var(--text)">http &middot; https &middot; http3 &middot; crawl &middot; ftp &middot; bigfile &middot; speedtest &middot; url-response &middot; s3</td></tr>
+          <tr><td>Threat Simulation</td><td style="color:var(--text)">c2-beacon &middot; malware-download &middot; malware-agents &middot; phishing-domains &middot; squatting &middot; virus &middot; ads &middot; pornography</td></tr>
+          <tr><td>Data Exfiltration</td><td style="color:var(--text)">dns-exfil &middot; data-exfil-http &middot; dlp &middot; llm-dlp</td></tr>
+          <tr><td>IDS / IPS / WAF</td><td style="color:var(--text)">ids-trigger &middot; waf-attack &middot; log4shell &middot; nmap &middot; metasploit-check &middot; web-scanner</td></tr>
+          <tr><td>SASE / SSE / CASB</td><td style="color:var(--text)">shadow-it &middot; tor-anonymizer &middot; tls-check &middot; lateral-movement</td></tr>
+          <tr><td>Security Tools</td><td style="color:var(--text)">snmp &middot; kyber &middot; ai-browse</td></tr>
+          <tr><td>all</td><td style="color:var(--text)">Shuffled rotation of every suite above</td></tr>
         </table>
       </div>
       <div class="a-section">
