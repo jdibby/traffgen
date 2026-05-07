@@ -1377,7 +1377,7 @@ function showTab(btn){
   if(btn.dataset.tab==='output')connectLog();
   clearInterval(_healthTimer);_healthTimer=null;
   clearInterval(_secTimer);_secTimer=null;
-  if(btn.dataset.tab==='health'){pollHealth();_healthTimer=setInterval(pollHealth,2500);}
+  if(btn.dataset.tab==='health'){pollHealth();pollNetInfo();_healthTimer=setInterval(pollHealth,2500);}
   if(btn.dataset.tab==='security'){updateSecurityTab();_secTimer=setInterval(updateSecurityTab,_secInterval);}
 }
 function drawDonut(ok,fail){
@@ -1744,7 +1744,10 @@ function applyNetInfo(d){
   }).join('');
 }
 function pollNetInfo(){
-  fetch('/api/netinfo').then(r=>r.json()).then(d=>applyNetInfo(d)).catch(()=>{});
+  fetch('/api/netinfo')
+    .then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+    .then(d=>applyNetInfo(d))
+    .catch(e=>{const tb=$('netinfo-body');if(tb)tb.innerHTML='<tr><td colspan="6" class="empty" style="color:var(--red)">Error: '+String(e)+'</td></tr>';});
 }
 pollNetInfo();
 setInterval(pollNetInfo,60000);
@@ -1972,7 +1975,6 @@ body{background:var(--bg);color:var(--text);font-family:'SF Mono',Consolas,monos
 <script>
 let as=true,lf='all',lt=null;
 const b=document.getElementById('body');
-const H=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const Tc=ts=>new Date(ts*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
 function setF(btn,lvl){lf=lvl;document.querySelectorAll('.fgrp .btn').forEach(x=>x.classList.remove('af'));btn.classList.add('af');document.querySelectorAll('.ll').forEach(el=>{if(el.classList.contains('ll-sep'))return;el.style.display=(lvl==='all'||el.classList.contains(lvl))?'':'none';});}
 const es=new EventSource('/log');
