@@ -17,33 +17,36 @@ set -euo pipefail
 
 # ── Warning banner ────────────────────────────────────────────────────────────
 cat <<'BANNER'
-╔═════════════════════════════════════════════════════════════════════════════╗
-║               ⚠   TRAFFGEN STAGER — SYSTEM CHANGES WARNING   ⚠             ║
-╠═════════════════════════════════════════════════════════════════════════════╣
-║                                                                             ║
-║  This script will make the following changes to your system:               ║
-║                                                                             ║
-║    1. apt update            — refresh package index                        ║
-║    2. apt upgrade           — upgrade ALL installed packages               ║
-║    3. Install prerequisites — ca-certificates, curl, gnupg, lsb-release   ║
-║    4. Install Docker CE     — docker-ce, docker-ce-cli, containerd.io,     ║
-║                               docker-buildx-plugin, docker-compose-plugin  ║
-║    5. Enable Docker service — systemctl enable --now docker                ║
-║    6. Stop & remove ALL existing Docker containers                         ║
-║    7. Prune ALL Docker images, volumes, and build cache                    ║
-║    8. Pull jdibby/traffgen:latest from Docker Hub                          ║
-║    9. Start traffgen container (port 7777, restart unless-stopped)         ║
-║                                                                             ║
-║  !! Steps 6 & 7 will permanently DELETE all existing containers and        ║
-║     images on this host. Run on a dedicated machine or review the script   ║
-║     at https://github.com/jdibby/traffgen/blob/main/stager.sh first.      ║
-║                                                                             ║
-╠═════════════════════════════════════════════════════════════════════════════╣
-║  DISCLAIMER: For AUTHORIZED SECURITY TESTING AND RESEARCH only.            ║
-║  You are solely responsible for obtaining explicit written permission       ║
-║  before testing any systems or networks. The author(s) accept NO           ║
-║  liability for misuse, unauthorized access, damage, or data loss.          ║
-╚═════════════════════════════════════════════════════════════════════════════╝
+
+================================================================================
+            TRAFFGEN STAGER -- SYSTEM CHANGES WARNING
+================================================================================
+
+  This script will make the following changes to your system:
+
+    1. apt update        - refresh package index
+    2. apt upgrade       - upgrade ALL installed packages
+    3. Install deps      - ca-certificates, curl, gnupg, lsb-release
+    4. Install Docker CE - docker-ce, docker-ce-cli, containerd.io,
+                           docker-buildx-plugin, docker-compose-plugin
+    5. Enable Docker     - systemctl enable --now docker
+    6. Remove containers - stop and remove ALL existing Docker containers
+    7. Prune images      - delete ALL Docker images, volumes, build cache
+    8. Pull image        - jdibby/traffgen:latest from Docker Hub
+    9. Start container   - port 7777, restart unless-stopped
+
+  NOTE: Steps 6 & 7 will permanently DELETE all existing containers and
+  images on this host. Run on a dedicated machine, or review the script
+  at https://github.com/jdibby/traffgen/blob/main/stager.sh before use.
+
+--------------------------------------------------------------------------------
+
+  DISCLAIMER: For AUTHORIZED SECURITY TESTING AND RESEARCH only.
+  You are solely responsible for obtaining explicit written permission
+  before testing any systems or networks. The author(s) accept NO
+  liability for misuse, unauthorized access, damage, or data loss.
+
+================================================================================
 BANNER
 
 # Read acceptance — works both interactively and when piped via curl | bash
