@@ -675,24 +675,28 @@ def _curl_head(url: str, user_agent: str,
 
 def _curl_download(url: str, rate_limit: str = "3M",
                    connect_timeout: int = 4, timeout: int = 20,
-                   user_agent: str = "") -> tuple[str, int]:
+                   user_agent: str = "") -> tuple[str, int, str]:
     """
     Download a remote file via curl, discarding data to /dev/null.
 
     `rate_limit` caps bandwidth (e.g. "3M" = 3 MB/s) so the test doesn't
     saturate the uplink.  Use an empty string to remove the cap.
-    Returns (http_code, curl_exit_code).
+    Returns (http_code, curl_exit_code, content_type).
     """
     rate_flag = f"--limit-rate {rate_limit}" if rate_limit else ""
     ua_flag   = f"-A '{user_agent}'"          if user_agent  else ""
     cmd = (
         f"curl {rate_flag} -k --show-error "
         f"--connect-timeout {connect_timeout} "
-        f"-L -o /dev/null -w '%{{response_code}}' {ua_flag} {url}"
+        f"-L -o /dev/null -w '%{{response_code}} %{{content_type}}' {ua_flag} {url}"
     )
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True,
                             timeout=timeout)
-    return result.stdout.strip() or "---", result.returncode
+    out   = result.stdout.strip()
+    parts = out.split(" ", 1)
+    status       = parts[0] if parts[0] else "---"
+    content_type = parts[1] if len(parts) > 1 else ""
+    return status, result.returncode, content_type
 
 
 def _status_style(code: str) -> str:
@@ -920,7 +924,7 @@ def bgp_peering() -> None:
             ui_warn("gobgpd not ready — skipping BGP neighbor setup")
 
     except Exception as e:
-        ui_error(f"[bgp_peering] {e}")
+        _stats.fail(); ui_error(f"[bgp_peering] {e}")
     finally:
         # Brief settle time before tearing down the daemon.
         with ui_status("Terminating gobgpd in 10 s..."):
@@ -1081,6 +1085,7 @@ def dig_random() -> None:
                     finally:
                         prog.update(task, advance=1)
     except Exception as e:
+        _stats.fail()
         ui_error(f"[dig_random] {e}")
 
 
@@ -1094,11 +1099,12 @@ def ftp_random() -> None:
         target = _size_to_limits(ARGS.size, "1MB", "10MB", "100MB", "1GB")
         url    = f"ftp://speedtest:speedtest@ftp.otenet.gr/test{target}.db"
         console.log(f"FTP → {url}  ({target}, rate-limited 3 MB/s)")
-        status, exit_code = _curl_download(url, rate_limit="3M", connect_timeout=5, timeout=60)
+        status, exit_code, _ = _curl_download(url, rate_limit="3M", connect_timeout=5, timeout=60)
         console.log(f"  ↳ FTP response {status}")
         _stats.record(status, exit_code)
         ui_ok("FTP test complete")
     except Exception as e:
+        _stats.fail()
         _stats.fail()
         ui_error(f"[ftp_random] {e}")
 
@@ -1116,6 +1122,7 @@ def http_random() -> None:
         _run_head_batch(pool[:n], "HTTP", user_agents)
         ui_ok("HTTP random complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[http_random] {e}")
 
 
@@ -1129,11 +1136,15 @@ def http_download_zip() -> None:
     ua     = random.choice(user_agents)
     ui_banner("HTTP Download (ZIP)", f"{target} — {url}")
     try:
-        status, exit_code = _curl_download(url, rate_limit="3M", connect_timeout=5, timeout=120, user_agent=ua)
+        status, exit_code, ctype = _curl_download(url, rate_limit="3M", connect_timeout=5, timeout=120, user_agent=ua)
         console.log(f"  ↳ [{_status_style(status)}]HTTP {status}[/]  ({target} ZIP)")
-        _stats.record(status, exit_code)
+        if status == "200" and ctype.startswith("text/html"):
+            _stats.block()
+        else:
+            _stats.record(status, exit_code)
         ui_ok("HTTP ZIP download complete")
     except Exception as e:
+        _stats.fail()
         _stats.fail()
         ui_error(f"[http_download_zip] {e}")
 
@@ -1142,12 +1153,16 @@ def http_download_targz() -> None:
     """Download the WordPress latest.tar.gz archive (plain HTTP)."""
     ui_banner("HTTP Download (tar.gz)", "WordPress latest.tar.gz")
     try:
-        status, exit_code = _curl_download("http://wordpress.org/latest.tar.gz",
+        status, exit_code, ctype = _curl_download("http://wordpress.org/latest.tar.gz",
                                 rate_limit="3M", connect_timeout=5, timeout=120)
         console.log(f"  ↳ [{_status_style(status)}]HTTP {status}[/]  (wordpress latest.tar.gz)")
-        _stats.record(status, exit_code)
+        if status == "200" and ctype.startswith("text/html"):
+            _stats.block()
+        else:
+            _stats.record(status, exit_code)
         ui_ok("HTTP tar.gz download complete")
     except Exception as e:
+        _stats.fail()
         _stats.fail()
         ui_error(f"[http_download_targz] {e}")
 
@@ -1164,6 +1179,7 @@ def https_random() -> None:
         _run_head_batch(https_endpoints[:n], "HTTPS", user_agents)
         ui_ok("HTTPS random complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[https_random] {e}")
 
 
@@ -1186,6 +1202,7 @@ def kyber_random() -> None:
         )
         ui_ok("Kyber test complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[kyber_random] {e}")
 
 
@@ -1203,6 +1220,7 @@ def ai_https_random() -> None:
                         connect_timeout=3, max_time=5)
         ui_ok("AI HTTPS complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[ai_https_random] {e}")
 
 
@@ -1219,6 +1237,7 @@ def ads_random() -> None:
                         connect_timeout=3, max_time=5)
         ui_ok("Ads test complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[ads_random] {e}")
 
 
@@ -1237,6 +1256,7 @@ def https_crawl() -> None:
             scrape_iterative(url, iterations)
         ui_ok("HTTPS crawl complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[https_crawl] {e}")
 
 
@@ -1255,6 +1275,7 @@ def pornography_crawl() -> None:
             scrape_iterative(url, iterations)
         ui_ok("Pornography crawl complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[pornography_crawl] {e}")
 
 
@@ -1272,6 +1293,7 @@ def malware_random() -> None:
                         connect_timeout=3, max_time=5)
         ui_ok("Malware agent HEAD complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[malware_random] {e}")
 
 
@@ -1304,6 +1326,7 @@ def ping_random() -> None:
                     prog.update(task, advance=1)
         ui_ok("Ping complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[ping_random] {e}")
 
 
@@ -1339,6 +1362,7 @@ def metasploit_check() -> None:
                     prog.update(task, advance=1)
         ui_ok("Metasploit checks complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[metasploit_check] {e}")
 
 
@@ -1374,6 +1398,7 @@ def snmp_random() -> None:
                     prog.update(task, advance=1)
         ui_ok("SNMP complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[snmp_random] {e}")
 
 
@@ -1407,6 +1432,7 @@ def traceroute_random() -> None:
                     prog.update(task, advance=1)
         ui_ok("Traceroute complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[traceroute_random] {e}")
 
 
@@ -1454,6 +1480,7 @@ def speedtest_fast() -> None:
 
         ui_ok("Speed-test complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[speedtest_fast] {e}")
 
 
@@ -1515,6 +1542,7 @@ def nmap_cve() -> None:
                 time.sleep(random.uniform(1.0, 3.0))
         ui_ok("Nmap CVE scan complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[nmap_cve] {e}")
 
 
@@ -1546,6 +1574,7 @@ def ntp_random() -> None:
                 time.sleep(random.uniform(0.4, 1.0))
         ui_ok("NTP complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[ntp_random] {e}")
 
 
@@ -1588,6 +1617,7 @@ def ssh_random() -> None:
                 _stats.fail()
         ui_ok("SSH test complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[ssh_random] {e}")
 
 
@@ -1629,6 +1659,7 @@ def urlresponse_random() -> None:
                     prog.update(task, advance=1)
         ui_ok("Response-time test complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[urlresponse_random] {e}")
 
 
@@ -1643,14 +1674,18 @@ def virus_sim() -> None:
         random.shuffle(virus_endpoints)
         for i, url in enumerate(virus_endpoints[:n], 1):
             try:
-                status, exit_code = _curl_download(url, rate_limit="3M", connect_timeout=4, timeout=20)
+                status, exit_code, ctype = _curl_download(url, rate_limit="3M", connect_timeout=4, timeout=20)
                 console.log(f"virus-sim ({i}/{n}) {url}  [{_status_style(status)}]HTTP {status}[/]")
-                _stats.record(status, exit_code)
+                if status == "200" and ctype.startswith("text/html"):
+                    _stats.block()
+                else:
+                    _stats.record(status, exit_code)
             except Exception as e:
                 console.log(f"[yellow]virus-sim ({i}/{n}) {url}  {e.__class__.__name__}[/]")
                 _stats.fail()
         ui_ok("Virus simulation complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[virus_sim] {e}")
 
 
@@ -1665,14 +1700,18 @@ def dlp_sim_https() -> None:
         random.shuffle(dlp_https_endpoints)
         for i, url in enumerate(dlp_https_endpoints[:n], 1):
             try:
-                status, exit_code = _curl_download(url, rate_limit="3M", connect_timeout=4, timeout=20)
+                status, exit_code, ctype = _curl_download(url, rate_limit="3M", connect_timeout=4, timeout=20)
                 console.log(f"dlp-sim ({i}/{n}) {url}  [{_status_style(status)}]HTTP {status}[/]")
-                _stats.record(status, exit_code)
+                if status == "200" and ctype.startswith("text/html"):
+                    _stats.block()
+                else:
+                    _stats.record(status, exit_code)
             except Exception as e:
                 console.log(f"[yellow]dlp-sim ({i}/{n}) {url}  {e.__class__.__name__}[/]")
                 _stats.fail()
         ui_ok("DLP simulation complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[dlp_sim_https] {e}")
 
 
@@ -1707,16 +1746,15 @@ def s3_sim() -> None:
     urls_dl = random.sample(s3_download_urls, min(n_dl, len(s3_download_urls)))
     for i, url in enumerate(urls_dl, 1):
         try:
-            with requests.get(
-                url, stream=True, verify=False, timeout=(3, 3),
+            resp = requests.get(
+                url, verify=False, timeout=(3, 3),
                 headers={"User-Agent": ua},
                 allow_redirects=True,
-            ) as resp:
-                resp.raw.read(65536)  # consume a small chunk then close
+            )
             console.log(
                 f"s3-get ({i}/{n_dl}) {url}  [{_status_style(resp.status_code)}]HTTP {resp.status_code}[/]"
             )
-            _stats.record(resp.status_code)
+            _stats.record(str(resp.status_code))
         except requests.exceptions.ConnectionError as e:
             console.log(f"[yellow]s3-get ({i}/{n_dl}) {url}  {e.__class__.__name__}[/]")
             if "Connection refused" in str(e) or "ECONNREFUSED" in str(e) or "Reset" in str(e):
@@ -1747,7 +1785,7 @@ def s3_sim() -> None:
             console.log(
                 f"s3-put ({i}/{n_ul}) {url}  [{_status_style(resp.status_code)}]HTTP {resp.status_code}[/]"
             )
-            _stats.record(resp.status_code)
+            _stats.record(str(resp.status_code))
         except requests.exceptions.ConnectionError as e:
             console.log(f"[yellow]s3-put ({i}/{n_ul}) {url}  {e.__class__.__name__}[/]")
             if "Connection refused" in str(e) or "ECONNREFUSED" in str(e) or "Reset" in str(e):
@@ -1777,14 +1815,18 @@ def malware_download() -> None:
         random.shuffle(malware_files)
         for i, url in enumerate(malware_files[:n], 1):
             try:
-                status, exit_code = _curl_download(url, rate_limit="3M", connect_timeout=4, timeout=20)
+                status, exit_code, ctype = _curl_download(url, rate_limit="3M", connect_timeout=4, timeout=20)
                 console.log(f"malware-dl ({i}/{n}) {url}  [{_status_style(status)}]HTTP {status}[/]")
-                _stats.record(status, exit_code)
+                if status == "200" and ctype.startswith("text/html"):
+                    _stats.block()
+                else:
+                    _stats.record(status, exit_code)
             except Exception as e:
                 console.log(f"[yellow]malware-dl ({i}/{n}) {url}  {e.__class__.__name__}[/]")
                 _stats.fail()
         ui_ok("Malware download complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[malware_download] {e}")
 
 
@@ -1808,6 +1850,7 @@ def squatting_domains() -> None:
                 _stats.fail()
         ui_ok("Squatting-domains test complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[squatting_domains] {e}")
 
 
@@ -1827,6 +1870,7 @@ def webcrawl() -> None:
             scrape_iterative(ARGS.crawl_start, iterations)
         ui_ok("Web crawl complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[webcrawl] {e}")
 
 
@@ -1852,6 +1896,7 @@ def ips() -> None:
         ui_ok("IDS/IPS trigger complete")
     except Exception as e:
         _stats.fail()
+        _stats.fail()
         ui_error(f"[ips] {e}")
 
 
@@ -1871,6 +1916,7 @@ def web_scanner() -> None:
         _stats.ok()
         ui_ok("Nikto scan complete")
     except Exception as e:
+        _stats.fail()
         _stats.fail()
         ui_error(f"[web_scanner] {e}")
 
@@ -1929,6 +1975,7 @@ def doh_random() -> None:
                     time.sleep(random.uniform(0.3, 0.8))
         ui_ok("DoH test complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[doh_random] {e}")
 
 
@@ -1971,6 +2018,7 @@ def dot_random() -> None:
                 time.sleep(random.uniform(0.5, 1.2))
         ui_ok("DoT test complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[dot_random] {e}")
 
 
@@ -2204,6 +2252,7 @@ def dns_exfil() -> None:
                     prog.update(task, advance=1)
         ui_ok("DNS exfil simulation complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[dns_exfil] {e}")
 
 
@@ -2571,6 +2620,7 @@ def llm_dlp_sim() -> None:
 
         ui_ok("LLM / AI DLP simulation complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[llm_dlp_sim] {e}")
 
 
@@ -2659,6 +2709,7 @@ def github_domain_check() -> None:
         _probe_domain_list(local, n=n)
         ui_ok("GitHub domain check complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[github_domain_check] {e}")
 
 
@@ -2684,6 +2735,7 @@ def github_phishing_domain_check() -> None:
         _probe_domain_list(local, n=n)
         ui_ok("Phishing domain check complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[github_phishing_domain_check] {e}")
 
 

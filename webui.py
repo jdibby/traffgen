@@ -47,18 +47,20 @@ _sse_lock  = threading.Lock()
 _controller_id:    str                          = ""
 _controller_lock:  threading.Lock               = threading.Lock()
 _controller_timer: "threading.Timer | None"     = None
+_controller_gen:   int                          = 0   # increments on every new claim
 
 
-def _schedule_controller_release(sid: str, delay: float = 10.0) -> None:
+def _schedule_controller_release(sid: str, gen: int, delay: float = 10.0) -> None:
     global _controller_id, _controller_timer
     with _controller_lock:
         if _controller_timer is not None:
             _controller_timer.cancel()
 
         def _release():
-            global _controller_id, _controller_timer
+            global _controller_id, _controller_timer, _controller_gen
             with _controller_lock:
-                if _controller_id == sid:
+                # Only release if no newer connection has since claimed control.
+                if _controller_id == sid and _controller_gen == gen:
                     _controller_id = ""
                 _controller_timer = None
 
@@ -296,11 +298,16 @@ def _sse_wrap(gen_fn, session_id: str = ""):
         _sse_count += 1
 
     # Claim or renew the controller slot when no ADMIN_TOKEN is configured.
+    my_gen = -1
     if not ADMIN_TOKEN and session_id:
         with _controller_lock:
             if not _controller_id:
                 _controller_id = session_id
             is_ctrl = (_controller_id == session_id)
+            if is_ctrl:
+                global _controller_gen
+                _controller_gen += 1
+                my_gen = _controller_gen
         if is_ctrl:
             _cancel_controller_release()
 
@@ -311,12 +318,15 @@ def _sse_wrap(gen_fn, session_id: str = ""):
         finally:
             with _sse_lock:
                 _sse_count -= 1
-            # Start the release grace timer when the controller's stream ends.
-            if not ADMIN_TOKEN and session_id:
+            # Only schedule release if this connection is still the active one.
+            # my_gen ensures a delayed finally from an old connection doesn't
+            # restart the timer after a newer connection already claimed control.
+            if not ADMIN_TOKEN and session_id and my_gen >= 0:
                 with _controller_lock:
-                    was_ctrl = (_controller_id == session_id)
+                    was_ctrl = (_controller_id == session_id
+                                and _controller_gen == my_gen)
                 if was_ctrl:
-                    _schedule_controller_release(session_id)
+                    _schedule_controller_release(session_id, my_gen)
 
     return Response(
         _guarded(),
