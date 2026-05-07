@@ -75,6 +75,7 @@ The dashboard includes:
 - **Health** — CPU/memory gauges, load average, disk I/O bars, network sparkline in Mbps, top-processes table
 - **Dark / light mode** — toggle with the ☾ button in the topbar; preference saved across sessions
 - **Controls** — pause, resume, stop, and settings drawer to change suite/size/wait without restarting the container
+- **Status pill** — live state badge in the topbar: `Running` (with pulse dot), `Between Tests (Ns)` with a live countdown during inter-test pauses, `Paused`, and `Stopped`
 - **Multi-user:** first browser tab gets full control; additional tabs are read-only with a visible banner
 
 > **Full documentation:** [docs/web-dashboard.md](docs/web-dashboard.md)
@@ -87,7 +88,7 @@ The dashboard includes:
 |---|---|---|---|
 | `--suite` | See suite names below | `all` | Test suite to run |
 | `--size` | `XS` `S` `M` `L` `XL` | `S` | Traffic volume / intensity |
-| `--loop` | — | off | Loop forever, picking tests at random each iteration |
+| `--loop` | — | off | Loop forever in a randomised round-robin deck — every test runs once per round before any test repeats |
 | `--max-wait-secs` | integer | `20` | Max random pause between iterations when looping |
 | `--nowait` | — | off | Disable all inter-test pauses (loop and single-run mode) |
 | `--crawl-start` | URL | `https://data.commoncrawl.org` | Seed URL for the `crawl` suite |
@@ -131,7 +132,7 @@ The dashboard includes:
 | 🔮 `kyber` | HTTPS HEAD requests using the post-quantum **X25519MLKEM768** (Kyber) key exchange. Tests whether TLS inspection infrastructure handles hybrid post-quantum cipher suites without breaking connectivity. |
 | 🌐 `doh` | DNS over HTTPS (RFC 8484 JSON API) via `curl` to a rotating list of DoH providers. Tests DoH detection and DNS-over-HTTPS bypass policy enforcement. |
 | 🔏 `dot` | DNS over TLS on TCP/853 via `openssl s_client`. Tests whether DoT connections are logged, blocked, or decrypted by TLS inspection. |
-| ⚡ `http3` | HTTP/3 QUIC HEAD requests via `curl --http3`. QUIC runs over UDP/443 and is invisible to many legacy inspection stacks. Tests QUIC visibility, fallback behaviour, and QUIC-block policy enforcement. |
+| ⚡ `http3` | HTTP/3 QUIC HEAD requests via a native `aioquic` implementation (`QuicConnectionProtocol` + `H3Connection`). QUIC runs over UDP/443 and is invisible to many legacy inspection stacks. Tests QUIC visibility and QUIC-block policy enforcement without relying on a curl build that supports HTTP/3. |
 
 ---
 
@@ -212,7 +213,7 @@ All requests use a fake `sk-DLPTEST-…` token — responses are HTTP 401/403. T
 | Suite | Description |
 |---|---|
 | 🚀 `speedtest` | Runs a `fast.com` speed test via the `fastcli` Python package. Rounds scale with `--size`. Establishes baseline bandwidth and confirms speed-test traffic appears in application-awareness logs. |
-| 📡 `snmp` | SNMPv2c `snmpwalk` queries against SNMP-enabled hosts using rotating community strings (`public`, `private`, and common defaults). Tests SNMP inspection and community-string detection. |
+| 📡 `snmp` | Three-function suite covering all SNMP versions: **SNMPv1** (18 community strings: `public`, `private`, `cisco`, `ILMI`, `manager`, `guest`, …), **SNMPv2c** (26 community strings: `public`, `private`, `readonly`, `readwrite`, `network`, `core`, …), and **SNMPv3** (20 credential sets across noAuthNoPriv, authNoPriv MD5/SHA, and authPriv DES/AES). Tests SNMP inspection, community-string detection, and SNMPv3 weak-credential signatures. |
 
 ---
 
@@ -432,7 +433,9 @@ All network targets are defined as plain Python lists in `endpoints.py` — DNS 
 | `ssh_endpoints` | `ssh` | SSH probe targets |
 | `nmap_endpoints` | `nmap` | Nmap port-scan targets |
 | `snmp_endpoints` | `snmp` | SNMP walk targets |
-| `snmp_strings` | `snmp` | SNMP community strings |
+| `snmp_v1_strings` | `snmp` | SNMPv1 community strings |
+| `snmp_v2c_strings` | `snmp` | SNMPv2c community strings |
+| `snmp_v3_creds` | `snmp` | SNMPv3 credential tuples (user, level, auth-proto, auth-pass, priv-proto, priv-pass) |
 | `http_endpoints` | `http` | Plain HTTP hostnames |
 | `https_endpoints` | `https`, `crawl`, `http3`, `speedtest`, `web-scanner` | General HTTPS URLs |
 | `ad_endpoints` | `ads` | Ad-network and tracker URLs |
