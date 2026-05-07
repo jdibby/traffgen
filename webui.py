@@ -325,41 +325,7 @@ def _sample_net_info() -> None:
     while True:
         try:
             now = time.time()
-            ifaces = []
-
-            for name in sorted(os.listdir("/sys/class/net")):
-                if name == "lo":
-                    continue
-                base = f"/sys/class/net/{name}"
-
-                def _rd(path: str) -> str:
-                    try:
-                        return open(path).read().strip()
-                    except Exception:
-                        return ""
-
-                mac   = _rd(f"{base}/address")
-                mtu   = _rd(f"{base}/mtu")
-                try:
-                    spd_raw = int(_rd(f"{base}/speed") or "-1")
-                    speed = f"{spd_raw} Mbps" if spd_raw > 0 else "unknown"
-                except Exception:
-                    speed = "unknown"
-                try:
-                    link = "up" if int(_rd(f"{base}/carrier") or "0") else "down"
-                except Exception:
-                    link = "unknown"
-
-                ip4 = _iface_ip4(name)
-
-                ifaces.append({
-                    "name":  name,
-                    "ip":    ip4,
-                    "mac":   mac,
-                    "speed": speed,
-                    "mtu":   int(mtu) if mtu.isdigit() else 0,
-                    "link":  link,
-                })
+            ifaces = _collect_ifaces()
 
             # Push interfaces immediately so the widget has data before the
             # public IP curl completes (which can take several seconds).
@@ -380,6 +346,83 @@ def _sample_net_info() -> None:
             pass
 
         time.sleep(60)
+
+
+def _collect_ifaces() -> list:
+    """Return a list of interface dicts, using 'ip -j addr' with /sys fallback."""
+    # Primary: ip -j addr produces reliable JSON without ioctl or file-permission issues
+    try:
+        r = subprocess.run(
+            ["ip", "-j", "addr"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if r.returncode == 0:
+            result = []
+            for iface in json.loads(r.stdout):
+                name = iface.get("ifname", "")
+                if not name or name == "lo":
+                    continue
+                ip4 = next(
+                    (a.get("local", "") for a in iface.get("addr_info", [])
+                     if a.get("family") == "inet"),
+                    "",
+                )
+                flags = iface.get("flags", [])
+                link  = "up" if "LOWER_UP" in flags else "down"
+                try:
+                    spd_raw = int(open(f"/sys/class/net/{name}/speed").read().strip() or "-1")
+                    speed = f"{spd_raw} Mbps" if spd_raw > 0 else "unknown"
+                except Exception:
+                    speed = "unknown"
+                result.append({
+                    "name":  name,
+                    "ip":    ip4,
+                    "mac":   iface.get("address", ""),
+                    "speed": speed,
+                    "mtu":   iface.get("mtu", 0),
+                    "link":  link,
+                })
+            return result
+    except Exception:
+        pass
+
+    # Fallback: /sys/class/net + SIOCGIFADDR ioctl
+    result = []
+    for name in sorted(os.listdir("/sys/class/net")):
+        if name == "lo":
+            continue
+        try:
+            base = f"/sys/class/net/{name}"
+
+            def _rd(path: str, _b=base) -> str:
+                try:
+                    return open(path).read().strip()
+                except Exception:
+                    return ""
+
+            mac = _rd(f"{base}/address")
+            mtu = _rd(f"{base}/mtu")
+            try:
+                spd_raw = int(_rd(f"{base}/speed") or "-1")
+                speed = f"{spd_raw} Mbps" if spd_raw > 0 else "unknown"
+            except Exception:
+                speed = "unknown"
+            try:
+                link = "up" if int(_rd(f"{base}/carrier") or "0") else "down"
+            except Exception:
+                link = "unknown"
+            result.append({
+                "name":  name,
+                "ip":    _iface_ip4(name),
+                "mac":   mac,
+                "speed": speed,
+                "mtu":   int(mtu) if mtu.isdigit() else 0,
+                "link":  link,
+            })
+        except Exception:
+            continue
+    return result
+
 
 
 _SEC_HEADERS = {
@@ -1765,11 +1808,14 @@ function applyNetInfo(d){
 function pollNetInfo(){
   fetch('/api/netinfo')
     .then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
-    .then(d=>applyNetInfo(d))
-    .catch(e=>{const tb=$('netinfo-body');if(tb)tb.innerHTML='<tr><td colspan="6" class="empty" style="color:var(--red)">Error: '+String(e)+'</td></tr>';});
+    .then(d=>{
+      applyNetInfo(d);
+      if(!d.interfaces||!d.interfaces.length){setTimeout(pollNetInfo,3000);}
+    })
+    .catch(e=>{const tb=$('netinfo-body');if(tb)tb.innerHTML='<tr><td colspan="6" class="empty" style="color:var(--red)">Error: '+String(e)+'</td></tr>';setTimeout(pollNetInfo,5000);});
 }
 pollNetInfo();
-setInterval(pollNetInfo,60000);
+setInterval(pollNetInfo,30000);
 // ── Security Summary ──────────────────────────────────────────────────────────
 let _secTimer=null,_secInterval=60000,_secHist=[];
 function drawSecDonut(allowed,blocked,dropped,other){
