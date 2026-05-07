@@ -628,7 +628,7 @@ td.nm{font-family:inherit;font-weight:500;font-size:15px}
 .xcell{padding:7px 12px 9px 26px;background:var(--surf2);font-size:14px;font-family:'SF Mono',Consolas,monospace;border-bottom:1px solid var(--border)}
 .xinner{display:flex;flex-wrap:wrap;gap:14px}
 .xi{display:flex;flex-direction:column;gap:2px}
-.xl{font-size:12px;letter-spacing:.6px;text-transform:uppercase;color:var(--dim)}
+.xl{font-size:12px;color:var(--dim)}
 .ctags{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px}
 .ctag{padding:1px 6px;border-radius:4px;font-size:13px;background:var(--surf);border:1px solid var(--border2);color:var(--muted)}
 .chev{font-size:13px;color:var(--muted);transition:transform .15s;display:inline-block}
@@ -677,7 +677,7 @@ td.nm{font-family:inherit;font-weight:500;font-size:15px}
 .a-ver{font-size:14px;color:var(--green);font-weight:600;margin-top:3px}
 .a-sub{color:var(--muted);font-size:15px;margin-top:6px;line-height:1.55}
 .a-section{background:var(--surf);border:1px solid var(--border);border-radius:var(--r);padding:18px}
-.a-h{font-size:13px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--green);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.a-h{font-size:15px;font-weight:600;color:var(--text);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
 .lk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
 .lk{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--r);background:var(--surf2);text-decoration:none;color:var(--text);transition:border-color .15s}
 .lk:hover{border-color:var(--green)}
@@ -728,7 +728,7 @@ input:checked+.tslider:before{transform:translateX(17px)}
 .modal-desc{font-size:15px;color:var(--muted);line-height:1.5;padding:9px 11px;background:var(--surf2);border-radius:var(--r);border-left:3px solid var(--green)}
 .mstats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .mstat{padding:8px 10px;background:var(--surf2);border-radius:var(--r);display:flex;flex-direction:column;gap:2px}
-.mstat-lbl{font-size:12px;font-weight:600;color:var(--muted)}
+.mstat-lbl{font-size:13px;font-weight:600;color:var(--muted)}
 .mstat-val{font-size:18px;font-weight:700;font-family:'SF Mono',Consolas,monospace}
 .modal-sep{font-size:13px;font-weight:600;color:var(--muted);padding-bottom:4px;border-bottom:1px solid var(--border)}
 .modal-ftr{padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px}
@@ -934,6 +934,11 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <button class="btn" onclick="window.open('/log-view','tg-log','width=960,height=680,scrollbars=yes')">Pop Out &#8599;</button>
         <button class="btn" id="btn-as" onclick="toggleAS()">Auto-scroll &#10003;</button>
       </div>
+      <div id="wait-banner" style="display:none;align-items:center;padding:10px 14px;background:rgba(245,158,11,.06);border-top:1px solid rgba(245,158,11,.3);border-bottom:1px solid rgba(245,158,11,.3);flex-shrink:0">
+        <div style="flex:1;height:1px;background:rgba(245,158,11,.3)"></div>
+        <div id="wait-banner-txt" style="padding:0 16px;font-size:14px;font-weight:600;color:var(--amber);white-space:nowrap">&#8987; Pausing between tests…</div>
+        <div style="flex:1;height:1px;background:rgba(245,158,11,.3)"></div>
+      </div>
       <div class="obody" id="obody"></div>
     </div>
     <!-- Health -->
@@ -956,18 +961,18 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         </div>
         <div class="cc">
           <div class="ctitle">Disk I/O</div>
-          <div style="display:flex;gap:16px;margin-bottom:8px;font-family:'SF Mono',Consolas,monospace;font-size:14px">
-            <span><span style="color:var(--muted)">Read: </span><span id="disk-read" style="color:var(--green)">&#8212;</span></span>
-            <span><span style="color:var(--muted)">Write: </span><span id="disk-write" style="color:var(--blue)">&#8212;</span></span>
+          <div style="display:flex;gap:16px;margin-bottom:8px;font-size:14px">
+            <span><span style="color:var(--muted)">Read: </span><span id="disk-read" style="color:var(--green);font-family:'SF Mono',Consolas,monospace">&#8212;</span></span>
+            <span><span style="color:var(--muted)">Write: </span><span id="disk-write" style="color:var(--blue);font-family:'SF Mono',Consolas,monospace">&#8212;</span></span>
           </div>
           <canvas id="disk-bars" width="300" height="58" style="width:100%"></canvas>
         </div>
       </div>
       <div class="cc">
         <div class="ctitle">Network I/O <span id="h-net-iface" style="font-weight:400;color:var(--dim)"></span></div>
-        <div style="display:flex;gap:24px;font-family:'SF Mono',Consolas,monospace;font-size:15px;margin-top:6px">
-          <div><div style="font-size:13px;font-weight:600;color:var(--muted)">&#9660; Receive</div><div id="h-rx" class="c-green" style="font-size:22px;font-weight:700;margin-top:3px">&#8212;</div></div>
-          <div><div style="font-size:13px;font-weight:600;color:var(--muted)">&#9650; Transmit</div><div id="h-tx" class="c-blue" style="font-size:22px;font-weight:700;margin-top:3px">&#8212;</div></div>
+        <div style="display:flex;gap:24px;font-size:15px;margin-top:6px">
+          <div><div style="font-size:13px;font-weight:600;color:var(--muted)">&#9660; Receive</div><div id="h-rx" class="c-green" style="font-size:22px;font-weight:700;margin-top:3px;font-family:'SF Mono',Consolas,monospace">&#8212;</div></div>
+          <div><div style="font-size:13px;font-weight:600;color:var(--muted)">&#9650; Transmit</div><div id="h-tx" class="c-blue" style="font-size:22px;font-weight:700;margin-top:3px;font-family:'SF Mono',Consolas,monospace">&#8212;</div></div>
         </div>
         <canvas id="h-net-spark" width="600" height="60" style="width:100%;margin-top:10px"></canvas>
       </div>
@@ -1063,7 +1068,7 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
 <div class="drawer" id="drawer">
   <div class="dhdr"><span class="dtitle">Settings</span><button class="ico-btn" onclick="closeDrawer()">&#10005;</button></div>
   <div class="dbody">
-    <div style="font-size:12px;color:var(--muted)">Current configuration:</div>
+    <div style="font-size:13px;color:var(--muted)">Current configuration:</div>
     <div class="cur-cfg" id="cur-cfg">&#8212;</div>
     <div class="field"><label>Suite</label><select id="cfg-suite"><option value="all">all &#8212; run everything</option></select></div>
     <div class="field"><label>Size</label>
@@ -1140,34 +1145,26 @@ const RC=p=>p>=90?'var(--green)':p>=70?'var(--amber)':'var(--red)';
 let _start=null,_uptimer=null,_elTimer=null,_autoScroll=true,_scrollLock=false;
 let _lastState=null,_logEs=null,_logFilter='all';
 let _xRows=new Set(),_xEvs=new Set(),_modalSuite=null,_isPaused=false,_lastTest=null;
-let _waitBannerEl=null,_waitBannerTimer=null,_waitBannerUntil=0;
+let _waitBannerTimer=null,_waitBannerUntil=0;
 function _showWaitBanner(until){
-  const b=$('obody');if(!b)return;
-  if(_waitBannerEl&&_waitBannerUntil===until)return;
-  _hideWaitBanner();
+  const wb=$('wait-banner'),txt=$('wait-banner-txt');if(!wb||!txt)return;
+  if(wb.style.display==='flex'&&_waitBannerUntil===until)return;
   _waitBannerUntil=until;
-  const el=document.createElement('div');
-  el.id='_wait-banner';
-  el.style.cssText='padding:10px 0;display:flex;align-items:center;position:sticky;bottom:0;background:#080c10;z-index:3;border-top:1px solid rgba(245,158,11,.25);margin-top:4px;';
-  b.appendChild(el);
-  _waitBannerEl=el;
+  wb.style.display='flex';
   function tick(){
     const rem=Math.max(0,until-Math.floor(Date.now()/1000));
-    el.innerHTML='<div style="flex:1;height:1px;background:rgba(245,158,11,.25)"></div>'
-      +'<div style="padding:0 14px;font-size:13px;font-weight:600;color:var(--amber);white-space:nowrap;letter-spacing:.3px">'
-      +'&#8987; Pausing between tests — next test in '+rem+'s'
-      +'</div>'
-      +'<div style="flex:1;height:1px;background:rgba(245,158,11,.25)"></div>';
-    if(rem<=0){_hideWaitBanner();return;}
-    const ob=$('obody');
-    if(_autoScroll&&ob){_scrollLock=true;ob.scrollTop=ob.scrollHeight;requestAnimationFrame(()=>{_scrollLock=false;});}
+    txt.textContent=until>0
+      ?'⏳ Pausing between tests — next test in '+rem+'s'
+      :'⏳ Pausing between tests…';
+    if(until>0&&rem<=0){_hideWaitBanner();}
   }
+  if(_waitBannerTimer)clearInterval(_waitBannerTimer);
   tick();
   _waitBannerTimer=setInterval(tick,1000);
 }
 function _hideWaitBanner(){
   if(_waitBannerTimer){clearInterval(_waitBannerTimer);_waitBannerTimer=null;}
-  if(_waitBannerEl){_waitBannerEl.remove();_waitBannerEl=null;}
+  const wb=$('wait-banner');if(wb)wb.style.display='none';
   _waitBannerUntil=0;
 }
 let _isAdmin=true,_authRequired=false,_adminToken='',_sessionMode=false,_hasController=false;
@@ -1242,14 +1239,14 @@ function drawSpark(history){
   const okV=history.map(p=>p.ok||0),failV=history.map(p=>p.fail||0),mx=Math.max(...okV,...failV,1);
   const xOf=i=>P.l+(i/(history.length-1))*IW,yOf=v=>P.t+IH-(v/mx)*IH;
   ctx.strokeStyle='#1e2d3d';ctx.lineWidth=1;
-  for(let i=0;i<=4;i++){const y=P.t+(i/4)*IH;ctx.beginPath();ctx.moveTo(P.l,y);ctx.lineTo(P.l+IW,y);ctx.stroke();ctx.fillStyle='#374151';ctx.font='9px SF Mono,Consolas,monospace';ctx.textAlign='right';ctx.fillText(Math.round(mx*(1-i/4)),P.l-4,y+3);}
+  for(let i=0;i<=4;i++){const y=P.t+(i/4)*IH;ctx.beginPath();ctx.moveTo(P.l,y);ctx.lineTo(P.l+IW,y);ctx.stroke();ctx.fillStyle='#374151';ctx.font='11px SF Mono,Consolas,monospace';ctx.textAlign='right';ctx.fillText(Math.round(mx*(1-i/4)),P.l-4,y+3);}
   ctx.beginPath();history.forEach((p,i)=>{const x=xOf(i),y=yOf(p.ok||0);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});
   ctx.lineTo(xOf(history.length-1),P.t+IH);ctx.lineTo(xOf(0),P.t+IH);ctx.closePath();
   const g=ctx.createLinearGradient(0,P.t,0,P.t+IH);g.addColorStop(0,'rgba(34,197,94,.22)');g.addColorStop(1,'rgba(34,197,94,.01)');ctx.fillStyle=g;ctx.fill();
   ctx.beginPath();history.forEach((p,i)=>{const x=xOf(i),y=yOf(p.ok||0);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});
   ctx.strokeStyle='#22c55e';ctx.lineWidth=2;ctx.lineJoin='round';ctx.stroke();
   if(failV.some(v=>v>0)){ctx.beginPath();history.forEach((p,i)=>{const x=xOf(i),y=yOf(p.fail||0);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});ctx.strokeStyle='#f85149';ctx.lineWidth=1.5;ctx.setLineDash([4,3]);ctx.stroke();ctx.setLineDash([]);}
-  ctx.fillStyle='#374151';ctx.font='9px SF Mono,Consolas,monospace';ctx.textAlign='left';ctx.fillText(Ts(history[0].t),P.l,H2-3);ctx.textAlign='right';ctx.fillText(Ts(history[history.length-1].t),P.l+IW,H2-3);
+  ctx.fillStyle='#374151';ctx.font='11px SF Mono,Consolas,monospace';ctx.textAlign='left';ctx.fillText(Ts(history[0].t),P.l,H2-3);ctx.textAlign='right';ctx.fillText(Ts(history[history.length-1].t),P.l+IW,H2-3);
 }
 const ST_CLS={running:'tp-running',between_tests:'tp-dim',paused:'tp-paused',stopped:'tp-stopped',starting:'tp-dim'};
 const ST_LBL={running:'Running',between_tests:'Between Tests',paused:'Paused',stopped:'Stopped',starting:'Starting'};
@@ -1260,7 +1257,7 @@ function apply(s){
   if(s.started_at&&!_start){_start=s.started_at;clearInterval(_uptimer);_uptimer=setInterval(()=>$('s-uptime').textContent='up '+uptime(_start),1000);}
   const st=s.status||'starting';
   const wu=s.wait_until||0,now=Math.floor(Date.now()/1000);
-  if(st==='between_tests'&&wu>now){_showWaitBanner(wu);}else{_hideWaitBanner();}
+  if(st==='between_tests'){_showWaitBanner(wu>now?wu:0);}else{_hideWaitBanner();}
   const pill=$('status-pill');pill.className='tp-pill '+(ST_CLS[st]||'tp-dim');
   const dot=st==='running'||st==='starting';pill.innerHTML=(dot?'<span class="pulse"></span>':'')+(ST_LBL[st]||st);
   _isPaused=(st==='paused');$('btn-pause').innerHTML=_isPaused?'&#9654;':'&#9208;';$('btn-pause').title=_isPaused?'Resume tests':'Pause tests';
@@ -1462,11 +1459,11 @@ function drawDiskBars(r,w){
   ctx.clearRect(0,0,W,58);
   const mx=Math.max(r,w,1);
   const drawBar=(y,v,col,lbl)=>{
-    ctx.fillStyle='#64748b';ctx.font='9px SF Mono,Consolas,monospace';ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText(lbl,lw-4,y+bh/2);
+    ctx.fillStyle='#64748b';ctx.font='11px SF Mono,Consolas,monospace';ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText(lbl,lw-4,y+bh/2);
     ctx.fillStyle='#1e2d3d';ctx.fillRect(lw,y,W-lw-gy,bh);
     const bw=Math.max(2,(v/mx)*(W-lw-gy));
     ctx.fillStyle=col;ctx.fillRect(lw,y,bw,bh);
-    ctx.fillStyle='#e2e8f0';ctx.textAlign='left';ctx.font='9px SF Mono,Consolas,monospace';ctx.fillText(fmtIO(v),lw+bw+4,y+bh/2);
+    ctx.fillStyle='#e2e8f0';ctx.textAlign='left';ctx.font='11px SF Mono,Consolas,monospace';ctx.fillText(fmtIO(v),lw+bw+4,y+bh/2);
   };
   drawBar(4,r,'#22c55e','Read');drawBar(34,w,'#58a6ff','Write');
 }
@@ -1484,7 +1481,7 @@ function drawNetSpark(cid,hist,rxColor,txColor){
     ctx.strokeStyle=col;ctx.lineWidth=1.5;ctx.lineJoin='round';ctx.stroke();
   };
   drawLine('rx','#22c55e');drawLine('tx','#58a6ff');
-  ctx.fillStyle='#374151';ctx.font='9px SF Mono,Consolas,monospace';ctx.textAlign='left';ctx.fillText(fmtIO(hist[hist.length-1].rx||0)+' rx',P.l,H2-3);
+  ctx.fillStyle='#374151';ctx.font='11px SF Mono,Consolas,monospace';ctx.textAlign='left';ctx.fillText(fmtIO(hist[hist.length-1].rx||0)+' rx',P.l,H2-3);
   ctx.textAlign='right';ctx.fillText(fmtIO(hist[hist.length-1].tx||0)+' tx',P.l+IW,H2-3);
 }
 function applyHealth(d){
@@ -1553,11 +1550,11 @@ function drawSecTrend(hist){
   const mx=100;
   const xOf=i=>P.l+(i/(hist.length-1))*IW,yOf=v=>P.t+IH-(Math.max(0,Math.min(100,v))/mx)*IH;
   ctx.strokeStyle='#1e2d3d';ctx.lineWidth=1;
-  for(let i=0;i<=4;i++){const y=P.t+(i/4)*IH;ctx.beginPath();ctx.moveTo(P.l,y);ctx.lineTo(P.l+IW,y);ctx.stroke();ctx.fillStyle='#374151';ctx.font='9px SF Mono,Consolas,monospace';ctx.textAlign='right';ctx.fillText(Math.round(100*(1-i/4))+'%',P.l-4,y+3);}
+  for(let i=0;i<=4;i++){const y=P.t+(i/4)*IH;ctx.beginPath();ctx.moveTo(P.l,y);ctx.lineTo(P.l+IW,y);ctx.stroke();ctx.fillStyle='#374151';ctx.font='11px SF Mono,Consolas,monospace';ctx.textAlign='right';ctx.fillText(Math.round(100*(1-i/4))+'%',P.l-4,y+3);}
   const drawLine=(key,col,dash)=>{if(dash)ctx.setLineDash(dash);else ctx.setLineDash([]);ctx.beginPath();hist.forEach((p,i)=>{const x=xOf(i),y=yOf(p[key]||0);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});ctx.strokeStyle=col;ctx.lineWidth=2;ctx.lineJoin='round';ctx.stroke();ctx.setLineDash([]);};
   drawLine('block_pct','#f59e0b');
   drawLine('drop_pct','#818cf8',[4,3]);
-  ctx.fillStyle='#374151';ctx.font='9px SF Mono,Consolas,monospace';ctx.textAlign='left';ctx.fillText(Ts(hist[0].t),P.l,H2-3);ctx.textAlign='right';ctx.fillText(Ts(hist[hist.length-1].t),P.l+IW,H2-3);
+  ctx.fillStyle='#374151';ctx.font='11px SF Mono,Consolas,monospace';ctx.textAlign='left';ctx.fillText(Ts(hist[0].t),P.l,H2-3);ctx.textAlign='right';ctx.fillText(Ts(hist[hist.length-1].t),P.l+IW,H2-3);
 }
 function updateSecurityTab(){
   if(!_lastState)return;
@@ -1720,7 +1717,7 @@ html,body{height:100%;overflow:hidden}
 body{background:var(--bg);color:var(--text);font-family:'SF Mono',Consolas,monospace;font-size:15px;display:flex;flex-direction:column}
 .hdr{display:flex;align-items:center;gap:8px;padding:7px 12px;background:var(--surf);border-bottom:1px solid var(--border);flex-shrink:0}
 .title{font-weight:700;font-size:15px;margin-right:auto;color:var(--text)}
-.btn{padding:3px 10px;border-radius:5px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:13px;cursor:pointer}
+.btn{padding:3px 10px;border-radius:5px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:14px;cursor:pointer}
 .btn:hover{border-color:var(--green);color:var(--green)}
 .btn.af{border-color:var(--green);color:var(--green)}
 .fgrp{display:flex;gap:3px}
