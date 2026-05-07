@@ -297,10 +297,21 @@ step "Pulling latest traffgen image"
 docker pull jdibby/traffgen:latest
 
 step "Starting traffgen container"
+
+# Capture the host's LAN IP before the container starts so the lateral-movement
+# suite can scan the real physical network rather than the Docker bridge.
+HOST_LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+if [ -n "$HOST_LAN_IP" ]; then
+    ok "Host LAN IP detected: ${HOST_LAN_IP} (will be passed to container for lateral movement)"
+else
+    echo "WARNING: could not detect host LAN IP — lateral-movement suite will fall back to container network"
+fi
+
 docker run \
     --detach \
     --restart unless-stopped \
     -p 7777:7777 \
+    ${HOST_LAN_IP:+-e HOST_LAN_IP="$HOST_LAN_IP"} \
     --name traffgen \
     jdibby/traffgen:latest \
     --suite=all --size=S --max-wait-secs=20 --loop
