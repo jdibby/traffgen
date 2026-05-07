@@ -1472,13 +1472,16 @@ const SUITE_ICONS={
   'dns':'🔍','dns-exfil':'📤','doh':'🔐','domain-check':'🚫',
   'dot':'🔑','ftp':'📁','http':'🌍','http3':'⚡',
   'https':'🛡️','icmp':'🏓','ids-trigger':'🚨','kyber':'🔮',
-  'malware-agents':'👾','malware-download':'🦠','metasploit-check':'⚔️',
+  'lateral-movement':'🕵️','log4shell':'💥','tls-check':'🔏',
+  'shadow-it':'👥','waf-attack':'🛑','data-exfil-http':'📬',
+  'tor-anonymizer':'🧅',
+  'malware-agents':'👾','malware-download':'🦠','metasploit-check':'🗡️',
   'speedtest':'🚀','nmap':'🗺️','ntp':'🕐','phishing-domains':'🎣',
   'pornography':'🔞','snmp':'📊','squatting':'🔤','s3':'🪣',
   'ssh':'💻','url-response':'⏱️','virus':'☣️','web-scanner':'🔬',
   'all':'✨',
 };
-function suiteIco(n){return(SUITE_ICONS[n]||'◈')+' ';}
+function suiteIco(n){const k=n.replace(/_/g,'-');return(SUITE_ICONS[k]||SUITE_ICONS[n]||'◈')+' ';}
 function showTab(btn){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
