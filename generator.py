@@ -247,7 +247,7 @@ _SUITE_DESCRIPTIONS: list[tuple[str, str]] = [
     ("icmp",             "Ping + traceroute to a set of remote hosts"),
     ("ids-trigger",      "16 Snort/Suricata signatures: scanner UAs + web-attack URL probes → testmyids.com"),
     ("kyber",            "HTTPS HEAD with X25519MLKEM768 post-quantum curves"),
-    ("malware-agents",   "HEAD requests using known malware user-agents"),
+    ("malware-agents",   "HEAD requests to malware-category URLs using C2 framework user-agents (SASE/NGFW)"),
     ("malware-download", "Download known-malware file samples (to /dev/null)"),
     ("metasploit-check", "Run Metasploit .rc check scripts (no exploitation)"),
     ("speedtest",        "fast.com speed-test via fastcli"),
@@ -1331,15 +1331,20 @@ def pornography_crawl() -> None:
 
 def malware_random() -> None:
     """
-    HEAD requests to known malware / C2 domains using realistic malware
-    user-agents.  Tests whether threat-intel feed blocks fire correctly.
-    No payload is downloaded — HEAD only.
+    HEAD requests to malware-category test URLs (WICAR, AMTSO, Google Safe
+    Browsing test domains) using known C2 framework user-agents.
+
+    The URL destinations trigger URL-category blocks on any SASE/NGFW with
+    GSB or AMTSO integration.  The user-agents (Cobalt Strike, Meterpreter,
+    Empire, DarkComet, etc.) trigger C2 UA detection rules independently.
+    Together they exercise both the URL-intel and UA-behavioural detection
+    paths of SASE/SSE/NGFW platforms.
     """
     ui_banner("Malware Agents (HEAD)", "Known malware domains with malware UAs")
     try:
         n = _size_to_limits(ARGS.size, 10, 20, 50, len(malware_endpoints))
         random.shuffle(malware_endpoints)
-        _run_head_batch(malware_endpoints[:n], "MALWARE", malware_user_agents,
+        _run_head_batch(malware_endpoints[:n], "MALWARE", c2_user_agents,
                         connect_timeout=3, max_time=5)
         ui_ok("Malware agent HEAD complete")
     except Exception as e:
@@ -2333,7 +2338,7 @@ def c2_beacon() -> None:
             task = prog.add_task("c2", total=beacons)
             for i in range(1, beacons + 1):
                 target = random.choice(c2_beacon_targets)
-                ua     = random.choice(malware_user_agents)
+                ua     = random.choice(c2_user_agents)
                 # Encode random bytes as the fake "check-in" payload.
                 payload = base64.b64encode(os.urandom(48)).decode()
                 jitter  = random.uniform(1, 5)
