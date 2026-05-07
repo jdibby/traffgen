@@ -88,6 +88,8 @@ def _sample_health() -> None:
     prev_disk  = None
     prev_procs: dict = {}
     prev_ts    = 0.0
+    net_start:  tuple | None = None   # (rx_bytes, tx_bytes) at first sample
+    disk_start: tuple | None = None   # (rd_sectors, wr_sectors) at first sample
 
     while True:
         time.sleep(2)
@@ -127,8 +129,36 @@ def _sample_health() -> None:
                 data["mem_total_mb"] = round(total_kb / 1024, 1)
                 data["mem_used_mb"]  = round(used_kb  / 1024, 1)
                 data["mem_pct"]      = round(used_kb / total_kb * 100, 1) if total_kb > 0 else 0.0
+                swap_total = mem_kb.get("SwapTotal", 0)
+                swap_free  = mem_kb.get("SwapFree",  0)
+                swap_used  = swap_total - swap_free
+                data["swap_total_mb"] = round(swap_total / 1024, 1)
+                data["swap_used_mb"]  = round(swap_used  / 1024, 1)
+                data["swap_pct"]      = round(swap_used / swap_total * 100, 1) if swap_total > 0 else 0.0
             except Exception:
-                data.update({"mem_total_mb": 0, "mem_used_mb": 0, "mem_pct": 0.0})
+                data.update({"mem_total_mb": 0, "mem_used_mb": 0, "mem_pct": 0.0,
+                             "swap_total_mb": 0, "swap_used_mb": 0, "swap_pct": 0.0})
+
+            # Thread count + open FDs (self)
+            try:
+                with open("/proc/self/status") as f:
+                    for ln in f:
+                        if ln.startswith("Threads:"):
+                            data["thread_count"] = int(ln.split()[1])
+                            break
+            except Exception:
+                data["thread_count"] = 0
+            try:
+                data["fd_count"] = len(os.listdir("/proc/self/fd"))
+            except Exception:
+                data["fd_count"] = 0
+
+            # System uptime
+            try:
+                with open("/proc/uptime") as f:
+                    data["uptime_secs"] = float(f.read().split()[0])
+            except Exception:
+                data["uptime_secs"] = 0.0
 
             # Disk I/O
             try:
@@ -144,6 +174,10 @@ def _sample_health() -> None:
                             continue
                         rd += int(p[5]);  wr += int(p[9])
                 cur_d = (rd, wr, now)
+                if disk_start is None:
+                    disk_start = (rd, wr)
+                data["disk_rd_total_mb"] = round(max(0, (rd - disk_start[0]) * 512) / 1024 / 1024, 1)
+                data["disk_wr_total_mb"] = round(max(0, (wr - disk_start[1]) * 512) / 1024 / 1024, 1)
                 if prev_disk:
                     dt2 = now - prev_disk[2]
                     if dt2 > 0:
@@ -222,6 +256,10 @@ def _sample_health() -> None:
                         net_rx += int(p[1])   # bytes received
                         net_tx += int(p[9])   # bytes transmitted
                 cur_net = (net_rx, net_tx, now)
+                if net_start is None:
+                    net_start = (net_rx, net_tx)
+                data["net_rx_total_mb"] = round(max(0, net_rx - net_start[0]) / 1024 / 1024, 1)
+                data["net_tx_total_mb"] = round(max(0, net_tx - net_start[1]) / 1024 / 1024, 1)
                 prev_net = _health_cache.get("_net_raw")
                 if prev_net:
                     dt4 = now - prev_net[2]
@@ -974,6 +1012,39 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
           <div><div style="font-size:9px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)">&#9650; Transmit</div><div id="h-tx" class="c-blue" style="font-size:20px;font-weight:700;margin-top:3px">&#8212;</div></div>
         </div>
         <canvas id="h-net-spark" width="600" height="60" style="width:100%;margin-top:10px"></canvas>
+        <div style="display:flex;gap:24px;margin-top:10px;font-family:'SF Mono',Consolas,monospace;font-size:12px;color:var(--muted)">
+          <span>&#8595; cumulative: <span id="cum-rx" style="color:var(--green)">&#8212;</span></span>
+          <span>&#8593; cumulative: <span id="cum-tx" style="color:var(--blue)">&#8212;</span></span>
+        </div>
+      </div>
+      <div class="h-row">
+        <div class="cc">
+          <div class="ctitle">Swap Usage <span id="swap-pct" style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim)"></span></div>
+          <div id="swap-detail" style="font-family:'SF Mono',Consolas,monospace;font-size:12px;color:var(--muted);margin-top:4px">&#8212; MB / &#8212; MB used</div>
+          <div style="background:#1e2d3d;border-radius:4px;height:8px;margin-top:8px;overflow:hidden">
+            <div id="swap-bar" style="height:100%;background:var(--amber);width:0%;transition:width .4s ease"></div>
+          </div>
+        </div>
+        <div class="cc">
+          <div class="ctitle">Cumulative Disk I/O <span style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim);font-size:10px">since start</span></div>
+          <div style="display:flex;gap:16px;margin-top:6px;font-family:'SF Mono',Consolas,monospace;font-size:12px">
+            <span><span style="color:var(--muted)">Read: </span><span id="cum-drd" style="color:var(--green)">&#8212;</span></span>
+            <span><span style="color:var(--muted)">Write: </span><span id="cum-dwr" style="color:var(--blue)">&#8212;</span></span>
+          </div>
+        </div>
+      </div>
+      <div class="h-row">
+        <div class="cc">
+          <div class="ctitle">System Uptime</div>
+          <div id="sys-uptime" style="font-family:'SF Mono',Consolas,monospace;font-size:18px;color:var(--green);padding:8px 0 4px">&#8212;</div>
+        </div>
+        <div class="cc">
+          <div class="ctitle">Process Internals</div>
+          <div style="display:flex;gap:20px;margin-top:6px;font-family:'SF Mono',Consolas,monospace;font-size:12px">
+            <span><span style="color:var(--muted)">Threads: </span><span id="h-threads" style="color:var(--text)">&#8212;</span></span>
+            <span><span style="color:var(--muted)">Open FDs: </span><span id="h-fds" style="color:var(--text)">&#8212;</span></span>
+          </div>
+        </div>
       </div>
       <div class="tcard">
         <div class="thdr">Top Processes <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:10px">sorted by CPU</span></div>
@@ -1483,6 +1554,8 @@ function drawNetSpark(cid,hist,rxColor,txColor){
   ctx.fillStyle='#374151';ctx.font='9px SF Mono,Consolas,monospace';ctx.textAlign='left';ctx.fillText(fmtIO(hist[hist.length-1].rx||0)+' rx',P.l,H2-3);
   ctx.textAlign='right';ctx.fillText(fmtIO(hist[hist.length-1].tx||0)+' tx',P.l+IW,H2-3);
 }
+function fmtUptime(s){const d=Math.floor(s/86400),h=Math.floor((s%86400)/3600),m=Math.floor((s%3600)/60);return(d?d+'d ':'')+h+'h '+m+'m';}
+function fmtMB(v){return v>=1024?(v/1024).toFixed(2)+' GB':v.toFixed(0)+' MB';}
 function applyHealth(d){
   if(!d)return;
   _lastHealth=d;
@@ -1512,6 +1585,19 @@ function applyHealth(d){
   if($('h-tx'))$('h-tx').textContent=fmtIO(tx);
   _hNetHist.push({rx,tx,t:Date.now()/1000});if(_hNetHist.length>60)_hNetHist.shift();
   drawNetSpark('h-net-spark',_hNetHist,'#22c55e','#58a6ff');
+  if($('cum-rx'))$('cum-rx').textContent=fmtMB(d.net_rx_total_mb||0);
+  if($('cum-tx'))$('cum-tx').textContent=fmtMB(d.net_tx_total_mb||0);
+  if($('cum-drd'))$('cum-drd').textContent=fmtMB(d.disk_rd_total_mb||0);
+  if($('cum-dwr'))$('cum-dwr').textContent=fmtMB(d.disk_wr_total_mb||0);
+  // Swap
+  const swapPct=d.swap_pct||0;
+  if($('swap-detail'))$('swap-detail').textContent=(d.swap_used_mb||0).toFixed(0)+' MB / '+(d.swap_total_mb||0).toFixed(0)+' MB used';
+  if($('swap-bar'))$('swap-bar').style.width=Math.min(100,swapPct)+'%';
+  if($('swap-pct'))$('swap-pct').textContent=swapPct.toFixed(1)+'%';
+  // System uptime + process internals
+  if($('sys-uptime'))$('sys-uptime').textContent=fmtUptime(d.uptime_secs||0);
+  if($('h-threads'))$('h-threads').textContent=d.thread_count||'—';
+  if($('h-fds'))$('h-fds').textContent=d.fd_count||'—';
   const procs=d.processes||[];
   const tb=$('proc-body');
   if(tb)tb.innerHTML=!procs.length?'<tr><td colspan="5" class="empty">No data</td></tr>':
