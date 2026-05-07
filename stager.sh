@@ -4,18 +4,26 @@
 # Idempotent: skips Docker install if already running, skips container
 # start if already running under the name "traffgen".
 #
-# Supported distros:
+# Supported platforms:
+#   macOS         : 12 Monterey and later (requires Homebrew)
 #   Debian family : Ubuntu, Debian, Linux Mint, Pop!_OS
 #   Raspberry Pi  : Raspbian (Pi 4 ARMv7 / Pi 5 arm64)
 #   RHEL family   : Rocky Linux, AlmaLinux, CentOS Stream, RHEL, Fedora
 #   Amazon Linux  : Amazon Linux 2 and Amazon Linux 2023
 #
-# Usage:
+# Usage (Linux — requires sudo):
 #   curl -sk https://raw.githubusercontent.com/jdibby/traffgen/refs/heads/main/stager.sh | sudo bash
+#
+# Usage (macOS — do NOT use sudo; Homebrew cannot run as root):
+#   curl -sk https://raw.githubusercontent.com/jdibby/traffgen/refs/heads/main/stager.sh | bash
 
 set -euo pipefail
 
+# ── Early platform detection (needed before privilege check and banner) ────────
+_UNAME=$(uname -s 2>/dev/null || echo "Linux")
+
 # ── Warning banner ────────────────────────────────────────────────────────────
+if [ "$_UNAME" = "Darwin" ]; then
 cat <<'BANNER'
 
 ================================================================================
@@ -24,8 +32,42 @@ cat <<'BANNER'
 
   This script will make the following changes to your system:
 
-    1. apt update        - refresh package index
-    2. apt upgrade       - upgrade ALL installed packages
+    1. brew update       - refresh Homebrew package index
+    2. brew upgrade      - upgrade all Homebrew packages
+    3. Install Docker    - Docker Desktop via: brew install --cask docker
+    4. Launch Docker     - open Docker Desktop and wait for daemon
+    5. Remove containers - stop and remove ALL existing Docker containers
+    6. Prune images      - delete ALL Docker images, volumes, build cache
+    7. Pull image        - jdibby/traffgen:latest from Docker Hub
+    8. Start container   - port 7777, restart unless-stopped
+
+  NOTE: Steps 5 & 6 will permanently DELETE all existing containers and
+  images on this host. Run on a dedicated machine, or review the script
+  at https://github.com/jdibby/traffgen/blob/main/stager.sh before use.
+
+  NOTE: macOS does not support --network=host. The lateral-movement suite
+  will be limited to the Docker bridge network, not your physical LAN.
+
+--------------------------------------------------------------------------------
+
+  DISCLAIMER: For AUTHORIZED SECURITY TESTING AND RESEARCH only.
+  You are solely responsible for obtaining explicit written permission
+  before testing any systems or networks. The author(s) accept NO
+  liability for misuse, unauthorized access, damage, or data loss.
+
+================================================================================
+BANNER
+else
+cat <<'BANNER'
+
+================================================================================
+            TRAFFGEN STAGER -- SYSTEM CHANGES WARNING
+================================================================================
+
+  This script will make the following changes to your system:
+
+    1. apt/dnf update    - refresh package index
+    2. apt/dnf upgrade   - upgrade ALL installed packages
     3. Install deps      - ca-certificates, curl, gnupg, lsb-release
     4. Install Docker CE - docker-ce, docker-ce-cli, containerd.io,
                            docker-buildx-plugin, docker-compose-plugin
@@ -48,6 +90,7 @@ cat <<'BANNER'
 
 ================================================================================
 BANNER
+fi
 
 # Read acceptance — works both interactively and when piped via curl | bash
 printf '\nDo you accept these terms and wish to continue? [y/N] '
@@ -58,7 +101,7 @@ else
     read -r _ACCEPT < /dev/tty 2>/dev/null || {
         echo ""
         echo "ERROR: No terminal available for interactive input." >&2
-        echo "       Save the script and run it directly: sudo bash stager.sh" >&2
+        echo "       Save the script and run it directly: bash stager.sh" >&2
         exit 1
     }
 fi
@@ -72,9 +115,19 @@ case "${_ACCEPT}" in
 esac
 
 # ── Privilege check ───────────────────────────────────────────────────────────
-if [ "$(id -u)" -ne 0 ]; then
-    echo "ERROR: Run as root or via sudo." >&2
-    exit 1
+if [ "$_UNAME" = "Darwin" ]; then
+    # Homebrew must NOT be run as root.
+    if [ "$(id -u)" -eq 0 ]; then
+        echo "ERROR: On macOS, run WITHOUT sudo — Homebrew cannot run as root." >&2
+        echo "       Usage: curl -sk <url>/stager.sh | bash" >&2
+        exit 1
+    fi
+    _REAL_USER="$(id -un)"
+else
+    if [ "$(id -u)" -ne 0 ]; then
+        echo "ERROR: Run as root or via sudo." >&2
+        exit 1
+    fi
 fi
 
 # ── Terminal helpers ──────────────────────────────────────────────────────────
@@ -116,59 +169,62 @@ fi
 ID_LIKE_LOWER=$(echo "${ID_LIKE:-}" | tr '[:upper:]' '[:lower:]')
 
 is_like() {
-    # Returns 0 if $ID or $ID_LIKE contains the given string
     local needle="$1"
     [ "${ID:-}" = "$needle" ] && return 0
     echo "$ID_LIKE_LOWER" | grep -qw "$needle" && return 0
     return 1
 }
 
-PKG_FAMILY=""  # "deb", "rpm-rhel", or "rpm-amzn"
+PKG_FAMILY=""  # "mac", "deb", "rpm-rhel", or "rpm-amzn"
 
-case "${ID:-}" in
-    raspbian)
-        PKG_FAMILY="deb"
-        OS_LABEL="Raspbian (Pi ${RPIVER})"
-        ;;
-    ubuntu|linuxmint|pop)
-        PKG_FAMILY="deb"
-        OS_LABEL="${PRETTY_NAME:-Ubuntu-family}"
-        ;;
-    debian)
-        PKG_FAMILY="deb"
-        OS_LABEL="${PRETTY_NAME:-Debian}"
-        ;;
-    amzn)
-        PKG_FAMILY="rpm-amzn"
-        OS_LABEL="Amazon Linux ${VERSION_ID:-}"
-        ;;
-    fedora|rhel|rocky|almalinux|centos)
-        PKG_FAMILY="rpm-rhel"
-        OS_LABEL="${PRETTY_NAME:-RHEL-family}"
-        ;;
-    *)
-        # Fallback: try ID_LIKE
-        if is_like "debian" || is_like "ubuntu"; then
+if [ "$_UNAME" = "Darwin" ]; then
+    PKG_FAMILY="mac"
+    OS_LABEL="macOS $(sw_vers -productVersion 2>/dev/null || echo '')"
+else
+    case "${ID:-}" in
+        raspbian)
             PKG_FAMILY="deb"
-            OS_LABEL="${PRETTY_NAME:-Debian-like}"
-        elif is_like "rhel" || is_like "fedora"; then
+            OS_LABEL="Raspbian (Pi ${RPIVER})"
+            ;;
+        ubuntu|linuxmint|pop)
+            PKG_FAMILY="deb"
+            OS_LABEL="${PRETTY_NAME:-Ubuntu-family}"
+            ;;
+        debian)
+            PKG_FAMILY="deb"
+            OS_LABEL="${PRETTY_NAME:-Debian}"
+            ;;
+        amzn)
+            PKG_FAMILY="rpm-amzn"
+            OS_LABEL="Amazon Linux ${VERSION_ID:-}"
+            ;;
+        fedora|rhel|rocky|almalinux|centos)
             PKG_FAMILY="rpm-rhel"
-            OS_LABEL="${PRETTY_NAME:-RHEL-like}"
-        else
-            echo "ERROR: Unsupported OS (ID=${ID:-unknown}). Open an issue at https://github.com/jdibby/traffgen" >&2
-            exit 1
-        fi
-        ;;
-esac
+            OS_LABEL="${PRETTY_NAME:-RHEL-family}"
+            ;;
+        *)
+            # Fallback: try ID_LIKE
+            if is_like "debian" || is_like "ubuntu"; then
+                PKG_FAMILY="deb"
+                OS_LABEL="${PRETTY_NAME:-Debian-like}"
+            elif is_like "rhel" || is_like "fedora"; then
+                PKG_FAMILY="rpm-rhel"
+                OS_LABEL="${PRETTY_NAME:-RHEL-like}"
+            else
+                echo "ERROR: Unsupported OS (ID=${ID:-unknown}). Open an issue at https://github.com/jdibby/traffgen" >&2
+                exit 1
+            fi
+            ;;
+    esac
+fi
 
 ok "Detected: ${OS_LABEL}"
 
-# ── Remove duplicate package source entries ───────────────────────────────────
+# ── Remove duplicate package source entries (Linux deb/rpm only) ──────────────
 # On re-runs or systems where Docker was previously added via add-apt-repository
 # or a third-party script, an auto-named file like
 # archive_uri-https_download_docker_com_linux_ubuntu-jammy.list can coexist
 # with our canonical docker.list, causing 'configured multiple times' warnings.
-# Remove any conflicting Docker source files before apt-get update runs.
 if [ "$PKG_FAMILY" = "deb" ]; then
     for _f in /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
         [ -f "$_f" ] || continue
@@ -189,6 +245,15 @@ fi
 step "Updating and upgrading system packages"
 
 case "$PKG_FAMILY" in
+    mac)
+        if ! command -v brew >/dev/null 2>&1; then
+            echo "ERROR: Homebrew is not installed." >&2
+            echo "       Install it from https://brew.sh then re-run this script." >&2
+            exit 1
+        fi
+        brew update
+        brew upgrade
+        ;;
     deb)
         export DEBIAN_FRONTEND=noninteractive
         export NEEDRESTART_MODE=a
@@ -217,6 +282,26 @@ else
     step "Installing Docker"
 
     case "$PKG_FAMILY" in
+
+        mac)
+            brew install --cask docker
+            ok "Docker Desktop installed — launching..."
+            open -a Docker
+            step "Waiting for Docker Desktop to start (this may take up to 60 seconds)"
+            _tries=0
+            until docker info &>/dev/null 2>&1; do
+                _tries=$((_tries + 1))
+                if [ "$_tries" -ge 30 ]; then
+                    echo "" >&2
+                    echo "ERROR: Docker Desktop did not start within 60 seconds." >&2
+                    echo "       Open Docker Desktop from Applications and re-run this script." >&2
+                    exit 1
+                fi
+                printf '.'
+                sleep 2
+            done
+            echo ""
+            ;;
 
         deb)
             export DEBIAN_FRONTEND=noninteractive
@@ -307,23 +392,44 @@ docker pull jdibby/traffgen:latest
 step "Starting traffgen container"
 
 # Capture the host's LAN IP and subnet prefix before the container starts.
-# This lets the lateral-movement suite scan the real physical network.
-# We grab both the IP and the prefix length (/24, /32, etc.) so the scanner
-# knows the actual network size.  If the prefix is /32 (microsegmentation),
-# the suite will assume /24 and note that microsegmentation is detected.
-HOST_LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+# This lets the lateral-movement suite and Network Info widget use the real
+# host IP instead of the Docker bridge address.
+HOST_LAN_IP=""
 HOST_LAN_CIDR=""
-if [ -n "$HOST_LAN_IP" ]; then
-    _PREFIX=24  # safe default
-    if command -v ip >/dev/null 2>&1; then
-        _P=$(ip -o -f inet addr 2>/dev/null \
-             | awk -v h="$HOST_LAN_IP" 'index($4, h"/")>0 {split($4,a,"/"); print a[2]; exit}')
-        [ -n "$_P" ] && _PREFIX="$_P"
+
+if [ "$_UNAME" = "Darwin" ]; then
+    # macOS: try Wi-Fi (en0) then Ethernet (en1) then any non-loopback inet addr
+    HOST_LAN_IP=$(ipconfig getifaddr en0 2>/dev/null || \
+                  ipconfig getifaddr en1 2>/dev/null || \
+                  ifconfig 2>/dev/null | awk '/inet / && !/127\.0\.0\.1/{print $2; exit}')
+    if [ -n "$HOST_LAN_IP" ]; then
+        # Convert hex netmask (e.g. 0xffffff00) to CIDR prefix length via python3
+        _HEX_MASK=$(ifconfig 2>/dev/null | awk -v ip="$HOST_LAN_IP" '$2==ip{print $4}' | sed 's/0x//')
+        _PREFIX=24  # safe default
+        if [ -n "$_HEX_MASK" ] && command -v python3 >/dev/null 2>&1; then
+            _PREFIX=$(python3 -c "print(bin(int('${_HEX_MASK}',16)).count('1'))" 2>/dev/null || echo 24)
+        fi
+        HOST_LAN_CIDR="${HOST_LAN_IP}/${_PREFIX}"
+        ok "Host LAN detected: ${HOST_LAN_CIDR} (passed to container for Network Info widget)"
+        echo "  Note: --network=host is not supported on macOS — lateral-movement suite"
+        echo "        will be limited to the Docker bridge network."
+    else
+        echo "WARNING: could not detect host LAN IP"
     fi
-    HOST_LAN_CIDR="${HOST_LAN_IP}/${_PREFIX}"
-    ok "Host LAN detected: ${HOST_LAN_CIDR} (passed to container for lateral movement)"
 else
-    echo "WARNING: could not detect host LAN — lateral-movement suite will fall back to container network"
+    HOST_LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+    if [ -n "$HOST_LAN_IP" ]; then
+        _PREFIX=24  # safe default
+        if command -v ip >/dev/null 2>&1; then
+            _P=$(ip -o -f inet addr 2>/dev/null \
+                 | awk -v h="$HOST_LAN_IP" 'index($4, h"/")>0 {split($4,a,"/"); print a[2]; exit}')
+            [ -n "$_P" ] && _PREFIX="$_P"
+        fi
+        HOST_LAN_CIDR="${HOST_LAN_IP}/${_PREFIX}"
+        ok "Host LAN detected: ${HOST_LAN_CIDR} (passed to container for lateral movement)"
+    else
+        echo "WARNING: could not detect host LAN — lateral-movement suite will fall back to container network"
+    fi
 fi
 
 docker run \
@@ -343,7 +449,16 @@ echo "${BOLD}━━━━━━━━━━━━━━━━━━━━━━�
 echo "${BOLD}  Install complete${RESET}"
 echo ""
 docker ps --filter "name=^traffgen$" --format "  Container : {{.Names}}  ({{.Status}})"
-HOST_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")
+
+if [ "$_UNAME" = "Darwin" ]; then
+    HOST_IP=$(ipconfig getifaddr en0 2>/dev/null || \
+              ipconfig getifaddr en1 2>/dev/null || \
+              ifconfig 2>/dev/null | awk '/inet / && !/127\.0\.0\.1/{print $2; exit}' || \
+              echo "localhost")
+else
+    HOST_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")
+fi
+
 echo ""
 echo "  ${BOLD}Web dashboard : ${GREEN}https://${HOST_IP}:7777${RESET}"
 echo "  (Accept the self-signed certificate warning in your browser)"

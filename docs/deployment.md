@@ -25,13 +25,28 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=nmap --size=L
 
 ## Automated Deployment
 
-`stager.sh` installs Docker (if needed) and starts the container on a fresh host. Supports Ubuntu, Debian, Rocky Linux, and Raspberry Pi 4/5.
+`stager.sh` installs Docker (if needed) and starts the container on a fresh host.
 
+**Supported platforms:**
+- macOS 12 Monterey and later (requires [Homebrew](https://brew.sh))
+- Ubuntu, Debian, Linux Mint, Pop!_OS
+- Raspberry Pi 4/5 (Raspbian)
+- Rocky Linux, AlmaLinux, CentOS Stream, RHEL, Fedora
+- Amazon Linux 2 and 2023
+
+**Linux** (requires sudo):
 ```bash
 curl -sk https://raw.githubusercontent.com/jdibby/traffgen/refs/heads/main/stager.sh | sudo bash
 ```
 
-`stager.sh` also captures the host's LAN IP and subnet prefix before the container starts, injecting them as `HOST_LAN_CIDR` so the `lateral-movement` suite and the Network Info widget use the real host IP instead of the Docker bridge address.
+**macOS** (do NOT use sudo — Homebrew cannot run as root):
+```bash
+curl -sk https://raw.githubusercontent.com/jdibby/traffgen/refs/heads/main/stager.sh | bash
+```
+
+On macOS, `stager.sh` installs Docker Desktop via `brew install --cask docker`, launches it, and waits for the daemon to be ready. Note that `--network=host` is not supported on macOS Docker Desktop, so the `lateral-movement` suite will be limited to the Docker bridge network.
+
+`stager.sh` captures the host's LAN IP and subnet prefix before the container starts, injecting them as `HOST_LAN_CIDR` so the Network Info widget and `lateral-movement` suite use the real host IP instead of the Docker bridge address.
 
 ---
 
