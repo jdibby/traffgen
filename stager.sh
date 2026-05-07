@@ -163,6 +163,28 @@ esac
 
 ok "Detected: ${OS_LABEL}"
 
+# ── Remove duplicate package source entries ───────────────────────────────────
+# On re-runs or systems where Docker was previously added via add-apt-repository
+# or a third-party script, an auto-named file like
+# archive_uri-https_download_docker_com_linux_ubuntu-jammy.list can coexist
+# with our canonical docker.list, causing 'configured multiple times' warnings.
+# Remove any conflicting Docker source files before apt-get update runs.
+if [ "$PKG_FAMILY" = "deb" ]; then
+    for _f in /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+        [ -f "$_f" ] || continue
+        [ "$(basename "$_f")" = "docker.list" ] && continue
+        if grep -q "download\.docker\.com" "$_f" 2>/dev/null; then
+            rm -f "$_f"
+            ok "Removed duplicate Docker source: $(basename "$_f")"
+        fi
+    done
+fi
+if [ "$PKG_FAMILY" = "rpm-rhel" ]; then
+    # dnf config-manager --add-repo is not idempotent on all versions; remove
+    # any existing Docker CE repo file before we add it so there's no duplicate.
+    rm -f /etc/yum.repos.d/docker-ce.repo /etc/yum.repos.d/docker-ce-fedora.repo 2>/dev/null || true
+fi
+
 # ── System package update & upgrade ──────────────────────────────────────────
 step "Updating and upgrading system packages"
 
@@ -199,20 +221,6 @@ else
         deb)
             export DEBIAN_FRONTEND=noninteractive
             export NEEDRESTART_MODE=a
-
-            # Minimal APT source deduplication to avoid 'duplicate' warnings
-            _dedup_apt() {
-                local _awk='/^[[:space:]]*$/{next}/^[[:space:]]*#/{next}!seen[$0]++'
-                [ -f /etc/apt/sources.list ] && \
-                    awk "$_awk" /etc/apt/sources.list > /tmp/_src && \
-                    mv /tmp/_src /etc/apt/sources.list
-                for f in /etc/apt/sources.list.d/*.list; do
-                    [ -f "$f" ] || continue
-                    awk "$_awk" "$f" > /tmp/_src && mv /tmp/_src "$f"
-                    [ -s "$f" ] || rm -f "$f"
-                done
-            }
-            _dedup_apt
 
             apt-get -qq update
             apt-get -qq install -y ca-certificates curl gnupg lsb-release
