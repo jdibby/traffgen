@@ -24,7 +24,7 @@ This tool is intended for **authorized security testing and research in controll
 ```bash
 # Run all suites in a continuous loop
 docker run --pull=always --detach --restart unless-stopped \
-  --network=host --name traffgen jdibby/traffgen:latest \
+  -p 7777:7777 --name traffgen jdibby/traffgen:latest \
   --suite=all --size=S --max-wait-secs=20 --loop
 
 # Then open the dashboard
