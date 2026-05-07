@@ -1308,15 +1308,20 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
       </div>
       <div class="a-section">
         <div class="a-h">Quick Start</div>
-        <div class="cmd-blk"><span class="cmt"># Run all suites in a continuous loop with web dashboard</span>
+        <div class="cmd-blk"><span class="cmt"># With web dashboard (https://&lt;host&gt;:7777)</span>
 docker run --pull=always --detach --restart unless-stopped \
   <span class="flg">-p 7777:7777</span> --name traffgen jdibby/traffgen:latest \
   --suite=all --size=S --max-wait-secs=20 --loop
 
-<span class="cmt"># One-command install on fresh host (Ubuntu / Debian / Rocky / Raspberry Pi)</span>
-sudo bash &lt; &lt;(curl -s https://raw.githubusercontent.com/jdibby/traffgen/refs/heads/main/stager.sh)
+<span class="cmt"># Headless — no web dashboard, log output only</span>
+docker run --pull=always --detach --restart unless-stopped \
+  --name traffgen jdibby/traffgen:latest \
+  --suite=all --size=S --max-wait-secs=20 --loop
 
-<span class="cmt"># Run a specific suite once</span>
+<span class="cmt"># One-command install on fresh host (interactive — asks suite, size, UI options)</span>
+sudo bash &lt; &lt;(curl -sk https://raw.githubusercontent.com/jdibby/traffgen/refs/heads/main/stager.sh)
+
+<span class="cmt"># Run a specific suite once (interactive terminal output)</span>
 docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
       </div>
       <div class="a-section">

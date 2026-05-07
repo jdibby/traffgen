@@ -23,9 +23,71 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=nmap --size=L
 
 ---
 
+## Running Without the Web Dashboard (Headless)
+
+Use headless mode when you want minimal overhead, clean log output, or are running on a host where port 7777 is unavailable. There is no port mapping and no HTTPS server — traffgen runs and logs results to stdout/stderr only.
+
+```bash
+# Continuous loop — all suites, medium intensity, headless
+docker run --pull=always --detach --restart unless-stopped \
+  --name traffgen jdibby/traffgen:latest \
+  --suite=all --size=M --max-wait-secs=20 --loop
+
+# Run a single suite once, interactive (output in terminal)
+docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L
+
+# Tail logs from a running headless container
+docker logs -f traffgen
+```
+
+---
+
+## Running With the Web Dashboard
+
+The web dashboard runs on HTTPS port 7777. It provides live test status, security trend charts, network I/O, health stats, and controls to pause/stop/reconfigure tests without restarting the container.
+
+### Standard — expose port 7777
+
+Works on Linux, macOS, and Windows Docker Desktop. The `lateral-movement` suite is limited to the Docker bridge network.
+
+```bash
+docker run --pull=always --detach --restart unless-stopped \
+  -p 7777:7777 --name traffgen jdibby/traffgen:latest \
+  --suite=all --size=S --max-wait-secs=20 --loop
+```
+
+Open `https://<host-ip>:7777` — accept the self-signed certificate warning on first visit.
+
+### Host networking — full LAN access (Linux only)
+
+`--network=host` shares the host's network namespace, giving the `lateral-movement` suite access to your physical LAN for realistic host discovery scans. The dashboard is available at port 7777 without an explicit mapping.
+
+```bash
+docker run --pull=always --detach --restart unless-stopped \
+  --network=host --name traffgen jdibby/traffgen:latest \
+  --suite=all --size=S --max-wait-secs=20 --loop
+```
+
+> **Note:** `--network=host` does not work on Docker Desktop for Mac or Windows.
+
+---
+
 ## Automated Deployment
 
-`stager.sh` installs Docker (if needed) and starts the container on a fresh host.
+`stager.sh` installs Docker (if needed), asks you a set of configuration questions, then starts the container on a fresh host.
+
+**Configuration prompts** — stager.sh asks:
+
+| Prompt | Options | Default |
+|---|---|---|
+| Suite to run | any suite name or `all` | `all` |
+| Traffic intensity | `XS` `S` `M` `L` `XL` | `S` |
+| Run in a loop | yes / no | yes |
+| Max wait between tests | seconds | `20` |
+| Enable web dashboard | yes / no | yes |
+| Use host networking *(Linux only)* | yes / no | no |
+
+Based on your answers, stager.sh builds and runs the appropriate `docker run` command.
 
 **Supported platforms:**
 - macOS 12 Monterey and later (requires [Homebrew](https://brew.sh))
