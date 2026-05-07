@@ -559,25 +559,25 @@ html,body{height:100%;overflow:hidden}
 body{display:flex;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;font-size:13px;line-height:1.5}
 .sidebar{width:var(--sw);background:var(--sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;height:100vh;overflow-y:auto}
 .sb-logo{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--border)}
-.logo-name{font-weight:700;font-size:15px;letter-spacing:-.3px;color:var(--text)}
-.nav-lbl{padding:14px 16px 4px;font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
-.nav-item{display:flex;align-items:center;gap:9px;padding:7px 16px 7px 13px;color:var(--muted);cursor:pointer;border:none;background:none;width:100%;text-align:left;font-size:13px;border-left:3px solid transparent;transition:all .12s}
+.logo-name{font-weight:700;font-size:17px;letter-spacing:-.3px;color:var(--text)}
+.nav-lbl{padding:14px 16px 4px;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 16px 8px 13px;color:var(--muted);cursor:pointer;border:none;background:none;width:100%;text-align:left;font-size:15px;border-left:3px solid transparent;transition:all .12s}
 .nav-item:hover{color:var(--text);background:rgba(255,255,255,.04)}
 .nav-item.active{color:var(--green);background:var(--gdim);border-left-color:var(--green);font-weight:500}
-.nav-ico{width:16px;text-align:center;font-size:13px;opacity:.75}
+.nav-ico{width:18px;text-align:center;font-size:15px;opacity:.75}
 .sb-foot{margin-top:auto;padding:12px 16px;border-top:1px solid var(--border)}
-.sb-foot div{font-size:10px;color:var(--dim);margin-top:2px}
+.sb-foot div{font-size:12px;color:var(--dim);margin-top:2px}
 .main{flex:1;display:flex;flex-direction:column;min-width:0;height:100vh;overflow:hidden}
-.topbar{height:48px;display:flex;align-items:center;gap:8px;padding:0 18px;border-bottom:1px solid var(--border);background:var(--sidebar);flex-shrink:0}
-.pg-title{font-size:14px;font-weight:700;color:var(--text);letter-spacing:-.2px;margin-right:auto}
-.tp-pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:500;border:1px solid;white-space:nowrap}
+.topbar{height:52px;display:flex;align-items:center;gap:8px;padding:0 18px;border-bottom:1px solid var(--border);background:var(--sidebar);flex-shrink:0}
+.pg-title{font-size:16px;font-weight:700;color:var(--text);letter-spacing:-.2px;margin-right:auto}
+.tp-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 11px;border-radius:20px;font-size:13px;font-weight:500;border:1px solid;white-space:nowrap}
 .tp-running{border-color:var(--green);color:var(--green)}
 .tp-paused{border-color:var(--amber);color:var(--amber)}
 .tp-stopped{border-color:var(--red);color:var(--red)}
 .tp-dim{border-color:var(--muted);color:var(--muted)}
 .pulse{width:6px;height:6px;border-radius:50%;background:currentColor;animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-.ico-btn{width:30px;height:30px;border-radius:var(--r);border:1px solid var(--border2);background:var(--surf);color:var(--muted);cursor:pointer;display:grid;place-items:center;font-size:14px;transition:all .12s;flex-shrink:0}
+.ico-btn{width:33px;height:33px;border-radius:var(--r);border:1px solid var(--border2);background:var(--surf);color:var(--muted);cursor:pointer;display:grid;place-items:center;font-size:16px;transition:all .12s;flex-shrink:0}
 .ico-btn:hover{border-color:var(--green);color:var(--green)}
 .ico-btn.danger:hover{border-color:var(--red);color:var(--red)}
 .content{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column}
