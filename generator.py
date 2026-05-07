@@ -3710,57 +3710,95 @@ def tor_anonymizer() -> None:
 def _detect_host_lan() -> "tuple[str, str] | None":
     """Return (gateway_ip, subnet/24) for the physical LAN the Docker host uses.
 
-    Two strategies:
-      1. Parse ``ip route show`` for non-docker RFC1918 connected subnets.
-         Works when the container has a secondary interface on the host LAN or
-         runs with --network=host.
-      2. Traceroute to 8.8.8.8 (max 4 hops); the first RFC1918 hop that is NOT
-         the Docker bridge (172.16-31.x) is the real LAN gateway.
+    Strategies (tried in order):
+      1. Parse /proc/net/route — no external tools required. Finds connected
+         routes (gateway=0.0.0.0, flags RTF_UP) on non-loopback interfaces,
+         skipping docker bridge (172.16-31.x) and loopback (127.x).
+         Falls back to the default-route gateway's /24 if no connected
+         non-docker subnet is found.
+      2. ``ip route show`` — for environments where ip(8) is available.
+      3. Traceroute to 8.8.8.8, take first non-docker hop (no RFC1918 filter
+         since lab environments may use non-standard ranges).
     """
+    import socket as _socket
+    import struct as _struct
     import re as _re
 
+    _LOOPBACK = _re.compile(r"^127\.")
     _DOCKER_BRIDGE = _re.compile(r"^172\.(1[6-9]|2[0-9]|3[01])\.")
-    _RFC1918 = _re.compile(r"^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)")
+
+    def _hex_to_ip(h: str) -> str:
+        return _socket.inet_ntoa(_struct.pack("<I", int(h, 16)))
 
     def _to_24(ip: str) -> str:
         return ".".join(ip.split(".")[:3]) + ".0/24"
 
-    # Strategy 1 — connected routes that are not docker-bridge interfaces
+    # Strategy 1 — /proc/net/route (no tools needed, works in any container)
     try:
-        r = subprocess.run(["ip", "route", "show"],
-                           capture_output=True, text=True, timeout=5)
-        for line in r.stdout.splitlines():
-            m = _re.match(r"^(\d+\.\d+\.\d+\.\d+)/(\d+)\s+dev\s+(\S+)", line)
-            if not m:
-                continue
-            ip_base, iface = m.group(1), m.group(3)
-            if iface in ("lo",):
-                continue
-            if iface.startswith(("docker", "br-", "veth")):
-                continue
-            if _DOCKER_BRIDGE.match(ip_base):
-                continue
-            if _RFC1918.match(ip_base):
-                gw = ".".join(ip_base.split(".")[:3]) + ".1"
-                return gw, ip_base + "/24"
+        default_gw: str | None = None
+        with open("/proc/net/route") as _f:
+            for _line in _f.readlines()[1:]:
+                _fields = _line.strip().split()
+                if len(_fields) < 8:
+                    continue
+                _iface   = _fields[0]
+                _dest    = _hex_to_ip(_fields[1])
+                _gw      = _hex_to_ip(_fields[2])
+                _flags   = int(_fields[3], 16)
+                # RTF_UP=0x1, RTF_GATEWAY=0x2
+                _is_up      = bool(_flags & 0x1)
+                _is_gw_flag = bool(_flags & 0x2)
+                if not _is_up:
+                    continue
+                if _iface == "lo" or _LOOPBACK.match(_dest):
+                    continue
+                if _dest == "0.0.0.0":
+                    # Default route — save gateway as fallback
+                    if not default_gw and _gw != "0.0.0.0":
+                        default_gw = _gw
+                    continue
+                # Connected route (no gateway flag) — this is the local subnet
+                if not _is_gw_flag and _gw == "0.0.0.0":
+                    if _DOCKER_BRIDGE.match(_dest):
+                        continue  # skip docker bridge subnet
+                    return _to_24(_dest).split("/")[0].rsplit(".", 1)[0] + ".1", _to_24(_dest)
+        # Fallback: use default gateway's /24
+        if default_gw and not _DOCKER_BRIDGE.match(default_gw):
+            return default_gw, _to_24(default_gw)
     except Exception:
         pass
 
-    # Strategy 2 — traceroute: skip docker bridge hops, take first real RFC1918 hop
+    # Strategy 2 — ip route show
+    try:
+        r = subprocess.run(["ip", "route", "show"],
+                           capture_output=True, text=True, timeout=5)
+        for _line in r.stdout.splitlines():
+            _m = _re.match(r"^(\d+\.\d+\.\d+\.\d+)/(\d+)\s+dev\s+(\S+)", _line)
+            if not _m:
+                continue
+            _ip, _iface = _m.group(1), _m.group(3)
+            if _iface in ("lo",) or _iface.startswith(("docker", "br-", "veth")):
+                continue
+            if _DOCKER_BRIDGE.match(_ip) or _LOOPBACK.match(_ip):
+                continue
+            return ".".join(_ip.split(".")[:3]) + ".1", _ip + "/24"
+    except Exception:
+        pass
+
+    # Strategy 3 — traceroute: first non-docker hop
     try:
         tr = subprocess.run(
             ["traceroute", "-n", "-m", "4", "-w", "2", "-q", "1", "8.8.8.8"],
             capture_output=True, text=True, timeout=25,
         )
-        for line in tr.stdout.splitlines()[1:]:
-            m = _re.search(r"(\d+\.\d+\.\d+\.\d+)", line)
-            if not m:
+        for _line in tr.stdout.splitlines()[1:]:
+            _m = _re.search(r"(\d+\.\d+\.\d+\.\d+)", _line)
+            if not _m:
                 continue
-            ip = m.group(1)
-            if _DOCKER_BRIDGE.match(ip):
-                continue  # skip docker bridge gateway
-            if _RFC1918.match(ip):
-                return ip, _to_24(ip)
+            _ip = _m.group(1)
+            if _DOCKER_BRIDGE.match(_ip) or _LOOPBACK.match(_ip):
+                continue
+            return _ip, _to_24(_ip)
     except Exception:
         pass
 
