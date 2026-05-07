@@ -266,6 +266,8 @@ _SUITE_DESCRIPTIONS: list[tuple[str, str]] = [
     ("tor-anonymizer",   "HEAD requests to Tor/VPN/proxy sites → URL-filter anonymizer category"),
     ("url-response",     "Measure HTTPS response times via requests library"),
     ("virus",            "Download known-virus samples (to /dev/null)"),
+    ("voip",             "STUN Binding Requests (UDP/3478+19302) + SIP OPTIONS probes → VoIP/WebRTC app-ID"),
+    ("ucaas",            "HEAD requests to Zoom/Teams/WebEx/Meet/Slack/RingCentral/8x8 → UCaaS/video-conferencing app-ID"),
     ("waf-attack",       "SQLi/XSS/LFI/SSRF/CMDi/XXE/SSTI payloads in query params and POST bodies → WAF inline"),
     ("data-exfil-http",  "POST synthetic PII/credentials to paste sites → DLP + CASB outbound inspection"),
     ("web-scanner",      "Nikto web vulnerability scan"),
@@ -3951,6 +3953,122 @@ def lateral_movement_sim() -> None:
           f"(subnet={subnet}  live={len(live_hosts)}  open_ports_found={total_open})")
 
 
+def voip_sim() -> None:
+    """
+    Simulate VoIP signaling traffic:
+
+      Phase 1 — STUN Binding Requests (UDP) to public STUN servers used by
+        Zoom, Google Meet, Teams, and open-source VoIP stacks.  STUN is the
+        ICE/NAT-traversal protocol used in every WebRTC and SIP/RTP call.
+        Generates UDP/3478 and UDP/19302 traffic that NGFW app-ID engines
+        classify as "VoIP", "WebRTC", or "RTP".
+
+      Phase 2 — SIP OPTIONS probes (UDP/5060) to public SIP registrars.
+        OPTIONS is the standard SIP "ping" — it exercises SIP parser logic
+        in NGFWs and triggers "SIP" or "VoIP-signaling" app-ID signatures.
+
+    No real calls are placed and no audio/video media is generated.
+    """
+    import struct
+
+    n_stun = _size_to_limits(ARGS.size, 3, 6, len(stun_servers), len(stun_servers))
+    n_sip  = _size_to_limits(ARGS.size, 3, 6, len(sip_servers),  len(sip_servers))
+    ui_banner("VoIP Simulation", f"STUN probes ({n_stun}) + SIP OPTIONS ({n_sip})")
+
+    # ── Phase 1: STUN Binding Requests ────────────────────────────────────────
+    random.shuffle(stun_servers)
+    for i, (host, port) in enumerate(stun_servers[:n_stun], 1):
+        try:
+            # Minimal STUN Binding Request: type=0x0001, length=0x0000, magic cookie, txid
+            txid = random.randbytes(12)
+            pkt  = struct.pack(">HHI12s", 0x0001, 0, 0x2112A442, txid)
+            sock = __import__("socket")
+            s = sock.socket(sock.AF_INET, sock.SOCK_DGRAM)
+            s.settimeout(2)
+            s.sendto(pkt, (host, port))
+            try:
+                resp, _ = s.recvfrom(512)
+                rtype = struct.unpack(">H", resp[:2])[0]
+                outcome = "[green]binding-response[/]" if rtype == 0x0101 else f"[dim]type=0x{rtype:04x}[/]"
+                _stats.ok()
+            except sock.timeout:
+                outcome = "[dim]no-response (UDP filtered)[/]"
+                _stats.drop()
+            s.close()
+            console.log(f"  stun ({i}/{n_stun}) {host}:{port}  → {outcome}")
+        except Exception as e:
+            console.log(f"  [yellow]stun ({i}/{n_stun}) {host}:{port}: {e}[/]")
+            _stats.fail()
+        if i < n_stun:
+            time.sleep(random.uniform(0.3, 0.8))
+
+    # ── Phase 2: SIP OPTIONS ──────────────────────────────────────────────────
+    random.shuffle(sip_servers)
+    for i, (host, port) in enumerate(sip_servers[:n_sip], 1):
+        call_id = "".join(random.choices("abcdef0123456789", k=16))
+        branch  = "z9hG4bK" + "".join(random.choices("abcdef0123456789", k=8))
+        tag     = "".join(random.choices("abcdef0123456789", k=8))
+        msg = (
+            f"OPTIONS sip:{host} SIP/2.0\r\n"
+            f"Via: SIP/2.0/UDP 127.0.0.1:5060;branch={branch}\r\n"
+            f"Max-Forwards: 70\r\n"
+            f"To: <sip:{host}>\r\n"
+            f"From: <sip:traffgen@localhost>;tag={tag}\r\n"
+            f"Call-ID: {call_id}@localhost\r\n"
+            f"CSeq: 1 OPTIONS\r\n"
+            f"Contact: <sip:traffgen@127.0.0.1:5060>\r\n"
+            f"Content-Length: 0\r\n\r\n"
+        )
+        try:
+            sock = __import__("socket")
+            s = sock.socket(sock.AF_INET, sock.SOCK_DGRAM)
+            s.settimeout(2)
+            s.sendto(msg.encode(), (host, port))
+            try:
+                resp, _ = s.recvfrom(2048)
+                first_line = resp.decode(errors="replace").split("\r\n")[0]
+                status = first_line.split(" ")[1] if len(first_line.split(" ")) > 1 else "?"
+                style = "green" if status.startswith("2") else "yellow"
+                console.log(f"  sip-options ({i}/{n_sip}) {host}:{port}  → [{style}]{first_line[:60]}[/]")
+                _stats.ok()
+            except sock.timeout:
+                console.log(f"  sip-options ({i}/{n_sip}) {host}:{port}  → [dim]no-response (UDP filtered)[/]")
+                _stats.drop()
+            s.close()
+        except Exception as e:
+            console.log(f"  [yellow]sip-options ({i}/{n_sip}) {host}:{port}: {e}[/]")
+            _stats.fail()
+        if i < n_sip:
+            time.sleep(random.uniform(0.4, 1.0))
+
+    ui_ok("VoIP simulation complete")
+
+
+def ucaas_sim() -> None:
+    """
+    HEAD requests to UCaaS / cloud-collaboration platform signaling URLs:
+    Zoom, Microsoft Teams, Cisco WebEx, Google Meet, Slack, RingCentral,
+    8x8, GoTo Meeting, Discord, WhatsApp, Apple FaceTime, Vonage, Twilio,
+    and Jitsi.
+
+    NGFW / SASE platforms (Palo Alto, Cato Networks, Zscaler, Prisma Access)
+    classify these destinations as "video-conferencing", "voice-over-ip", or
+    "UCaaS" application categories.  Use this suite to validate those
+    app-ID and URL-filtering policies without placing real calls.
+    """
+    n = _size_to_limits(ARGS.size, 8, 20, len(ucaas_endpoints), len(ucaas_endpoints))
+    ui_banner("UCaaS / Cloud Collaboration",
+              f"{n} HEAD requests → video-conferencing / VoIP app-ID categories")
+    try:
+        random.shuffle(ucaas_endpoints)
+        _run_head_batch(ucaas_endpoints[:n], "UCAAS", user_agents,
+                        connect_timeout=5, max_time=10)
+        ui_ok("UCaaS simulation complete")
+    except Exception as e:
+        _stats.fail()
+        ui_error(f"[ucaas_sim] {e}")
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # CLI & RUNNER
 # ══════════════════════════════════════════════════════════════════════════════
@@ -3996,6 +4114,8 @@ _SUITE_MAP: dict[str, list] = {
     "tor-anonymizer":   [tor_anonymizer],
     "url-response":     [urlresponse_random],
     "virus":            [virus_sim],
+    "voip":             [voip_sim],
+    "ucaas":            [ucaas_sim],
     "waf-attack":       [waf_attack],
     "data-exfil-http":  [data_exfil_http],
     "web-scanner":      [web_scanner],
