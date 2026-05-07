@@ -3090,15 +3090,52 @@ def tls_inspection_check() -> None:
         "www.nist.gov",
     ]
 
-    _KNOWN_PROXY_ISSUERS = [
-        "zscaler", "netskope", "palo alto", "fortigate", "fortinet",
-        "cato networks", "cisco", "symantec", "blue coat", "broadcom",
-        "forcepoint", "iboss", "check point", "contentkeeper", "squid",
-        "mitmproxy", "fiddler", "portswigger", "burp", "charles", "proxyman",
-        "umbrella", "prisma", "mcafee", "trend micro", "sophos",
-        "ironport", "barracuda", "watchguard", "websense", "bluecoat",
-        "inspector", "skyhigh",
+    # Maps lowercase search token → canonical display name shown in alerts.
+    # Longer/more-specific strings listed first so they match before shorter prefixes.
+    _PROXY_VENDOR_MAP: list[tuple[str, str]] = [
+        ("zscaler",          "Zscaler"),
+        ("netskope",         "Netskope"),
+        ("palo alto",        "Palo Alto Networks"),
+        ("prisma",           "Palo Alto Prisma"),
+        ("fortigate",        "Fortinet (FortiGate)"),
+        ("fortinet",         "Fortinet"),
+        ("cato networks",    "Cato Networks"),
+        ("cato ",            "Cato Networks"),
+        ("cisco umbrella",   "Cisco Umbrella"),
+        ("cisco",            "Cisco"),
+        ("umbrella",         "Cisco Umbrella"),
+        ("blue coat",        "Broadcom Blue Coat"),
+        ("bluecoat",         "Broadcom Blue Coat"),
+        ("symantec",         "Broadcom/Symantec"),
+        ("broadcom",         "Broadcom"),
+        ("forcepoint",       "Forcepoint"),
+        ("websense",         "Forcepoint/Websense"),
+        ("iboss",            "iboss"),
+        ("check point",      "Check Point"),
+        ("contentkeeper",    "ContentKeeper"),
+        ("ironport",         "Cisco IronPort"),
+        ("barracuda",        "Barracuda"),
+        ("watchguard",       "WatchGuard"),
+        ("skyhigh",          "Skyhigh Security"),
+        ("mcafee",           "McAfee/Trellix"),
+        ("trend micro",      "Trend Micro"),
+        ("sophos",           "Sophos"),
+        ("mitmproxy",        "mitmproxy"),
+        ("fiddler",          "Fiddler"),
+        ("portswigger",      "Burp Suite"),
+        ("burp",             "Burp Suite"),
+        ("charles proxy",    "Charles Proxy"),
+        ("charles",          "Charles Proxy"),
+        ("proxyman",         "Proxyman"),
+        ("squid",            "Squid Proxy"),
     ]
+
+    def _detect_vendor(issuer_cn: str, issuer_org: str) -> str:
+        combined = (issuer_cn + " " + issuer_org).lower()
+        for token, display in _PROXY_VENDOR_MAP:
+            if token in combined:
+                return display
+        return ""
 
     def _get_field(d: dict, section: str, field: str) -> str:
         for rdns in d.get(section, ()):
@@ -3111,7 +3148,7 @@ def tls_inspection_check() -> None:
         result = {
             "host": host, "subject_cn": "", "issuer_cn": "", "issuer_org": "",
             "not_after": "", "fingerprint": "", "verified": False,
-            "error": "", "status": "ERROR",
+            "error": "", "status": "ERROR", "proxy_vendor": "",
         }
         try:
             # ── Fetch cert (no verification so we always get something) ───────
@@ -3176,10 +3213,10 @@ def tls_inspection_check() -> None:
                 result["verified"] = False  # network error on second conn is OK
 
             # ── Classify ─────────────────────────────────────────────────────
-            issuer_lower = (result["issuer_cn"] + " " + result["issuer_org"]).lower()
-            is_proxy = any(vendor in issuer_lower for vendor in _KNOWN_PROXY_ISSUERS)
-            if is_proxy:
-                result["status"] = "INTERCEPTED"
+            vendor = _detect_vendor(result["issuer_cn"], result["issuer_org"])
+            if vendor:
+                result["status"]       = "INTERCEPTED"
+                result["proxy_vendor"] = vendor
             elif not result["verified"]:
                 result["status"] = "UNVERIFIED"
             else:
@@ -3210,15 +3247,17 @@ def tls_inspection_check() -> None:
 
     tbl = _Table(show_header=True, header_style="bold magenta",
                  show_lines=False, box=None, pad_edge=False)
-    tbl.add_column("Host",         style="cyan",  no_wrap=True, min_width=28)
-    tbl.add_column("Subject CN",   style="white", no_wrap=True, min_width=22)
-    tbl.add_column("Issuer CN / Org",              no_wrap=True, min_width=30)
+    tbl.add_column("Host",         style="cyan",  no_wrap=True, min_width=26)
+    tbl.add_column("Subject CN",   style="white", no_wrap=True, min_width=20)
+    tbl.add_column("Issuer / Proxy",               no_wrap=True, min_width=32)
     tbl.add_column("Expires",      style="dim",   no_wrap=True, min_width=18)
     tbl.add_column("SHA-256 (16)", style="dim",   no_wrap=True, min_width=16)
-    tbl.add_column("Status",                       no_wrap=True, min_width=12)
+    tbl.add_column("Status",                       no_wrap=True, min_width=14)
 
     status_counts: dict[str, int] = {}
-    issuer_map: dict[str, list[str]] = {}   # fingerprint → [hosts]
+    issuer_fp_map: dict[str, list[str]] = {}   # issuer-fingerprint → [hosts]
+    intercepted_rows: list[dict] = []
+    unverified_rows:  list[dict] = []
 
     for r in results:
         status = r.get("status", "ERROR")
@@ -3226,24 +3265,38 @@ def tls_inspection_check() -> None:
 
         fp      = r.get("fingerprint", "")
         fp_abbr = fp[:16] if fp else ""
-        # Group by issuer fingerprint to detect shared-CA pattern
+
+        # Track issuer fingerprint (use first 16 chars as proxy-CA key)
         if fp and status not in ("UNREACHABLE", "ERROR"):
-            issuer_map.setdefault(fp, []).append(r["host"])
+            issuer_fp_map.setdefault(fp[:16], []).append(r["host"])
+
+        vendor = r.get("proxy_vendor", "")
 
         if status == "INTERCEPTED":
-            status_str = "[red]INTERCEPTED[/]"
+            # Issuer column: show vendor name in bold red
+            issuer_display = f"[bold red]{vendor}[/]"
+            if r.get("issuer_cn"):
+                issuer_display += f"[red] ({r['issuer_cn']})[/]"
+            status_str = "[bold red]⚠ INTERCEPTED[/]"
+            intercepted_rows.append(r)
         elif status == "CLEAN":
-            status_str = "[green]CLEAN[/]"
+            cn  = r.get("issuer_cn", "")
+            org = r.get("issuer_org", "")
+            issuer_display = f"{cn} / {org}" if (cn and org) else cn or org or "—"
+            status_str = "[green]✓ CLEAN[/]"
         elif status == "UNVERIFIED":
-            status_str = "[yellow]UNVERIFIED[/]"
+            cn  = r.get("issuer_cn", "")
+            org = r.get("issuer_org", "")
+            issuer_display = (f"[yellow]{cn} / {org}[/]" if (cn and org)
+                              else f"[yellow]{cn or org or 'unknown CA'}[/]")
+            status_str = "[yellow]? UNVERIFIED[/]"
+            unverified_rows.append(r)
         elif status == "UNREACHABLE":
+            issuer_display = f"[dim]{r.get('error', '')}[/]"
             status_str = "[dim]UNREACHABLE[/]"
         else:
+            issuer_display = f"[dim]{r.get('error', '')}[/]"
             status_str = "[dim]ERROR[/]"
-
-        issuer_display = r.get("issuer_cn") or r.get("issuer_org") or r.get("error") or "—"
-        if r.get("issuer_org") and r.get("issuer_cn"):
-            issuer_display = f"{r['issuer_cn']} / {r['issuer_org']}"
 
         tbl.add_row(
             r.get("host", ""),
@@ -3266,40 +3319,92 @@ def tls_inspection_check() -> None:
 
     console.print(tbl)
 
-    # ── Detect shared-CA (proxy) by fingerprint grouping ─────────────────────
-    shared_cas = {fp: hosts for fp, hosts in issuer_map.items() if len(hosts) >= 3}
-    if shared_cas and status_counts.get("INTERCEPTED", 0) == 0:
-        console.print("\n[yellow]⚠  Same certificate fingerprint seen on "
-                      f"{len(shared_cas)} group(s) — possible proxy re-signing:[/]")
-        for fp, hosts in shared_cas.items():
-            console.print(f"   fp={fp[:16]}  hosts={', '.join(hosts)}")
+    # ── Per-host interception alerts ──────────────────────────────────────────
+    if intercepted_rows:
+        lines = ["[bold red]TLS INSPECTION DETECTED — proxy CA is re-signing these certificates:[/]\n"]
+        for r in intercepted_rows:
+            vendor  = r["proxy_vendor"]
+            host    = r["host"]
+            subj    = r.get("subject_cn") or host
+            issuer  = r.get("issuer_cn") or r.get("issuer_org") or vendor
+            expires = r.get("not_after", "")
+            fp      = r.get("fingerprint", "")
+            lines.append(
+                f"  [bold red]⚠  {host}[/]\n"
+                f"     Expected:  original certificate from {host}\n"
+                f"     [bold red]Received:  certificate signed by {vendor}[/]  ← PROXY CA\n"
+                f"     Subject:   {subj}\n"
+                f"     Issuer:    {issuer}\n"
+                + (f"     Expires:   {expires}\n" if expires else "")
+                + (f"     SHA-256:   {fp[:32]}…\n" if fp else "")
+            )
+        console.print(Panel("\n".join(lines),
+                            title="[bold red]⚠  TLS INSPECTION ALERT[/]",
+                            border_style="red"))
 
-    # ── Summary ───────────────────────────────────────────────────────────────
+    if unverified_rows:
+        lines = ["[yellow]A certificate was presented but it did NOT verify against the trust store.[/]\n"
+                 "[yellow]The proxy is likely re-signing but its CA is not installed in this container.[/]\n"
+                 "[yellow]Inject the proxy CA via EXTRA_CA_CERT env var or bind-mount a .crt file.[/]\n"]
+        for r in unverified_rows:
+            issuer = r.get("issuer_cn") or r.get("issuer_org") or "unknown CA"
+            lines.append(f"  [yellow]?  {r['host']}  (issuer: {issuer})[/]")
+        console.print(Panel("\n".join(lines),
+                            title="[yellow]⚠  UNVERIFIED CERTIFICATES[/]",
+                            border_style="yellow"))
+
+    # ── Detect shared-CA by fingerprint grouping (unknown proxy vendors) ──────
+    shared_cas = {fp: hosts for fp, hosts in issuer_fp_map.items()
+                  if len(hosts) >= 3
+                  and not any(r.get("proxy_vendor") for r in results
+                              if r.get("fingerprint", "")[:16] == fp)}
+    if shared_cas:
+        console.print(
+            "\n[yellow]⚠  Same certificate fingerprint on 3+ unrelated sites — "
+            "possible unknown proxy CA:[/]"
+        )
+        for fp, hosts in shared_cas.items():
+            console.print(f"   fp={fp}  sites={', '.join(hosts)}")
+
+    # ── Final summary ─────────────────────────────────────────────────────────
     clean       = status_counts.get("CLEAN", 0)
     intercepted = status_counts.get("INTERCEPTED", 0)
     unverified  = status_counts.get("UNVERIFIED", 0)
     unreachable = status_counts.get("UNREACHABLE", 0)
 
-    summary_parts = [
-        f"[green]{clean} CLEAN[/]",
-        f"[red]{intercepted} INTERCEPTED[/]" if intercepted else f"[dim]0 intercepted[/]",
-        f"[yellow]{unverified} UNVERIFIED[/]"  if unverified  else f"[dim]0 unverified[/]",
-    ]
-    if unreachable:
-        summary_parts.append(f"[dim]{unreachable} unreachable[/]")
-
     if intercepted > 0 and clean > 0:
-        console.print(f"\n[yellow]⚠  Selective bypass: {clean} host(s) not decrypted, "
-                      f"{intercepted} intercepted — proxy has category/ASN bypass rules.[/]")
+        # Identify which vendor(s) are intercepting
+        vendors = list({r["proxy_vendor"] for r in intercepted_rows if r.get("proxy_vendor")})
+        vendor_str = " + ".join(vendors) if vendors else "unknown proxy"
+        console.print(
+            f"\n[red]⚠  {intercepted} site(s) intercepted by {vendor_str}  |  "
+            f"{clean} site(s) bypassed (not decrypted)[/]\n"
+            f"[dim]   Selective bypass detected — proxy has category or ASN whitelist rules.[/]"
+        )
     elif intercepted > 0:
-        console.print(f"\n[red]✗  TLS inspection active — all reachable traffic is being decrypted.[/]")
+        vendors = list({r["proxy_vendor"] for r in intercepted_rows if r.get("proxy_vendor")})
+        vendor_str = " + ".join(vendors) if vendors else "unknown proxy"
+        console.print(
+            f"\n[red]⚠  All reachable traffic is being decrypted by {vendor_str}.[/]"
+        )
     elif unverified > 0:
-        console.print(f"\n[yellow]⚠  Proxy CA not in trust store — inject via EXTRA_CA_CERT or "
-                      f"bind-mount .crt to /usr/local/share/ca-certificates/[/]")
+        console.print(
+            f"\n[yellow]⚠  Proxy is intercepting but the proxy CA is not installed "
+            f"in this container.[/]\n"
+            f"[dim]   Use EXTRA_CA_CERT or bind-mount the proxy CA .crt file.[/]"
+        )
     else:
-        console.print(f"\n[green]✓  No TLS inspection detected — original certificates received.[/]")
+        console.print(
+            f"\n[green]✓  No TLS inspection detected — all original certificates received.[/]"
+        )
 
-    ui_ok("TLS inspection check complete  " + "  ".join(summary_parts))
+    summary = (
+        f"[green]{clean} clean[/]  "
+        f"[{'red' if intercepted else 'dim'}]{intercepted} intercepted[/]  "
+        f"[{'yellow' if unverified else 'dim'}]{unverified} unverified[/]"
+        + (f"  [dim]{unreachable} unreachable[/]" if unreachable else "")
+    )
+    ui_ok(f"TLS inspection check complete  {summary}")
 
 
 def log4shell_probe() -> None:
