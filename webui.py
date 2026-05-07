@@ -943,7 +943,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
   <button class="nav-item active" data-tab="overview" onclick="showTab(this)"><span class="nav-ico">◈</span>Overview</button>
   <button class="nav-item" data-tab="security" onclick="showTab(this)"><span class="nav-ico">&#128737;</span>Security</button>
   <button class="nav-item" data-tab="tests" onclick="showTab(this)"><span class="nav-ico">⚗</span>Tests</button>
-  <button class="nav-item" data-tab="output" onclick="showTab(this)"><span class="nav-ico">⬛</span>Output</button>
+  <button class="nav-item" data-tab="output" onclick="showTab(this)"><span class="nav-ico">⬛</span>Live View</button>
   <div class="nav-lbl">System</div>
   <button class="nav-item" data-tab="health" onclick="showTab(this)"><span class="nav-ico">&#9889;</span>Health</button>
   <div class="nav-lbl">Info</div>
@@ -1071,7 +1071,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
     <!-- Output -->
     <div id="tab-output" class="panel">
       <div class="otb">
-        <span class="otlbl">Live Output</span>
+        <span class="otlbl">Live View</span>
         <div class="fgrp">
           <button class="btn af" data-lvl="all" onclick="setFilter(this,'all')">All</button>
           <button class="btn" data-lvl="ok" onclick="setFilter(this,'ok')">OK</button>
@@ -1373,7 +1373,7 @@ let _healthTimer=null,_lastHealth=null,_netHist=[],_hNetHist=[],_netTimer=null,_
 let _cpuHist=[],_memHist=[];
 function uptime(t){const s=Math.floor(Date.now()/1000-t);return[Math.floor(s/3600),Math.floor((s%3600)/60),s%60].map(v=>String(v).padStart(2,'0')).join(':');}
 function elapsed(t){if(!t)return'';const s=Math.floor(Date.now()/1000-t);if(s<60)return s+'s elapsed';if(s<3600)return Math.floor(s/60)+'m '+(s%60)+'s elapsed';return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m elapsed';}
-const PAGE_TITLES={overview:'Overview',security:'Security',tests:'Tests',output:'Output',health:'Health',about:'About'};
+const PAGE_TITLES={overview:'Overview',security:'Security',tests:'Tests',output:'Live View',health:'Health',about:'About'};
 const SUITE_ICONS={
   'ads':'🎯','ai-browse':'🤖','bgp':'🌐','bigfile':'💾',
   'c2-beacon':'📡','llm-dlp':'🧠','crawl':'🕷️','dlp':'🔒',
@@ -1953,7 +1953,7 @@ _LOG_HTML = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>traffgen &middot; Live Output</title>
+<title>traffgen &middot; Live View</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#080c10;--surf:#161b22;--border:#1e2d3d;--green:#22c55e;--red:#f85149;--amber:#f59e0b;--blue:#60a5fa;--text:#c9d1d9;--muted:#64748b;--dim:#374151}
@@ -1980,7 +1980,7 @@ body{background:var(--bg);color:var(--text);font-family:'SF Mono',Consolas,monos
 </head>
 <body>
 <div class="hdr">
-  <span class="title">&#9889; traffgen &middot; Live Output</span>
+  <span class="title">&#9889; traffgen &middot; Live View</span>
   <div class="fgrp">
     <button class="btn af" data-lvl="all" onclick="setF(this,'all')">All</button>
     <button class="btn" data-lvl="ok" onclick="setF(this,'ok')">OK</button>
