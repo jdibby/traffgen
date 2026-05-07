@@ -28,13 +28,15 @@ Variable index (matches generator.py usage names 1-to-1):
     ntp_endpoints       NTP server hostnames (ntp_probe)
     ssh_endpoints       IPs / hostnames for SSH probes (ssh_probe)
     nmap_endpoints      IPs for nmap port scans (nmap_scan, nmap_vuln)
-    snmp_endpoints      IPs for SNMPv2c walks (snmp_walk)
-    snmp_strings        SNMP community strings (snmp_walk)
+    snmp_endpoints      IPs / hostnames for SNMP probes (snmp_v1/v2c/v3)
+    snmp_v1_strings     SNMPv1 community strings
+    snmp_v2c_strings    SNMPv2c community strings
+    snmp_v3_creds       SNMPv3 credential tuples (user, level, auth-proto, auth-pass, priv-proto, priv-pass)
 
   Web / HTTPS traffic
     http_endpoints      Plain HTTP hostnames (http_random)
     https_endpoints     General HTTPS URLs (https_random, https_crawl, http3, webscan_nikto, speed_test)
-    ad_endpoints        Ad-network URLs (ad_tracker)
+    ad_endpoints        Ad-network URLs — fallback when Hagezi blocklist is unreachable
     ai_endpoints        AI-service HTTPS URLs (ai_https)
     webscan_endpoints   Intentionally-vulnerable web apps (webscan_nikto)
     kyber_endpoints     Post-quantum TLS endpoints (kyber_tls)
@@ -60,6 +62,12 @@ Variable index (matches generator.py usage names 1-to-1):
   S3 / cloud object storage
     s3_download_urls    S3 bucket/object URLs for GET simulation (s3_sim)
     s3_upload_targets   S3 bucket/key paths for PUT upload simulation (s3_sim)
+
+  New detection suites
+    shadow_it_endpoints      Unsanctioned cloud apps (shadow_it) — CASB app-control
+    tor_anonymizer_endpoints Tor/VPN/proxy sites (tor_anonymizer) — URL-filter category
+    waf_attack_targets       Pen-test-authorised web apps for WAF probes (waf_attack)
+    data_exfil_targets       Paste/upload services for DLP POST simulation (data_exfil_http)
 """
 
 # ── DNS resolvers ──────────────────────────────────────────────────────────────
@@ -218,22 +226,14 @@ ssh_endpoints = [
     ]
 
 # ── Nmap scan targets ─────────────────────────────────────────────────────────
+# Only publicly routable hosts that explicitly authorise scanning.
+# scanme.nmap.org / 45.33.32.156 — Nmap's official scan-me service (nmap.org/book/legal-issues.html)
+# testmyids.com              — Emerging Threats IDS test service
+# juice-shop.herokuapp.com   — OWASP Juice Shop intentionally-vulnerable demo app
 nmap_endpoints = [
-    '192.168.2.2',
-    '10.188.188.9',
-    '45.33.32.156',
-    '176.28.50.165',
-    '192.168.1.1',
-    '172.16.0.1',
-    '10.10.10.1',
-    '192.168.2.100',
-    '192.168.2.200',
-    '12.12.12.12',
-    '172.30.0.1',
-    '172.30.0.21',
-    '192.168.2.3',
-    'www.testmyids.com',
+    '45.33.32.156',            # scanme.nmap.org (IPv4)
     'scanme.nmap.org',
+    'www.testmyids.com',
     'juice-shop.herokuapp.com',
 ]
 
@@ -399,7 +399,7 @@ ad_endpoints = [
     "analytics-sg.tiktok.com",
     "analytics.pointdrive.linkedin.com",
     "careers.hotjar.com",
-    ]
+]
 
 # ── General HTTPS endpoints ───────────────────────────────────────────────────
 https_endpoints = [
@@ -632,31 +632,33 @@ https_endpoints = [
 ]
 
 # ── Malware / C2-category domains ─────────────────────────────────────────────
+# These URLs are specifically designed to trigger URL-category blocks in
+# SASE/NGFW/AV platforms.  testmyids.com and scanme.nmap.org are intentionally
+# excluded: they are categorised as "security testing tools", not malware.
+# httpbin.org / postman-echo paths are also excluded: the domain is trusted
+# and SASE URL-category lookups are domain-based, so the path is irrelevant
+# — those belong in c2_beacon_targets for POST-based behavioural testing.
 malware_endpoints = [
-    # Classic IDS trigger sites — Snort/Suricata SID 1:2100498 and ET INFO rules
-    "http://www.testmyids.com",
-    "https://www.testmyids.com",
-    "http://scanme.nmap.org",
-    "https://scanme.nmap.org",
-
-    # WICAR — safe malware-behaviour test pages designed to trigger AV/IDS/NGFW
+    # WICAR — safe malware-behaviour test pages designed to trigger AV/NGFW/SASE
     "https://www.wicar.org/test-malware.html",
     "https://www.wicar.org/",
     "https://malware.wicar.org/data/ms14_064_ole_not_xp.html",
     "https://malware.wicar.org/data/java_jre17_exec.html",
     "https://malware.wicar.org/data/eicar.com",
 
-    # AMTSO — Anti-Malware Testing Standards Organisation test features
+    # AMTSO — Anti-Malware Testing Standards Organisation (cross-vendor standard)
     "https://www.amtso.org/check-desktop-security-tools/",
     "https://www.amtso.org/potentially-unwanted-application-detection/",
     "https://www.amtso.org/phishing-test-page/",
 
-    # Google Safe Browsing test URLs (triggers SB API / URL-filter lookups)
+    # Google Safe Browsing test URLs — categorised as malware/phishing/unwanted
+    # by every SASE vendor that integrates the GSB API
     "http://malware.testing.google.test/testing/malware/",
     "http://phishing.testing.google.test/testing/phishing/",
     "http://unwanted.testing.google.test/testing/unwanted/",
 
-    # HTTP evader — tests IDS/IPS evasion via malformed HTTP constructs
+    # HTTP-evader — tests whether the NGFW/IPS decodes evasion tricks
+    # (chunked TE, compressed body, broken headers, multipart, etc.)
     "https://http-evader.semantic-gap.de/chunked",
     "https://http-evader.semantic-gap.de/compressed",
     "https://http-evader.semantic-gap.de/clen",
@@ -671,18 +673,66 @@ malware_endpoints = [
     "https://noxxi.de/research/http-evader-testsite.html",
     "http://http-evader.semantic-gap.de",
     "https://http-evader.semantic-gap.de",
-
-    # Common C2-panel URL patterns — appended to echo/test services so requests
-    # match ET TROJAN and ET MALWARE Snort/Suricata signatures without hitting
-    # real infrastructure.  These paths are frequently blocked by URL-category
-    # feeds (gate.php, panel paths, update patterns used by Zbot/Zeus, njRAT, etc.)
-    "https://httpbin.org/post?r=gate.php",
-    "https://httpbin.org/anything/panel/gate.php",
-    "https://httpbin.org/anything/update.php",
-    "https://httpbin.org/post?action=checkin&id=1",
-    "https://postman-echo.com/post?cmd=ping&id=1",
-    "https://postman-echo.com/post?r=config.php",
 ]
+
+# ── C2 framework / malware family user-agents ─────────────────────────────────
+# Default UAs shipped with C2 frameworks and known malware families.
+# SASE/SSE, NGFW, and EDR vendors maintain threat-intel signatures for these
+# specific strings — they are far more effective at triggering C2 detection
+# rules than generic bad-bot / scraper UAs.
+#
+# Used by: malware_random (HEAD) and c2_beacon (POST)
+c2_user_agents = [
+    # ── Cobalt Strike beacon defaults ────────────────────────────────────────
+    # Stock jQuery malleable-C2 profile (3.x / 4.x) — in every major vendor feed
+    "Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; Trident/6.0)",
+    # CS IE11 malleable profile
+    "Mozilla/5.0 (Windows NT 6.3; Trident/7.0; rv:11.0) like Gecko",
+    # CS stock pre-profile MSIE Trident UA
+    "Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 5.1; Trident/4.0; SLCC2; .NET CLR 2.0.50727)",
+
+    # ── Metasploit Meterpreter HTTP/HTTPS reverse handler ────────────────────
+    "Mozilla/4.0 (compatible; MSIE 6.1; Windows NT)",
+    "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)",
+
+    # ── PowerShell Empire HTTP stager ────────────────────────────────────────
+    "Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko",
+
+    # ── Sliver C2 default HTTPS implant ──────────────────────────────────────
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.1 Safari/605.1.15",
+
+    # ── DarkComet RAT — extremely distinctive, present in every vendor feed ──
+    "DarkComets/0.1",
+
+    # ── QuasarRAT default HTTP listener ──────────────────────────────────────
+    "Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/29.0.1547.2 Safari/537.36",
+
+    # ── Emotet / TrickBot family — old IE UA pattern common to both families ─
+    "Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.1; Trident/4.0; SLCC2)",
+
+    # ── AgentTesla / OriginLogger exfil HTTP POST ────────────────────────────
+    "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1)",
+
+    # ── njRAT / Bladabindi minimal UA ────────────────────────────────────────
+    "Mozilla/5.0 (compatible)",
+
+    # ── Generic script / implant frameworks ─────────────────────────────────
+    # Python requests — extremely common in commodity malware and downloaders
+    "python-requests/2.28.2",
+    # Go HTTP client — Sliver, Havoc, Mythic, and custom Go implants
+    "Go-http-client/1.1",
+    # Java — jRAT, Adwind, STRRAT, and many commodity Java RATs
+    "Java/11.0.16",
+    # curl — dropper and staging scripts
+    "curl/7.74.0",
+    # PowerShell Invoke-WebRequest default
+    "Mozilla/5.0 (Windows NT; Windows NT 10.0; en-US) WindowsPowerShell/5.1.19041.1682",
+]
+
+# ── Bad-bot / scraper user-agents ─────────────────────────────────────────────
+# Large list of web scrapers, SEO crawlers, and aggressive bots.
+# Useful for testing WAF bot-detection rules and rate-limiting policies.
+# For C2 / SASE threat-detection testing use c2_user_agents above instead.
 
 # ── AI service HTTPS endpoints ────────────────────────────────────────────────
 ai_endpoints = [
@@ -2261,21 +2311,52 @@ pornography_endpoints = [
 ]
 
 # ── SNMP community strings and probe targets ───────────────────────────────────
-snmp_strings = [
-    "public",
-    "private",
-    "trap",
-    "system",
-    "access",
-    "agent",
-    "monitor",
-    "secret",
+snmp_v1_strings = [
+    "public", "private", "community", "default", "manager",
+    "admin", "cisco", "monitor", "trap", "access", "secret",
+    "write", "read", "snmp", "ILMI", "guest", "password", "0",
+]
+
+snmp_v2c_strings = [
+    "public", "private", "community", "default", "admin",
+    "cisco", "router", "switch", "network", "manager",
+    "monitor", "core", "access", "test", "security",
+    "system", "read", "write", "readonly", "readwrite",
+    "all", "temp", "snmpd", "agent", "trap", "secret",
+]
+
+# (username, security-level, auth-proto, auth-pass, priv-proto, priv-pass)
+# Covers noAuthNoPriv, authNoPriv, and authPriv — common defaults found in the wild
+snmp_v3_creds = [
+    ("initial",    "noAuthNoPriv", "",     "",              "",     ""),
+    ("public",     "noAuthNoPriv", "",     "",              "",     ""),
+    ("admin",      "noAuthNoPriv", "",     "",              "",     ""),
+    ("readonly",   "noAuthNoPriv", "",     "",              "",     ""),
+    ("monitor",    "noAuthNoPriv", "",     "",              "",     ""),
+    ("default",    "noAuthNoPriv", "",     "",              "",     ""),
+    ("guest",      "noAuthNoPriv", "",     "",              "",     ""),
+    ("cisco",      "authNoPriv",   "MD5",  "cisco123",      "",     ""),
+    ("admin",      "authNoPriv",   "MD5",  "admin123",      "",     ""),
+    ("admin",      "authNoPriv",   "SHA",  "admin123",      "",     ""),
+    ("netadmin",   "authNoPriv",   "SHA",  "netadmin",      "",     ""),
+    ("snmpv3",     "authNoPriv",   "MD5",  "snmpv3pass",    "",     ""),
+    ("v3user",     "authNoPriv",   "SHA",  "password",      "",     ""),
+    ("operator",   "authNoPriv",   "MD5",  "operator",      "",     ""),
+    ("snmpuser",   "authNoPriv",   "SHA",  "authpass12",    "",     ""),
+    ("cisco",      "authPriv",     "MD5",  "cisco123",      "DES",  "cisco123"),
+    ("admin",      "authPriv",     "SHA",  "admin123",      "AES",  "admin123"),
+    ("snmpuser",   "authPriv",     "SHA",  "authpass12",    "AES",  "privpass12"),
+    ("operator",   "authPriv",     "MD5",  "operator",      "DES",  "operator"),
+    ("netadmin",   "authPriv",     "SHA",  "netadmin",      "AES",  "netadmin"),
 ]
 
 snmp_endpoints = [
     "192.168.1.1",
     "172.16.0.1",
     "10.0.0.1",
+    "10.0.0.254",
+    "192.168.0.1",
+    "192.168.1.254",
     "test.net-snmp.org",
     "demo.snmplabs.com",
     "snmp.inetdaemon.com",
@@ -2650,6 +2731,7 @@ bgp_neighbors = [
     "10.0.0.1",
     "172.16.0.1",
     "12.12.12.12",
+    "192.168.168.1",
 ]
 
 # ── Post-quantum TLS (Kyber/ML-KEM) endpoints ────────────────────────────────
@@ -2946,4 +3028,84 @@ s3_upload_targets: list[str] = [
     # S3-compatible storage providers
     "https://s3.wasabisys.com/exfil-test-bucket/payload.bin",
     "https://s3.us-west-002.backblazeb2.com/traffgen-test/upload.dat",
+]
+
+# ── Shadow IT / unsanctioned cloud-app endpoints (shadow_it) ──────────────────
+# CASB / SSE platforms (Zscaler, Netskope, Cato, Prisma) categorise these as
+# personal file sharing, personal messaging, crypto, or shadow IT.  HEAD
+# requests exercise app-control policies without uploading any data.
+shadow_it_endpoints: list[str] = [
+    # Personal cloud storage — "personal file sharing" CASB category
+    "https://www.dropbox.com",
+    "https://www.box.com",
+    "https://mega.nz",
+    "https://wetransfer.com",
+    "https://transfer.sh",
+    "https://onedrive.live.com",        # Microsoft consumer (not M365 corporate)
+    "https://www.icloud.com",
+    # Personal messaging / collaboration
+    "https://discord.com",
+    "https://web.telegram.org",
+    "https://web.whatsapp.com",
+    # Anonymising / privacy-first mail
+    "https://proton.me",
+    "https://tutanota.com",
+    "https://guerrillamail.com",
+    # Paste / file hosting (data-exfil category)
+    "https://pastebin.com",
+    "https://filebin.net",
+    "https://gofile.io",
+    # Crypto / blockchain (often blocked by financial/enterprise policy)
+    "https://www.coinbase.com",
+    "https://etherscan.io",
+    "https://www.binance.com",
+    # Unsanctioned productivity / no-code tools
+    "https://notion.so",
+    "https://trello.com",
+    "https://www.airtable.com",
+]
+
+# ── Tor / anonymiser / VPN landing pages (tor_anonymizer) ────────────────────
+# URL-filter "anonymizers" or "proxy avoidance" category on every major NGFW,
+# SASE, and DNS-filter vendor (Cisco Umbrella, Palo Alto, Fortinet, Zscaler).
+tor_anonymizer_endpoints: list[str] = [
+    "https://check.torproject.org",
+    "https://www.torproject.org",
+    "https://protonvpn.com",
+    "https://nordvpn.com",
+    "https://mullvad.net",
+    "https://www.expressvpn.com",
+    "https://www.ipvanish.com",
+    "https://kproxy.com",
+    "https://hide.me",
+    "https://hidemy.name",
+    "https://www.anonymouse.org",
+    "https://filterbypass.me",
+    "https://www.croxyproxy.com",
+    "https://www.proxysite.com",
+    "https://4everproxy.com",
+    "https://www.freeproxyserver.net",
+]
+
+# ── WAF-attack test targets ───────────────────────────────────────────────────
+# Intentionally-vulnerable / pen-test-authorised web applications used as
+# targets for WAF-bypass probes.  Do NOT add production sites.
+waf_attack_targets: list[str] = [
+    "https://juice-shop.herokuapp.com",
+    "http://www.testmyids.com",
+    "https://hackazon.webscantest.com",
+    "http://testhtml5.vulnweb.com",
+]
+
+# ── HTTP data-exfil paste/upload targets (data_exfil_http) ───────────────────
+# Public paste and file-drop services used by attackers to exfiltrate data via
+# HTTP POST.  DLP and CASB inline inspectors should catch requests to these
+# destinations containing PII / credential patterns.
+data_exfil_targets: list[str] = [
+    "https://pastebin.com/api/api_post.php",
+    "https://hastebin.com/documents",
+    "https://paste2.org/new-paste",
+    "https://transfer.sh/upload",
+    "https://filebin.net",
+    "https://api.paste.fo/v1/pastes",
 ]

@@ -5,7 +5,7 @@
 [![Docker Hub](https://img.shields.io/docker/pulls/jdibby/traffgen?logo=docker&label=Docker%20Hub)](https://hub.docker.com/r/jdibby/traffgen)
 [![Multi-arch](https://img.shields.io/badge/arch-amd64%20%7C%20arm64%20%7C%20arm%2Fv7-blue?logo=linux)](https://hub.docker.com/r/jdibby/traffgen)
 
-Traffgen simulates realistic network traffic across **48 test suites** — DNS, HTTP/S, FTP, SSH, BGP, ICMP, NTP, SNMP, DoH, DoT, C2 beacons, DNS exfiltration, AI/LLM DLP, Metasploit checks, malware downloads, phishing probes, web scanning, and more.
+Traffgen simulates realistic network traffic across **42 test suites** — DNS, HTTP/S, FTP, SSH, BGP, ICMP, NTP, SNMP, DoH, DoT, C2 beacons, DNS exfiltration, AI/LLM DLP, Metasploit checks, malware downloads, phishing probes, IDS/WAF triggers, lateral movement, TLS inspection checks, and more.
 
 Purpose-built to stress-test **firewalls**, **IDS/IPS**, **URL filters**, **DLP engines**, **CASB platforms**, and **SIEM pipelines**.
 
@@ -73,10 +73,11 @@ The dashboard includes:
 - **Overview** — stat cards, live Network I/O sparkline in Mbps (1 s default refresh with selectable interval), requests-over-time chart, per-test breakdown table, and live events feed
 - **Security** — dedicated security posture page modeled on NGFW/SASE dashboards: KPI cards (Total Probes / Blocked / Silently Dropped / Allowed), outcome-distribution donut, block & drop trend sparkline, per-suite security breakdown table sorted by blocked count, and a block-signal breakdown showing exactly how controls are signalling blocks (HTTP 403 block page, TCP RST, proxy refused, TLS intercept, DNS sinkhole, timeout). Refresh interval is configurable (default 1 m, 30 s–5 m).
 - **Tests** — card grid for every suite; click any card to launch it immediately with custom settings
-- **Output** — CLI-style live log with level coloring (✔ OK, ✗ Error, ⚠ Warn), section banners, and rule separators mirroring the terminal output; filterable by level
+- **Live View** — CLI-style live log with level coloring (✔ OK, ✗ Error, ⚠ Warn), section banners, and rule separators mirroring the terminal output; filterable by level
 - **Health** — CPU/memory gauges, load average, disk I/O bars, network sparkline in Mbps, top-processes table
 - **Dark / light mode** — toggle with the ☾ button in the topbar; preference saved across sessions
 - **Controls** — pause, resume, stop, and settings drawer to change suite/size/wait without restarting the container
+- **Status pill** — live state badge in the topbar: `Running` (with pulse dot), `Between Tests (Ns)` with a live countdown during inter-test pauses, `Paused`, and `Stopped`
 - **Multi-user:** first browser tab gets full control; additional tabs are read-only with a visible banner
 
 > **Full documentation:** [docs/web-dashboard.md](docs/web-dashboard.md)
@@ -89,7 +90,7 @@ The dashboard includes:
 |---|---|---|---|
 | `--suite` | See suite names below | `all` | Test suite to run |
 | `--size` | `XS` `S` `M` `L` `XL` | `S` | Traffic volume / intensity |
-| `--loop` | — | off | Loop forever, picking tests at random each iteration |
+| `--loop` | — | off | Loop forever in a randomised round-robin deck — every test runs once per round before any test repeats |
 | `--max-wait-secs` | integer | `20` | Max random pause between iterations when looping |
 | `--nowait` | — | off | Disable all inter-test pauses (loop and single-run mode) |
 | `--crawl-start` | URL | `https://data.commoncrawl.org` | Seed URL for the `crawl` suite |
@@ -133,7 +134,7 @@ The dashboard includes:
 | 🔮 `kyber` | HTTPS HEAD requests using the post-quantum **X25519MLKEM768** (Kyber) key exchange. Tests whether TLS inspection infrastructure handles hybrid post-quantum cipher suites without breaking connectivity. |
 | 🌐 `doh` | DNS over HTTPS (RFC 8484 JSON API) via `curl` to a rotating list of DoH providers. Tests DoH detection and DNS-over-HTTPS bypass policy enforcement. |
 | 🔏 `dot` | DNS over TLS on TCP/853 via `openssl s_client`. Tests whether DoT connections are logged, blocked, or decrypted by TLS inspection. |
-| ⚡ `http3` | HTTP/3 QUIC HEAD requests via `curl --http3`. QUIC runs over UDP/443 and is invisible to many legacy inspection stacks. Tests QUIC visibility, fallback behaviour, and QUIC-block policy enforcement. |
+| ⚡ `http3` | HTTP/3 QUIC HEAD requests via a native `aioquic` implementation (`QuicConnectionProtocol` + `H3Connection`). QUIC runs over UDP/443 and is invisible to many legacy inspection stacks. Tests QUIC visibility and QUIC-block policy enforcement without relying on a curl build that supports HTTP/3. |
 
 ---
 
@@ -141,23 +142,63 @@ The dashboard includes:
 
 | Suite | Description |
 |---|---|
-| 🚨 `ids-trigger` | Sends a HEAD request to `testmyids.com` with the `BlackSun` user-agent string — a classic Snort/Suricata IDS/IPS signature. Confirms that IDS alert rules are active and generating SIEM events. |
-| 🦠 `malware-agents` | HEAD requests to benign endpoints using known malware user-agent strings (Emotet, Cobalt Strike, AsyncRAT, and others). Tests whether user-agent-based IDS/IPS signatures fire for malware-associated UA patterns. |
+| 🚨 `ids-trigger` | Fires a battery of **16 HTTP requests** targeting `testmyids.com` — the Emerging Threats IDS validation service — each matching a distinct Snort/Suricata signature category: **10 scanner user-agents** (BlackSun, ZmEu, Havij, sqlmap, Nikto, Acunetix, w3af, masscan, DirBuster, libwww-perl) and **6 web-attack URL probes** (LFI `../../etc/passwd`, SQLi `UNION SELECT`, XSS `<script>`, `.env` disclosure, wp-admin, cmd-injection). All requests target testmyids.com — no unauthorized hosts are scanned. Tests inline IDS/IPS (Snort, Suricata, Cisco FTD, Palo Alto NGFW with IPS rules) signature coverage across multiple rule categories. |
+| 🦠 `malware-agents` | HEAD requests to malware-category test URLs using **known C2 framework user-agents**. Destinations include WICAR, AMTSO, and Google Safe Browsing test URLs — specifically designed to trigger URL-category blocks on SASE/NGFW platforms (Zscaler, Cato, Prisma Access, Netskope, Palo Alto). UAs cover Cobalt Strike (jQuery/IE11/Trident malleable profiles), Metasploit Meterpreter, PowerShell Empire, Sliver, DarkComet RAT, QuasarRAT, Emotet/TrickBot family, AgentTesla, njRAT, python-requests, Go-http-client, Java RATs, curl, and PowerShell Invoke-WebRequest — the exact strings in major SASE vendor threat-intel feeds. Exercises both URL-category blocking and C2 UA behavioral detection independently. |
 | ⬇️ `malware-download` | Downloads known-malware file samples from public repositories to `/dev/null`. Tests whether anti-malware scanning or URL reputation filtering blocks downloads before they reach the endpoint. |
 | 🧬 `virus` | Downloads EICAR anti-virus test files and virus sample markers to `/dev/null`. Confirms that inline AV scanning is active and reporting correctly. |
 | 🚫 `domain-check` | Probes a random sample of domains from the **Hagezi DNS blocklist**. Tests whether DNS-based threat intelligence blocks known bad domains and generates expected SIEM events. |
 | 🎣 `phishing-domains` | Probes a random sample of domains from an active phishing domain feed. Tests anti-phishing DNS/URL filtering, confirms phishing-category blocks appear in firewall logs, and validates events reach the SIEM. |
 | 🔤 `squatting` | Runs `dnstwist` typosquatting generation against popular brand domains. Generates hundreds of lookalike domain variants (homoglyphs, additions, transpositions) and resolves them. Tests whether DNS analytics detect typosquatting lookups. |
-| 🗺️ `nmap` | Nmap port scan covering ports 1–1024 against a target list, followed by an NSE CVE-script scan. Tests whether IDS/IPS detects and alerts on port-scan patterns and CVE-detection signatures. |
+| 🗺️ `nmap` | Nmap port scan covering ports 1–1024 against a target list, followed by an NSE CVE-script scan (`--script=ALL`). Targets are restricted to explicitly authorized public hosts: `scanme.nmap.org` (Nmap's official scan-me service), `testmyids.com`, and `juice-shop.herokuapp.com`. Tests whether IDS/IPS detects and alerts on port-scan patterns and CVE-detection signatures. Note: raw TCP scans are not proxied through SASE; use `ids-trigger` or `malware-agents` for SASE coverage. |
 | 🔬 `web-scanner` | Nikto web vulnerability scanner against `testmyids.com`. Generates a broad mix of vulnerability-probe HTTP requests (path traversal, header injection, known CVE probes). Scan duration scales with `--size`. |
 | 💥 `metasploit-check` | Runs Metasploit `.rc` scripts in **check-only mode** — no exploitation performed. Scripts issue the same probe traffic Metasploit uses to fingerprint a target before exploit delivery, without sending any payload. Covers 46 check scripts across web apps, network appliances, databases, and protocol-level scanners. Tests IDS/IPS, CASB, and SIEM detection of Metasploit fingerprint traffic. |
+| ☢️ `log4shell` | Injects **Log4Shell (CVE-2021-44228) JNDI payloads** into six HTTP request headers (`User-Agent`, `X-Api-Version`, `X-Forwarded-For`, `Referer`, `Authorization`, `X-Custom-IP-Authorization`) using LDAP, RMI, DNS, and obfuscated `${lower:}` / `${::-}` bypass variants. Targets testmyids.com and OWASP Juice Shop. Triggers Suricata SID 2034907/2034908 (ET EXPLOIT Log4j), WAF header-injection rules (Cloudflare, AWS WAF, F5, Imperva), and SASE inline threat-intel detection. |
+| 🛡️ `waf-attack` | Sends **18 WAF-targeting attack payloads** in URL query parameters and POST bodies against OWASP Juice Shop and other pen-test-authorised apps: SQLi (union/error/blind/sleep), XSS (script/img/svg), LFI (path traversal), SSRF (AWS metadata + localhost), OS command injection (semicolon/pipe/backtick), XXE (external entity), and SSTI (Jinja2/Twig). Complements `ids-trigger` (URL-path based) with param/body-based WAF inline inspection. |
+| 🧅 `tor-anonymizer` | HEAD requests to 16 **Tor Project, commercial VPN landing pages, and web-proxy sites** (check.torproject.org, ProtonVPN, NordVPN, Mullvad, ExpressVPN, kproxy.com, hide.me, croxyproxy.com, etc.). Tests the "anonymizers / proxy avoidance" URL-filter category on NGFW (Palo Alto, Fortinet), SASE (Zscaler, Netskope), and DNS-filter (Cisco Umbrella) platforms. |
+| 🏢 `shadow-it` | HEAD requests to **27 unsanctioned cloud applications** across five CASB app-control categories: personal file sharing (Dropbox, Box, MEGA, WeTransfer, OneDrive consumer, iCloud), personal messaging (Discord, Telegram, WhatsApp Web), privacy/anonymising mail (ProtonMail, Tutanota, Guerrilla Mail), paste/file hosting (Pastebin, Filebin, GoFile), and crypto/blockchain (Coinbase, Etherscan, Binance). Tests CASB app-control and SSE category blocking policies for unsanctioned cloud usage. |
+| 📤 `data-exfil-http` | POSTs **synthetic PII and credential payloads** to public paste and file-drop services (Pastebin, Hastebin, Paste2, transfer.sh, Filebin). Payload types: US Social Security Number lists, payment card numbers (Luhn-valid), RSA private key blocks, password hashes, and CSV PII. Tests DLP outbound content-inspection (Zscaler DLP, Netskope DLP, Palo Alto Enterprise DLP) and CASB upload policies — all destinations return 4xx but the outbound POST bodies are visible to inline inspection. |
+| 🔐 `tls-check` | Connects to **20 diverse HTTPS endpoints** (CDN, cloud, social, developer tools, finance, government) and reports the presented TLS certificate for each: Subject CN, Issuer CN + Org, expiry, SHA-256 fingerprint, and verification status. Classifies each host as **CLEAN** (original cert received), **INTERCEPTED** (issuer matches a known SASE/SSE/proxy vendor CA — Zscaler, Netskope, Palo Alto, Fortinet, Cato, Cisco, Blue Coat, Forcepoint, iboss, and others), **UNVERIFIED** (proxy is re-signing but the CA is not installed in the container), or **UNREACHABLE**. Also detects shared-CA fingerprints across unrelated sites (a reliable proxy signal even when the vendor name is unrecognised). Reports selective bypass: if finance/government hosts are CLEAN while social/developer hosts are INTERCEPTED, the proxy has category or ASN bypass rules active. Use `EXTRA_CA_CERT` or a bind-mounted `.crt` file to install the proxy CA if seeing UNVERIFIED results. |
+| 🔀 `lateral-movement` | Two-phase east-west reconnaissance against the Docker **host's physical LAN**. ⚠️ **Requires one of the two methods below** to reach the real LAN — see [Lateral Movement networking](#-lateral-movement-networking) for details. **Phase 1:** nmap `-sn` ping sweep of the entire **/24** — enumerates all live hosts. **Phase 2:** port scan every discovered host on **12 lateral-movement ports**: SSH (22), Kerberos (88), WMI/RPC (135), NetBIOS (137-139), LDAP (389), SMB (445), LDAPS (636), RDP (3389), WinRM HTTP/HTTPS (5985/5986). Per-host results classified and recorded — `open` → `allowed`, TCP RST → `blocked`, silently dropped → `dropped`. Tests east-west NGFW policies (Palo Alto, Fortinet), SIEM lateral-movement correlation rules, and network IDS SMB/RDP recon signatures. |
+
+---
+
+### 🔀 Lateral Movement Networking
+
+The `lateral-movement` suite scans the **host's physical LAN**, not the Docker bridge (`172.17.x.x`). A standard Docker container runs in its own network namespace and cannot see the host's physical interfaces. One of the following two methods is required:
+
+#### Method 1 — stager.sh (recommended)
+
+`stager.sh` captures the host's LAN IP **and subnet prefix** with `hostname -I` and `ip addr` **before** the container starts and passes them as `-e HOST_LAN_CIDR=<ip>/<prefix>`. The suite reads this and scans the correct network:
+
+| Host prefix | Scan target | Notes |
+|---|---|---|
+| `/24` | `x.x.x.0/24` | Normal LAN |
+| `/25` – `/31` | Actual subnet | Smaller segment |
+| `/32` | `x.x.x.0/24` | **Microsegmentation detected** — suite logs a warning and scans the containing /24 to probe east-west policy |
+| `/8` – `/23` | `x.x.x.0/24` | Large subnet capped at /24 to keep scan time reasonable |
+
+No extra flags needed — just use stager.sh.
+
+#### Method 2 — `--network=host`
+
+Run the container with `--network=host` to share the host's network namespace. The container can then see and scan the host's physical interfaces directly.
+
+```bash
+docker run --pull=always --detach --restart unless-stopped \
+  -p 7777:7777 --network=host --name traffgen jdibby/traffgen:latest \
+  --suite=all --size=S --max-wait-secs=20 --loop
+```
+
+> **Note:** `--network=host` is Linux-only. It does not work on Docker Desktop for Mac or Windows.
+
+If neither method is used, the suite logs a warning and falls back to scanning the container's own subnet (useful only for inter-container east-west testing).
 
 ---
 
 ### 🕵️ Evasion & Advanced Techniques
 
 #### 📻 `c2-beacon`
-Simulates a C2 beacon: periodic HTTP POST requests using randomised malware user-agent strings with random jitter delay between beacons. The request body contains a base64-encoded pseudo-random session ID, mimicking the check-in pattern of common RAT families. Tests C2 beacon detection rules in SIEM and NDR platforms.
+Simulates a C2 beacon: periodic HTTP POST requests using **known C2 framework user-agent strings** (the same pool as `malware-agents` — Cobalt Strike, Meterpreter, Empire, DarkComet, etc.) with random jitter delay between beacons. The request body contains a base64-encoded pseudo-random session ID, mimicking the check-in pattern of common RAT families. The combination of C2 UA + POST + base64 payload + jitter is a textbook beacon signature detectable by SASE behavioral analysis, NDR platforms, and SIEM rules. Tests C2 beacon detection rules end-to-end.
 
 #### 🧅 `dns-exfil`
 Simulates DNS data exfiltration using base32-encoded subdomains in DNS TXT queries, mimicking traffic produced by `iodine` and `dnscat2`. Tests whether DNS analytics detect high-entropy subdomain patterns characteristic of DNS tunnelling.
@@ -194,18 +235,10 @@ All requests use a fake `sk-DLPTEST-…` token — responses are HTTP 401/403. T
 
 | Suite | Description |
 |---|---|
-| 📢 `ads` | HEAD requests to advertising networks, analytics trackers, and telemetry endpoints. Tests ad-blocker and tracker-block URL filter categories. |
+| 📢 `ads` | HEAD requests to a random sample of domains from the [Hagezi pro blocklist](https://github.com/hagezi/dns-blocklists) (300k+ ad, tracker, telemetry, and malware domains). The list is fetched at first run and cached for the process lifetime; falls back to a small inline set if the CDN is unreachable. Tests ad-blocker and tracker-block URL filter categories at scale. |
 | 🤖 `ai-browse` | HEAD requests to AI and LLM service endpoints (API gateways, model-serving hosts). Tests the AI-category URL filter independently from browser-facing chat UIs. Useful for testing API-level AI access policies. |
 | 🔞 `pornography` | HTTPS crawl of adult-content endpoints. Tests the adult-content URL filter category and confirms policy enforcement is logging correctly. |
 | 🗂️ `dlp` | Downloads DLP test files over HTTPS containing structured PII and PCI data patterns (SSNs, credit card numbers, bank account numbers). Tests inline DLP file-scanning and download-inspection policies. |
-
----
-
-### 📞 VoIP & Video
-
-| Suite | Description |
-|---|---|
-| 📞 `voip` | Simulates voice and video call traffic across three phases to trigger application-identification on NGFWs and SASE platforms (Cato Networks, Prisma Access, Palo Alto, etc.):<br><br>**Phase 1 — STUN Binding Requests:** Raw UDP packets with the STUN magic cookie (`0x2112A442`) sent to public STUN servers (Google, Cloudflare, Zoom, Mozilla, and others on UDP/3478). The magic cookie is the primary fingerprint app-ID engines use to classify WebRTC, Zoom, Teams, and generic VoIP sessions.<br><br>**Phase 2 — UCaaS Signaling:** HTTPS requests to meeting/calling APIs for Zoom, Microsoft Teams, Cisco WebEx, Google Meet, Slack, RingCentral, 8x8, GoTo Meeting, Discord, WhatsApp, FaceTime, Vonage, Twilio, and Jitsi. URL-category databases identify these hostnames as "voice/video-conferencing" and trigger the relevant policy hit.<br><br>**Phase 3 — RTP Media Simulation:** UDP packets with valid RTP headers (V=2, PCMU/PCMA audio or H.264/H.265 video payload type) sent to STUN server IPs on standard media ports (5004, 5005, 16384+). Triggers RTP/SRTP app-classification rules without establishing a real media session. Packets are paced with 0.2–0.8 s gaps to mimic real codec timing. |
 
 ---
 
@@ -214,7 +247,7 @@ All requests use a fake `sk-DLPTEST-…` token — responses are HTTP 401/403. T
 | Suite | Description |
 |---|---|
 | 🚀 `speedtest` | Runs a `fast.com` speed test via the `fastcli` Python package. Rounds scale with `--size`. Establishes baseline bandwidth and confirms speed-test traffic appears in application-awareness logs. |
-| 📡 `snmp` | SNMPv2c `snmpwalk` queries against SNMP-enabled hosts using rotating community strings (`public`, `private`, and common defaults). Tests SNMP inspection and community-string detection. |
+| 📡 `snmp` | Three-function suite covering all SNMP versions: **SNMPv1** (18 community strings: `public`, `private`, `cisco`, `ILMI`, `manager`, `guest`, …), **SNMPv2c** (26 community strings: `public`, `private`, `readonly`, `readwrite`, `network`, `core`, …), and **SNMPv3** (20 credential sets across noAuthNoPriv, authNoPriv MD5/SHA, and authPriv DES/AES). Tests SNMP inspection, community-string detection, and SNMPv3 weak-credential signatures. |
 
 ---
 
@@ -265,8 +298,8 @@ Three-stage multi-arch build (`linux/amd64`, `linux/arm64`, `linux/arm/v7`):
 
 | Stage | Base Image | Purpose |
 |---|---|---|
-| `gobgp-build` | `golang:1.23-bookworm` | Compiles GoBGP v3.36.0 with stripped binaries |
-| `msf-build` | `debian:bookworm-slim` | Clones Metasploit, vendors gems, strips payloads and docs |
+| `gobgp-build` | `golang:1.26-bookworm` | Compiles GoBGP with stripped binaries |
+| `msf-build` | `jdibby/msf-base:latest` | Pre-built Metasploit base with vendored gems |
 | runtime | `debian:bookworm-slim` | Slim runtime — only compiled binaries and vendored Metasploit |
 
 **🐕 Watchdog:** A 600-second inactivity timer in `generator.py` force-exits the process when no test activity is detected. The container's `restart: unless-stopped` policy relaunches it immediately, providing self-healing for silent hangs.
@@ -434,21 +467,28 @@ All network targets are defined as plain Python lists in `endpoints.py` — DNS 
 | `ssh_endpoints` | `ssh` | SSH probe targets |
 | `nmap_endpoints` | `nmap` | Nmap port-scan targets |
 | `snmp_endpoints` | `snmp` | SNMP walk targets |
-| `snmp_strings` | `snmp` | SNMP community strings |
+| `snmp_v1_strings` | `snmp` | SNMPv1 community strings |
+| `snmp_v2c_strings` | `snmp` | SNMPv2c community strings |
+| `snmp_v3_creds` | `snmp` | SNMPv3 credential tuples (user, level, auth-proto, auth-pass, priv-proto, priv-pass) |
 | `http_endpoints` | `http` | Plain HTTP hostnames |
 | `https_endpoints` | `https`, `crawl`, `http3`, `speedtest`, `web-scanner` | General HTTPS URLs |
-| `ad_endpoints` | `ads` | Ad-network and tracker URLs |
+| *(Hagezi pro blocklist)* | `ads` | 300k+ domains fetched at runtime from [`cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/pro.txt`](https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/pro.txt); falls back to `ad_endpoints` in `endpoints.py` if unreachable |
 | `ai_endpoints` | `ai-browse` | AI-service HTTPS endpoints |
 | `webscan_endpoints` | `web-scanner` | Intentionally-vulnerable web app targets |
 | `kyber_endpoints` | `kyber` | Post-quantum TLS server URLs |
-| `malware_endpoints` | `malware-agents` | Malware / C2-category domains |
-| `malware_user_agents` | `malware-agents`, `c2-beacon` | Bot / malware user-agent strings |
+| `malware_endpoints` | `malware-agents` | Malware-category test URLs (WICAR, AMTSO, Google Safe Browsing test domains, http-evader) |
+| `c2_user_agents` | `malware-agents`, `c2-beacon` | C2 framework and malware family UAs (Cobalt Strike, Meterpreter, Empire, DarkComet, QuasarRAT, etc.) — triggers SASE/NGFW C2 UA detection rules |
+| `malware_user_agents` | *(available for custom use)* | ~600 bad-bot / scraper UAs — useful for WAF bot-detection testing |
 | `malware_files` | `malware-download` | RAT archive URLs for download testing |
 | `c2_beacon_targets` | `c2-beacon` | Public echo services for C2 check-in simulation |
 | `virus_endpoints` | `virus` | EICAR / AV-test file URLs |
 | `squatting_endpoints` | `domain-check`, `phishing-domains` | Domains probed for squatting detection |
 | `pornography_endpoints` | `pornography` | Adult-content URLs |
 | `dlp_https_endpoints` | `dlp` | DLP test-data file URLs |
+| `shadow_it_endpoints` | `shadow-it` | 27 unsanctioned cloud apps across CASB categories |
+| `tor_anonymizer_endpoints` | `tor-anonymizer` | Tor/VPN/proxy sites for URL-filter anonymizer category |
+| `waf_attack_targets` | `waf-attack` | Pen-test-authorised web apps for WAF probe targets |
+| `data_exfil_targets` | `data-exfil-http` | Paste/file-drop services for DLP POST simulation |
 | `user_agents` | all HTTP suites | 500 realistic browser user-agent strings |
 | `stun_servers` | `voip` | `(host, port)` tuples for STUN Binding Requests |
 | `ucaas_endpoints` | `voip` | UCaaS platform signaling URLs (Zoom, Teams, WebEx, etc.) |
@@ -508,7 +548,7 @@ The dashboard uses a **self-signed TLS certificate** generated at container star
 |---|---|
 | **Overview** | Stat cards (total requests, success rate, active test, iteration), Network I/O sparkline (1s default, selectable interval), success/failure donut chart, requests-over-time sparkline, per-test breakdown table, live events feed |
 | **Tests** | Card grid of every available suite with description, attempt/ok/fail counters, and a colour-coded success bar. Click any card to launch it immediately with custom settings. |
-| **Output** | CLI-style live log mirroring terminal output — ✔/✗/⚠ level icons, section banners, and rule separators. Filterable by level (OK / Warn / Error / Debug). Auto-scroll, clear, and **Pop Out** into a standalone window. |
+| **Live View** | CLI-style live log mirroring terminal output — ✔/✗/⚠ level icons, section banners, and rule separators. Filterable by level (OK / Warn / Error / Debug). Auto-scroll, clear, and **Pop Out** into a standalone window. |
 | **Health** | CPU/memory gauges, load average, disk I/O bars, network sparkline, and top-processes table sampled every 2 seconds. |
 
 ### Dark / Light Mode

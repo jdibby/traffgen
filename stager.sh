@@ -15,24 +15,61 @@
 
 set -euo pipefail
 
-cat <<'DISCLAIMER'
+# ── Warning banner ────────────────────────────────────────────────────────────
+cat <<'BANNER'
 
-==========================================================================
-                            ! DISCLAIMER !
-==========================================================================
+================================================================================
+            TRAFFGEN STAGER -- SYSTEM CHANGES WARNING
+================================================================================
 
-  This tool is intended for AUTHORIZED SECURITY TESTING AND RESEARCH
-  in controlled lab environments only.
+  This script will make the following changes to your system:
 
-  * You are solely responsible for obtaining explicit written
-    permission before testing any systems or networks.
-  * The author(s) accept NO liability for misuse, unauthorized access,
-    damage, data loss, or legal consequences arising from use of this
-    tool.
-  * Use of this software constitutes acceptance of these terms.
+    1. apt update        - refresh package index
+    2. apt upgrade       - upgrade ALL installed packages
+    3. Install deps      - ca-certificates, curl, gnupg, lsb-release
+    4. Install Docker CE - docker-ce, docker-ce-cli, containerd.io,
+                           docker-buildx-plugin, docker-compose-plugin
+    5. Enable Docker     - systemctl enable --now docker
+    6. Remove containers - stop and remove ALL existing Docker containers
+    7. Prune images      - delete ALL Docker images, volumes, build cache
+    8. Pull image        - jdibby/traffgen:latest from Docker Hub
+    9. Start container   - port 7777, restart unless-stopped
 
-==========================================================================
-DISCLAIMER
+  NOTE: Steps 6 & 7 will permanently DELETE all existing containers and
+  images on this host. Run on a dedicated machine, or review the script
+  at https://github.com/jdibby/traffgen/blob/main/stager.sh before use.
+
+--------------------------------------------------------------------------------
+
+  DISCLAIMER: For AUTHORIZED SECURITY TESTING AND RESEARCH only.
+  You are solely responsible for obtaining explicit written permission
+  before testing any systems or networks. The author(s) accept NO
+  liability for misuse, unauthorized access, damage, or data loss.
+
+================================================================================
+BANNER
+
+# Read acceptance — works both interactively and when piped via curl | bash
+printf '\nDo you accept these terms and wish to continue? [y/N] '
+if [ -t 0 ]; then
+    read -r _ACCEPT
+else
+    _ACCEPT=""
+    read -r _ACCEPT < /dev/tty 2>/dev/null || {
+        echo ""
+        echo "ERROR: No terminal available for interactive input." >&2
+        echo "       Save the script and run it directly: sudo bash stager.sh" >&2
+        exit 1
+    }
+fi
+case "${_ACCEPT}" in
+    y|Y|yes|YES) echo "" ;;
+    *)
+        echo ""
+        echo "Aborted."
+        exit 0
+        ;;
+esac
 
 # ── Privilege check ───────────────────────────────────────────────────────────
 if [ "$(id -u)" -ne 0 ]; then
@@ -125,6 +162,29 @@ case "${ID:-}" in
 esac
 
 ok "Detected: ${OS_LABEL}"
+
+# ── System package update & upgrade ──────────────────────────────────────────
+step "Updating and upgrading system packages"
+
+case "$PKG_FAMILY" in
+    deb)
+        export DEBIAN_FRONTEND=noninteractive
+        export NEEDRESTART_MODE=a
+        apt-get -qq update
+        apt-get -qq -y upgrade
+        ;;
+    rpm-rhel)
+        dnf -y -q upgrade
+        ;;
+    rpm-amzn)
+        if [ "${VERSION_ID:-}" = "2" ]; then
+            yum -y -q update
+        else
+            dnf -y -q upgrade
+        fi
+        ;;
+esac
+ok "System packages up to date"
 
 # ── Docker install (idempotent) ───────────────────────────────────────────────
 step "Checking Docker"
@@ -237,10 +297,32 @@ step "Pulling latest traffgen image"
 docker pull jdibby/traffgen:latest
 
 step "Starting traffgen container"
+
+# Capture the host's LAN IP and subnet prefix before the container starts.
+# This lets the lateral-movement suite scan the real physical network.
+# We grab both the IP and the prefix length (/24, /32, etc.) so the scanner
+# knows the actual network size.  If the prefix is /32 (microsegmentation),
+# the suite will assume /24 and note that microsegmentation is detected.
+HOST_LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+HOST_LAN_CIDR=""
+if [ -n "$HOST_LAN_IP" ]; then
+    _PREFIX=24  # safe default
+    if command -v ip >/dev/null 2>&1; then
+        _P=$(ip -o -f inet addr 2>/dev/null \
+             | awk -v h="$HOST_LAN_IP" 'index($4, h"/")>0 {split($4,a,"/"); print a[2]; exit}')
+        [ -n "$_P" ] && _PREFIX="$_P"
+    fi
+    HOST_LAN_CIDR="${HOST_LAN_IP}/${_PREFIX}"
+    ok "Host LAN detected: ${HOST_LAN_CIDR} (passed to container for lateral movement)"
+else
+    echo "WARNING: could not detect host LAN — lateral-movement suite will fall back to container network"
+fi
+
 docker run \
     --detach \
     --restart unless-stopped \
-    --network=host \
+    -p 7777:7777 \
+    ${HOST_LAN_CIDR:+-e HOST_LAN_CIDR="$HOST_LAN_CIDR"} \
     --name traffgen \
     jdibby/traffgen:latest \
     --suite=all --size=S --max-wait-secs=20 --loop
