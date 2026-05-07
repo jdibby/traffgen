@@ -23,6 +23,23 @@ This tool is intended for **authorized security testing and research in controll
 
 ---
 
+## 🆕 What's New in v3.0.0
+
+### Web Dashboard
+- **Active test in topbar** — currently running suite name (with emoji icon and pulse dot) is always visible at the top of every page
+- **Real suite names everywhere** — suite names display with dashes throughout the UI (e.g. `lateral-movement`, `c2-beacon`) so they correlate directly to `--suite` CLI flags
+- **Suite name tooltips** — hover over any suite name to see its full description
+- **Draggable widgets on all pages** — widgets on Security and Health pages can be reordered and position is saved to localStorage
+- **Block & Drop Trend hover** — mouse over the Security page trend chart to see exact block%, drop%, and allow% values at any data point
+- **Auto-navigate to Live View** — clicking Run on the Tests page automatically switches to Live View
+- **LIVE EVENTS font sizing** — header and row fonts match the TEST BREAKDOWN widget; time column widened and forced to 24-hour format
+- **Live View auto-scroll self-healing** — a 2-second watchdog catches and corrects any scroll drift when auto-scroll is enabled
+- **Network Info widget improvements** — virtual/bridge interfaces (veth*, docker*, br-*) filtered out; Host LAN IP shown when running with `--network=host`
+- **Suite icons on all tests** — `lateral-movement`, `log4shell`, `tls-check`, `shadow-it`, `waf-attack`, `data-exfil-http`, `tor-anonymizer` now have emoji icons
+
+### CLI
+- **Cleaner `--help` menu** — grouped options, expanded `--size` descriptions, copy-pasteable examples section, and dashboard URL reminder
+
 ## ⚡ Quick Start
 
 ```bash
@@ -78,6 +95,9 @@ The dashboard includes:
 - **Dark / light mode** — toggle with the ☾ button in the topbar; preference saved across sessions
 - **Controls** — pause, resume, stop, and settings drawer to change suite/size/wait without restarting the container
 - **Status pill** — live state badge in the topbar: `Running` (with pulse dot), `Between Tests (Ns)` with a live countdown during inter-test pauses, `Paused`, and `Stopped`
+- **Active test pill** — currently running suite (emoji icon + name) always visible in topbar regardless of which page is open
+- **Draggable widgets** — drag-to-reorder on Overview, Security, and Health pages; order saved to localStorage
+- **Suite tooltips** — hover over any suite name for its description; hover over trend/sparkline charts for exact values at any data point
 - **Multi-user:** first browser tab gets full control; additional tabs are read-only with a visible banner
 
 > **Full documentation:** [docs/web-dashboard.md](docs/web-dashboard.md)
@@ -602,7 +622,7 @@ docker buildx build \
 docker buildx build \
   --platform linux/amd64,linux/arm64,linux/arm/v7 \
   --tag jdibby/traffgen:latest \
-  --tag jdibby/traffgen:2.6.0 \
+  --tag jdibby/traffgen:3.0.0 \
   --push .
 ```
 
