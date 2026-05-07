@@ -777,7 +777,7 @@ body{display:flex;background:var(--bg);color:var(--text);font-family:-apple-syst
 .content{flex:1;display:flex;flex-direction:column}
 .panel{display:none;flex-direction:column;gap:14px;padding:18px}
 .panel.active{display:flex}
-#tab-output.panel{padding:0;gap:0;overflow:hidden;flex:1;min-height:0}
+#tab-output.panel{padding:0;gap:0}
 .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
 @media(max-width:1000px){.cards{grid-template-columns:repeat(2,1fr)}}
 .card{background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:3px;transition:border-color .15s,box-shadow .15s;box-shadow:0 1px 4px rgba(0,0,0,.25)}
@@ -852,7 +852,7 @@ td.nm{font-family:inherit;font-weight:500;font-size:12px}
 .btn:hover{border-color:var(--green);color:var(--green)}
 .btn.af{border-color:var(--green);color:var(--green);background:var(--gdim)}
 .fgrp{display:flex;gap:4px}
-.obody{flex:1;overflow-y:auto;min-height:0;font-family:'SF Mono',Consolas,monospace;font-size:12px;line-height:1.65;background:#080c10}
+.obody{flex:1;min-height:calc(100vh - 100px);font-family:'SF Mono',Consolas,monospace;font-size:12px;line-height:1.65;background:#080c10}
 .ll{padding:1px 14px;display:flex;align-items:baseline;gap:0;white-space:pre-wrap;word-break:break-all}
 .ll:hover{background:rgba(255,255,255,.025)}
 .ll-sep{padding:5px 0;display:flex;align-items:center}
@@ -999,7 +999,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
   </div>
 </aside>
 <!-- Main -->
-<div class="main">
+<div class="main" id="main-scroll">
   <div class="topbar">
     <span class="pg-title" id="pg-title">Overview</span>
     <span id="cfg-s-pill" class="mono" style="color:var(--muted)">—</span>
@@ -1618,7 +1618,7 @@ function appendLog(d){
   }
   if(!structural&&_logFilter!=='all'&&!div.classList.contains(_logFilter))div.style.display='none';
   b.appendChild(div);
-  if(_autoScroll)b.scrollTop=b.scrollHeight;
+  if(_autoScroll){const ms=$('main-scroll');if(ms)ms.scrollTop=ms.scrollHeight;}
   while(b.children.length>800)b.removeChild(b.firstChild);
 }
 function toggleAS(){_autoScroll=!_autoScroll;$('btn-as').innerHTML='Auto-scroll '+(_autoScroll?'&#10003;':'&#10007;');}
