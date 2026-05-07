@@ -1019,21 +1019,10 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
   <div class="content">
     <!-- Overview -->
     <div id="tab-overview" class="panel active">
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <div class="cc" style="flex:1;min-width:120px;padding:10px 14px">
-          <div style="font-size:9px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)">CPU</div>
-          <div id="ov-cpu" style="font-size:22px;font-weight:700;color:var(--green);font-family:'SF Mono',Consolas,monospace;margin-top:4px">&#8212;</div>
-        </div>
-        <div class="cc" style="flex:1;min-width:120px;padding:10px 14px">
-          <div style="font-size:9px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)">Memory</div>
-          <div id="ov-mem" style="font-size:22px;font-weight:700;color:var(--blue);font-family:'SF Mono',Consolas,monospace;margin-top:4px">&#8212;</div>
-        </div>
-        <div class="cc" style="flex:2;min-width:200px;padding:10px 14px">
-          <div style="font-size:9px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)">Load Average <span style="opacity:.6">1m &middot; 5m &middot; 15m</span></div>
-          <div id="ov-load" style="font-size:18px;font-weight:700;color:var(--amber);font-family:'SF Mono',Consolas,monospace;margin-top:4px">&#8212;</div>
-        </div>
-      </div>
       <div class="cards" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))">
+        <div class="card"><div class="clbl">CPU</div><div class="cval c-green" id="ov-cpu">&#8212;</div></div>
+        <div class="card"><div class="clbl">Memory</div><div class="cval c-blue" id="ov-mem">&#8212;</div></div>
+        <div class="card"><div class="clbl">Load Average <span style="font-weight:400;letter-spacing:0;text-transform:none;font-size:9px;opacity:.7">1m &middot; 5m &middot; 15m</span></div><div class="cval c-amber" id="ov-load" style="font-size:14px">&#8212;</div></div>
         <div class="card"><div class="clbl">Total Requests</div><div class="cval c-blue" id="v-total">&#8212;</div><div class="csub" id="s-total">&#8212;</div></div>
         <div class="card"><div class="clbl">Success Rate</div><div class="cval" id="v-rate">&#8212;</div><div class="csub" id="s-rate">&#8212;</div></div>
         <div class="card hi"><div class="clbl">Active Test</div><div class="cval c-green" id="v-test" style="font-size:15px">&#8212;</div><div class="csub" id="s-test">&#8212;</div></div>
