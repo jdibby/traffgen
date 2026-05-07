@@ -3165,8 +3165,8 @@ def parse_cli() -> argparse.Namespace:
         help=f"Test suite to run (default: all).  Choices:\n  {', '.join(suite_choices)}",
     )
     traffic.add_argument(
-        "--size", type=str.upper, choices=["XS", "S", "M", "L", "XL"], default="M",
-        help="Volume of traffic: XS=tiny  S=small  M=medium  L=large  XL=extra-large (default: M)",
+        "--size", type=str.upper, choices=["XS", "S", "M", "L", "XL"], default="S",
+        help="Volume of traffic: XS=tiny  S=small  M=medium  L=large  XL=extra-large (default: S)",
     )
 
     timing = parser.add_argument_group("Timing & Loop")
