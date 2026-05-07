@@ -1082,7 +1082,8 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
     </div>
     <!-- Security Summary -->
     <div id="tab-security" class="panel">
-      <div class="cards">
+      <div id="sec-grid" style="display:flex;flex-direction:column;gap:14px">
+      <div class="cards" data-widget="sec-stats">
         <div class="card"><div class="clbl">Total Probes</div><div class="cval c-blue" id="sec-total">&#8212;</div><div class="csub" id="sec-total-sub">&#8212;</div></div>
         <div class="card"><div class="clbl">Blocked</div><div class="cval" id="sec-blocked" style="color:var(--amber)">&#8212;</div><div class="csub" id="sec-blocked-sub">&#8212;</div></div>
         <div class="card"><div class="clbl">Silently Dropped</div><div class="cval" id="sec-dropped" style="color:#818cf8">&#8212;</div><div class="csub" id="sec-dropped-sub">&#8212;</div></div>
@@ -1111,15 +1112,16 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
           <canvas id="sec-trend" style="width:100%;height:160px"></canvas>
         </div>
       </div>
-      <div class="tcard">
+      <div class="tcard" data-widget="sec-breakdown">
         <div class="thdr">Per-Suite Security Breakdown <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px">sorted by blocked</span></div>
         <table><thead><tr><th>Suite</th><th class="r">Probes</th><th class="r" style="color:#22c55e">Allowed</th><th class="r" style="color:var(--amber)">Blocked</th><th class="r" style="color:#818cf8">Dropped</th><th class="r">Block%</th><th class="r">Drop%</th></tr></thead>
         <tbody id="sec-tbl"><tr><td colspan="7" class="empty">Waiting for data&#8230;</td></tr></tbody></table>
       </div>
-      <div class="tcard">
+      <div class="tcard" data-widget="sec-signals">
         <div class="thdr">Block Signal Breakdown <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px">how security controls are signalling blocks</span></div>
         <div id="sec-signals" class="sec-signals"><div class="empty">Waiting for data&#8230;</div></div>
       </div>
+      </div><!-- /#sec-grid -->
     </div>
     <!-- Tests -->
     <div id="tab-tests" class="panel">
@@ -1149,14 +1151,15 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
     </div>
     <!-- Health -->
     <div id="tab-health" class="panel">
-      <div class="tcard">
+      <div id="health-grid" style="display:flex;flex-direction:column;gap:14px">
+      <div class="tcard" data-widget="h-netinfo">
         <div class="thdr">Network Interfaces
           <span style="color:var(--muted);font-weight:400;letter-spacing:0;text-transform:none;font-size:15px">Public IP: <span id="h-pub-ip" style="color:var(--green);font-family:'SF Mono',Consolas,monospace;font-size:17px;font-weight:600">&#8212;</span></span>
         </div>
         <table><thead><tr><th>Interface</th><th>IPv4 Address</th><th>MAC Address</th><th class="r">Speed</th><th class="r">MTU</th><th class="r">Link</th></tr></thead>
         <tbody id="netinfo-body"><tr><td colspan="6" class="empty">Loading&#8230;</td></tr></tbody></table>
       </div>
-      <div class="h-row">
+      <div class="h-row" data-widget="h-io-row">
         <div class="cc">
           <div class="ctitle">Swap Usage <span id="swap-pct" style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim)"></span></div>
           <div id="swap-detail" style="font-family:'SF Mono',Consolas,monospace;font-size:14px;color:var(--muted);margin-top:4px">&#8212; MB / &#8212; MB used</div>
@@ -1172,7 +1175,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
           </div>
         </div>
       </div>
-      <div class="h-row">
+      <div class="h-row" data-widget="h-sys-row">
         <div class="cc">
           <div class="ctitle">System Uptime</div>
           <div id="sys-uptime" style="font-family:'SF Mono',Consolas,monospace;font-size:20px;color:var(--green);padding:8px 0 4px">&#8212;</div>
@@ -1185,7 +1188,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
           </div>
         </div>
       </div>
-      <div class="h-gauges">
+      <div class="h-gauges" data-widget="h-gauges">
         <div class="cc"><div class="ctitle">CPU Usage <span id="cpu-cur" style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim)"></span></div>
           <div class="gauge-wrap"><canvas id="cpu-gauge" width="200" height="130"></canvas></div>
           <canvas id="cpu-spark" style="width:100%;height:44px;margin-top:8px"></canvas>
@@ -1198,7 +1201,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
           <canvas id="mem-spark" style="width:100%;height:44px;margin-top:8px"></canvas>
         </div>
       </div>
-      <div class="h-row">
+      <div class="h-row" data-widget="h-load-row">
         <div class="cc">
           <div class="ctitle">Load Average <span style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim)">1m &middot; 5m &middot; 15m</span></div>
           <div id="h-load" style="font-family:'SF Mono',Consolas,monospace;font-size:20px;color:var(--green);padding:8px 0 4px">&#8212; &middot; &#8212; &middot; &#8212;</div>
@@ -1212,7 +1215,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
           <canvas id="disk-bars" width="300" height="58" style="width:100%"></canvas>
         </div>
       </div>
-      <div class="cc">
+      <div class="cc" data-widget="h-net-io">
         <div class="ctitle">Network I/O <span id="h-net-iface" style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim)"></span></div>
         <div style="display:flex;gap:24px;font-family:'SF Mono',Consolas,monospace;font-size:15px;margin-top:6px">
           <div><div style="font-size:12px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)">&#9660; Receive</div><div id="h-rx" class="c-green" style="font-size:22px;font-weight:700;margin-top:3px">&#8212;</div></div>
@@ -1224,11 +1227,12 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
           <span>&#8593; cumulative: <span id="cum-tx" style="color:var(--blue)">&#8212;</span></span>
         </div>
       </div>
-      <div class="tcard">
+      <div class="tcard" data-widget="h-top-proc">
         <div class="thdr">Top Processes <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px">sorted by CPU</span></div>
         <table><thead><tr><th class="r">PID</th><th>Name</th><th class="r">CPU%</th><th class="r">Mem%</th><th class="r">RSS</th></tr></thead>
         <tbody id="proc-body"><tr><td colspan="5" class="empty">Loading&#8230;</td></tr></tbody></table>
       </div>
+      </div><!-- /#health-grid -->
     </div>
     <!-- About -->
     <div id="tab-about" class="panel">
@@ -1484,8 +1488,8 @@ function showTab(btn){
   if(btn.dataset.tab==='output')connectLog();
   clearInterval(_healthTimer);_healthTimer=null;
   clearInterval(_secTimer);_secTimer=null;
-  if(btn.dataset.tab==='health'){pollHealth();pollNetInfo();_healthTimer=setInterval(pollHealth,2500);}
-  if(btn.dataset.tab==='security'){updateSecurityTab();_secTimer=setInterval(updateSecurityTab,_secInterval);}
+  if(btn.dataset.tab==='health'){pollHealth();pollNetInfo();_healthTimer=setInterval(pollHealth,2500);_initDrag('health-grid');}
+  if(btn.dataset.tab==='security'){updateSecurityTab();_secTimer=setInterval(updateSecurityTab,_secInterval);_initDrag('sec-grid');}
 }
 function drawDonut(ok,fail){
   const c=$('donut'),ctx=c.getContext('2d'),W=c.width,H2=c.height,cx=W/2,cy=H2/2,r=66,ri=46;
@@ -2048,6 +2052,8 @@ checkRole();
 connect();
 setInterval(checkRole,5000);
 _initDrag('ov-grid');
+_initDrag('sec-grid');
+_initDrag('health-grid');
 
 // ── Disclaimer modal (shown once per browser session) ─────────────────────
 (function(){
