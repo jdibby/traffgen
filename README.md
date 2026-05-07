@@ -71,7 +71,7 @@ The dashboard includes:
 - **Overview** — stat cards, live Network I/O sparkline in Mbps (1 s default refresh with selectable interval), requests-over-time chart, per-test breakdown table, and live events feed
 - **Security** — dedicated security posture page modeled on NGFW/SASE dashboards: KPI cards (Total Probes / Blocked / Silently Dropped / Allowed), outcome-distribution donut, block & drop trend sparkline, per-suite security breakdown table sorted by blocked count, and a block-signal breakdown showing exactly how controls are signalling blocks (HTTP 403 block page, TCP RST, proxy refused, TLS intercept, DNS sinkhole, timeout). Refresh interval is configurable (default 1 m, 30 s–5 m).
 - **Tests** — card grid for every suite; click any card to launch it immediately with custom settings
-- **Output** — CLI-style live log with level coloring (✔ OK, ✗ Error, ⚠ Warn), section banners, and rule separators mirroring the terminal output; filterable by level
+- **Live View** — CLI-style live log with level coloring (✔ OK, ✗ Error, ⚠ Warn), section banners, and rule separators mirroring the terminal output; filterable by level
 - **Health** — CPU/memory gauges, load average, disk I/O bars, network sparkline in Mbps, top-processes table
 - **Dark / light mode** — toggle with the ☾ button in the topbar; preference saved across sessions
 - **Controls** — pause, resume, stop, and settings drawer to change suite/size/wait without restarting the container
@@ -140,14 +140,14 @@ The dashboard includes:
 
 | Suite | Description |
 |---|---|
-| 🚨 `ids-trigger` | Sends a HEAD request to `testmyids.com` with the `BlackSun` user-agent string — a classic Snort/Suricata IDS/IPS signature. Confirms that IDS alert rules are active and generating SIEM events. |
-| 🦠 `malware-agents` | HEAD requests to benign endpoints using known malware user-agent strings (Emotet, Cobalt Strike, AsyncRAT, and others). Tests whether user-agent-based IDS/IPS signatures fire for malware-associated UA patterns. |
+| 🚨 `ids-trigger` | Fires a battery of **16 HTTP requests** targeting `testmyids.com` — the Emerging Threats IDS validation service — each matching a distinct Snort/Suricata signature category: **10 scanner user-agents** (BlackSun, ZmEu, Havij, sqlmap, Nikto, Acunetix, w3af, masscan, DirBuster, libwww-perl) and **6 web-attack URL probes** (LFI `../../etc/passwd`, SQLi `UNION SELECT`, XSS `<script>`, `.env` disclosure, wp-admin, cmd-injection). All requests target testmyids.com — no unauthorized hosts are scanned. Tests inline IDS/IPS (Snort, Suricata, Cisco FTD, Palo Alto NGFW with IPS rules) signature coverage across multiple rule categories. |
+| 🦠 `malware-agents` | HEAD requests to malware-category test URLs using **known C2 framework user-agents**. Destinations include WICAR, AMTSO, and Google Safe Browsing test URLs — specifically designed to trigger URL-category blocks on SASE/NGFW platforms (Zscaler, Cato, Prisma Access, Netskope, Palo Alto). UAs cover Cobalt Strike (jQuery/IE11/Trident malleable profiles), Metasploit Meterpreter, PowerShell Empire, Sliver, DarkComet RAT, QuasarRAT, Emotet/TrickBot family, AgentTesla, njRAT, python-requests, Go-http-client, Java RATs, curl, and PowerShell Invoke-WebRequest — the exact strings in major SASE vendor threat-intel feeds. Exercises both URL-category blocking and C2 UA behavioral detection independently. |
 | ⬇️ `malware-download` | Downloads known-malware file samples from public repositories to `/dev/null`. Tests whether anti-malware scanning or URL reputation filtering blocks downloads before they reach the endpoint. |
 | 🧬 `virus` | Downloads EICAR anti-virus test files and virus sample markers to `/dev/null`. Confirms that inline AV scanning is active and reporting correctly. |
 | 🚫 `domain-check` | Probes a random sample of domains from the **Hagezi DNS blocklist**. Tests whether DNS-based threat intelligence blocks known bad domains and generates expected SIEM events. |
 | 🎣 `phishing-domains` | Probes a random sample of domains from an active phishing domain feed. Tests anti-phishing DNS/URL filtering, confirms phishing-category blocks appear in firewall logs, and validates events reach the SIEM. |
 | 🔤 `squatting` | Runs `dnstwist` typosquatting generation against popular brand domains. Generates hundreds of lookalike domain variants (homoglyphs, additions, transpositions) and resolves them. Tests whether DNS analytics detect typosquatting lookups. |
-| 🗺️ `nmap` | Nmap port scan covering ports 1–1024 against a target list, followed by an NSE CVE-script scan. Tests whether IDS/IPS detects and alerts on port-scan patterns and CVE-detection signatures. |
+| 🗺️ `nmap` | Nmap port scan covering ports 1–1024 against a target list, followed by an NSE CVE-script scan (`--script=ALL`). Targets are restricted to explicitly authorized public hosts: `scanme.nmap.org` (Nmap's official scan-me service), `testmyids.com`, and `juice-shop.herokuapp.com`. Tests whether IDS/IPS detects and alerts on port-scan patterns and CVE-detection signatures. Note: raw TCP scans are not proxied through SASE; use `ids-trigger` or `malware-agents` for SASE coverage. |
 | 🔬 `web-scanner` | Nikto web vulnerability scanner against `testmyids.com`. Generates a broad mix of vulnerability-probe HTTP requests (path traversal, header injection, known CVE probes). Scan duration scales with `--size`. |
 | 💥 `metasploit-check` | Runs Metasploit `.rc` scripts in **check-only mode** — no exploitation performed. Scripts issue the same probe traffic Metasploit uses to fingerprint a target before exploit delivery, without sending any payload. Covers 46 check scripts across web apps, network appliances, databases, and protocol-level scanners. Tests IDS/IPS, CASB, and SIEM detection of Metasploit fingerprint traffic. |
 
@@ -156,7 +156,7 @@ The dashboard includes:
 ### 🕵️ Evasion & Advanced Techniques
 
 #### 📻 `c2-beacon`
-Simulates a C2 beacon: periodic HTTP POST requests using randomised malware user-agent strings with random jitter delay between beacons. The request body contains a base64-encoded pseudo-random session ID, mimicking the check-in pattern of common RAT families. Tests C2 beacon detection rules in SIEM and NDR platforms.
+Simulates a C2 beacon: periodic HTTP POST requests using **known C2 framework user-agent strings** (the same pool as `malware-agents` — Cobalt Strike, Meterpreter, Empire, DarkComet, etc.) with random jitter delay between beacons. The request body contains a base64-encoded pseudo-random session ID, mimicking the check-in pattern of common RAT families. The combination of C2 UA + POST + base64 payload + jitter is a textbook beacon signature detectable by SASE behavioral analysis, NDR platforms, and SIEM rules. Tests C2 beacon detection rules end-to-end.
 
 #### 🧅 `dns-exfil`
 Simulates DNS data exfiltration using base32-encoded subdomains in DNS TXT queries, mimicking traffic produced by `iodine` and `dnscat2`. Tests whether DNS analytics detect high-entropy subdomain patterns characteristic of DNS tunnelling.
@@ -264,8 +264,8 @@ Three-stage multi-arch build (`linux/amd64`, `linux/arm64`, `linux/arm/v7`):
 
 | Stage | Base Image | Purpose |
 |---|---|---|
-| `gobgp-build` | `golang:1.23-bookworm` | Compiles GoBGP v3.36.0 with stripped binaries |
-| `msf-build` | `debian:bookworm-slim` | Clones Metasploit, vendors gems, strips payloads and docs |
+| `gobgp-build` | `golang:1.26-bookworm` | Compiles GoBGP with stripped binaries |
+| `msf-build` | `jdibby/msf-base:latest` | Pre-built Metasploit base with vendored gems |
 | runtime | `debian:bookworm-slim` | Slim runtime — only compiled binaries and vendored Metasploit |
 
 **🐕 Watchdog:** A 600-second inactivity timer in `generator.py` force-exits the process when no test activity is detected. The container's `restart: unless-stopped` policy relaunches it immediately, providing self-healing for silent hangs.
@@ -442,8 +442,9 @@ All network targets are defined as plain Python lists in `endpoints.py` — DNS 
 | `ai_endpoints` | `ai-browse` | AI-service HTTPS endpoints |
 | `webscan_endpoints` | `web-scanner` | Intentionally-vulnerable web app targets |
 | `kyber_endpoints` | `kyber` | Post-quantum TLS server URLs |
-| `malware_endpoints` | `malware-agents` | Malware / C2-category domains |
-| `malware_user_agents` | `malware-agents`, `c2-beacon` | Bot / malware user-agent strings |
+| `malware_endpoints` | `malware-agents` | Malware-category test URLs (WICAR, AMTSO, Google Safe Browsing test domains, http-evader) |
+| `c2_user_agents` | `malware-agents`, `c2-beacon` | C2 framework and malware family UAs (Cobalt Strike, Meterpreter, Empire, DarkComet, QuasarRAT, etc.) — triggers SASE/NGFW C2 UA detection rules |
+| `malware_user_agents` | *(available for custom use)* | ~600 bad-bot / scraper UAs — useful for WAF bot-detection testing |
 | `malware_files` | `malware-download` | RAT archive URLs for download testing |
 | `c2_beacon_targets` | `c2-beacon` | Public echo services for C2 check-in simulation |
 | `virus_endpoints` | `virus` | EICAR / AV-test file URLs |
@@ -509,7 +510,7 @@ The dashboard uses a **self-signed TLS certificate** generated at container star
 |---|---|
 | **Overview** | Stat cards (total requests, success rate, active test, iteration), Network I/O sparkline (1s default, selectable interval), success/failure donut chart, requests-over-time sparkline, per-test breakdown table, live events feed |
 | **Tests** | Card grid of every available suite with description, attempt/ok/fail counters, and a colour-coded success bar. Click any card to launch it immediately with custom settings. |
-| **Output** | CLI-style live log mirroring terminal output — ✔/✗/⚠ level icons, section banners, and rule separators. Filterable by level (OK / Warn / Error / Debug). Auto-scroll, clear, and **Pop Out** into a standalone window. |
+| **Live View** | CLI-style live log mirroring terminal output — ✔/✗/⚠ level icons, section banners, and rule separators. Filterable by level (OK / Warn / Error / Debug). Auto-scroll, clear, and **Pop Out** into a standalone window. |
 | **Health** | CPU/memory gauges, load average, disk I/O bars, network sparkline, and top-processes table sampled every 2 seconds. |
 
 ### Dark / Light Mode
