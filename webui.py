@@ -2054,6 +2054,12 @@ wireTip('h-net-spark',10,6,()=>_hNetHist,p=>[
   `<span style="color:var(--green)">▼ RX&nbsp;&nbsp;${fmtIO(p.rx||0)}</span>`,
   `<span style="color:var(--blue)">▲ TX&nbsp;&nbsp;${fmtIO(p.tx||0)}</span>`
 ]);
+wireTip('sec-trend',36,10,()=>_secHist,p=>[
+  `<span style="color:var(--muted)">${Tc(p.t)}</span>`,
+  `<span style="color:#f59e0b">⬛ Block&nbsp;&nbsp;${p.block_pct!=null?p.block_pct.toFixed(1)+'%':'—'}</span>`,
+  `<span style="color:#818cf8">╌ Drop&nbsp;&nbsp;&nbsp;${p.drop_pct!=null?p.drop_pct.toFixed(1)+'%':'—'}</span>`,
+  p.reach_pct!=null?`<span style="color:#22c55e">✔ Allow&nbsp;&nbsp;${p.reach_pct.toFixed(1)+'%'}</span>`:''
+]);
 checkRole();
 connect();
 setInterval(checkRole,5000);
