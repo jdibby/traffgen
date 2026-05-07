@@ -593,14 +593,14 @@ body{display:flex;background:var(--bg);color:var(--text);font-family:-apple-syst
 .card{background:var(--surf);border:1px solid var(--border);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:3px;transition:border-color .15s}
 .card:hover{border-color:var(--border2)}
 .card.hi{border-color:rgba(34,197,94,.3);background:var(--gdim)}
-.clbl{font-size:14px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)}
+.clbl{font-size:13px;font-weight:500;color:var(--muted)}
 .cval{font-size:26px;font-weight:700;font-family:'SF Mono',Consolas,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
 .csub{font-size:14px;color:var(--muted);margin-top:1px}
 .c-green{color:var(--green)}.c-red{color:var(--red)}.c-amber{color:var(--amber)}.c-blue{color:var(--blue)}.c-mut{color:var(--muted)}
 .charts{display:grid;grid-template-columns:230px 1fr;gap:12px}
 @media(max-width:860px){.charts{grid-template-columns:1fr}}
 .cc{background:var(--surf);border:1px solid var(--border);border-radius:var(--r);padding:14px}
-.ctitle{font-size:13px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+.ctitle{font-size:15px;font-weight:600;color:var(--text);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
 .donut-wrap{display:flex;flex-direction:column;align-items:center;gap:10px}
 .legend{display:flex;gap:12px;font-size:14px}
 .leg{display:flex;align-items:center;gap:5px}
@@ -610,11 +610,11 @@ body{display:flex;background:var(--bg);color:var(--text);font-family:-apple-syst
 .sec-signals{display:flex;flex-wrap:wrap;gap:10px;padding:12px 14px}
 .sec-sig{background:var(--surf2);border:1px solid var(--border);border-radius:6px;padding:8px 14px;font-family:'SF Mono',Consolas,monospace;font-size:15px;display:flex;flex-direction:column;gap:3px;min-width:120px}
 .sec-sig-val{font-size:24px;font-weight:700}
-.sec-sig-lbl{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.sec-sig-lbl{font-size:13px;color:var(--muted)}
 .tcard{background:var(--surf);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
-.thdr{padding:10px 14px 8px;font-size:13px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.thdr{padding:10px 14px 8px;font-size:15px;font-weight:600;color:var(--text);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
 table{width:100%;border-collapse:collapse;font-size:15px}
-thead th{padding:6px 12px;text-align:left;font-size:13px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);background:var(--surf2);border-bottom:1px solid var(--border)}
+thead th{padding:6px 12px;text-align:left;font-size:13px;font-weight:600;color:var(--muted);background:var(--surf2);border-bottom:1px solid var(--border)}
 th.r,td.r{text-align:right}
 tbody tr.mrow{border-bottom:1px solid var(--border);transition:background .1s;cursor:pointer}
 tbody tr.mrow:hover{background:var(--surf2)}
@@ -634,7 +634,7 @@ td.nm{font-family:inherit;font-weight:500;font-size:15px}
 .chev{font-size:13px;color:var(--muted);transition:transform .15s;display:inline-block}
 .chev.open{transform:rotate(90deg)}
 .ecard{background:var(--surf);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
-.ehdr{padding:10px 14px 8px;font-size:13px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);display:flex;justify-content:space-between}
+.ehdr{padding:10px 14px 8px;font-size:15px;font-weight:600;color:var(--text);border-bottom:1px solid var(--border);display:flex;justify-content:space-between}
 .ebody{max-height:200px;overflow-y:auto}
 .ev-wrap{border-bottom:1px solid rgba(30,45,61,.6);cursor:pointer}
 .ev-wrap:last-child{border-bottom:none}
@@ -656,7 +656,7 @@ td.nm{font-family:inherit;font-weight:500;font-size:15px}
 .tcbar{width:100%;height:2px;background:var(--border2);border-radius:1px;overflow:hidden;margin-top:1px}
 .tcbf{height:100%;border-radius:1px;transition:width .4s}
 .otb{display:flex;gap:6px;padding:8px 12px;background:var(--surf);border-bottom:1px solid var(--border);align-items:center;flex-shrink:0;flex-wrap:wrap}
-.otlbl{font-size:13px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-right:auto}
+.otlbl{font-size:15px;font-weight:600;color:var(--text);margin-right:auto}
 .btn{padding:4px 11px;border-radius:var(--r);border:1px solid var(--border2);background:var(--surf2);color:var(--muted);font-size:14px;cursor:pointer;transition:all .12s}
 .btn:hover{border-color:var(--green);color:var(--green)}
 .btn.af{border-color:var(--green);color:var(--green);background:var(--gdim)}
@@ -689,7 +689,7 @@ td.nm{font-family:inherit;font-weight:500;font-size:15px}
 .pg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px}
 .pg-badge{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--surf2);border:1px solid var(--border);border-radius:var(--r);font-size:15px}
 .st-table{width:100%;border-collapse:collapse;font-size:15px}
-.st-table th{padding:5px 10px;text-align:left;font-size:13px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--muted)}
+.st-table th{padding:5px 10px;text-align:left;font-size:13px;font-weight:600;color:var(--muted)}
 .st-table td{padding:5px 10px;border-top:1px solid var(--border);color:var(--muted)}
 .st-table td:first-child{font-weight:500;color:var(--text);font-family:'SF Mono',Consolas,monospace;font-size:14px;white-space:nowrap}
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:299}
@@ -700,7 +700,7 @@ td.nm{font-family:inherit;font-weight:500;font-size:15px}
 .dtitle{font-weight:600;font-size:16px}
 .dbody{padding:16px;display:flex;flex-direction:column;gap:14px;flex:1;overflow-y:auto}
 .field{display:flex;flex-direction:column;gap:5px}
-.field label{font-size:13px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)}
+.field label{font-size:13px;font-weight:600;color:var(--muted)}
 .field select{width:100%;padding:7px 10px;background:var(--bg);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-size:15px;outline:none}
 .field select:focus{border-color:var(--green)}
 .rngw{display:flex;align-items:center;gap:10px}
@@ -728,9 +728,9 @@ input:checked+.tslider:before{transform:translateX(17px)}
 .modal-desc{font-size:15px;color:var(--muted);line-height:1.5;padding:9px 11px;background:var(--surf2);border-radius:var(--r);border-left:3px solid var(--green)}
 .mstats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .mstat{padding:8px 10px;background:var(--surf2);border-radius:var(--r);display:flex;flex-direction:column;gap:2px}
-.mstat-lbl{font-size:12px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)}
+.mstat-lbl{font-size:12px;font-weight:600;color:var(--muted)}
 .mstat-val{font-size:18px;font-weight:700;font-family:'SF Mono',Consolas,monospace}
-.modal-sep{font-size:13px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);padding-bottom:4px;border-bottom:1px solid var(--border)}
+.modal-sep{font-size:13px;font-weight:600;color:var(--muted);padding-bottom:4px;border-bottom:1px solid var(--border)}
 .modal-ftr{padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px}
 .btn-run{flex:1;padding:9px;background:var(--green);color:#080c10;border:none;border-radius:var(--r);font-size:15px;font-weight:700;cursor:pointer;transition:opacity .12s}
 .btn-run:hover{opacity:.85}
@@ -759,7 +759,7 @@ html.light .obody .ll:hover{background:rgba(0,0,0,.04)}html.light .cmd-blk{backg
 .gauge-wrap{display:flex;flex-direction:column;align-items:center;padding-top:4px}
 .net-widget{display:flex;gap:16px;padding:6px 0;font-family:'SF Mono',Consolas,monospace;font-size:15px;align-items:center}
 .net-dir{display:flex;flex-direction:column;gap:1px}
-.net-lbl{font-size:12px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+.net-lbl{font-size:12px;font-weight:600;color:var(--muted)}
 .net-val{font-size:17px;font-weight:700}
 .ro-banner{display:none;align-items:center;gap:10px;padding:7px 18px;background:rgba(245,158,11,.07);border-bottom:2px solid var(--amber);font-size:15px;color:var(--amber);flex-shrink:0}
 .ro-banner strong{font-weight:700}
@@ -835,7 +835,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div class="card"><div class="clbl">Iteration</div><div class="cval c-amber" id="v-iter">&#8212;</div><div class="csub" id="s-iter">&#8212;</div></div>
       </div>
       <div class="cc" style="display:flex;flex-direction:column;gap:10px">
-        <div class="ctitle">Network I/O <span id="net-iface" style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim);font-size:12px"></span>
+        <div class="ctitle">Network I/O <span id="net-iface" style="font-weight:400;color:var(--dim);font-size:13px"></span>
           <select class="net-interval" onchange="setNetInterval(+this.value)" title="Refresh interval">
             <option value="1000" selected>1s</option><option value="2000">2s</option>
             <option value="5000">5s</option><option value="10000">10s</option>
@@ -860,17 +860,17 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
           </div>
         </div>
         <div class="cc">
-          <div class="ctitle">Requests Over Time <span id="hist-info" style="font-weight:400;letter-spacing:0;text-transform:none;font-size:12px;color:var(--dim)"></span></div>
+          <div class="ctitle">Requests Over Time <span id="hist-info" style="font-weight:400;font-size:13px;color:var(--dim)"></span></div>
           <canvas id="spark" style="width:100%;height:160px"></canvas>
         </div>
       </div>
       <div class="tcard">
-        <div class="thdr">Test Breakdown <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px">&#8250; click row to expand</span></div>
+        <div class="thdr">Test Breakdown <span style="color:var(--dim);font-weight:400;font-size:13px">&#8250; click row to expand</span></div>
         <table><thead><tr><th></th><th>Test</th><th class="r">Attempts</th><th class="r">OK</th><th class="r">Fail</th><th class="r">Rate</th><th class="r">Avg</th><th class="r">Last Run</th></tr></thead>
         <tbody id="tbl-body"><tr><td colspan="8" class="empty">Waiting for data&#8230;</td></tr></tbody></table>
       </div>
       <div class="ecard">
-        <div class="ehdr">Live Events <span id="ev-cnt" style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none"></span></div>
+        <div class="ehdr">Live Events <span id="ev-cnt" style="color:var(--dim);font-weight:400;font-size:13px"></span></div>
         <div class="ebody" id="ev-body"><div class="empty">Waiting&#8230;</div></div>
       </div>
     </div>
@@ -906,12 +906,12 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         </div>
       </div>
       <div class="tcard">
-        <div class="thdr">Per-Suite Security Breakdown <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px">sorted by blocked</span></div>
+        <div class="thdr">Per-Suite Security Breakdown <span style="color:var(--dim);font-weight:400;font-size:13px">sorted by blocked</span></div>
         <table><thead><tr><th>Suite</th><th class="r">Probes</th><th class="r" style="color:#22c55e">Allowed</th><th class="r" style="color:var(--amber)">Blocked</th><th class="r" style="color:#818cf8">Dropped</th><th class="r">Block%</th><th class="r">Drop%</th></tr></thead>
         <tbody id="sec-tbl"><tr><td colspan="7" class="empty">Waiting for data&#8230;</td></tr></tbody></table>
       </div>
       <div class="tcard">
-        <div class="thdr">Block Signal Breakdown <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px">how security controls are signalling blocks</span></div>
+        <div class="thdr">Block Signal Breakdown <span style="color:var(--dim);font-weight:400;font-size:13px">how security controls are signalling blocks</span></div>
         <div id="sec-signals" class="sec-signals"><div class="empty">Waiting for data&#8230;</div></div>
       </div>
     </div>
@@ -951,7 +951,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
       </div>
       <div class="h-row">
         <div class="cc">
-          <div class="ctitle">Load Average <span style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim)">1m &middot; 5m &middot; 15m</span></div>
+          <div class="ctitle">Load Average <span style="font-weight:400;color:var(--dim);font-size:13px">1m &middot; 5m &middot; 15m</span></div>
           <div id="h-load" style="font-family:'SF Mono',Consolas,monospace;font-size:20px;color:var(--green);padding:8px 0 4px">&#8212; &middot; &#8212; &middot; &#8212;</div>
         </div>
         <div class="cc">
@@ -964,15 +964,15 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         </div>
       </div>
       <div class="cc">
-        <div class="ctitle">Network I/O <span id="h-net-iface" style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim)"></span></div>
+        <div class="ctitle">Network I/O <span id="h-net-iface" style="font-weight:400;color:var(--dim)"></span></div>
         <div style="display:flex;gap:24px;font-family:'SF Mono',Consolas,monospace;font-size:15px;margin-top:6px">
-          <div><div style="font-size:11px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)">&#9660; Receive</div><div id="h-rx" class="c-green" style="font-size:22px;font-weight:700;margin-top:3px">&#8212;</div></div>
-          <div><div style="font-size:11px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)">&#9650; Transmit</div><div id="h-tx" class="c-blue" style="font-size:22px;font-weight:700;margin-top:3px">&#8212;</div></div>
+          <div><div style="font-size:13px;font-weight:600;color:var(--muted)">&#9660; Receive</div><div id="h-rx" class="c-green" style="font-size:22px;font-weight:700;margin-top:3px">&#8212;</div></div>
+          <div><div style="font-size:13px;font-weight:600;color:var(--muted)">&#9650; Transmit</div><div id="h-tx" class="c-blue" style="font-size:22px;font-weight:700;margin-top:3px">&#8212;</div></div>
         </div>
         <canvas id="h-net-spark" width="600" height="60" style="width:100%;margin-top:10px"></canvas>
       </div>
       <div class="tcard">
-        <div class="thdr">Top Processes <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px">sorted by CPU</span></div>
+        <div class="thdr">Top Processes <span style="color:var(--dim);font-weight:400;font-size:13px">sorted by CPU</span></div>
         <table><thead><tr><th class="r">PID</th><th>Name</th><th class="r">CPU%</th><th class="r">Mem%</th><th class="r">RSS</th></tr></thead>
         <tbody id="proc-body"><tr><td colspan="5" class="empty">Loading&#8230;</td></tr></tbody></table>
       </div>
