@@ -1028,6 +1028,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
   <div class="content">
     <!-- Overview -->
     <div id="tab-overview" class="panel active">
+      <div id="ov-grid" style="display:flex;flex-direction:column;gap:14px">
       <div class="cards" data-widget="stat-cards" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));cursor:default">
         <div class="card"><div class="clbl">CPU</div><div class="cval c-green" id="ov-cpu">&#8212;</div></div>
         <div class="card"><div class="clbl">Memory</div><div class="cval c-blue" id="ov-mem">&#8212;</div></div>
@@ -1077,6 +1078,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div class="ehdr">Live Events <span id="ev-cnt" style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none"></span></div>
         <div class="ebody" id="ev-body"><div class="empty">Waiting&#8230;</div></div>
       </div>
+      </div><!-- /#ov-grid -->
     </div>
     <!-- Security Summary -->
     <div id="tab-security" class="panel">
@@ -1387,7 +1389,7 @@ const H=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&g
 const N=n=>Number(n).toLocaleString();
 function _canvasText(){return document.documentElement.classList.contains('light')?'#1f2328':'#e2e8f0';}
 function _canvasMuted(){return document.documentElement.classList.contains('light')?'#636e7b':'#64748b';}
-function _canvasBg(){return document.documentElement.classList.contains('light')?'#d0d7de':'#1e2d3d';}
+function _canvasBg(){return document.documentElement.classList.contains('light')?'#f0f3f7':'#1e2d3d';}
 const Tc=ts=>new Date(ts*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
 const Ts=ts=>new Date(ts*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
 const Dur=ms=>ms<1000?ms+'ms':(ms/1000).toFixed(1)+'s';
@@ -1396,17 +1398,16 @@ let _start=null,_uptimer=null,_elTimer=null,_pauseTimer=null,_autoScroll=true,_s
 let _waitBannerTimer=null,_waitBannerUntil=0;
 function _showWaitBanner(until){
   const wb=$('wait-banner'),txt=$('wait-banner-txt');if(!wb||!txt)return;
-  if(wb.style.display==='flex'&&_waitBannerUntil===until)return;
   _waitBannerUntil=until;
   wb.style.display='flex';
+  if(_waitBannerTimer)clearInterval(_waitBannerTimer);
   function tick(){
-    const rem=until>0?Math.max(0,until-Math.floor(Date.now()/1000)):0;
+    const rem=until>0?Math.max(0,Math.floor(until-Date.now()/1000)):0;
     txt.textContent=until>0&&rem>0
       ?'⏳ Pausing between tests — next test in '+rem+'s'
       :'⏳ Pausing between tests…';
-    if(until>0&&rem<=0)_hideWaitBanner();
+    if(until>0&&rem<=0){_hideWaitBanner();}
   }
-  if(_waitBannerTimer)clearInterval(_waitBannerTimer);
   tick();
   _waitBannerTimer=setInterval(tick,1000);
 }
@@ -1689,11 +1690,11 @@ function _initDrag(gridId){
 function _saveWidgetOrder(gridId){
   const grid=$(gridId);if(!grid)return;
   const order=[...grid.querySelectorAll('[data-widget]')].map(c=>c.dataset.widget);
-  try{localStorage.setItem('tg-worder-'+gridId,JSON.stringify(order));}catch(e){}
+  try{localStorage.setItem('tg-widget-order-'+gridId,JSON.stringify(order));}catch(e){}
 }
 function _restoreWidgetOrder(gridId){
   const grid=$(gridId);if(!grid)return;
-  let order;try{order=JSON.parse(localStorage.getItem('tg-worder-'+gridId)||'null');}catch(e){return;}
+  let order;try{order=JSON.parse(localStorage.getItem('tg-widget-order-'+gridId)||'null');}catch(e){return;}
   if(!order||!order.length)return;
   order.forEach(id=>{const c=grid.querySelector('[data-widget="'+id+'"]');if(c)grid.appendChild(c);});
 }
@@ -2039,6 +2040,7 @@ wireTip('h-net-spark',10,6,()=>_hNetHist,p=>[
 checkRole();
 connect();
 setInterval(checkRole,5000);
+_initDrag('ov-grid');
 
 // ── Disclaimer modal (shown once per browser session) ─────────────────────
 (function(){
@@ -2082,10 +2084,10 @@ _LOG_HTML = """<!DOCTYPE html>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#080c10;--surf:#161b22;--border:#1e2d3d;--green:#22c55e;--red:#f85149;--amber:#f59e0b;--blue:#60a5fa;--text:#c9d1d9;--muted:#64748b;--dim:#374151}
 html,body{height:100%;overflow:hidden}
-body{background:var(--bg);color:var(--text);font-family:'SF Mono',Consolas,monospace;font-size:12px;display:flex;flex-direction:column}
+body{background:var(--bg);color:var(--text);font-family:'SF Mono',Consolas,monospace;font-size:14px;display:flex;flex-direction:column}
 .hdr{display:flex;align-items:center;gap:8px;padding:7px 12px;background:var(--surf);border-bottom:1px solid var(--border);flex-shrink:0}
-.title{font-weight:700;font-size:13px;margin-right:auto;color:var(--text)}
-.btn{padding:5px 12px;border-radius:5px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:13px;cursor:pointer}
+.title{font-weight:700;font-size:15px;margin-right:auto;color:var(--text)}
+.btn{padding:5px 12px;border-radius:5px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:15px;cursor:pointer}
 .btn:hover{border-color:var(--green);color:var(--green)}
 .btn.af{border-color:var(--green);color:var(--green)}
 .fgrp{display:flex;gap:3px}
@@ -2094,9 +2096,9 @@ body{background:var(--bg);color:var(--text);font-family:'SF Mono',Consolas,monos
 .ll:hover{background:rgba(255,255,255,.02)}
 .ll-sep{padding:4px 0;display:flex;align-items:center}
 .sep-line{flex:1;height:1px;background:var(--dim);opacity:.3}
-.sep-txt{padding:0 10px;font-size:10px;letter-spacing:.5px;color:var(--dim);white-space:nowrap}
-.llt{color:#374151;margin-right:8px;flex-shrink:0;font-size:11px}
-.llv{font-weight:700;margin-right:8px;flex-shrink:0;width:40px;font-size:11px}
+.sep-txt{padding:0 10px;font-size:12px;letter-spacing:.5px;color:var(--dim);white-space:nowrap}
+.llt{color:#374151;margin-right:8px;flex-shrink:0;font-size:13px}
+.llv{font-weight:700;margin-right:8px;flex-shrink:0;width:40px;font-size:13px}
 .llm{color:#c9d1d9;flex:1}
 .ll.info .llv{color:#60a5fa}.ll.ok .llv{color:#22c55e}.ll.warn .llv{color:#f59e0b}.ll.error .llv{color:#f85149}.ll.debug .llv{color:#374151}
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--dim);border-radius:2px}
