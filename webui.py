@@ -1456,7 +1456,7 @@ function _hideWaitBanner(){
   const wb=$('wait-banner');if(wb)wb.style.display='none';
   _waitBannerUntil=0;
 }
-(()=>{const ob=$('obody');if(!ob)return;ob.addEventListener('scroll',()=>{if(_scrollLock)return;const atBot=ob.scrollHeight-ob.scrollTop-ob.clientHeight<80;if(atBot&&!_autoScroll){_autoScroll=true;const b=$('btn-as');if(b)b.innerHTML='Auto-scroll &#10003;';}else if(!atBot&&_autoScroll){_autoScroll=false;const b=$('btn-as');if(b)b.innerHTML='Auto-scroll &#10007;';}},{passive:true});})();
+(()=>{const ob=$('obody');if(!ob)return;ob.addEventListener('scroll',()=>{if(_scrollLock)return;const gap=ob.scrollHeight-ob.scrollTop-ob.clientHeight;const atBot=gap<120;if(atBot&&!_autoScroll){_autoScroll=true;const b=$('btn-as');if(b)b.innerHTML='Auto-scroll &#10003;';}else if(!atBot&&_autoScroll){_autoScroll=false;const b=$('btn-as');if(b)b.innerHTML='Auto-scroll &#10007;';}},{passive:true});})();
 let _lastState=null,_logEs=null,_logFilter='all';
 let _xRows=new Set(),_xEvs=new Set(),_modalSuite=null,_isPaused=false,_lastTest=null;
 let _SD={};  // suite name → description, populated on first state arrival
@@ -1713,10 +1713,23 @@ function appendLog(d){
   }
   if(!structural&&_logFilter!=='all'&&!div.classList.contains(_logFilter))div.style.display='none';
   b.appendChild(div);
-  if(_autoScroll)requestAnimationFrame(()=>{const ob=$('obody');if(ob){_scrollLock=true;ob.scrollTop=ob.scrollHeight;requestAnimationFrame(()=>{_scrollLock=false;});}});
+  if(_autoScroll)_scrollToBot();
   while(b.children.length>800)b.removeChild(b.firstChild);
 }
-function toggleAS(){_autoScroll=!_autoScroll;$('btn-as').innerHTML='Auto-scroll '+(_autoScroll?'&#10003;':'&#10007;');}
+function _scrollToBot(){
+  const ob=$('obody');if(!ob)return;
+  _scrollLock=true;
+  ob.scrollTop=ob.scrollHeight;
+  setTimeout(()=>{_scrollLock=false;},50);
+}
+// Self-healing: if auto-scroll is on but we drifted from the bottom, catch up
+setInterval(()=>{
+  if(!_autoScroll)return;
+  const ob=$('obody');if(!ob)return;
+  const gap=ob.scrollHeight-ob.scrollTop-ob.clientHeight;
+  if(gap>120)_scrollToBot();
+},2000);
+function toggleAS(){_autoScroll=!_autoScroll;$('btn-as').innerHTML='Auto-scroll '+(_autoScroll?'&#10003;':'&#10007;');if(_autoScroll)_scrollToBot();}
 
 // ── Draggable overview widgets ─────────────────────────────────────────────────
 function _initDrag(gridId){
