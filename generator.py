@@ -826,14 +826,15 @@ def _run_guarded(func) -> None:
     """
     limit = _SUITE_TIMEOUTS.get(func.__name__, 120)
     exc_box: list[BaseException] = []
+    suite_name = _FUNC_TO_SUITE.get(func.__name__, func.__name__)
 
     _stats.reset(func.__name__)
     with _WEB_STATE_LOCK:
-        _WEB_STATE["current_test"]    = func.__name__
+        _WEB_STATE["current_test"]    = suite_name
         _WEB_STATE["test_started_at"] = time.time()
         _WEB_STATE["status"]          = "running"
     _web_flush()
-    _web_log(f"Starting {func.__name__}", level="info", test=func.__name__)
+    _web_log(f"Starting {suite_name}", level="info", test=suite_name)
     t0 = time.time()
 
     def _wrapper() -> None:
@@ -846,20 +847,20 @@ def _run_guarded(func) -> None:
     t.start()
     t.join(timeout=limit)
     if t.is_alive():
-        ui_warn(f"[guard] {func.__name__} exceeded {limit}s — advancing to next test")
+        ui_warn(f"[guard] {suite_name} exceeded {limit}s — advancing to next test")
     elif exc_box:
-        ui_error(f"[{func.__name__}] {exc_box[0]}")
+        ui_error(f"[{suite_name}] {exc_box[0]}")
 
     _stats.print_summary()
     dur_ms = int((time.time() - t0) * 1000)
     run_ok = not exc_box and not t.is_alive()
-    _web_record(func.__name__, run_ok, dur_ms, _stats.responses, dict(_stats.codes),
+    _web_record(suite_name, run_ok, dur_ms, _stats.responses, dict(_stats.codes),
                 blocked=_stats.blocked, dropped=_stats.dropped, allowed=_stats.allowed)
     _web_log(
-        f"{func.__name__}: {_stats.attempts} attempts, "
+        f"{suite_name}: {_stats.attempts} attempts, "
         f"{_stats.responses} ok, {_stats.errors} fail — {dur_ms}ms",
         level="ok" if run_ok else "warn",
-        test=func.__name__,
+        test=suite_name,
     )
 
 
@@ -3998,6 +3999,14 @@ _SUITE_MAP: dict[str, list] = {
     "waf-attack":       [waf_attack],
     "data-exfil-http":  [data_exfil_http],
     "web-scanner":      [web_scanner],
+}
+
+
+# Reverse map: Python function name → suite key (e.g. "lateral_movement_sim" → "lateral-movement")
+_FUNC_TO_SUITE: dict[str, str] = {
+    f.__name__: suite
+    for suite, funcs in _SUITE_MAP.items()
+    for f in funcs
 }
 
 
