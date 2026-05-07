@@ -2952,18 +2952,25 @@ def run_test(func_list: list) -> None:
     Execute `func_list` tests.
 
     * Non-loop mode: run each function once in shuffled order.
-    * Loop mode: pick a random function each iteration, run indefinitely,
-      kicking the watchdog after each test so it doesn't time out.
+    * Loop mode: cycle through the full list in a new random order each round,
+      guaranteeing every test runs once per round before any repeats.
     """
     ui_startup_banner()
     time.sleep(0.3)     # let the banner render before test output begins
 
     iteration = 0
     if ARGS.loop:
+        deck: list = []
+        round_num = 0
         while True:
+            if not deck:
+                round_num += 1
+                deck = func_list[:]
+                random.shuffle(deck)
+                console.rule(f"[dim]round {round_num} — {len(deck)} tests[/]")
+            func = deck.pop()
             iteration += 1
             console.rule(f"[dim]iteration {iteration}[/]")
-            func = random.choice(func_list)
             _run_guarded(func)
             WATCHDOG.kick()
             finish_test()
