@@ -675,24 +675,28 @@ def _curl_head(url: str, user_agent: str,
 
 def _curl_download(url: str, rate_limit: str = "3M",
                    connect_timeout: int = 4, timeout: int = 20,
-                   user_agent: str = "") -> tuple[str, int]:
+                   user_agent: str = "") -> tuple[str, int, str]:
     """
     Download a remote file via curl, discarding data to /dev/null.
 
     `rate_limit` caps bandwidth (e.g. "3M" = 3 MB/s) so the test doesn't
     saturate the uplink.  Use an empty string to remove the cap.
-    Returns (http_code, curl_exit_code).
+    Returns (http_code, curl_exit_code, content_type).
     """
     rate_flag = f"--limit-rate {rate_limit}" if rate_limit else ""
     ua_flag   = f"-A '{user_agent}'"          if user_agent  else ""
     cmd = (
         f"curl {rate_flag} -k --show-error "
         f"--connect-timeout {connect_timeout} "
-        f"-L -o /dev/null -w '%{{response_code}}' {ua_flag} {url}"
+        f"-L -o /dev/null -w '%{{response_code}} %{{content_type}}' {ua_flag} {url}"
     )
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True,
                             timeout=timeout)
-    return result.stdout.strip() or "---", result.returncode
+    out   = result.stdout.strip()
+    parts = out.split(" ", 1)
+    status       = parts[0] if parts[0] else "---"
+    content_type = parts[1] if len(parts) > 1 else ""
+    return status, result.returncode, content_type
 
 
 def _status_style(code: str) -> str:
@@ -1095,7 +1099,7 @@ def ftp_random() -> None:
         target = _size_to_limits(ARGS.size, "1MB", "10MB", "100MB", "1GB")
         url    = f"ftp://speedtest:speedtest@ftp.otenet.gr/test{target}.db"
         console.log(f"FTP → {url}  ({target}, rate-limited 3 MB/s)")
-        status, exit_code = _curl_download(url, rate_limit="3M", connect_timeout=5, timeout=60)
+        status, exit_code, _ = _curl_download(url, rate_limit="3M", connect_timeout=5, timeout=60)
         console.log(f"  ↳ FTP response {status}")
         _stats.record(status, exit_code)
         ui_ok("FTP test complete")
@@ -1132,9 +1136,12 @@ def http_download_zip() -> None:
     ua     = random.choice(user_agents)
     ui_banner("HTTP Download (ZIP)", f"{target} — {url}")
     try:
-        status, exit_code = _curl_download(url, rate_limit="3M", connect_timeout=5, timeout=120, user_agent=ua)
+        status, exit_code, ctype = _curl_download(url, rate_limit="3M", connect_timeout=5, timeout=120, user_agent=ua)
         console.log(f"  ↳ [{_status_style(status)}]HTTP {status}[/]  ({target} ZIP)")
-        _stats.record(status, exit_code)
+        if status == "200" and ctype.startswith("text/html"):
+            _stats.block()
+        else:
+            _stats.record(status, exit_code)
         ui_ok("HTTP ZIP download complete")
     except Exception as e:
         _stats.fail()
@@ -1146,10 +1153,13 @@ def http_download_targz() -> None:
     """Download the WordPress latest.tar.gz archive (plain HTTP)."""
     ui_banner("HTTP Download (tar.gz)", "WordPress latest.tar.gz")
     try:
-        status, exit_code = _curl_download("http://wordpress.org/latest.tar.gz",
+        status, exit_code, ctype = _curl_download("http://wordpress.org/latest.tar.gz",
                                 rate_limit="3M", connect_timeout=5, timeout=120)
         console.log(f"  ↳ [{_status_style(status)}]HTTP {status}[/]  (wordpress latest.tar.gz)")
-        _stats.record(status, exit_code)
+        if status == "200" and ctype.startswith("text/html"):
+            _stats.block()
+        else:
+            _stats.record(status, exit_code)
         ui_ok("HTTP tar.gz download complete")
     except Exception as e:
         _stats.fail()
@@ -1664,9 +1674,12 @@ def virus_sim() -> None:
         random.shuffle(virus_endpoints)
         for i, url in enumerate(virus_endpoints[:n], 1):
             try:
-                status, exit_code = _curl_download(url, rate_limit="3M", connect_timeout=4, timeout=20)
+                status, exit_code, ctype = _curl_download(url, rate_limit="3M", connect_timeout=4, timeout=20)
                 console.log(f"virus-sim ({i}/{n}) {url}  [{_status_style(status)}]HTTP {status}[/]")
-                _stats.record(status, exit_code)
+                if status == "200" and ctype.startswith("text/html"):
+                    _stats.block()
+                else:
+                    _stats.record(status, exit_code)
             except Exception as e:
                 console.log(f"[yellow]virus-sim ({i}/{n}) {url}  {e.__class__.__name__}[/]")
                 _stats.fail()
@@ -1687,9 +1700,12 @@ def dlp_sim_https() -> None:
         random.shuffle(dlp_https_endpoints)
         for i, url in enumerate(dlp_https_endpoints[:n], 1):
             try:
-                status, exit_code = _curl_download(url, rate_limit="3M", connect_timeout=4, timeout=20)
+                status, exit_code, ctype = _curl_download(url, rate_limit="3M", connect_timeout=4, timeout=20)
                 console.log(f"dlp-sim ({i}/{n}) {url}  [{_status_style(status)}]HTTP {status}[/]")
-                _stats.record(status, exit_code)
+                if status == "200" and ctype.startswith("text/html"):
+                    _stats.block()
+                else:
+                    _stats.record(status, exit_code)
             except Exception as e:
                 console.log(f"[yellow]dlp-sim ({i}/{n}) {url}  {e.__class__.__name__}[/]")
                 _stats.fail()
@@ -1799,9 +1815,12 @@ def malware_download() -> None:
         random.shuffle(malware_files)
         for i, url in enumerate(malware_files[:n], 1):
             try:
-                status, exit_code = _curl_download(url, rate_limit="3M", connect_timeout=4, timeout=20)
+                status, exit_code, ctype = _curl_download(url, rate_limit="3M", connect_timeout=4, timeout=20)
                 console.log(f"malware-dl ({i}/{n}) {url}  [{_status_style(status)}]HTTP {status}[/]")
-                _stats.record(status, exit_code)
+                if status == "200" and ctype.startswith("text/html"):
+                    _stats.block()
+                else:
+                    _stats.record(status, exit_code)
             except Exception as e:
                 console.log(f"[yellow]malware-dl ({i}/{n}) {url}  {e.__class__.__name__}[/]")
                 _stats.fail()
