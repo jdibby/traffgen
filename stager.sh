@@ -160,6 +160,29 @@ esac
 
 ok "Detected: ${OS_LABEL}"
 
+# ── System package update & upgrade ──────────────────────────────────────────
+step "Updating and upgrading system packages"
+
+case "$PKG_FAMILY" in
+    deb)
+        export DEBIAN_FRONTEND=noninteractive
+        export NEEDRESTART_MODE=a
+        apt-get -qq update
+        apt-get -qq -y upgrade
+        ;;
+    rpm-rhel)
+        dnf -y -q upgrade
+        ;;
+    rpm-amzn)
+        if [ "${VERSION_ID:-}" = "2" ]; then
+            yum -y -q update
+        else
+            dnf -y -q upgrade
+        fi
+        ;;
+esac
+ok "System packages up to date"
+
 # ── Docker install (idempotent) ───────────────────────────────────────────────
 step "Checking Docker"
 
