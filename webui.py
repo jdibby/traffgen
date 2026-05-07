@@ -690,6 +690,10 @@ def sse_log():
         while True:
             try:
                 with open(_LOG_FILE) as f:
+                    f.seek(0, 2)
+                    size = f.tell()
+                    if pos > size:
+                        pos = size
                     f.seek(pos)
                     new = f.readlines()
                     pos = f.tell()
@@ -1129,6 +1133,11 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <button class="btn" onclick="window.open('/log-view','tg-log','width=960,height=680,scrollbars=yes')">Pop Out &#8599;</button>
         <button class="btn" id="btn-as" onclick="toggleAS()">Auto-scroll &#10003;</button>
       </div>
+      <div id="wait-banner" style="display:none;align-items:center;padding:10px 14px;background:rgba(245,158,11,.06);border-top:1px solid rgba(245,158,11,.3);border-bottom:1px solid rgba(245,158,11,.3);flex-shrink:0">
+        <div style="flex:1;height:1px;background:rgba(245,158,11,.3)"></div>
+        <div id="wait-banner-txt" style="padding:0 16px;font-size:14px;font-weight:600;color:var(--amber);white-space:nowrap">&#8987; Pausing between tests…</div>
+        <div style="flex:1;height:1px;background:rgba(245,158,11,.3)"></div>
+      </div>
       <div class="obody" id="obody"></div>
     </div>
     <!-- Health -->
@@ -1375,7 +1384,30 @@ const Tc=ts=>new Date(ts*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-d
 const Ts=ts=>new Date(ts*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
 const Dur=ms=>ms<1000?ms+'ms':(ms/1000).toFixed(1)+'s';
 const RC=p=>p>=90?'var(--green)':p>=70?'var(--amber)':'var(--red)';
-let _start=null,_uptimer=null,_elTimer=null,_pauseTimer=null,_autoScroll=true;
+let _start=null,_uptimer=null,_elTimer=null,_pauseTimer=null,_autoScroll=true,_scrollLock=false;
+let _waitBannerTimer=null,_waitBannerUntil=0;
+function _showWaitBanner(until){
+  const wb=$('wait-banner'),txt=$('wait-banner-txt');if(!wb||!txt)return;
+  if(wb.style.display==='flex'&&_waitBannerUntil===until)return;
+  _waitBannerUntil=until;
+  wb.style.display='flex';
+  function tick(){
+    const rem=until>0?Math.max(0,until-Math.floor(Date.now()/1000)):0;
+    txt.textContent=until>0&&rem>0
+      ?'⏳ Pausing between tests — next test in '+rem+'s'
+      :'⏳ Pausing between tests…';
+    if(until>0&&rem<=0)_hideWaitBanner();
+  }
+  if(_waitBannerTimer)clearInterval(_waitBannerTimer);
+  tick();
+  _waitBannerTimer=setInterval(tick,1000);
+}
+function _hideWaitBanner(){
+  if(_waitBannerTimer){clearInterval(_waitBannerTimer);_waitBannerTimer=null;}
+  const wb=$('wait-banner');if(wb)wb.style.display='none';
+  _waitBannerUntil=0;
+}
+(()=>{const ob=$('obody');if(!ob)return;ob.addEventListener('scroll',()=>{if(_scrollLock)return;const atBot=ob.scrollHeight-ob.scrollTop-ob.clientHeight<80;if(atBot&&!_autoScroll){_autoScroll=true;const b=$('btn-as');if(b)b.innerHTML='Auto-scroll &#10003;';}else if(!atBot&&_autoScroll){_autoScroll=false;const b=$('btn-as');if(b)b.innerHTML='Auto-scroll &#10007;';}},{passive:true});})();
 let _lastState=null,_logEs=null,_logFilter='all';
 let _xRows=new Set(),_xEvs=new Set(),_modalSuite=null,_isPaused=false,_lastTest=null;
 let _isAdmin=true,_authRequired=false,_adminToken='',_sessionMode=false,_hasController=false;
@@ -1481,6 +1513,7 @@ function apply(s){
   $('s-ver').textContent=ver;$('about-ver').textContent=ver;
   if(s.started_at&&!_start){_start=s.started_at;clearInterval(_uptimer);_uptimer=setInterval(()=>$('s-uptime').textContent='up '+uptime(_start),1000);}
   const st=s.status||'starting';
+  if(st==='between_tests'){const pu=s.pause_until||0,now=Date.now()/1000;_showWaitBanner(pu>now?pu:0);}else{_hideWaitBanner();}
   const pill=$('status-pill');pill.className='tp-pill '+(ST_CLS[st]||'tp-dim');
   clearInterval(_pauseTimer);_pauseTimer=null;
   if(st==='between_tests'&&s.pause_until){
@@ -1622,7 +1655,7 @@ function appendLog(d){
   }
   if(!structural&&_logFilter!=='all'&&!div.classList.contains(_logFilter))div.style.display='none';
   b.appendChild(div);
-  if(_autoScroll){const ms=$('main-scroll');if(ms)ms.scrollTop=ms.scrollHeight;}
+  if(_autoScroll)requestAnimationFrame(()=>{const ob=$('obody');if(ob){_scrollLock=true;ob.scrollTop=ob.scrollHeight;requestAnimationFrame(()=>{_scrollLock=false;});}});
   while(b.children.length>800)b.removeChild(b.firstChild);
 }
 function toggleAS(){_autoScroll=!_autoScroll;$('btn-as').innerHTML='Auto-scroll '+(_autoScroll?'&#10003;':'&#10007;');}

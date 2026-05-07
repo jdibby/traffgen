@@ -58,13 +58,15 @@ curl -sk https://raw.githubusercontent.com/jdibby/traffgen/refs/heads/main/stage
 
 ## 🖥️ Web Dashboard
 
-Add `-p 7777:7777` to expose a live HTTPS monitoring dashboard at `https://<host>:7777`.
+Run with `--network=host` to expose the live HTTPS dashboard at `https://<host>:7777` and give the container full access to the host's physical network (required for lateral movement scanning).
 
 ```bash
 docker run --pull=always --detach --restart unless-stopped \
-  -p 7777:7777 --name traffgen jdibby/traffgen:latest \
+  --network=host --name traffgen jdibby/traffgen:latest \
   --suite=all --size=S --max-wait-secs=20 --loop
 ```
+
+> **Note:** `--network=host` is Linux-only. It does not work on Docker Desktop for Mac or Windows (use `-p 7777:7777` on those platforms, but lateral movement will be limited to the Docker bridge network).
 
 The dashboard includes:
 
