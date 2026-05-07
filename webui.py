@@ -775,7 +775,7 @@ body{display:flex;background:var(--bg);color:var(--text);font-family:-apple-syst
 .ico-btn:hover{border-color:var(--green);color:var(--green)}
 .ico-btn.danger:hover{border-color:var(--red);color:var(--red)}
 .content{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column}
-.panel{display:none;flex-direction:column;gap:14px;flex:1;overflow-y:auto;padding:18px}
+.panel{display:none;flex-direction:column;gap:14px;flex:1;overflow-y:auto;padding:18px;min-height:0}
 .panel.active{display:flex}
 #tab-output.panel{padding:0;gap:0;overflow:hidden}
 .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
