@@ -245,7 +245,7 @@ _SUITE_DESCRIPTIONS: list[tuple[str, str]] = [
     ("http3",            "HTTP/3 QUIC HEAD requests via curl --http3"),
     ("https",            "HTTPS HEAD requests + iterative crawl"),
     ("icmp",             "Ping + traceroute to a set of remote hosts"),
-    ("ids-trigger",      "BlackSun user-agent IDS/IPS trigger to testmyids.com"),
+    ("ids-trigger",      "16 Snort/Suricata signatures: scanner UAs + web-attack URL probes → testmyids.com"),
     ("kyber",            "HTTPS HEAD with X25519MLKEM768 post-quantum curves"),
     ("malware-agents",   "HEAD requests using known malware user-agents"),
     ("malware-download", "Download known-malware file samples (to /dev/null)"),
@@ -2009,28 +2009,62 @@ def webcrawl() -> None:
 
 def ips() -> None:
     """
-    Send a HEAD request to testmyids.com using the "BlackSun" user-agent,
-    which matches a classic Snort/Suricata IPS signature.  Confirms that
-    IPS alert rules are active and generating events.
+    Fire a battery of HTTP requests that each match a well-known Snort /
+    Suricata / Emerging Threats signature category:
+      • Scanner user-agents (BlackSun, ZmEu, Havij, sqlmap, Nikto, Acunetix,
+        w3af, masscan, DirBuster, libwww-perl)
+      • Web-attack URL probes (LFI, SQLi, XSS, .env, wp-admin, cmd injection)
+
+    All requests target testmyids.com — an Emerging Threats service that exists
+    solely for IDS validation — so no third-party hosts are scanned.
+
+    Note: these signatures are for inline network IDS/IPS (Snort, Suricata,
+    Cisco FTD, Palo Alto NGFW).  SASE/SSE platforms rely on URL-category and
+    behavioural analysis; use the http/https/malware-* suites for those.
     """
-    ui_banner("IDS/IPS Trigger", "BlackSun UA → testmyids.com")
-    try:
-        console.log("HEAD www.testmyids.com  User-Agent: BlackSun")
-        result = subprocess.run(
-            ["curl", "-k", "-s", "--show-error", "--connect-timeout", "3",
-             "-I", "-o", "/dev/null", "-w", "%{http_code}", "--max-time", "5",
-             "-A", "BlackSun", "www.testmyids.com"],
-            capture_output=True, text=True,
-            timeout=10,
-        )
-        status = result.stdout.strip()
-        console.log(f"  ↳ [{_status_style(status)}]HTTP {status}[/]  (IDS signature: BlackSun UA)")
-        _stats.record(status)
-        ui_ok("IDS/IPS trigger complete")
-    except Exception as e:
-        _stats.fail()
-        _stats.fail()
-        ui_error(f"[ips] {e}")
+    # (label, url, extra curl args)
+    _TRIGGERS = [
+        # ── Scanner user-agent triggers ───────────────────────────────────────
+        ("BlackSun UA",          "http://www.testmyids.com", ["-A", "BlackSun"]),
+        ("ZmEu UA",              "http://www.testmyids.com", ["-A", "ZmEu"]),
+        ("Havij UA",             "http://www.testmyids.com", ["-A", "Havij"]),
+        ("sqlmap UA",            "http://www.testmyids.com", ["-A", "sqlmap/1.7.8#stable"]),
+        ("Nikto UA",             "http://www.testmyids.com", ["-A", "Nikto/2.1.6"]),
+        ("Acunetix UA",          "http://www.testmyids.com", ["-A", "acunetix-wvs-scanner/10"]),
+        ("w3af UA",              "http://www.testmyids.com", ["-A", "w3af.org"]),
+        ("masscan UA",           "http://www.testmyids.com", ["-A", "masscan/1.0"]),
+        ("DirBuster UA",         "http://www.testmyids.com", ["-A", "DirBuster-1.0-RC1"]),
+        ("libwww-perl UA",       "http://www.testmyids.com", ["-A", "libwww-perl/6.15"]),
+        # ── Web-attack URL pattern triggers ───────────────────────────────────
+        ("LFI probe",            "http://www.testmyids.com/../../etc/passwd",           []),
+        ("SQLi probe",           "http://www.testmyids.com/?id=1+UNION+SELECT+1,2--",   []),
+        ("XSS probe",            "http://www.testmyids.com/?q=%3Cscript%3Ealert(1)%3C/script%3E", []),
+        (".env probe",           "http://www.testmyids.com/.env",                        []),
+        ("wp-admin probe",       "http://www.testmyids.com/wp-admin/",                   ["-A", "ZmEu"]),
+        ("cmd-injection probe",  "http://www.testmyids.com/?cmd=cat+/etc/passwd",        []),
+    ]
+
+    ui_banner("IDS/IPS Trigger", f"{len(_TRIGGERS)} signatures → testmyids.com")
+    ok_count = 0
+    for label, url, extra in _TRIGGERS:
+        try:
+            console.log(f"  {label:<24}  {url}")
+            result = subprocess.run(
+                ["curl", "-k", "-s", "--show-error", "--connect-timeout", "3",
+                 "-I", "-o", "/dev/null", "-w", "%{http_code}", "--max-time", "5"]
+                + extra + [url],
+                capture_output=True, text=True,
+                timeout=10,
+            )
+            status = result.stdout.strip()
+            console.log(f"    ↳ [{_status_style(status)}]HTTP {status}[/]")
+            _stats.record(status)
+            ok_count += 1
+        except Exception as e:
+            _stats.fail()
+            console.log(f"    ↳ [yellow]error: {e}[/]")
+        time.sleep(random.uniform(0.3, 0.8))
+    ui_ok(f"IDS/IPS trigger complete  ({ok_count}/{len(_TRIGGERS)} sent)")
 
 
 def web_scanner() -> None:
