@@ -1019,6 +1019,20 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
   <div class="content">
     <!-- Overview -->
     <div id="tab-overview" class="panel active">
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div class="cc" style="flex:1;min-width:120px;padding:10px 14px">
+          <div style="font-size:9px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)">CPU</div>
+          <div id="ov-cpu" style="font-size:22px;font-weight:700;color:var(--green);font-family:'SF Mono',Consolas,monospace;margin-top:4px">&#8212;</div>
+        </div>
+        <div class="cc" style="flex:1;min-width:120px;padding:10px 14px">
+          <div style="font-size:9px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)">Memory</div>
+          <div id="ov-mem" style="font-size:22px;font-weight:700;color:var(--blue);font-family:'SF Mono',Consolas,monospace;margin-top:4px">&#8212;</div>
+        </div>
+        <div class="cc" style="flex:2;min-width:200px;padding:10px 14px">
+          <div style="font-size:9px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)">Load Average <span style="opacity:.6">1m &middot; 5m &middot; 15m</span></div>
+          <div id="ov-load" style="font-size:18px;font-weight:700;color:var(--amber);font-family:'SF Mono',Consolas,monospace;margin-top:4px">&#8212;</div>
+        </div>
+      </div>
       <div class="cards" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))">
         <div class="card"><div class="clbl">Total Requests</div><div class="cval c-blue" id="v-total">&#8212;</div><div class="csub" id="s-total">&#8212;</div></div>
         <div class="card"><div class="clbl">Success Rate</div><div class="cval" id="v-rate">&#8212;</div><div class="csub" id="s-rate">&#8212;</div></div>
@@ -1751,6 +1765,9 @@ function applyHealth(d){
   if($('mem-detail'))$('mem-detail').textContent=(d.mem_used_mb||0).toFixed(0)+' MB / '+(d.mem_total_mb||0).toFixed(0)+' MB used';
   const la=d.load_avg||[0,0,0];
   if($('h-load'))$('h-load').textContent=la.map(v=>v.toFixed(2)).join('  \xb7  ');
+  if($('ov-cpu'))$('ov-cpu').textContent=cpuPct.toFixed(1)+'%';
+  if($('ov-mem'))$('ov-mem').textContent=memPct.toFixed(1)+'%';
+  if($('ov-load'))$('ov-load').textContent=la.map(v=>v.toFixed(2)).join('  \xb7  ');
   if($('disk-read'))$('disk-read').textContent=fmtIO(d.disk_read_kbps||0);
   if($('disk-write'))$('disk-write').textContent=fmtIO(d.disk_write_kbps||0);
   drawDiskBars(d.disk_read_kbps||0,d.disk_write_kbps||0);
