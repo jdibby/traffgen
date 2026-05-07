@@ -1423,6 +1423,7 @@ function _hideWaitBanner(){
 (()=>{const ob=$('obody');if(!ob)return;ob.addEventListener('scroll',()=>{if(_scrollLock)return;const atBot=ob.scrollHeight-ob.scrollTop-ob.clientHeight<80;if(atBot&&!_autoScroll){_autoScroll=true;const b=$('btn-as');if(b)b.innerHTML='Auto-scroll &#10003;';}else if(!atBot&&_autoScroll){_autoScroll=false;const b=$('btn-as');if(b)b.innerHTML='Auto-scroll &#10007;';}},{passive:true});})();
 let _lastState=null,_logEs=null,_logFilter='all';
 let _xRows=new Set(),_xEvs=new Set(),_modalSuite=null,_isPaused=false,_lastTest=null;
+let _SD={};  // suite name → description, populated on first state arrival
 let _isAdmin=true,_authRequired=false,_adminToken='',_sessionMode=false,_hasController=false;
 let _sessionId=(()=>{try{let s=sessionStorage.getItem('tg-sid');if(!s){s=crypto.randomUUID();sessionStorage.setItem('tg-sid',s);}return s;}catch(e){return '';}})();
 function _getToken(){try{return localStorage.getItem('tg-admin-token')||'';}catch(e){return '';}}
@@ -1526,6 +1527,7 @@ const ST_CLS={running:'tp-running',between_tests:'tp-dim',paused:'tp-paused',sto
 const ST_LBL={running:'Running',between_tests:'Between Tests',paused:'Paused',stopped:'Stopped',starting:'Starting'};
 function apply(s){
   _lastState=s;
+  if(s.suites&&s.suites.length&&!Object.keys(_SD).length){s.suites.forEach(su=>{_SD[su.name]=su.description||'';});}
   const ver=s.version||'—';
   $('s-ver').textContent=ver;$('about-ver').textContent=ver;
   if(s.started_at&&!_start){_start=s.started_at;clearInterval(_uptimer);_uptimer=setInterval(()=>$('s-uptime').textContent='up '+uptime(_start),1000);}
@@ -1562,7 +1564,7 @@ function apply(s){
     const ctags=Object.entries(codes).sort().map(([k,v])=>`<span class="ctag">${H(k)}: ${N(v)}</span>`).join('');
     return`<tr class="mrow${act?' style="background:rgba(34,197,94,.04)"':''}" onclick="toggleRow('${n}')">
       <td><span class="chev${exp?' open':''}">&#8250;</span></td>
-      <td class="nm"><span class="s-ico">${suiteIco(n)}</span>${act?'<span style="color:var(--green)">&#9654; </span>':''}${H(n.replace(/-/g,' '))}</td>
+      <td class="nm" title="${_SD[n]||''}" style="cursor:default"><span class="s-ico">${suiteIco(n)}</span>${act?'<span style="color:var(--green)">&#9654; </span>':''}${H(n.replace(/-/g,' '))}</td>
       <td class="r">${N(ta)}</td><td class="r" style="color:var(--green)">${N(tok)}</td>
       <td class="r" style="color:${tf?'var(--red)':'var(--muted)'}">${N(tf)}</td>
       <td class="r"><div class="rw"><span style="color:${bc}">${ta?tp.toFixed(1)+'%':'—'}</span><div class="bt"><div class="bf" style="width:${tp}%;background:${bc}"></div></div></div></td>
@@ -1585,7 +1587,7 @@ function apply(s){
     const codes=e.codes&&Object.keys(e.codes).length?Object.entries(e.codes).sort().map(([k,v])=>k+':'+v).join(' \xb7 '):'';
     return`<div class="ev-wrap" onclick="toggleEv(${i})"><div class="evrow">
       <span class="et">${Tc(e.t)}</span>
-      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${H((e.test||'').replace(/-/g,' '))}</span>
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${_SD[e.test||'']||''}">${H((e.test||'').replace(/-/g,' '))}</span>
       <span class="${e.ok?'eok':'efail'}">${e.ok?'✓ OK':'✗ FAIL'}</span>
       <span class="edur">${e.dur_ms!=null?Dur(e.dur_ms):'—'}</span>
       <span class="echev${exp?' open':''}">&#8250;</span>
@@ -1599,7 +1601,7 @@ function apply(s){
     const td=tests[su.name]||{},ta=td.attempts||0,tok=td.ok||0,tf=td.fail||0,tp=ta?tok/ta*100:0;
     const bc=RC(tp),act=su.name===cur;
     return`<div class="tcard2${act?' running':''}" data-suite="${H(su.name)}" data-desc="${H(su.description||'')}" onclick="openModal(this.dataset.suite,this.dataset.desc)">
-      <div class="tcn"><span class="s-ico">${suiteIco(su.name)}</span>${H(su.name.replace(/-/g,' '))}${act?'<span class="badge">RUNNING</span>':''}</div>
+      <div class="tcn" title="${H(su.description||'')}"><span class="s-ico">${suiteIco(su.name)}</span>${H(su.name.replace(/-/g,' '))}${act?'<span class="badge">RUNNING</span>':''}</div>
       <div class="tcd">${H(su.description||'—')}</div>
       <div class="tcs"><span style="color:var(--muted)">${N(ta)} attempts</span><span style="color:var(--green)">${N(tok)} ok</span><span style="color:${tf?'var(--red)':'var(--muted)'}">${N(tf)} fail</span>${ta?'<span style="color:'+bc+'">'+tp.toFixed(1)+'%</span>':''}</div>
       ${ta?`<div class="tcbar"><div class="tcbf" style="width:${tp}%;background:${bc}"></div></div>`:''}
@@ -1973,7 +1975,7 @@ function updateSecurityTab(){
     const bp=r.tot?r.blk/r.tot*100:0,dp=r.tot?r.drp/r.tot*100:0;
     const bpC=bp>50?'var(--red)':bp>10?'var(--amber)':'var(--muted)';
     const dpC=dp>50?'var(--red)':dp>10?'#818cf8':'var(--muted)';
-    return`<tr class="mrow"><td class="nm"><span class="s-ico">${suiteIco(r.n)}</span>${H(r.n.replace(/-/g,' '))}</td><td class="r">${N(r.tot)}</td><td class="r" style="color:#22c55e">${N(r.rch)}</td><td class="r" style="color:var(--amber)">${N(r.blk)}</td><td class="r" style="color:#818cf8">${N(r.drp)}</td><td class="r"><span style="color:${bpC}">${r.tot?bp.toFixed(1)+'%':'—'}</span></td><td class="r"><span style="color:${dpC}">${r.tot?dp.toFixed(1)+'%':'—'}</span></td></tr>`;
+    return`<tr class="mrow"><td class="nm" title="${_SD[r.n]||''}" style="cursor:default"><span class="s-ico">${suiteIco(r.n)}</span>${H(r.n.replace(/-/g,' '))}</td><td class="r">${N(r.tot)}</td><td class="r" style="color:#22c55e">${N(r.rch)}</td><td class="r" style="color:var(--amber)">${N(r.blk)}</td><td class="r" style="color:#818cf8">${N(r.drp)}</td><td class="r"><span style="color:${bpC}">${r.tot?bp.toFixed(1)+'%':'—'}</span></td><td class="r"><span style="color:${dpC}">${r.tot?dp.toFixed(1)+'%':'—'}</span></td></tr>`;
   }).join('');
   // block signal breakdown — aggregate codes across all tests
   const codeTotals={};
