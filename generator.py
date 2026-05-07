@@ -246,6 +246,7 @@ _SUITE_DESCRIPTIONS: list[tuple[str, str]] = [
     ("https",            "HTTPS HEAD requests + iterative crawl"),
     ("icmp",             "Ping + traceroute to a set of remote hosts"),
     ("ids-trigger",      "16 Snort/Suricata signatures: scanner UAs + web-attack URL probes → testmyids.com"),
+    ("tls-check",        "Connect to 20 diverse HTTPS sites and report cert Subject/Issuer/expiry/fingerprint — detects TLS inspection proxy"),
     ("kyber",            "HTTPS HEAD with X25519MLKEM768 post-quantum curves"),
     ("lateral-movement", "Ping sweep /24 subnet + nmap lateral-movement ports (SSH/SMB/RDP/WMI/LDAP/Kerberos)"),
     ("log4shell",        "Log4Shell JNDI header injection probes (CVE-2021-44228) → IDS/WAF/SASE"),
@@ -3034,6 +3035,273 @@ def scrape_iterative(base_url: str, iterations: int = 3) -> None:
 # NEW DETECTION SUITES
 # ══════════════════════════════════════════════════════════════════════════════
 
+def tls_inspection_check() -> None:
+    """
+    Connect to 20 diverse HTTPS endpoints and report the presented TLS
+    certificate for each — Subject CN, Issuer (CN + Org), expiry, SHA-256
+    fingerprint, and verification status against the system trust store.
+
+    Primary purpose: validate that TLS inspection (MITM decryption) is working
+    correctly end-to-end from this container's perspective.
+
+    Reading the results:
+      CLEAN        — original site certificate received; proxy is NOT decrypting
+                     this destination, or no proxy is present.
+      INTERCEPTED  — issuer matches a known SASE/SSE/proxy vendor CA (Zscaler,
+                     Netskope, Palo Alto, Fortinet, Cato, Cisco, etc.), or the
+                     same CA is signing certs for multiple unrelated sites.
+      UNVERIFIED   — a certificate was presented but it does not validate against
+                     the container's trust store.  The proxy CA is re-signing but
+                     has not been installed — inject it via EXTRA_CA_CERT or a
+                     bind-mounted .crt file so other suites work cleanly.
+
+    Selective bypass: if some hosts are CLEAN and others are INTERCEPTED, the
+    proxy has a category-bypass or ASN-bypass rule.  Finance and government
+    domains are commonly bypassed; social and developer sites are often not.
+    """
+    import hashlib as _hashlib
+
+    _PROBE_HOSTS = [
+        # CDN / infrastructure
+        "www.cloudflare.com",
+        "one.one.one.one",
+        "www.digicert.com",
+        # Major cloud / SaaS
+        "www.google.com",
+        "www.microsoft.com",
+        "www.apple.com",
+        "www.amazon.com",
+        "login.microsoftonline.com",
+        # Developer tools (commonly inspected)
+        "github.com",
+        "api.github.com",
+        "pypi.org",
+        "hub.docker.com",
+        # Social / media
+        "www.youtube.com",
+        "www.facebook.com",
+        "www.reddit.com",
+        "www.linkedin.com",
+        # Finance (often bypassed / whitelisted by proxies)
+        "www.bankofamerica.com",
+        "www.wellsfargo.com",
+        # Government (often bypassed)
+        "www.irs.gov",
+        "www.nist.gov",
+    ]
+
+    _KNOWN_PROXY_ISSUERS = [
+        "zscaler", "netskope", "palo alto", "fortigate", "fortinet",
+        "cato networks", "cisco", "symantec", "blue coat", "broadcom",
+        "forcepoint", "iboss", "check point", "contentkeeper", "squid",
+        "mitmproxy", "fiddler", "portswigger", "burp", "charles", "proxyman",
+        "umbrella", "prisma", "mcafee", "trend micro", "sophos",
+        "ironport", "barracuda", "watchguard", "websense", "bluecoat",
+        "inspector", "skyhigh",
+    ]
+
+    def _get_field(d: dict, section: str, field: str) -> str:
+        for rdns in d.get(section, ()):
+            for attr, val in rdns:
+                if attr == field:
+                    return val
+        return ""
+
+    def _probe_host(host: str) -> dict:
+        result = {
+            "host": host, "subject_cn": "", "issuer_cn": "", "issuer_org": "",
+            "not_after": "", "fingerprint": "", "verified": False,
+            "error": "", "status": "ERROR",
+        }
+        try:
+            # ── Fetch cert (no verification so we always get something) ───────
+            ctx_noverify = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+            ctx_noverify.check_hostname = False
+            ctx_noverify.verify_mode    = ssl.CERT_NONE
+            with socket.create_connection((host, 443), timeout=5) as raw:
+                with ctx_noverify.wrap_socket(raw, server_hostname=host) as s:
+                    cert_der  = s.getpeercert(binary_form=True)
+                    cert_dict = s.getpeercert()   # parsed (may be sparse with CERT_NONE)
+
+            if not cert_der:
+                result["error"] = "no cert returned"
+                return result
+
+            # SHA-256 fingerprint of DER-encoded leaf cert
+            result["fingerprint"] = _hashlib.sha256(cert_der).hexdigest()
+
+            # ── Parse subject / issuer from getpeercert() dict ─────────────
+            # With CERT_NONE, getpeercert() may return an empty dict; fall back
+            # to openssl x509 text parsing via a subprocess.
+            result["subject_cn"] = _get_field(cert_dict, "subject", "commonName")
+            result["issuer_cn"]  = _get_field(cert_dict, "issuer",  "commonName")
+            result["issuer_org"] = _get_field(cert_dict, "issuer",  "organizationName")
+            result["not_after"]  = cert_dict.get("notAfter", "")
+
+            # Fall back to openssl if getpeercert() returned empty fields
+            if not result["subject_cn"] and not result["issuer_cn"]:
+                pem = ssl.DER_cert_to_PEM_cert(cert_der)
+                try:
+                    r = subprocess.run(
+                        ["openssl", "x509", "-noout",
+                         "-subject", "-issuer", "-enddate"],
+                        input=pem, capture_output=True, text=True, timeout=5,
+                    )
+                    for line in r.stdout.splitlines():
+                        if line.startswith("subject="):
+                            m = re.search(r"CN\s*=\s*([^,/\n]+)", line)
+                            if m:
+                                result["subject_cn"] = m.group(1).strip()
+                        elif line.startswith("issuer="):
+                            m = re.search(r"CN\s*=\s*([^,/\n]+)", line)
+                            if m:
+                                result["issuer_cn"] = m.group(1).strip()
+                            m2 = re.search(r"O\s*=\s*([^,/\n]+)", line)
+                            if m2:
+                                result["issuer_org"] = m2.group(1).strip()
+                        elif line.startswith("notAfter="):
+                            result["not_after"] = line.split("=", 1)[1].strip()
+                except Exception:
+                    pass
+
+            # ── Verify against system trust store ─────────────────────────
+            try:
+                ctx_verify = ssl.create_default_context()
+                with socket.create_connection((host, 443), timeout=5) as raw2:
+                    with ctx_verify.wrap_socket(raw2, server_hostname=host):
+                        result["verified"] = True
+            except ssl.SSLCertVerificationError:
+                result["verified"] = False
+            except Exception:
+                result["verified"] = False  # network error on second conn is OK
+
+            # ── Classify ─────────────────────────────────────────────────────
+            issuer_lower = (result["issuer_cn"] + " " + result["issuer_org"]).lower()
+            is_proxy = any(vendor in issuer_lower for vendor in _KNOWN_PROXY_ISSUERS)
+            if is_proxy:
+                result["status"] = "INTERCEPTED"
+            elif not result["verified"]:
+                result["status"] = "UNVERIFIED"
+            else:
+                result["status"] = "CLEAN"
+
+        except (socket.timeout, socket.gaierror, ConnectionRefusedError,
+                OSError) as e:
+            result["error"]  = str(e)[:60]
+            result["status"] = "UNREACHABLE"
+        except Exception as e:
+            result["error"]  = str(e)[:60]
+            result["status"] = "ERROR"
+        return result
+
+    ui_banner("TLS Inspection Check",
+              f"Probing {len(_PROBE_HOSTS)} hosts for certificate details")
+
+    # ── Probe all hosts concurrently ──────────────────────────────────────────
+    results: list[dict] = [{}] * len(_PROBE_HOSTS)
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futures = {pool.submit(_probe_host, h): i
+                   for i, h in enumerate(_PROBE_HOSTS)}
+        for fut in futures:
+            results[futures[fut]] = fut.result()
+
+    # ── Print certificate table ───────────────────────────────────────────────
+    from rich.table import Table as _Table
+
+    tbl = _Table(show_header=True, header_style="bold magenta",
+                 show_lines=False, box=None, pad_edge=False)
+    tbl.add_column("Host",         style="cyan",  no_wrap=True, min_width=28)
+    tbl.add_column("Subject CN",   style="white", no_wrap=True, min_width=22)
+    tbl.add_column("Issuer CN / Org",              no_wrap=True, min_width=30)
+    tbl.add_column("Expires",      style="dim",   no_wrap=True, min_width=18)
+    tbl.add_column("SHA-256 (16)", style="dim",   no_wrap=True, min_width=16)
+    tbl.add_column("Status",                       no_wrap=True, min_width=12)
+
+    status_counts: dict[str, int] = {}
+    issuer_map: dict[str, list[str]] = {}   # fingerprint → [hosts]
+
+    for r in results:
+        status = r.get("status", "ERROR")
+        status_counts[status] = status_counts.get(status, 0) + 1
+
+        fp      = r.get("fingerprint", "")
+        fp_abbr = fp[:16] if fp else ""
+        # Group by issuer fingerprint to detect shared-CA pattern
+        if fp and status not in ("UNREACHABLE", "ERROR"):
+            issuer_map.setdefault(fp, []).append(r["host"])
+
+        if status == "INTERCEPTED":
+            status_str = "[red]INTERCEPTED[/]"
+        elif status == "CLEAN":
+            status_str = "[green]CLEAN[/]"
+        elif status == "UNVERIFIED":
+            status_str = "[yellow]UNVERIFIED[/]"
+        elif status == "UNREACHABLE":
+            status_str = "[dim]UNREACHABLE[/]"
+        else:
+            status_str = "[dim]ERROR[/]"
+
+        issuer_display = r.get("issuer_cn") or r.get("issuer_org") or r.get("error") or "—"
+        if r.get("issuer_org") and r.get("issuer_cn"):
+            issuer_display = f"{r['issuer_cn']} / {r['issuer_org']}"
+
+        tbl.add_row(
+            r.get("host", ""),
+            r.get("subject_cn") or "—",
+            issuer_display,
+            r.get("not_after", "") or "—",
+            fp_abbr or "—",
+            status_str,
+        )
+
+        # Record stats
+        if status == "CLEAN":
+            _stats.ok()
+        elif status in ("INTERCEPTED", "UNVERIFIED"):
+            _stats.block()
+        elif status == "UNREACHABLE":
+            _stats.drop()
+        else:
+            _stats.fail()
+
+    console.print(tbl)
+
+    # ── Detect shared-CA (proxy) by fingerprint grouping ─────────────────────
+    shared_cas = {fp: hosts for fp, hosts in issuer_map.items() if len(hosts) >= 3}
+    if shared_cas and status_counts.get("INTERCEPTED", 0) == 0:
+        console.print("\n[yellow]⚠  Same certificate fingerprint seen on "
+                      f"{len(shared_cas)} group(s) — possible proxy re-signing:[/]")
+        for fp, hosts in shared_cas.items():
+            console.print(f"   fp={fp[:16]}  hosts={', '.join(hosts)}")
+
+    # ── Summary ───────────────────────────────────────────────────────────────
+    clean       = status_counts.get("CLEAN", 0)
+    intercepted = status_counts.get("INTERCEPTED", 0)
+    unverified  = status_counts.get("UNVERIFIED", 0)
+    unreachable = status_counts.get("UNREACHABLE", 0)
+
+    summary_parts = [
+        f"[green]{clean} CLEAN[/]",
+        f"[red]{intercepted} INTERCEPTED[/]" if intercepted else f"[dim]0 intercepted[/]",
+        f"[yellow]{unverified} UNVERIFIED[/]"  if unverified  else f"[dim]0 unverified[/]",
+    ]
+    if unreachable:
+        summary_parts.append(f"[dim]{unreachable} unreachable[/]")
+
+    if intercepted > 0 and clean > 0:
+        console.print(f"\n[yellow]⚠  Selective bypass: {clean} host(s) not decrypted, "
+                      f"{intercepted} intercepted — proxy has category/ASN bypass rules.[/]")
+    elif intercepted > 0:
+        console.print(f"\n[red]✗  TLS inspection active — all reachable traffic is being decrypted.[/]")
+    elif unverified > 0:
+        console.print(f"\n[yellow]⚠  Proxy CA not in trust store — inject via EXTRA_CA_CERT or "
+                      f"bind-mount .crt to /usr/local/share/ca-certificates/[/]")
+    else:
+        console.print(f"\n[green]✓  No TLS inspection detected — original certificates received.[/]")
+
+    ui_ok("TLS inspection check complete  " + "  ".join(summary_parts))
+
+
 def log4shell_probe() -> None:
     """
     Inject Log4Shell (CVE-2021-44228) JNDI payloads into common HTTP request
@@ -3454,6 +3722,7 @@ _SUITE_MAP: dict[str, list] = {
     "https":            [https_random, https_crawl],
     "icmp":             [ping_random, traceroute_random],
     "ids-trigger":      [ips],
+    "tls-check":        [tls_inspection_check],
     "kyber":            [kyber_random],
     "lateral-movement": [lateral_movement_sim],
     "log4shell":        [log4shell_probe],
