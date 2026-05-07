@@ -797,6 +797,7 @@ td.nm{font-family:inherit;font-weight:500;font-size:12px}
 .tcard2:hover{border-color:var(--green);background:var(--gdim)}
 .tcard2.running{border-color:rgba(34,197,94,.4);background:var(--gdim)}
 .tcn{font-weight:600;font-size:13px;display:flex;align-items:center;gap:6px}
+.s-ico{font-style:normal;font-size:15px;line-height:1;flex-shrink:0}
 .badge{font-size:9px;padding:1px 6px;border-radius:10px;background:var(--gdim);color:var(--green);border:1px solid rgba(34,197,94,.3)}
 .tcd{font-size:12px;color:var(--muted);line-height:1.4}
 .tcs{display:flex;gap:10px;font-size:11px;font-family:'SF Mono',Consolas,monospace}
@@ -1373,6 +1374,19 @@ let _cpuHist=[],_memHist=[];
 function uptime(t){const s=Math.floor(Date.now()/1000-t);return[Math.floor(s/3600),Math.floor((s%3600)/60),s%60].map(v=>String(v).padStart(2,'0')).join(':');}
 function elapsed(t){if(!t)return'';const s=Math.floor(Date.now()/1000-t);if(s<60)return s+'s elapsed';if(s<3600)return Math.floor(s/60)+'m '+(s%60)+'s elapsed';return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m elapsed';}
 const PAGE_TITLES={overview:'Overview',security:'Security',tests:'Tests',output:'Output',health:'Health',about:'About'};
+const SUITE_ICONS={
+  'ads':'🎯','ai-browse':'🤖','bgp':'🌐','bigfile':'💾',
+  'c2-beacon':'📡','llm-dlp':'🧠','crawl':'🕷️','dlp':'🔒',
+  'dns':'🔍','dns-exfil':'📤','doh':'🔐','domain-check':'🚫',
+  'dot':'🔑','ftp':'📁','http':'🌍','http3':'⚡',
+  'https':'🛡️','icmp':'🏓','ids-trigger':'🚨','kyber':'🔮',
+  'malware-agents':'👾','malware-download':'🦠','metasploit-check':'⚔️',
+  'speedtest':'🚀','nmap':'🗺️','ntp':'🕐','phishing-domains':'🎣',
+  'pornography':'🔞','snmp':'📊','squatting':'🔤','s3':'🪣',
+  'ssh':'💻','url-response':'⏱️','virus':'☣️','web-scanner':'🔬',
+  'all':'✨',
+};
+function suiteIco(n){return(SUITE_ICONS[n]||'◈')+' ';}
 function showTab(btn){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -1451,7 +1465,7 @@ function apply(s){
     const ctags=Object.entries(codes).sort().map(([k,v])=>`<span class="ctag">${H(k)}: ${N(v)}</span>`).join('');
     return`<tr class="mrow${act?' style="background:rgba(34,197,94,.04)"':''}" onclick="toggleRow('${n}')">
       <td><span class="chev${exp?' open':''}">&#8250;</span></td>
-      <td class="nm">${act?'<span style="color:var(--green)">&#9654; </span>':''}${H(n.replace(/_/g,' '))}</td>
+      <td class="nm"><span class="s-ico">${suiteIco(n)}</span>${act?'<span style="color:var(--green)">&#9654; </span>':''}${H(n.replace(/_/g,' '))}</td>
       <td class="r">${N(ta)}</td><td class="r" style="color:var(--green)">${N(tok)}</td>
       <td class="r" style="color:${tf?'var(--red)':'var(--muted)'}">${N(tf)}</td>
       <td class="r"><div class="rw"><span style="color:${bc}">${ta?tp.toFixed(1)+'%':'—'}</span><div class="bt"><div class="bf" style="width:${tp}%;background:${bc}"></div></div></div></td>
@@ -1488,7 +1502,7 @@ function apply(s){
     const td=tests[su.name]||{},ta=td.attempts||0,tok=td.ok||0,tf=td.fail||0,tp=ta?tok/ta*100:0;
     const bc=RC(tp),act=su.name===cur;
     return`<div class="tcard2${act?' running':''}" data-suite="${H(su.name)}" data-desc="${H(su.description||'')}" onclick="openModal(this.dataset.suite,this.dataset.desc)">
-      <div class="tcn">${H(su.name.replace(/_/g,' '))}${act?'<span class="badge">RUNNING</span>':''}</div>
+      <div class="tcn"><span class="s-ico">${suiteIco(su.name)}</span>${H(su.name.replace(/_/g,' '))}${act?'<span class="badge">RUNNING</span>':''}</div>
       <div class="tcd">${H(su.description||'—')}</div>
       <div class="tcs"><span style="color:var(--muted)">${N(ta)} attempts</span><span style="color:var(--green)">${N(tok)} ok</span><span style="color:${tf?'var(--red)':'var(--muted)'}">${N(tf)} fail</span>${ta?'<span style="color:'+bc+'">'+tp.toFixed(1)+'%</span>':''}</div>
       ${ta?`<div class="tcbar"><div class="tcbf" style="width:${tp}%;background:${bc}"></div></div>`:''}
@@ -1819,7 +1833,7 @@ function updateSecurityTab(){
     const bp=r.tot?r.blk/r.tot*100:0,dp=r.tot?r.drp/r.tot*100:0;
     const bpC=bp>50?'var(--red)':bp>10?'var(--amber)':'var(--muted)';
     const dpC=dp>50?'var(--red)':dp>10?'#818cf8':'var(--muted)';
-    return`<tr class="mrow"><td class="nm">${H(r.n.replace(/_/g,' '))}</td><td class="r">${N(r.tot)}</td><td class="r" style="color:#22c55e">${N(r.rch)}</td><td class="r" style="color:var(--amber)">${N(r.blk)}</td><td class="r" style="color:#818cf8">${N(r.drp)}</td><td class="r"><span style="color:${bpC}">${r.tot?bp.toFixed(1)+'%':'—'}</span></td><td class="r"><span style="color:${dpC}">${r.tot?dp.toFixed(1)+'%':'—'}</span></td></tr>`;
+    return`<tr class="mrow"><td class="nm"><span class="s-ico">${suiteIco(r.n)}</span>${H(r.n.replace(/_/g,' '))}</td><td class="r">${N(r.tot)}</td><td class="r" style="color:#22c55e">${N(r.rch)}</td><td class="r" style="color:var(--amber)">${N(r.blk)}</td><td class="r" style="color:#818cf8">${N(r.drp)}</td><td class="r"><span style="color:${bpC}">${r.tot?bp.toFixed(1)+'%':'—'}</span></td><td class="r"><span style="color:${dpC}">${r.tot?dp.toFixed(1)+'%':'—'}</span></td></tr>`;
   }).join('');
   // block signal breakdown — aggregate codes across all tests
   const codeTotals={};
