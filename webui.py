@@ -1130,6 +1130,13 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
     </div>
     <!-- Health -->
     <div id="tab-health" class="panel">
+      <div class="tcard">
+        <div class="thdr">Network Interfaces
+          <span style="color:var(--muted);font-weight:400;letter-spacing:0;text-transform:none;font-size:13px">Public IP: <span id="h-pub-ip" style="color:var(--green);font-family:'SF Mono',Consolas,monospace;font-size:15px;font-weight:600">&#8212;</span></span>
+        </div>
+        <table><thead><tr><th>Interface</th><th>IPv4 Address</th><th>MAC Address</th><th class="r">Speed</th><th class="r">MTU</th><th class="r">Link</th></tr></thead>
+        <tbody id="netinfo-body"><tr><td colspan="6" class="empty">Loading&#8230;</td></tr></tbody></table>
+      </div>
       <div class="h-gauges">
         <div class="cc"><div class="ctitle">CPU Usage <span id="cpu-cur" style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim)"></span></div>
           <div class="gauge-wrap"><canvas id="cpu-gauge" width="200" height="130"></canvas></div>
@@ -1197,13 +1204,6 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
             <span><span style="color:var(--muted)">Open FDs: </span><span id="h-fds" style="color:var(--text)">&#8212;</span></span>
           </div>
         </div>
-      </div>
-      <div class="tcard">
-        <div class="thdr">Network Interfaces
-          <span style="color:var(--muted);font-weight:400;letter-spacing:0;text-transform:none;font-size:13px">Public IP: <span id="h-pub-ip" style="color:var(--green);font-family:'SF Mono',Consolas,monospace;font-size:15px;font-weight:600">&#8212;</span></span>
-        </div>
-        <table><thead><tr><th>Interface</th><th>IPv4 Address</th><th>MAC Address</th><th class="r">Speed</th><th class="r">MTU</th><th class="r">Link</th></tr></thead>
-        <tbody id="netinfo-body"><tr><td colspan="6" class="empty">Loading&#8230;</td></tr></tbody></table>
       </div>
       <div class="tcard">
         <div class="thdr">Top Processes <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:10px">sorted by CPU</span></div>
