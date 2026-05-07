@@ -920,7 +920,7 @@ def bgp_peering() -> None:
             ui_warn("gobgpd not ready — skipping BGP neighbor setup")
 
     except Exception as e:
-        ui_error(f"[bgp_peering] {e}")
+        _stats.fail(); ui_error(f"[bgp_peering] {e}")
     finally:
         # Brief settle time before tearing down the daemon.
         with ui_status("Terminating gobgpd in 10 s..."):
@@ -1081,6 +1081,7 @@ def dig_random() -> None:
                     finally:
                         prog.update(task, advance=1)
     except Exception as e:
+        _stats.fail()
         ui_error(f"[dig_random] {e}")
 
 
@@ -1100,6 +1101,7 @@ def ftp_random() -> None:
         ui_ok("FTP test complete")
     except Exception as e:
         _stats.fail()
+        _stats.fail()
         ui_error(f"[ftp_random] {e}")
 
 
@@ -1116,6 +1118,7 @@ def http_random() -> None:
         _run_head_batch(pool[:n], "HTTP", user_agents)
         ui_ok("HTTP random complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[http_random] {e}")
 
 
@@ -1135,6 +1138,7 @@ def http_download_zip() -> None:
         ui_ok("HTTP ZIP download complete")
     except Exception as e:
         _stats.fail()
+        _stats.fail()
         ui_error(f"[http_download_zip] {e}")
 
 
@@ -1148,6 +1152,7 @@ def http_download_targz() -> None:
         _stats.record(status, exit_code)
         ui_ok("HTTP tar.gz download complete")
     except Exception as e:
+        _stats.fail()
         _stats.fail()
         ui_error(f"[http_download_targz] {e}")
 
@@ -1164,6 +1169,7 @@ def https_random() -> None:
         _run_head_batch(https_endpoints[:n], "HTTPS", user_agents)
         ui_ok("HTTPS random complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[https_random] {e}")
 
 
@@ -1186,6 +1192,7 @@ def kyber_random() -> None:
         )
         ui_ok("Kyber test complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[kyber_random] {e}")
 
 
@@ -1203,6 +1210,7 @@ def ai_https_random() -> None:
                         connect_timeout=3, max_time=5)
         ui_ok("AI HTTPS complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[ai_https_random] {e}")
 
 
@@ -1219,6 +1227,7 @@ def ads_random() -> None:
                         connect_timeout=3, max_time=5)
         ui_ok("Ads test complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[ads_random] {e}")
 
 
@@ -1237,6 +1246,7 @@ def https_crawl() -> None:
             scrape_iterative(url, iterations)
         ui_ok("HTTPS crawl complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[https_crawl] {e}")
 
 
@@ -1255,6 +1265,7 @@ def pornography_crawl() -> None:
             scrape_iterative(url, iterations)
         ui_ok("Pornography crawl complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[pornography_crawl] {e}")
 
 
@@ -1272,6 +1283,7 @@ def malware_random() -> None:
                         connect_timeout=3, max_time=5)
         ui_ok("Malware agent HEAD complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[malware_random] {e}")
 
 
@@ -1304,6 +1316,7 @@ def ping_random() -> None:
                     prog.update(task, advance=1)
         ui_ok("Ping complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[ping_random] {e}")
 
 
@@ -1339,6 +1352,7 @@ def metasploit_check() -> None:
                     prog.update(task, advance=1)
         ui_ok("Metasploit checks complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[metasploit_check] {e}")
 
 
@@ -1374,6 +1388,7 @@ def snmp_random() -> None:
                     prog.update(task, advance=1)
         ui_ok("SNMP complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[snmp_random] {e}")
 
 
@@ -1407,6 +1422,7 @@ def traceroute_random() -> None:
                     prog.update(task, advance=1)
         ui_ok("Traceroute complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[traceroute_random] {e}")
 
 
@@ -1454,6 +1470,7 @@ def speedtest_fast() -> None:
 
         ui_ok("Speed-test complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[speedtest_fast] {e}")
 
 
@@ -1515,6 +1532,7 @@ def nmap_cve() -> None:
                 time.sleep(random.uniform(1.0, 3.0))
         ui_ok("Nmap CVE scan complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[nmap_cve] {e}")
 
 
@@ -1546,6 +1564,7 @@ def ntp_random() -> None:
                 time.sleep(random.uniform(0.4, 1.0))
         ui_ok("NTP complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[ntp_random] {e}")
 
 
@@ -1588,6 +1607,7 @@ def ssh_random() -> None:
                 _stats.fail()
         ui_ok("SSH test complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[ssh_random] {e}")
 
 
@@ -1629,6 +1649,7 @@ def urlresponse_random() -> None:
                     prog.update(task, advance=1)
         ui_ok("Response-time test complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[urlresponse_random] {e}")
 
 
@@ -1651,6 +1672,7 @@ def virus_sim() -> None:
                 _stats.fail()
         ui_ok("Virus simulation complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[virus_sim] {e}")
 
 
@@ -1673,6 +1695,7 @@ def dlp_sim_https() -> None:
                 _stats.fail()
         ui_ok("DLP simulation complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[dlp_sim_https] {e}")
 
 
@@ -1707,16 +1730,15 @@ def s3_sim() -> None:
     urls_dl = random.sample(s3_download_urls, min(n_dl, len(s3_download_urls)))
     for i, url in enumerate(urls_dl, 1):
         try:
-            with requests.get(
-                url, stream=True, verify=False, timeout=(3, 3),
+            resp = requests.get(
+                url, verify=False, timeout=(3, 3),
                 headers={"User-Agent": ua},
                 allow_redirects=True,
-            ) as resp:
-                resp.raw.read(65536)  # consume a small chunk then close
+            )
             console.log(
                 f"s3-get ({i}/{n_dl}) {url}  [{_status_style(resp.status_code)}]HTTP {resp.status_code}[/]"
             )
-            _stats.record(resp.status_code)
+            _stats.record(str(resp.status_code))
         except requests.exceptions.ConnectionError as e:
             console.log(f"[yellow]s3-get ({i}/{n_dl}) {url}  {e.__class__.__name__}[/]")
             if "Connection refused" in str(e) or "ECONNREFUSED" in str(e) or "Reset" in str(e):
@@ -1747,7 +1769,7 @@ def s3_sim() -> None:
             console.log(
                 f"s3-put ({i}/{n_ul}) {url}  [{_status_style(resp.status_code)}]HTTP {resp.status_code}[/]"
             )
-            _stats.record(resp.status_code)
+            _stats.record(str(resp.status_code))
         except requests.exceptions.ConnectionError as e:
             console.log(f"[yellow]s3-put ({i}/{n_ul}) {url}  {e.__class__.__name__}[/]")
             if "Connection refused" in str(e) or "ECONNREFUSED" in str(e) or "Reset" in str(e):
@@ -1785,6 +1807,7 @@ def malware_download() -> None:
                 _stats.fail()
         ui_ok("Malware download complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[malware_download] {e}")
 
 
@@ -1808,6 +1831,7 @@ def squatting_domains() -> None:
                 _stats.fail()
         ui_ok("Squatting-domains test complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[squatting_domains] {e}")
 
 
@@ -1827,6 +1851,7 @@ def webcrawl() -> None:
             scrape_iterative(ARGS.crawl_start, iterations)
         ui_ok("Web crawl complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[webcrawl] {e}")
 
 
@@ -1852,6 +1877,7 @@ def ips() -> None:
         ui_ok("IDS/IPS trigger complete")
     except Exception as e:
         _stats.fail()
+        _stats.fail()
         ui_error(f"[ips] {e}")
 
 
@@ -1871,6 +1897,7 @@ def web_scanner() -> None:
         _stats.ok()
         ui_ok("Nikto scan complete")
     except Exception as e:
+        _stats.fail()
         _stats.fail()
         ui_error(f"[web_scanner] {e}")
 
@@ -1929,6 +1956,7 @@ def doh_random() -> None:
                     time.sleep(random.uniform(0.3, 0.8))
         ui_ok("DoH test complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[doh_random] {e}")
 
 
@@ -1971,6 +1999,7 @@ def dot_random() -> None:
                 time.sleep(random.uniform(0.5, 1.2))
         ui_ok("DoT test complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[dot_random] {e}")
 
 
@@ -2204,6 +2233,7 @@ def dns_exfil() -> None:
                     prog.update(task, advance=1)
         ui_ok("DNS exfil simulation complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[dns_exfil] {e}")
 
 
@@ -2571,6 +2601,7 @@ def llm_dlp_sim() -> None:
 
         ui_ok("LLM / AI DLP simulation complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[llm_dlp_sim] {e}")
 
 
@@ -2659,6 +2690,7 @@ def github_domain_check() -> None:
         _probe_domain_list(local, n=n)
         ui_ok("GitHub domain check complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[github_domain_check] {e}")
 
 
@@ -2684,6 +2716,7 @@ def github_phishing_domain_check() -> None:
         _probe_domain_list(local, n=n)
         ui_ok("Phishing domain check complete")
     except Exception as e:
+        _stats.fail()
         ui_error(f"[github_phishing_domain_check] {e}")
 
 
