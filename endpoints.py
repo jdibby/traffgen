@@ -62,6 +62,12 @@ Variable index (matches generator.py usage names 1-to-1):
   S3 / cloud object storage
     s3_download_urls    S3 bucket/object URLs for GET simulation (s3_sim)
     s3_upload_targets   S3 bucket/key paths for PUT upload simulation (s3_sim)
+
+  New detection suites
+    shadow_it_endpoints      Unsanctioned cloud apps (shadow_it) — CASB app-control
+    tor_anonymizer_endpoints Tor/VPN/proxy sites (tor_anonymizer) — URL-filter category
+    waf_attack_targets       Pen-test-authorised web apps for WAF probes (waf_attack)
+    data_exfil_targets       Paste/upload services for DLP POST simulation (data_exfil_http)
 """
 
 # ── DNS resolvers ──────────────────────────────────────────────────────────────
@@ -3021,4 +3027,84 @@ s3_upload_targets: list[str] = [
     # S3-compatible storage providers
     "https://s3.wasabisys.com/exfil-test-bucket/payload.bin",
     "https://s3.us-west-002.backblazeb2.com/traffgen-test/upload.dat",
+]
+
+# ── Shadow IT / unsanctioned cloud-app endpoints (shadow_it) ──────────────────
+# CASB / SSE platforms (Zscaler, Netskope, Cato, Prisma) categorise these as
+# personal file sharing, personal messaging, crypto, or shadow IT.  HEAD
+# requests exercise app-control policies without uploading any data.
+shadow_it_endpoints: list[str] = [
+    # Personal cloud storage — "personal file sharing" CASB category
+    "https://www.dropbox.com",
+    "https://www.box.com",
+    "https://mega.nz",
+    "https://wetransfer.com",
+    "https://transfer.sh",
+    "https://onedrive.live.com",        # Microsoft consumer (not M365 corporate)
+    "https://www.icloud.com",
+    # Personal messaging / collaboration
+    "https://discord.com",
+    "https://web.telegram.org",
+    "https://web.whatsapp.com",
+    # Anonymising / privacy-first mail
+    "https://proton.me",
+    "https://tutanota.com",
+    "https://guerrillamail.com",
+    # Paste / file hosting (data-exfil category)
+    "https://pastebin.com",
+    "https://filebin.net",
+    "https://gofile.io",
+    # Crypto / blockchain (often blocked by financial/enterprise policy)
+    "https://www.coinbase.com",
+    "https://etherscan.io",
+    "https://www.binance.com",
+    # Unsanctioned productivity / no-code tools
+    "https://notion.so",
+    "https://trello.com",
+    "https://www.airtable.com",
+]
+
+# ── Tor / anonymiser / VPN landing pages (tor_anonymizer) ────────────────────
+# URL-filter "anonymizers" or "proxy avoidance" category on every major NGFW,
+# SASE, and DNS-filter vendor (Cisco Umbrella, Palo Alto, Fortinet, Zscaler).
+tor_anonymizer_endpoints: list[str] = [
+    "https://check.torproject.org",
+    "https://www.torproject.org",
+    "https://protonvpn.com",
+    "https://nordvpn.com",
+    "https://mullvad.net",
+    "https://www.expressvpn.com",
+    "https://www.ipvanish.com",
+    "https://kproxy.com",
+    "https://hide.me",
+    "https://hidemy.name",
+    "https://www.anonymouse.org",
+    "https://filterbypass.me",
+    "https://www.croxyproxy.com",
+    "https://www.proxysite.com",
+    "https://4everproxy.com",
+    "https://www.freeproxyserver.net",
+]
+
+# ── WAF-attack test targets ───────────────────────────────────────────────────
+# Intentionally-vulnerable / pen-test-authorised web applications used as
+# targets for WAF-bypass probes.  Do NOT add production sites.
+waf_attack_targets: list[str] = [
+    "https://juice-shop.herokuapp.com",
+    "http://www.testmyids.com",
+    "https://hackazon.webscantest.com",
+    "http://testhtml5.vulnweb.com",
+]
+
+# ── HTTP data-exfil paste/upload targets (data_exfil_http) ───────────────────
+# Public paste and file-drop services used by attackers to exfiltrate data via
+# HTTP POST.  DLP and CASB inline inspectors should catch requests to these
+# destinations containing PII / credential patterns.
+data_exfil_targets: list[str] = [
+    "https://pastebin.com/api/api_post.php",
+    "https://hastebin.com/documents",
+    "https://paste2.org/new-paste",
+    "https://transfer.sh/upload",
+    "https://filebin.net",
+    "https://api.paste.fo/v1/pastes",
 ]
