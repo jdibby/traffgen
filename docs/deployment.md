@@ -136,7 +136,7 @@ docker run --pull=always --detach --restart unless-stopped \
 
 ## Lateral Movement Networking
 
-The `lateral-movement` suite scans the **host's physical LAN**, not the Docker bridge (`172.17.x.x`). A standard Docker container runs in its own network namespace and cannot see the host's physical interfaces. One of the two methods below is required.
+The `lateral-movement` suite scans **all physical networks** the Docker host is connected to — not the Docker bridge (`172.17.x.x`). When the host has multiple NICs or is multi-homed, all subnets are swept and port-scanned simultaneously. A standard Docker container runs in its own network namespace and cannot see the host's physical interfaces. One of the two methods below is required.
 
 ### Method 1 — stager.sh (recommended)
 
@@ -149,11 +149,13 @@ The `lateral-movement` suite scans the **host's physical LAN**, not the Docker b
 | `/32` | `x.x.x.0/24` | Microsegmentation detected — suite logs a warning and scans the containing /24 |
 | `/8` – `/23` | `x.x.x.0/24` | Large subnet capped at /24 to keep scan time reasonable |
 
+> **Note:** `stager.sh` only injects one `HOST_LAN_CIDR`. When the host is multi-homed, the container also auto-detects additional interfaces via `/proc/net/route` and `ip route show` and scans them concurrently alongside the injected CIDR.
+
 No extra flags needed — just use stager.sh.
 
 ### Method 2 — `--network=host`
 
-Run the container with `--network=host` to share the host's network namespace. The container can then see and scan the host's physical interfaces directly.
+Run the container with `--network=host` to share the host's network namespace. The container can then see and scan all of the host's physical interfaces directly — the preferred method for multi-homed hosts.
 
 ```bash
 docker run --pull=always --detach --restart unless-stopped \
