@@ -1366,7 +1366,7 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
           <tr><td>Web &amp; HTTP</td><td style="color:var(--text)">http &middot; https &middot; http3 &middot; crawl &middot; ftp &middot; bigfile &middot; speedtest &middot; url-response &middot; s3</td></tr>
           <tr><td>Threat Simulation</td><td style="color:var(--text)">c2-beacon &middot; malware-download &middot; malware-agents &middot; phishing-domains &middot; squatting &middot; virus &middot; ads &middot; pornography</td></tr>
           <tr><td>Data Exfiltration</td><td style="color:var(--text)">dns-exfil &middot; data-exfil-http &middot; dlp &middot; llm-dlp</td></tr>
-          <tr><td>IDS / IPS / WAF</td><td style="color:var(--text)">ids-trigger &middot; waf-attack &middot; log4shell &middot; nmap &middot; metasploit-check &middot; web-scanner</td></tr>
+          <tr><td>IDS / IPS / WAF</td><td style="color:var(--text)">ids-trigger &middot; waf-attack &middot; log4shell &middot; nmap &middot; msf-webapp &middot; msf-enterprise &middot; msf-appliance &middot; msf-cisa-kev &middot; msf-middleware &middot; msf-recon &middot; web-scanner</td></tr>
           <tr><td>VoIP / UCaaS</td><td style="color:var(--text)">voip &middot; ucaas</td></tr>
           <tr><td>SASE / SSE / CASB</td><td style="color:var(--text)">shadow-it &middot; tor-anonymizer &middot; tls-check &middot; lateral-movement</td></tr>
           <tr><td>Security Tools</td><td style="color:var(--text)">snmp &middot; kyber &middot; ai-browse</td></tr>
@@ -1398,6 +1398,16 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
     <!-- Changelog -->
     <div id="tab-changelog" class="panel">
       <div style="max-width:900px">
+
+        <div class="a-section">
+          <div class="a-h">v3.4.0 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
+          <table class="st-table" style="margin-top:10px">
+            <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Replaced <strong>metasploit-check</strong> with six themed Metasploit suites: <strong>msf-webapp</strong> (Drupal/Joomla/WordPress/GitLab/PHP/Magento), <strong>msf-enterprise</strong> (Exchange/Atlassian/ManageEngine/SAP), <strong>msf-appliance</strong> (Cisco/PAN-OS/Juniper/FortiOS/Ivanti/F5), <strong>msf-cisa-kev</strong> (Log4Shell/GoAnywhere/MOVEit/Barracuda/SolarWinds/Check Point), <strong>msf-middleware</strong> (Struts2/WebLogic/JBoss/Spring/Jenkins/OFBiz/Solr), <strong>msf-recon</strong> (EternalBlue probe, SMB/RDP/MySQL/Redis/HTTP auxiliary scanners)</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>MSF suite output now parsed per-module — each check outcome classified as <strong>allow</strong> (reachable, check ran), <strong>drop</strong> (ECONNREFUSED/ETIMEDOUT), or <strong>fail</strong> (module error); results reflected in dashboard stat cards</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Tests page suite cards now organized alphabetically within named category sections (Connectivity &amp; Network, Web &amp; HTTP, Encrypted &amp; Modern Protocols, Threat Detection &amp; IDS/IPS, Recon &amp; Lateral Movement, Evasion &amp; C2, UCaaS &amp; Communications, Content Filtering)</td></tr>
+          </table>
+        </div>
 
         <div class="a-section">
           <div class="a-h">v3.3.0 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
@@ -1476,7 +1486,7 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
             <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>kyber</strong> — TLS 1.3 handshakes using X25519Kyber768 post-quantum key exchange to test whether SASE/NGFW platforms can inspect PQ traffic</td></tr>
             <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>ai-browse</strong> — simulates AI assistant API calls to OpenAI, Anthropic, Gemini, Mistral and LLM-heavy browsing sessions</td></tr>
             <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>lateral-movement</strong> — nmap host discovery and port scan against the physical LAN; reads <code>HOST_LAN_CIDR</code> or falls back to <code>--network=host</code></td></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>shadow-it</strong>, <strong>tor-anonymizer</strong>, <strong>waf-attack</strong>, <strong>log4shell</strong>, <strong>metasploit-check</strong>, <strong>web-scanner</strong></td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>shadow-it</strong>, <strong>tor-anonymizer</strong>, <strong>waf-attack</strong>, <strong>log4shell</strong>, <strong>metasploit-check</strong>, <strong>web-scanner</strong> (metasploit-check replaced by themed suites in later release)</td></tr>
             <tr><td><span class="cl-feat">FEAT</span></td><td>Deployment</td><td>Multi-arch Docker image — <code>linux/amd64</code>, <code>linux/arm64</code>, <code>linux/arm/v7</code>; GitHub Actions auto-builds and pushes on every merge to main</td></tr>
             <tr><td><span class="cl-feat">FEAT</span></td><td>Deployment</td><td>Fully automatic TLS proxy CA detection at container startup — probes 15 diverse HTTPS hosts in parallel, votes on proxy CA fingerprint, installs winning cert, runs verification pass</td></tr>
             <tr><td><span class="cl-feat">FEAT</span></td><td>Deployment</td><td><code>stager.sh</code> — one-command deploy on Ubuntu, Debian, Rocky Linux, AlmaLinux, Amazon Linux 2/2023, Raspberry Pi 4/5; sets up Docker, prunes old containers, injects <code>HOST_LAN_CIDR</code></td></tr>
@@ -1751,7 +1761,9 @@ const SUITE_ICONS={
   'lateral-movement':'🕵️','log4shell':'💥','tls-check':'🔏',
   'shadow-it':'👥','waf-attack':'🛑','data-exfil-http':'📬',
   'tor-anonymizer':'🧅',
-  'malware-agents':'👾','malware-download':'🦠','metasploit-check':'🗡️',
+  'malware-agents':'👾','malware-download':'🦠',
+  'msf-webapp':'🌐','msf-enterprise':'🏢','msf-appliance':'📡',
+  'msf-cisa-kev':'🚨','msf-middleware':'⚙️','msf-recon':'🔭',
   'speedtest':'🚀','nmap':'🗺️','ntp':'🕐','phishing-domains':'🎣',
   'pornography':'🔞','snmp':'📊','squatting':'🔤','s3':'🪣',
   'ssh':'💻','url-response':'⏱️','virus':'☣️','web-scanner':'🔬',
@@ -1892,8 +1904,11 @@ function apply(s){
       'data-exfil-http':'Threat Detection & IDS/IPS','dlp':'Threat Detection & IDS/IPS',
       'ids-trigger':'Threat Detection & IDS/IPS','log4shell':'Threat Detection & IDS/IPS',
       'malware-agents':'Threat Detection & IDS/IPS','malware-download':'Threat Detection & IDS/IPS',
-      'metasploit-check':'Threat Detection & IDS/IPS','msf-aux-scan':'Threat Detection & IDS/IPS',
-      'msf-payload-delivery':'Threat Detection & IDS/IPS','msf-cred-spray':'Threat Detection & IDS/IPS',
+      'msf-appliance':'Threat Detection & IDS/IPS','msf-aux-scan':'Threat Detection & IDS/IPS',
+      'msf-cisa-kev':'Threat Detection & IDS/IPS','msf-cred-spray':'Threat Detection & IDS/IPS',
+      'msf-enterprise':'Threat Detection & IDS/IPS','msf-middleware':'Threat Detection & IDS/IPS',
+      'msf-payload-delivery':'Threat Detection & IDS/IPS','msf-recon':'Threat Detection & IDS/IPS',
+      'msf-webapp':'Threat Detection & IDS/IPS',
       'nmap':'Threat Detection & IDS/IPS','tls-check':'Threat Detection & IDS/IPS',
       'virus':'Threat Detection & IDS/IPS','waf-attack':'Threat Detection & IDS/IPS',
       'web-scanner':'Threat Detection & IDS/IPS',

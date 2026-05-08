@@ -1,0 +1,59 @@
+# msf_recon.rc — Auxiliary reconnaissance scanner checks.
+# Generates protocol-level fingerprint traffic that triggers tier-1 IDS/IPS
+# recon signatures: SMB/RDP probes, database exposure, HTTP fingerprinting.
+# WARNING: Use only in a legal, controlled lab environment.
+
+resource /opt/metasploit-framework/ms_checks/checks/_common.rc
+
+# ---- Auxiliary Recon Scanners ----
+
+# EternalBlue (MS17-010) probe — highest-fidelity SMB IDS signature
+use auxiliary/scanner/smb/smb_ms17_010
+run
+back
+sleep 1
+
+# SMB share enumeration — lateral-movement reconnaissance signature
+use auxiliary/scanner/smb/smb_enumshares
+run
+back
+sleep 1
+
+# RDP service detection — triggers RDP-scan IDS rules
+use auxiliary/scanner/rdp/rdp_scanner
+run
+back
+sleep 1
+
+# MySQL version probe — triggers database recon signatures
+use auxiliary/scanner/mysql/mysql_version
+run
+back
+sleep 1
+
+# Redis unauthenticated access probe — triggers exposed-cache-service alerts
+use auxiliary/scanner/redis/redis_server
+run
+back
+sleep 1
+
+# HTTP server version banner grab — triggers reconnaissance IDS alerts
+use auxiliary/scanner/http/http_version
+run
+back
+sleep 1
+
+# robots.txt fetch — triggers information-disclosure IDS rules
+use auxiliary/scanner/http/robots_txt
+run
+back
+sleep 1
+
+# SSH version scanner — triggers SSH-scan IDS rules
+use auxiliary/scanner/ssh/ssh_version
+run
+back
+sleep 1
+
+# ---- End ----
+exit

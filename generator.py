@@ -252,10 +252,15 @@ _SUITE_DESCRIPTIONS: list[tuple[str, str]] = [
     ("log4shell",        "Log4Shell JNDI header injection probes (CVE-2021-44228) → IDS/WAF/SASE"),
     ("malware-agents",   "HEAD requests to malware-category URLs using C2 framework user-agents (SASE/NGFW)"),
     ("malware-download", "Download known-malware file samples (to /dev/null)"),
-    ("metasploit-check", "Run Metasploit .rc check scripts (no exploitation)"),
-    ("msf-aux-scan",    "Metasploit auxiliary vulnerability scanners (EternalBlue/BlueKeep/Heartbleed/Shellshock) → live LAN hosts only"),
-    ("msf-payload-delivery", "msfvenom encoded payloads delivered via HTTP to public test targets — tests NGFW/IDS obfuscated payload detection"),
-    ("msf-cred-spray",  "Metasploit credential-testing modules (SSH/SMB/FTP/HTTP) → public test targets only"),
+    ("msf-appliance",       "Metasploit checks: network appliances (Cisco IOS XE, PAN-OS, Juniper, FortiOS, Ivanti, F5) — IDS/NGFW appliance CVE signatures"),
+    ("msf-aux-scan",        "Metasploit auxiliary vulnerability scanners (EternalBlue/BlueKeep/Heartbleed/Shellshock) → live LAN hosts only"),
+    ("msf-cisa-kev",        "Metasploit checks: CISA KEV catalog (Log4Shell, GoAnywhere, MOVEit, Barracuda, SolarWinds, Check Point)"),
+    ("msf-cred-spray",      "Metasploit credential-testing modules (SSH/SMB/FTP/HTTP) → public test targets only"),
+    ("msf-enterprise",      "Metasploit checks: enterprise software (Exchange ProxyShell/ProxyLogon, Atlassian, ManageEngine, SAP)"),
+    ("msf-middleware",      "Metasploit checks: app servers/middleware (Struts2, WebLogic, JBoss, Spring Cloud, Jenkins, OFBiz, Solr)"),
+    ("msf-payload-delivery","msfvenom encoded payloads delivered via HTTP to public test targets — tests NGFW/IDS obfuscated payload detection"),
+    ("msf-recon",           "Metasploit auxiliary recon scanners (EternalBlue probe, SMB/RDP/MySQL/Redis/HTTP fingerprinting)"),
+    ("msf-webapp",          "Metasploit checks: web app CVEs (Drupal, Joomla, WordPress, GitLab, PHP CGI, Magento, Webmin)"),
     ("speedtest",        "fast.com speed-test via fastcli"),
     ("nmap",             "Nmap port scan (1-1024) + CVE script scan"),
     ("ntp",              "NTP UDP probes to a pool of public time servers"),
@@ -813,7 +818,12 @@ def _popen_kill_group(cmd: str, timeout: int,
 # Per-function wall-clock limits (seconds).  Functions not listed fall back to
 # 120 s.  These are upper-bounds; most tests complete well within the limit.
 _SUITE_TIMEOUTS: dict[str, int] = {
-    "metasploit_check":      360,
+    "msf_webapp":            360,
+    "msf_enterprise":        360,
+    "msf_appliance":         360,
+    "msf_cisa_kev":          360,
+    "msf_middleware":        420,
+    "msf_recon":             300,
     "msf_aux_scan":          480,
     "msf_payload_delivery":  180,
     "msf_cred_spray":        300,
@@ -1410,40 +1420,144 @@ def ping_random() -> None:
         ui_error(f"[ping_random] {e}")
 
 
-def metasploit_check() -> None:
-    """
-    Run a random selection of Metasploit .rc resource scripts.  Each script
-    performs *check* operations only (no exploitation) against
-    scanme.nmap.org / testmyids.com.  Exercises IDS/IPS signature coverage.
-    """
-    ui_banner("Metasploit Checks", "Running .rc check scripts")
-    try:
-        n      = _size_to_limits(ARGS.size, 1, 3, 5, 7)
-        rc_dir = "/opt/metasploit-framework/ms_checks/checks"
-        files  = [f for f in os.listdir(rc_dir)
-                  if f.startswith("ms_check_") and f.endswith(".rc")]
-        random.shuffle(files)
-        files  = files[:n]
+_MSF_SUITES_DIR = "/opt/metasploit-framework/ms_checks/suites"
 
-        with Progress(SpinnerColumn(), TextColumn("[cyan]MSF[/]"),
-                      MofNCompleteColumn(), BarColumn(), TimeElapsedColumn(),
-                      console=console) as prog:
-            task = prog.add_task("msf", total=len(files))
-            for i, rc in enumerate(files, 1):
-                rc_path = os.path.join(rc_dir, rc)
-                console.log(f"msfconsole ({i}/{len(files)}): {rc}")
-                try:
-                    _popen_kill_group(f"msfconsole -q -r '{rc_path}'", timeout=300)
-                    _stats.ok()
-                except Exception as e:
-                    console.log(f"[yellow]msf error: {e}[/]")
-                    _stats.fail()
-                finally:
-                    prog.update(task, advance=1)
-        ui_ok("Metasploit checks complete")
-    except Exception as e:
+
+def _msf_run_rc_parsed(rc_name: str, banner: str, subtitle: str, timeout: int) -> None:
+    """
+    Run a themed MSF .rc script from _MSF_SUITES_DIR and parse per-module
+    results into _stats.
+
+    Outcome classification (per msfconsole output line):
+      ok    — check ran; target not exploitable / not vulnerable / vulnerable (reached)
+      drop  — ECONNREFUSED / ETIMEDOUT (firewall dropping or no service)
+      fail  — module error / check raised exception
+      Auxiliary module completions counted as ok if no error on that run.
+    """
+    rc_path = os.path.join(_MSF_SUITES_DIR, rc_name)
+    ui_banner(banner, subtitle)
+    console.log(f"[cyan]msfconsole -q -r {rc_name}[/]")
+
+    proc = subprocess.Popen(
+        f"msfconsole -q -r '{rc_path}'", shell=True,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        preexec_fn=os.setsid, text=True, errors="replace",
+    )
+    try:
+        out, _ = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        ui_warn(f"MSF script timed out after {timeout}s")
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+        except OSError:
+            pass
+        try:
+            proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except OSError:
+                pass
+        out = ""
+
+    found = 0
+    aux_ok: set[int] = set()
+    aux_err: set[int] = set()
+    module_idx = 0
+
+    for line in (out or "").splitlines():
+        ll = line.lower()
+        # Track module boundaries to pair auxiliary completions with modules
+        if ll.strip().startswith("use ") or "using configured payload" in ll:
+            module_idx += 1
+        if any(p in ll for p in (
+            "not exploitable", "not vulnerable",
+            "appears to be vulnerable", "appears vulnerable",
+        )):
+            _stats.ok(); found += 1
+        elif any(p in ll for p in ("econnrefused", "connection refused")):
+            _stats.drop(); found += 1
+        elif any(p in ll for p in ("etimedout", "timed out", "connection timed out")):
+            _stats.drop(); found += 1
+        elif "check failed" in ll:
+            _stats.fail(); found += 1
+        elif "auxiliary module execution completed" in ll:
+            aux_ok.add(module_idx); found += 1
+        elif any(p in ll for p in ("[-] error:", "module failed", "exploit failed")):
+            aux_err.add(module_idx); found += 1
+
+    for idx in aux_ok - aux_err:
+        _stats.ok()
+    for idx in aux_err:
         _stats.fail()
-        ui_error(f"[metasploit_check] {e}")
+
+    if found == 0:
+        if proc.returncode in (0, None):
+            _stats.ok()
+        else:
+            _stats.fail()
+
+    ui_ok(f"{banner} complete")
+
+
+def msf_webapp() -> None:
+    """Metasploit check-mode probes for web application CVEs."""
+    _msf_run_rc_parsed(
+        "msf_webapp.rc",
+        "MSF Web App",
+        "CVE checks: Drupal, Joomla, WordPress, GitLab, PHP CGI, Magento, Webmin",
+        timeout=_SUITE_TIMEOUTS["msf_webapp"],
+    )
+
+
+def msf_enterprise() -> None:
+    """Metasploit check-mode probes for enterprise software CVEs."""
+    _msf_run_rc_parsed(
+        "msf_enterprise.rc",
+        "MSF Enterprise",
+        "CVE checks: Exchange ProxyShell/ProxyLogon, Atlassian, ManageEngine, SAP",
+        timeout=_SUITE_TIMEOUTS["msf_enterprise"],
+    )
+
+
+def msf_appliance() -> None:
+    """Metasploit check-mode probes for network appliance CVEs."""
+    _msf_run_rc_parsed(
+        "msf_appliance.rc",
+        "MSF Appliance",
+        "CVE checks: Cisco IOS XE, PAN-OS, Juniper, FortiOS, Ivanti, F5 BIG-IP",
+        timeout=_SUITE_TIMEOUTS["msf_appliance"],
+    )
+
+
+def msf_cisa_kev() -> None:
+    """Metasploit check-mode probes for CISA Known Exploited Vulnerabilities."""
+    _msf_run_rc_parsed(
+        "msf_cisa_kev.rc",
+        "MSF CISA KEV",
+        "CVE checks: Log4Shell, GoAnywhere, MOVEit, Barracuda, SolarWinds, Check Point",
+        timeout=_SUITE_TIMEOUTS["msf_cisa_kev"],
+    )
+
+
+def msf_middleware() -> None:
+    """Metasploit check-mode probes for app server / middleware CVEs."""
+    _msf_run_rc_parsed(
+        "msf_middleware.rc",
+        "MSF Middleware",
+        "CVE checks: Struts2, WebLogic, JBoss, Spring Cloud, Jenkins, OFBiz, Solr",
+        timeout=_SUITE_TIMEOUTS["msf_middleware"],
+    )
+
+
+def msf_recon() -> None:
+    """Metasploit auxiliary recon scanners for protocol fingerprinting."""
+    _msf_run_rc_parsed(
+        "msf_recon.rc",
+        "MSF Recon",
+        "Auxiliary scanners: EternalBlue probe, SMB/RDP/MySQL/Redis/HTTP fingerprinting",
+        timeout=_SUITE_TIMEOUTS["msf_recon"],
+    )
 
 
 def msf_aux_scan() -> None:
@@ -4540,7 +4654,12 @@ _SUITE_MAP: dict[str, list] = {
     "log4shell":        [log4shell_probe],
     "malware-agents":   [malware_random],
     "malware-download": [malware_download],
-    "metasploit-check":      [metasploit_check],
+    "msf-webapp":            [msf_webapp],
+    "msf-enterprise":        [msf_enterprise],
+    "msf-appliance":         [msf_appliance],
+    "msf-cisa-kev":          [msf_cisa_kev],
+    "msf-middleware":        [msf_middleware],
+    "msf-recon":             [msf_recon],
     "msf-aux-scan":          [msf_aux_scan],
     "msf-payload-delivery":  [msf_payload_delivery],
     "msf-cred-spray":        [msf_cred_spray],
