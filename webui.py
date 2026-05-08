@@ -44,7 +44,7 @@ _sse_lock  = threading.Lock()
 # ── Exclusive-control session tracking ────────────────────────────────────────
 # When ADMIN_TOKEN is not set, the first browser tab to open an SSE connection
 # becomes the controller; all other tabs are read-only.  If the controller tab
-# closes, its SSE stream ends and a 10-second timer starts.  If the same tab
+# closes, its SSE stream ends and a 4-second timer starts.  If the same tab
 # reconnects within the grace period it reclaims control; otherwise the slot
 # opens for the next visitor.
 _controller_id:    str                          = ""
@@ -53,7 +53,7 @@ _controller_timer: "threading.Timer | None"     = None
 _controller_gen:   int                          = 0   # increments on every new claim
 
 
-def _schedule_controller_release(sid: str, gen: int, delay: float = 10.0) -> None:
+def _schedule_controller_release(sid: str, gen: int, delay: float = 4.0) -> None:
     global _controller_id, _controller_timer
     with _controller_lock:
         if _controller_timer is not None:
@@ -936,11 +936,12 @@ td.nm{font-family:inherit;font-weight:500;font-size:16px}
 .cl-feat{display:inline-block;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:700;background:#1e3a5f;color:#60a5fa;letter-spacing:.4px}
 .cl-fix{display:inline-block;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:700;background:#3d1f1f;color:#f87171;letter-spacing:.4px}
 .lk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
-.lk{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--r);background:var(--surf2);text-decoration:none;color:var(--text);transition:border-color .15s}
+.lk{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--r);background:var(--surf2);text-decoration:none;color:var(--text);transition:border-color .15s;min-width:0}
 .lk:hover{border-color:var(--green)}
 .lk-ico{font-size:20px;flex-shrink:0}
-.lk-name{font-weight:600;font-size:15px}
-.lk-url{font-size:12px;color:var(--muted);font-family:'SF Mono',Consolas,monospace}
+.lk-body{min-width:0;flex:1}
+.lk-name{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lk-url{font-size:12px;color:var(--muted);font-family:'SF Mono',Consolas,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cmd-blk{background:#080c10;border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;font-family:'SF Mono',Consolas,monospace;font-size:13px;line-height:1.85;color:#c9d1d9;white-space:pre-wrap;word-break:break-all}
 .cmd-blk .cmt{color:#374151}.cmd-blk .flg{color:#60a5fa}
 .pg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px}
@@ -1317,14 +1318,15 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div>
           <div class="a-title">traffgen</div>
           <div class="a-ver">v<span id="about-ver">&#8212;</span> &middot; Multi-Protocol Network Traffic Generator</div>
-          <div class="a-sub">Simulates realistic network traffic across 50+ test suites &#8212; DNS, HTTP/S, BGP, SSH, C2 beacons, DLP, IDS/WAF triggers, lateral movement, TLS inspection checks, and more.<br>Purpose-built to stress-test firewalls, IDS/IPS, URL filters, DLP engines, CASB/SASE/SSE platforms, and SIEM pipelines.</div>
+          <div class="a-sub">Simulates realistic network traffic across 45 test suites &#8212; DNS, HTTP/S, BGP, SSH, VoIP/UCaaS, C2 beacons, DLP, IDS/WAF triggers, lateral movement, TLS inspection checks, and more.<br>Purpose-built to stress-test firewalls, IDS/IPS, URL filters, DLP engines, CASB/SASE/SSE platforms, and SIEM pipelines.</div>
         </div>
       </div>
       <div class="a-section">
         <div class="a-h">Links &amp; Resources</div>
         <div class="lk-grid">
-          <a class="lk" href="https://github.com/jdibby/traffgen" target="_blank" rel="noopener"><span class="lk-ico">&#9415;</span><div><div class="lk-name">GitHub Repository</div><div class="lk-url">github.com/jdibby/traffgen</div></div></a>
-          <a class="lk" href="https://hub.docker.com/r/jdibby/traffgen" target="_blank" rel="noopener"><span class="lk-ico">&#127987;</span><div><div class="lk-name">Docker Hub</div><div class="lk-url">hub.docker.com/r/jdibby/traffgen</div></div></a>
+          <a class="lk" href="https://github.com/jdibby/traffgen" target="_blank" rel="noopener"><span class="lk-ico">&#9415;</span><div class="lk-body"><div class="lk-name">GitHub Repository</div><div class="lk-url">github.com/jdibby/traffgen</div></div></a>
+          <a class="lk" href="https://hub.docker.com/r/jdibby/traffgen" target="_blank" rel="noopener"><span class="lk-ico">&#127987;</span><div class="lk-body"><div class="lk-name">Docker Hub</div><div class="lk-url">hub.docker.com/r/jdibby/traffgen</div></div></a>
+          <a class="lk" href="https://github.com/jdibby/traffgen/tree/main/docs" target="_blank" rel="noopener"><span class="lk-ico">&#128218;</span><div class="lk-body"><div class="lk-name">Documentation</div><div class="lk-url">github.com/jdibby/traffgen/docs</div></div></a>
         </div>
       </div>
       <div class="a-section">
@@ -1393,6 +1395,21 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
     <!-- Changelog -->
     <div id="tab-changelog" class="panel">
       <div style="max-width:900px">
+
+        <div class="a-section">
+          <div class="a-h">v3.2.0 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
+          <table class="st-table" style="margin-top:10px">
+            <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Lateral Movement</td><td>Multi-network concurrent scanning — all physical host interfaces discovered and swept simultaneously; per-subnet Phase 1 (ping sweep) and Phase 2 (port scan) run in parallel via <code>ThreadPoolExecutor</code></td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Lateral Movement</td><td>Network selector in Settings drawer and test modal — choose which detected subnets to scan; leave all checked to scan every network</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Lateral Movement</td><td><code>--lateral-networks</code> CLI flag — comma-separated CIDRs to restrict scanning (e.g. <code>--lateral-networks=192.168.1.0/24,10.0.0.0/24</code>); omit to scan all</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>API</td><td>New <code>GET /api/networks</code> endpoint — returns available and currently-selected lateral movement networks from generator state</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Deployment</td><td>Configurable web dashboard port in <code>stager.sh</code> — prompts for port number (default 7777); uses <code>-p &lt;port&gt;:7777</code> so container always binds internally on 7777</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Dashboard</td><td>Network selector in Settings drawer was hidden behind suite dropdown change — now always visible; also added to lateral-movement test modal</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Dashboard</td><td>Read-only control release delay reduced from 10 s to 4 s — the JS reconnect timer is 3 s, so 4 s gives adequate margin while releasing the slot much faster after a tab closes</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Dashboard</td><td>Links &amp; Resources cards — URL text now truncates with ellipsis instead of overflowing; added Documentation link card</td></tr>
+          </table>
+        </div>
 
         <div class="a-section">
           <div class="a-h">v3.1.0 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
