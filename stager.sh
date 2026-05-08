@@ -182,11 +182,32 @@ esac
 
 # Web dashboard
 echo ""
-_CFG_WEBUI_ANS=$(_ask_tty "  Enable web dashboard on port 7777? [Y/n]: " "y")
+_CFG_WEBUI_ANS=$(_ask_tty "  Enable web dashboard? [Y/n]: " "y")
 case "$_CFG_WEBUI_ANS" in
     n|N|no|NO) _CFG_WEBUI=0 ;;
     *)          _CFG_WEBUI=1 ;;
 esac
+
+# Dashboard port (only when web UI is enabled)
+_CFG_PORT=7777
+if [ "$_CFG_WEBUI" -eq 1 ]; then
+    echo ""
+    _CFG_PORT_ANS=$(_ask_tty "  Web dashboard port [7777]: " "7777")
+    case "$_CFG_PORT_ANS" in
+        ''|*[!0-9]*)
+            echo "  Invalid port, defaulting to 7777"
+            _CFG_PORT=7777
+            ;;
+        *)
+            if [ "$_CFG_PORT_ANS" -lt 1 ] || [ "$_CFG_PORT_ANS" -gt 65535 ]; then
+                echo "  Port out of range (1-65535), defaulting to 7777"
+                _CFG_PORT=7777
+            else
+                _CFG_PORT="$_CFG_PORT_ANS"
+            fi
+            ;;
+    esac
+fi
 
 # Host networking (Linux only — not supported on macOS Docker Desktop)
 _CFG_NET_HOST=0
@@ -194,7 +215,7 @@ if [ "$_UNAME" != "Darwin" ] && [ "$_CFG_WEBUI" -eq 1 ]; then
     echo ""
     echo "  Host networking (--network=host) gives the lateral-movement suite access to"
     echo "  your physical LAN and exposes the dashboard without a port mapping."
-    echo "  Use -p 7777:7777 if you only need the web dashboard."
+    echo "  Use -p <port>:7777 if you only need the web dashboard."
     _CFG_NETHOST_ANS=$(_ask_tty "  Use host networking? [y/N]: " "n")
     case "$_CFG_NETHOST_ANS" in
         y|Y|yes|YES) _CFG_NET_HOST=1 ;;
@@ -212,9 +233,9 @@ echo "    Loop        : ${_CFG_LOOP:-no}"
 echo "    Max wait    : ${_CFG_WAIT}s"
 if [ "$_CFG_WEBUI" -eq 1 ]; then
     if [ "$_CFG_NET_HOST" -eq 1 ]; then
-        echo "    Networking  : --network=host (dashboard + full LAN scanning)"
+        echo "    Networking  : --network=host (dashboard on port 7777 + full LAN scanning)"
     else
-        echo "    Networking  : -p 7777:7777 (dashboard on https://<host>:7777)"
+        echo "    Networking  : -p ${_CFG_PORT}:7777 (dashboard on https://<host>:${_CFG_PORT})"
     fi
 else
     echo "    Networking  : none (headless, no web dashboard)"
@@ -539,7 +560,7 @@ if [ "$_CFG_WEBUI" -eq 1 ]; then
     if [ "$_CFG_NET_HOST" -eq 1 ]; then
         _DOCKER_NET_ARGS="--network=host"
     else
-        _DOCKER_NET_ARGS="-p 7777:7777"
+        _DOCKER_NET_ARGS="-p ${_CFG_PORT}:7777"
     fi
 fi
 
@@ -576,7 +597,7 @@ if [ "$_CFG_WEBUI" -eq 1 ]; then
         HOST_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")
     fi
     echo ""
-    echo "  ${BOLD}Web dashboard : ${GREEN}https://${HOST_IP}:7777${RESET}"
+    echo "  ${BOLD}Web dashboard : ${GREEN}https://${HOST_IP}:${_CFG_PORT}${RESET}"
     echo "  (Accept the self-signed certificate warning in your browser)"
 else
     echo ""
