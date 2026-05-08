@@ -821,12 +821,12 @@ body{display:flex;background:var(--bg);color:var(--text);font-family:-apple-syst
 #tab-output.panel{padding:0;gap:0;overflow:hidden}
 .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
 @media(max-width:1000px){.cards{grid-template-columns:repeat(2,1fr)}}
-.card{background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:3px;transition:border-color .15s,box-shadow .15s;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.card{background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:2px;transition:border-color .15s,box-shadow .15s;box-shadow:0 1px 4px rgba(0,0,0,.25)}
 .card:hover{border-color:var(--border2);box-shadow:0 2px 8px rgba(0,0,0,.35)}
 .card.hi{border-color:rgba(34,197,94,.3);background:var(--gdim)}
-.clbl{font-size:16px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)}
-.cval{font-size:24px;font-weight:700;font-family:'SF Mono',Consolas,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
-.csub{font-size:15px;color:var(--muted);margin-top:1px}
+.clbl{font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)}
+.cval{font-size:26px;font-weight:700;font-family:'SF Mono',Consolas,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:4px;line-height:1.1}
+.csub{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.4;word-break:break-word}
 .c-green{color:var(--green)}.c-red{color:var(--red)}.c-amber{color:var(--amber)}.c-blue{color:var(--blue)}.c-mut{color:var(--muted)}
 .charts{display:grid;grid-template-columns:230px 1fr;gap:12px}
 @media(max-width:860px){.charts{grid-template-columns:1fr}}
@@ -1078,13 +1078,13 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
     <!-- Overview -->
     <div id="tab-overview" class="panel active">
       <div id="ov-grid" style="display:flex;flex-direction:column;gap:14px">
-      <div class="cards" data-widget="stat-cards" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));cursor:default">
+      <div class="cards" data-widget="stat-cards" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr));cursor:default">
         <div class="card"><div class="clbl">CPU</div><div class="cval c-green" id="ov-cpu">&#8212;</div></div>
         <div class="card"><div class="clbl">Memory</div><div class="cval c-blue" id="ov-mem">&#8212;</div></div>
-        <div class="card"><div class="clbl">Load Average <span style="font-weight:400;letter-spacing:0;text-transform:none;font-size:12px;opacity:.7">1m &middot; 5m &middot; 15m</span></div><div class="cval c-amber" id="ov-load" style="font-size:16px">&#8212;</div></div>
+        <div class="card"><div class="clbl">Load Average</div><div class="cval c-amber" id="ov-load" style="font-size:16px;white-space:normal;word-break:break-all">&#8212;</div><div class="csub">1m &middot; 5m &middot; 15m</div></div>
         <div class="card"><div class="clbl">Total Requests</div><div class="cval c-blue" id="v-total">&#8212;</div><div class="csub" id="s-total">&#8212;</div></div>
         <div class="card"><div class="clbl">Success Rate</div><div class="cval" id="v-rate">&#8212;</div><div class="csub" id="s-rate">&#8212;</div></div>
-        <div class="card hi"><div class="clbl">Active Test</div><div class="cval c-green" id="v-test" style="font-size:17px">&#8212;</div><div class="csub" id="s-test">&#8212;</div></div>
+        <div class="card hi"><div class="clbl">Active Test</div><div class="cval c-green" id="v-test" style="font-size:16px;white-space:normal;word-break:break-word;line-height:1.2">&#8212;</div><div class="csub" id="s-test">&#8212;</div></div>
         <div class="card"><div class="clbl">Iteration</div><div class="cval c-amber" id="v-iter">&#8212;</div><div class="csub" id="s-iter">&#8212;</div></div>
         <div class="card"><div class="clbl">Probes / min</div><div class="cval c-blue" id="v-ppm">&#8212;</div><div class="csub" id="s-ppm">accumulating&hellip;</div></div>
       </div>
