@@ -1373,7 +1373,7 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
     </div>
 
     <!-- Changelog -->
-    <div id="tab-changelog" class="panel" style="display:none">
+    <div id="tab-changelog" class="panel">
       <div style="max-width:900px">
 
         <div class="a-section">
