@@ -813,6 +813,8 @@ body{display:flex;background:var(--bg);color:var(--text);font-family:-apple-syst
 .ico-btn{width:33px;height:33px;border-radius:var(--r);border:1px solid var(--border2);background:var(--surf);color:var(--muted);cursor:pointer;display:grid;place-items:center;font-size:20px;transition:all .12s;flex-shrink:0}
 .ico-btn:hover{border-color:var(--green);color:var(--green)}
 .ico-btn.danger:hover{border-color:var(--red);color:var(--red)}
+.ico-btn.ok{width:auto;padding:0 12px;font-size:14px;font-weight:600;color:var(--green);border-color:var(--green)}
+.ico-btn.ok:hover{background:var(--green);color:#000}
 .content{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
 .panel{display:none;flex-direction:column;gap:14px;padding:18px;flex:1;min-height:0;overflow-y:auto}
 .panel.active{display:flex}
@@ -1059,6 +1061,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
       <span id="cfg-s-pill" class="mono" style="color:var(--muted)">—</span>
       <span id="cfg-z-pill" class="mono" style="color:var(--muted)">—</span>
       <span id="status-pill" class="tp-pill tp-dim"><span class="pulse"></span>Starting</span>
+      <button id="btn-restart" class="ico-btn ok ro-ctrl" onclick="restartTests()" title="Restart tests (same settings)" style="display:none">&#9654; Restart</button>
       <button id="btn-pause" class="ico-btn ro-ctrl" onclick="togglePause()" title="Pause / Resume">&#9208;</button>
       <button id="btn-stop" class="ico-btn danger ro-ctrl" onclick="stopTests()" title="Stop all tests">&#9209;</button>
       <button class="ico-btn" onclick="openDrawer()" title="Settings">&#9881;</button>
@@ -1371,72 +1374,153 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
 
     <!-- Changelog -->
     <div id="tab-changelog" class="panel" style="display:none">
-      <div style="max-width:860px">
+      <div style="max-width:900px">
+
         <div class="a-section">
           <div class="a-h">v3.1.0 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
           <table class="st-table" style="margin-top:10px">
-            <tr><th style="width:80px">Type</th><th style="width:120px">Area</th><th>Description</th></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>VoIP</strong> suite — STUN binding requests (UDP/3478) and SIP OPTIONS (UDP/5060) against public registrars</td></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>UCaaS</strong> suite — HEAD probes to 34 UCaaS endpoints (Zoom, Teams, Webex, Google Meet, Slack, RingCentral, 8x8, and more)</td></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Changelog page added to the web UI</td></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Topbar redesigned as a 3-column flex layout — host LAN IP pinned left, active test centered, controls pinned right</td></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Host LAN IP displayed in topbar and Network Info widget (populated from <code>HOST_LAN_CIDR</code>)</td></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>TLS Check</td><td>Expanded SASE/SSE vendor detection map — added Cloudflare Gateway, Menlo Security, Akamai SIA, Microsoft Defender, Lookout, Aryaka, Versa Networks, Perimeter 81, Proofpoint, F5, Juniper</td></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Deployment</td><td>macOS support in <code>stager.sh</code> — Homebrew, Docker Desktop, <code>en0/en1</code> IP detection, hex netmask → CIDR via python3</td></tr>
-            <tr><td><span class="cl-fix">FIX</span></td><td>Dashboard</td><td>Stop and Pause buttons were sometimes locked in read-only mode on first page load due to a race between <code>checkRole()</code> and the SSE connection establishing the controller session</td></tr>
-            <tr><td><span class="cl-fix">FIX</span></td><td>Dashboard</td><td>Toast messages in read-only mode now correctly say &ldquo;Another session has control&rdquo; in multi-user mode instead of &ldquo;click Unlock&rdquo; (no Unlock button exists in that mode)</td></tr>
-            <tr><td><span class="cl-fix">FIX</span></td><td>Generator</td><td>Heartbeat stop safety net now uses <code>os._exit()</code> instead of <code>sys.exit()</code> — the old call only killed the daemon thread, leaving the main process running mid-test</td></tr>
-            <tr><td><span class="cl-fix">FIX</span></td><td>TLS Check</td><td>Cato Networks intercepted traffic was reported as &ldquo;CLEAN&rdquo; because the CN used hyphens (<code>Cato-Networks-Server-…</code>) — fixed by normalising hyphens to spaces before token matching</td></tr>
-            <tr><td><span class="cl-fix">FIX</span></td><td>Deployment</td><td>Duplicate Docker apt/yum sources no longer cause <code>apt-get update</code> failures on hosts that previously added Docker repos via a different method</td></tr>
-            <tr><td><span class="cl-fix">FIX</span></td><td>Deployment</td><td>Quick Start Docker examples now use <code>-p 7777:7777</code> instead of <code>--network=host</code> for cross-platform compatibility</td></tr>
+            <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>voip</strong> suite — STUN binding requests (RFC 5389, UDP/3478) and SIP OPTIONS (RFC 3261, UDP/5060) against 12 public registrars</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>ucaas</strong> suite — HEAD probes to 34 UCaaS endpoints: Zoom, Teams, Webex, Google Meet, Slack, RingCentral, 8x8, Vonage, GoTo, and more</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Changelog page in the web UI (this page)</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Topbar redesigned as a 3-column flex layout — host LAN IP pinned left, active test pill always centered, controls pinned right</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Host LAN IP displayed in topbar for easy identification when running multiple instances</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Green <strong>▶ Restart</strong> button appears in topbar when tests are stopped — resumes with same settings without restarting the container</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>LIVE pill changes to <strong>▶ RESTART</strong> when stopped; clicking it restarts tests rather than showing a "already stopped" toast</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>TLS Check</td><td>SASE/SSE vendor detection expanded — added Cloudflare Gateway, Menlo Security, Akamai SIA, Microsoft Defender, Lookout/CipherCloud, Aryaka, Versa Networks, Perimeter 81, Check Point Harmony, Proofpoint, F5 BIG-IP, A10 Networks, Juniper (now covers all major SASE vendors)</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Deployment</td><td>macOS support in <code>stager.sh</code> — Homebrew, Docker Desktop via <code>brew install --cask docker</code>, <code>en0/en1</code> IP detection, hex netmask → CIDR prefix via python3</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Deployment</td><td><code>stager.sh</code> interactive configuration — asks suite, size, loop, max-wait, dashboard on/off, and host networking before launching; shows confirmation summary</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Docs</td><td>README restructured to concise overview; full detail moved to <code>docs/</code> — deployment, configuration, suites, web-dashboard</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Generator</td><td>Stop no longer causes tests to restart — <code>finish_test()</code> now enters an idle loop instead of calling <code>sys.exit()</code>, keeping the container alive so Docker's restart policy doesn't relaunch traffic generation</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Generator</td><td>Mid-test stop now uses <code>_thread.interrupt_main()</code> to raise <code>KeyboardInterrupt</code> in the main thread rather than <code>os._exit()</code>, which also kept the container alive</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Dashboard</td><td>Stop and Pause buttons locked in read-only mode on first page load — premature <code>checkRole()</code> call before SSE established the controller session; removed the early call</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Dashboard</td><td>Toast in session read-only mode said "click Unlock" — there is no Unlock button in that mode; now says "Another session has control — you are read-only"</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>TLS Check</td><td>Cato Networks intercepted connections reported as CLEAN — the CA CN used hyphens (<code>Cato-Networks-Server-…</code>) which didn't match the space-separated token; fixed by normalising hyphens before matching</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Deployment</td><td>Duplicate Docker apt/yum sources caused <code>apt-get update</code> failures on hosts where Docker was previously added via a different method; conflicting files now removed before first update</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Deployment</td><td>Quick Start commands changed from <code>--network=host</code> to <code>-p 7777:7777</code> for cross-platform compatibility (macOS/Windows Docker Desktop do not support host networking)</td></tr>
           </table>
         </div>
+
         <div class="a-section">
-          <div class="a-h">v3.0.0 &mdash; <span style="color:var(--muted);font-weight:400">April 2026</span></div>
+          <div class="a-h">v3.0.0 &mdash; <span style="color:var(--muted);font-weight:400">February 2026</span></div>
           <table class="st-table" style="margin-top:10px">
-            <tr><th style="width:80px">Type</th><th style="width:120px">Area</th><th>Description</th></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Live HTTPS web dashboard on port 7777 with SSE state streaming</td></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Overview, Security, Tests, Live View, Health, and About pages</td></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Draggable widget layout on Overview, Security, and Health pages</td></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Multi-user session mode — first SSE tab gets admin control, others are read-only</td></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Sparkline charts for security trend, network I/O, CPU, and memory</td></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Per-test statistics (attempts, pass, fail) with block/drop/allow percentage breakdown</td></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Settings drawer — change suite, size, wait time and loop mode without restarting the container</td></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>tls-check</strong> — detects TLS inspection proxies by comparing intercepted cert chains to originals; identifies SASE/SSE vendor from issuer CN/O</td></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>ids-trigger</strong> — sends known IDS/IPS signatures (Shellshock, Heartbleed, SQL injection, XSS, EICAR) over HTTP</td></tr>
+            <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Live HTTPS web dashboard on port 7777 — built-in Flask server with SSE state streaming, dark/light mode, no external dependencies</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td><strong>Overview</strong> page — stat cards, network I/O sparkline, donut chart, requests-over-time sparkline, per-test breakdown table, LIVE EVENTS feed</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td><strong>Security</strong> page — KPI cards (probes/blocked/dropped/allowed), outcome donut, Block &amp; Drop Trend sparkline with hover tooltips, per-suite security breakdown</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td><strong>Tests</strong> page — card grid for every suite with emoji icons, attempt/ok/fail counters, click-to-run modal</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td><strong>Live View</strong> page — real-time log stream with level filters, auto-scroll, pop-out window, sticky toolbar</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td><strong>Health</strong> page — CPU/memory gauges, load average, disk I/O, network sparkline, Network Info widget (IP/MAC/speed/MTU, virtual interfaces filtered), top processes</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Draggable widget layout on Overview, Security, and Health pages — grab ⠿ handle to reorder; order saved to localStorage</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Multi-user session mode — first browser tab to connect gets admin control; additional tabs are read-only with a visible banner</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Settings drawer — change suite, size, wait time, loop mode without restarting the container; changes apply at next test boundary via execv</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Suite name tooltips — hover any suite name anywhere in the UI for its full description</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Topbar active test pill — always shows the currently running suite with emoji icon and pulse dot across all pages</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Host LAN IP shown in Network Info widget header (uses real host IP via <code>HOST_LAN_CIDR</code>, not Docker bridge address)</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Real suite names with dashes used everywhere in the UI (was inconsistent mix of underscores/spaces)</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Auto-navigate to Live View after clicking Run on the Tests page</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>tls-check</strong> — probes 15 HTTPS hosts, compares cert chains, identifies TLS inspection proxies and names the SASE/SSE vendor from the issuer</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>ids-trigger</strong> — sends Shellshock, Heartbleed, SQL injection, XSS, and EICAR payloads over HTTP to trigger IDS/IPS signatures</td></tr>
             <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>snmp</strong> v1/v2c/v3 — GET and WALK requests against public SNMP test agents</td></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>kyber</strong> — TLS 1.3 handshakes with X25519Kyber768 (post-quantum) key exchange</td></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>ai-browse</strong> — simulates AI assistant API calls (OpenAI, Anthropic, Gemini, Mistral) and LLM-heavy web browsing</td></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>lateral-movement</strong> — nmap host discovery and port scanning against LAN subnet; uses HOST_LAN_CIDR or --network=host</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>kyber</strong> — TLS 1.3 handshakes using X25519Kyber768 post-quantum key exchange to test whether SASE/NGFW platforms can inspect PQ traffic</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>ai-browse</strong> — simulates AI assistant API calls to OpenAI, Anthropic, Gemini, Mistral and LLM-heavy browsing sessions</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>lateral-movement</strong> — nmap host discovery and port scan against the physical LAN; reads <code>HOST_LAN_CIDR</code> or falls back to <code>--network=host</code></td></tr>
             <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>shadow-it</strong>, <strong>tor-anonymizer</strong>, <strong>waf-attack</strong>, <strong>log4shell</strong>, <strong>metasploit-check</strong>, <strong>web-scanner</strong></td></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Deployment</td><td>Multi-arch Docker image (linux/amd64, linux/arm64, linux/arm/v7)</td></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Deployment</td><td>Auto TLS proxy detection at container startup — probes 15 hosts, identifies proxy CA by voting, installs it automatically</td></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Deployment</td><td><code>stager.sh</code> for one-command deployment on Ubuntu, Debian, Rocky Linux, AlmaLinux, Amazon Linux, and Raspberry Pi</td></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Generator</td><td>600-second inactivity watchdog — force-exits and relies on Docker restart policy to recover</td></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Generator</td><td>Per-suite wall-clock timeout guard prevents a single stuck test from blocking the loop</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Deployment</td><td>Multi-arch Docker image — <code>linux/amd64</code>, <code>linux/arm64</code>, <code>linux/arm/v7</code>; GitHub Actions auto-builds and pushes on every merge to main</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Deployment</td><td>Fully automatic TLS proxy CA detection at container startup — probes 15 diverse HTTPS hosts in parallel, votes on proxy CA fingerprint, installs winning cert, runs verification pass</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Deployment</td><td><code>stager.sh</code> — one-command deploy on Ubuntu, Debian, Rocky Linux, AlmaLinux, Amazon Linux 2/2023, Raspberry Pi 4/5; sets up Docker, prunes old containers, injects <code>HOST_LAN_CIDR</code></td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Deployment</td><td><code>stager.sh</code> system-changes warning banner with explicit acceptance prompt before making any changes</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Generator</td><td>600-second inactivity watchdog — force-exits the process if no test activity is detected; Docker restart policy recovers immediately</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Generator</td><td>Per-suite wall-clock timeout guard — daemon thread enforces a maximum runtime per suite so one stuck test can't block the entire loop</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Generator</td><td>Healthcheck via heartbeat file — <code>healthcheck.sh</code> reads <code>/tmp/traffgen.health</code> written every 2 s; replaces fragile <code>pgrep</code>-based check</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Dashboard</td><td>Live View SSE truncation — events were cut off mid-line; fixed buffering and auto-scroll to use browser page scrollbar</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Dashboard</td><td>Network Info widget — virtual/bridge interfaces (veth*, docker*, br-*) filtered out when using <code>--network=host</code></td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Dashboard</td><td>LIVE EVENTS time column was rendering at 15px — increased to match TEST BREAKDOWN font sizing</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Suites</td><td>nmap test output parsing rewritten to use grepable format for accurate ok/block/drop/fail stats</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Deployment</td><td>TLS interception alerts made prominent and vendor-specific in <code>tls-check</code> output (was generic warning)</td></tr>
           </table>
         </div>
+
         <div class="a-section">
-          <div class="a-h">v2.5.0 &mdash; <span style="color:var(--muted);font-weight:400">January 2026</span></div>
+          <div class="a-h">v2.6.0 &mdash; <span style="color:var(--muted);font-weight:400">January 2026</span></div>
           <table class="st-table" style="margin-top:10px">
-            <tr><th style="width:80px">Type</th><th style="width:120px">Area</th><th>Description</th></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>bgp</strong> — GoBGP-based BGP session simulation with OPEN/KEEPALIVE/UPDATE messages</td></tr>
+            <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>lateral-movement</strong> (preview) — LAN host detection via <code>/proc/net/route</code> and <code>traceroute</code>; <code>HOST_LAN_IP</code> injected by <code>stager.sh</code> as fallback</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Generator</td><td>CPU/Memory/Load Average mini-widgets integrated into Overview stat card grid</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Deployment</td><td><code>stager.sh</code> captures host LAN IP and subnet prefix before container start, injects as <code>HOST_LAN_CIDR</code> environment variable</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Deployment</td><td><code>stager.sh</code> runs <code>apt upgrade</code> / <code>dnf upgrade</code> on the host before installing Docker</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Suites</td><td>Lateral movement LAN detection — added <code>/proc/net/route</code> as primary strategy; traceroute as secondary fallback</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Deployment</td><td><code>stager.sh</code> banner replaced Unicode box-drawing characters with plain ASCII for compatibility across all terminals</td></tr>
+          </table>
+        </div>
+
+        <div class="a-section">
+          <div class="a-h">v2.5.0 &mdash; <span style="color:var(--muted);font-weight:400">November 2025</span></div>
+          <table class="st-table" style="margin-top:10px">
+            <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>bgp</strong> — GoBGP-based BGP session simulation with OPEN, KEEPALIVE, and UPDATE messages to public route collectors</td></tr>
             <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>doh</strong> (DNS-over-HTTPS) and <strong>dot</strong> (DNS-over-TLS) suites</td></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>llm-dlp</strong> — exfiltrates synthetic PII/card/SSN data via prompts to public LLM APIs to test CASB DLP controls</td></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>http3</strong> — QUIC/HTTP3 requests using <code>curl --http3-only</code></td></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>data-exfil-http</strong> — simulates data exfiltration patterns via POST/PUT with synthetic sensitive payloads</td></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Deployment</td><td>Metasploit Framework pre-bundled in image via multi-stage build with vendored gems</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>llm-dlp</strong> — exfiltrates synthetic PII, credit card numbers, SSNs, API keys, and corporate secrets via LLM API prompts to test CASB DLP controls; 4 prompt categories including obfuscation and prompt injection</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>http3</strong> — QUIC/HTTP3 requests using <code>curl --http3-only</code> to validate QUIC inspection capability</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>data-exfil-http</strong> — simulates HTTP-based data exfiltration using POST/PUT with synthetic sensitive payloads in realistic field names</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Deployment</td><td>Metasploit Framework pre-bundled in image via multi-stage build with vendored gems — no runtime gem install needed</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Deployment</td><td>Automatic TLS inspection CA support — detects MITM proxy CA at startup and installs it; supports Cato Networks and any vendor</td></tr>
           </table>
         </div>
+
         <div class="a-section">
-          <div class="a-h">v2.0.0 &mdash; <span style="color:var(--muted);font-weight:400">September 2025</span></div>
+          <div class="a-h">v2.4.0 &mdash; <span style="color:var(--muted);font-weight:400">October 2025</span></div>
           <table class="st-table" style="margin-top:10px">
-            <tr><th style="width:80px">Type</th><th style="width:120px">Area</th><th>Description</th></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Initial suite set: dns, icmp, http, https, ftp, ssh, ntp, nmap, crawl, bigfile, speedtest, c2-beacon, phishing-domains, malware-download, virus, dlp, dns-exfil, domain-check, squatting, ads, pornography, url-response, s3</td></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Generator</td><td>--suite, --size (XS/S/M/L/XL), --loop, --max-wait-secs, --nowait CLI flags</td></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Deployment</td><td>Single Docker image with healthcheck and restart policy</td></tr>
+            <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>llm-dlp</strong> (initial version) — fake PII exfiltration to LLM APIs</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Suite naming standardised — all suites use dash-separated keys matching their CLI <code>--suite</code> value</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Generator</td><td>Per-request status detail added to all test output — each request logs URL, HTTP status, latency, and outcome classification</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Generator</td><td>Per-suite aggregate summary printed after every suite run — attempts, ok, fail, block, drop with colour coding</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Generator</td><td>500 modern user-agent strings replacing the previous small static list; coverage across browsers, crawlers, mobile, and security tools</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Generator</td><td>Concurrent HEAD requests via thread pool for batch endpoint probing suites</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Generator</td><td>Container hang prevention — process-group kill, per-test timeouts, watchdog reduction</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Suites</td><td>Metasploit bundler gem lookup fixed at runtime; 5 new MSF check scripts added</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Deployment</td><td>Switched base image from Ubuntu 25.10 to Debian Bookworm Slim for stability and smaller size</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Deployment</td><td>Fixed Nikto install — not in Debian Bookworm repos; now cloned from upstream</td></tr>
           </table>
         </div>
+
+        <div class="a-section">
+          <div class="a-h">v2.3.0 &mdash; <span style="color:var(--muted);font-weight:400">September 2025</span></div>
+          <table class="st-table" style="margin-top:10px">
+            <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>kyber</strong> (initial), <strong>ai-browse</strong> (initial), <strong>shadow-it</strong>, <strong>tor-anonymizer</strong>, <strong>waf-attack</strong>, <strong>log4shell</strong></td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>voip</strong> (initial preview) — SIP and RTP traffic simulation</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Generator</td><td>XS size tier added — minimal intensity for low-resource hosts</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Generator</td><td>Pacing system overhauled — consistent wait times across all size tiers with configurable <code>--max-wait-secs</code></td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Deployment</td><td>Docker image size significantly reduced via Dockerfile optimisation and multi-stage build</td></tr>
+          </table>
+        </div>
+
+        <div class="a-section">
+          <div class="a-h">v2.2.0 &mdash; <span style="color:var(--muted);font-weight:400">August 2025</span></div>
+          <table class="st-table" style="margin-top:10px">
+            <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>malware-agents</strong>, <strong>phishing-domains</strong>, <strong>squatting</strong>, <strong>ads</strong>, <strong>pornography</strong>, <strong>domain-check</strong> suites</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>snmp</strong> (initial), <strong>nmap</strong> expanded with aggressive timing and OS detection</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Generator</td><td>CLI refactored — <code>--suite</code>, <code>--size</code>, <code>--loop</code>, <code>--max-wait-secs</code>, <code>--nowait</code>, <code>--list</code>, <code>--version</code> flags</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Generator</td><td>Helper functions for concurrent batch requests, size-to-limit scaling, and progress display</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Deployment</td><td>GitHub Actions workflow — auto-build and push multi-arch Docker image on every push to main</td></tr>
+          </table>
+        </div>
+
+        <div class="a-section">
+          <div class="a-h">v2.0.0 &mdash; <span style="color:var(--muted);font-weight:400">July 2025</span></div>
+          <table class="st-table" style="margin-top:10px">
+            <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Initial suite set: <strong>dns</strong> · <strong>icmp</strong> · <strong>http</strong> · <strong>https</strong> · <strong>ftp</strong> · <strong>ssh</strong> · <strong>ntp</strong> · <strong>nmap</strong> · <strong>crawl</strong> · <strong>bigfile</strong> · <strong>speedtest</strong> · <strong>c2-beacon</strong> · <strong>malware-download</strong> · <strong>virus</strong> · <strong>dlp</strong> · <strong>dns-exfil</strong> · <strong>url-response</strong> · <strong>s3</strong></td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Generator</td><td>Multi-protocol traffic generation across DNS, HTTP/S, FTP, SSH, ICMP, NTP, SMTP</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Generator</td><td>Round-robin suite rotation with random shuffle per loop iteration</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Deployment</td><td>Docker container with <code>HEALTHCHECK</code>, <code>restart: unless-stopped</code>, and <code>--pull=always</code> support</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Deployment</td><td>Multi-arch build: <code>linux/amd64</code> · <code>linux/arm64</code> · <code>linux/arm/v7</code> (Raspberry Pi)</td></tr>
+          </table>
+        </div>
+
       </div>
     </div>
   </div><!-- /.content -->
@@ -1670,7 +1754,11 @@ function apply(s){
     const dot=st==='running'||st==='starting';pill.innerHTML=(dot?'<span class="pulse"></span>':'')+(ST_LBL[st]||st);
   }
   _isPaused=(st==='paused');$('btn-pause').innerHTML=_isPaused?'&#9654;':'&#9208;';$('btn-pause').title=_isPaused?'Resume tests':'Pause tests';
-  const lp=$('pill-live');if(st==='stopped'){lp.className='tp-pill tp-stopped';lp.innerHTML='&#9209; STOPPED';}else{lp.className='tp-pill tp-running';lp.innerHTML='<span class="pulse"></span>LIVE';}
+  const isStopped=(st==='stopped');
+  $('btn-restart').style.display=isStopped?'inline-flex':'none';
+  $('btn-pause').style.display=isStopped?'none':'inline-grid';
+  $('btn-stop').style.display=isStopped?'none':'inline-grid';
+  const lp=$('pill-live');if(isStopped){lp.className='tp-pill tp-stopped';lp.innerHTML='&#9654; RESTART';lp.title='Click to restart tests';}else{lp.className='tp-pill tp-running';lp.innerHTML='<span class="pulse"></span>LIVE';lp.title='Click to stop all tests';}
   $('cfg-s-pill').textContent='suite:'+(s.suite||'—');$('cfg-z-pill').textContent='size:'+(s.size||'—');
   const tot=s.totals||{},ok=tot.ok||0,fail=tot.fail||0,att=tot.attempts||0,p=att?ok/att*100:0,blk=tot.blocked||0,drp=tot.dropped||0;
   $('v-total').textContent=N(att);$('s-total').textContent=N(ok)+' ok \xb7 '+N(fail)+' fail'+(blk?' \xb7 '+N(blk)+' blocked':'')+(drp?' \xb7 '+N(drp)+' dropped':'');
@@ -1875,11 +1963,18 @@ function togglePause(){
 }
 function stopTests(){
   if(!_isAdmin){toast(_sessionMode?'Another session has control — you are read-only':'Admin access required — click Unlock',false);return;}
-  if(!confirm('Stop all tests? Traffic generation will halt until the container is restarted.'))return;
+  if(!confirm('Stop all tests? Use Settings ⚙ to restart with new parameters, or click Restart Tests when stopped.'))return;
   _ctrl({action:'stop'}).then(r=>r.json()).then(d=>{if(d.ok)toast('Stop signal sent — tests will halt after current test',true);else toast('Error: '+d.error,false);})
     .catch(()=>toast('Request failed',false));
 }
-function handleLiveClick(){if(_lastState&&_lastState.status==='stopped'){toast('Tests are already stopped',false);return;}stopTests();}
+function restartTests(){
+  if(!_isAdmin){toast(_sessionMode?'Another session has control — you are read-only':'Admin access required — click Unlock',false);return;}
+  const st=_lastState||{};
+  const body={suite:st.suite||'all',size:st.size||'S',max_wait_secs:st.max_wait_secs||20,loop:st.loop!==false,nowait:false};
+  _ctrl(body).then(r=>r.json()).then(d=>{if(d.ok)toast('Restarting tests…',true);else toast('Error: '+d.error,false);})
+    .catch(()=>toast('Request failed',false));
+}
+function handleLiveClick(){if(_lastState&&_lastState.status==='stopped'){restartTests();return;}stopTests();}
 function openModal(name,desc){
   _modalSuite=name;$('modal-name').textContent=name;$('modal-desc').textContent=desc||'No description available.';
   const td=(_lastState&&_lastState.tests&&_lastState.tests[name])||{};
