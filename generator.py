@@ -3732,133 +3732,186 @@ def tor_anonymizer() -> None:
         ui_error(f"[tor_anonymizer] {e}")
 
 
-def _detect_host_lan() -> "tuple[str, str] | None":
-    """Return (gateway_ip, subnet/24) for the physical LAN the Docker host uses.
+def _detect_host_lans() -> "list[tuple[str, str]]":
+    """Return all physical LAN networks the Docker host is connected to.
 
-    Strategies (tried in order):
-      0. HOST_LAN_IP env var — set by stager.sh before the container starts
-         using ``hostname -I`` on the host.  Most reliable: the host resolves
-         its own IP before Docker networking is involved at all.
-      1. Parse /proc/net/route — no external tools required.
-      2. ``ip route show`` — for environments where ip(8) is available.
-      3. Traceroute to 8.8.8.8, take first non-docker hop.
+    Each entry is (representative_ip, cidr) for one physical interface,
+    skipping loopback, Docker bridge (172.16-31.x), and veth/br- interfaces.
+    Multiple entries are returned when the host has multiple physical NICs
+    or is multi-homed (e.g. 192.168.1.0/24 + 10.0.0.0/24).
+
+    Strategies (tried in order, results merged and de-duplicated):
+      0. HOST_LAN_CIDR env var — injected by stager.sh; single CIDR, always
+         included when present.
+      1. /proc/net/route — no external tools; collects all connected routes.
+      2. ip route show — collects all non-Docker subnet routes.
+      3. Traceroute fallback — single network, only used when nothing else works.
     """
     import os as _os
     import socket as _socket
     import struct as _struct
     import re as _re
+    import ipaddress as _ipaddress
 
-    _LOOPBACK = _re.compile(r"^127\.")
+    _LOOPBACK      = _re.compile(r"^127\.")
     _DOCKER_BRIDGE = _re.compile(r"^172\.(1[6-9]|2[0-9]|3[01])\.")
-    _IP_RE = _re.compile(r"^\d{1,3}(?:\.\d{1,3}){3}$")
+    _SKIP_IFACES   = _re.compile(r"^(lo|docker|br-|veth|virbr|tun|tap)")
+    _IP_RE         = _re.compile(r"^\d{1,3}(?:\.\d{1,3}){3}$")
+
+    results: list[tuple[str, str]] = []
+    seen_nets: set[str] = set()
 
     def _hex_to_ip(h: str) -> str:
         return _socket.inet_ntoa(_struct.pack("<I", int(h, 16)))
 
-    def _to_24(ip: str) -> str:
-        return ".".join(ip.split(".")[:3]) + ".0/24"
+    def _normalise(ip: str, prefix: int) -> "tuple[str, str] | None":
+        """Return (ip, canonical_cidr), capping large subnets at /24."""
+        if not _IP_RE.match(ip):
+            return None
+        if _LOOPBACK.match(ip) or _DOCKER_BRIDGE.match(ip):
+            return None
+        try:
+            if prefix == 32:
+                # Microsegmented — scan containing /24
+                cidr = str(_ipaddress.ip_network(f"{ip}/24", strict=False))
+            elif prefix >= 24:
+                cidr = str(_ipaddress.ip_network(f"{ip}/{prefix}", strict=False))
+            else:
+                # Large subnet — cap at /24 to keep scan time reasonable
+                cidr = str(_ipaddress.ip_network(f"{ip}/24", strict=False))
+            return ip, cidr
+        except Exception:
+            return None
 
-    # Strategy 0 — HOST_LAN_CIDR env var injected by stager.sh before container start
+    def _add(ip: str, prefix: int) -> None:
+        entry = _normalise(ip, prefix)
+        if entry and entry[1] not in seen_nets:
+            seen_nets.add(entry[1])
+            results.append(entry)
+
+    # ── Strategy 0: HOST_LAN_CIDR env var ────────────────────────────────────
     _env_cidr = _os.environ.get("HOST_LAN_CIDR", "").strip()
     if _env_cidr and "/" in _env_cidr:
         _eip, _epfx = _env_cidr.split("/", 1)
         if _IP_RE.match(_eip) and _epfx.isdigit():
-            _prefix = int(_epfx)
-            if _prefix == 32:
-                # Every host is its own /32 — microsegmentation is on.
-                # Scan the containing /24 to probe east-west policy.
-                return _eip, _to_24(_eip)
-            elif _prefix >= 24:
-                # Use actual subnet (/24, /25, /26, /28, etc.)
-                import ipaddress as _ipaddress
-                _net = str(_ipaddress.ip_network(f"{_eip}/{_prefix}", strict=False))
-                return _eip, _net
-            else:
-                # Subnet larger than /24 (/16, /8, etc.) — cap at /24 to keep
-                # scan time reasonable (a /16 is 65535 hosts).
-                return _eip, _to_24(_eip)
+            _add(_eip, int(_epfx))
 
-    # Strategy 1 — /proc/net/route (no tools needed, works in any container)
+    # ── Strategy 1: /proc/net/route ───────────────────────────────────────────
     try:
-        default_gw: str | None = None
+        default_gw: "str | None" = None
         with open("/proc/net/route") as _f:
             for _line in _f.readlines()[1:]:
                 _fields = _line.strip().split()
                 if len(_fields) < 8:
                     continue
-                _iface   = _fields[0]
-                _dest    = _hex_to_ip(_fields[1])
-                _gw      = _hex_to_ip(_fields[2])
-                _flags   = int(_fields[3], 16)
-                # RTF_UP=0x1, RTF_GATEWAY=0x2
-                _is_up      = bool(_flags & 0x1)
-                _is_gw_flag = bool(_flags & 0x2)
-                if not _is_up:
+                _iface  = _fields[0]
+                _dest   = _hex_to_ip(_fields[1])
+                _gw     = _hex_to_ip(_fields[2])
+                _flags  = int(_fields[3], 16)
+                _mask   = _hex_to_ip(_fields[7])
+                if not (_flags & 0x1):        # RTF_UP
                     continue
-                if _iface == "lo" or _LOOPBACK.match(_dest):
+                if _SKIP_IFACES.match(_iface):
                     continue
                 if _dest == "0.0.0.0":
-                    # Default route — save gateway as fallback
                     if not default_gw and _gw != "0.0.0.0":
                         default_gw = _gw
                     continue
-                # Connected route (no gateway flag) — this is the local subnet
-                if not _is_gw_flag and _gw == "0.0.0.0":
-                    if _DOCKER_BRIDGE.match(_dest):
-                        continue  # skip docker bridge subnet
-                    return _to_24(_dest).split("/")[0].rsplit(".", 1)[0] + ".1", _to_24(_dest)
-        # Fallback: use default gateway's /24
-        if default_gw and not _DOCKER_BRIDGE.match(default_gw):
-            return default_gw, _to_24(default_gw)
+                if _LOOPBACK.match(_dest) or _DOCKER_BRIDGE.match(_dest):
+                    continue
+                # Connected route (no RTF_GATEWAY, no explicit gw)
+                if not (_flags & 0x2) and _gw == "0.0.0.0":
+                    # Convert dotted-decimal mask to prefix length
+                    try:
+                        _pfx = bin(int(_socket.inet_aton(_mask).hex(), 16)).count("1")
+                    except Exception:
+                        _pfx = 24
+                    # Use a representative host IP from this interface
+                    try:
+                        import subprocess as _sp
+                        _ip_out = _sp.run(
+                            ["ip", "-o", "-f", "inet", "addr", "show", _iface],
+                            capture_output=True, text=True, timeout=3,
+                        ).stdout
+                        _m = _re.search(r"inet (\d+\.\d+\.\d+\.\d+)/(\d+)", _ip_out)
+                        if _m:
+                            _add(_m.group(1), int(_m.group(2)))
+                            continue
+                    except Exception:
+                        pass
+                    _add(_dest, _pfx)
+        if default_gw and not results:
+            _add(default_gw, 24)
     except Exception:
         pass
 
-    # Strategy 2 — ip route show
-    try:
-        r = subprocess.run(["ip", "route", "show"],
-                           capture_output=True, text=True, timeout=5)
-        for _line in r.stdout.splitlines():
-            _m = _re.match(r"^(\d+\.\d+\.\d+\.\d+)/(\d+)\s+dev\s+(\S+)", _line)
-            if not _m:
-                continue
-            _ip, _iface = _m.group(1), _m.group(3)
-            if _iface in ("lo",) or _iface.startswith(("docker", "br-", "veth")):
-                continue
-            if _DOCKER_BRIDGE.match(_ip) or _LOOPBACK.match(_ip):
-                continue
-            return ".".join(_ip.split(".")[:3]) + ".1", _ip + "/24"
-    except Exception:
-        pass
+    # ── Strategy 2: ip route show ─────────────────────────────────────────────
+    if not results:
+        try:
+            r = subprocess.run(["ip", "route", "show"],
+                               capture_output=True, text=True, timeout=5)
+            for _line in r.stdout.splitlines():
+                _m = _re.match(r"^(\d+\.\d+\.\d+\.\d+)/(\d+)\s+dev\s+(\S+)", _line)
+                if not _m:
+                    continue
+                _ip, _pfx_s, _iface = _m.group(1), _m.group(2), _m.group(3)
+                if _SKIP_IFACES.match(_iface):
+                    continue
+                if _LOOPBACK.match(_ip) or _DOCKER_BRIDGE.match(_ip):
+                    continue
+                # Get the actual interface IP rather than the network address
+                try:
+                    _ip_out = subprocess.run(
+                        ["ip", "-o", "-f", "inet", "addr", "show", _iface],
+                        capture_output=True, text=True, timeout=3,
+                    ).stdout
+                    _im = _re.search(r"inet (\d+\.\d+\.\d+\.\d+)/(\d+)", _ip_out)
+                    if _im:
+                        _add(_im.group(1), int(_im.group(2)))
+                        continue
+                except Exception:
+                    pass
+                _add(_ip, int(_pfx_s))
+        except Exception:
+            pass
 
-    # Strategy 3 — traceroute: first non-docker hop
-    try:
-        tr = subprocess.run(
-            ["traceroute", "-n", "-m", "4", "-w", "2", "-q", "1", "8.8.8.8"],
-            capture_output=True, text=True, timeout=25,
-        )
-        for _line in tr.stdout.splitlines()[1:]:
-            _m = _re.search(r"(\d+\.\d+\.\d+\.\d+)", _line)
-            if not _m:
-                continue
-            _ip = _m.group(1)
-            if _DOCKER_BRIDGE.match(_ip) or _LOOPBACK.match(_ip):
-                continue
-            return _ip, _to_24(_ip)
-    except Exception:
-        pass
+    # ── Strategy 3: traceroute fallback (single network) ──────────────────────
+    if not results:
+        try:
+            tr = subprocess.run(
+                ["traceroute", "-n", "-m", "4", "-w", "2", "-q", "1", "8.8.8.8"],
+                capture_output=True, text=True, timeout=25,
+            )
+            for _line in tr.stdout.splitlines()[1:]:
+                _m = _re.search(r"(\d+\.\d+\.\d+\.\d+)", _line)
+                if not _m:
+                    continue
+                _ip = _m.group(1)
+                if _LOOPBACK.match(_ip) or _DOCKER_BRIDGE.match(_ip):
+                    continue
+                _add(_ip, 24)
+                break
+        except Exception:
+            pass
 
-    return None
+    return results
+
+
+def _detect_host_lan() -> "tuple[str, str] | None":
+    """Legacy single-network wrapper around _detect_host_lans()."""
+    lans = _detect_host_lans()
+    return lans[0] if lans else None
 
 
 def lateral_movement_sim() -> None:
     """
-    Simulate east-west lateral movement:
+    Simulate east-west lateral movement across all detected host networks.
 
-      Phase 1 — Ping sweep (nmap -sn) the entire /24 of the Docker host's
-        physical LAN gateway (detected via routing table or traceroute,
-        skipping the Docker bridge 172.17.x.x) to enumerate live hosts.
-      Phase 2 — Port scan every discovered host (up to 20) on common
-        lateral-movement ports:
+      Phase 1 — Ping sweep (nmap -sn) every physical subnet the host is
+        connected to, skipping Docker bridge (172.16-31.x) and loopback.
+        When multiple interfaces exist all subnets are swept concurrently.
+      Phase 2 — Port scan every discovered live host (up to 20 per subnet)
+        on common lateral-movement ports:
         22 (SSH), 88 (Kerberos), 135 (WMI/RPC), 137-139 (NetBIOS),
         389 (LDAP), 445 (SMB), 636 (LDAPS), 3389 (RDP),
         5985/5986 (WinRM HTTP/HTTPS).
@@ -3874,105 +3927,131 @@ def lateral_movement_sim() -> None:
     scanned.  Generates east-west NGFW alerts (Palo Alto, Fortinet), SIEM
     lateral-movement correlation, and network IDS SMB/RDP recon signatures.
     """
+    import concurrent.futures
+    import threading
+
     _LATERAL_PORTS = "22,88,135,137,138,139,389,445,636,3389,5985,5986"
 
-    # ── Detect host LAN (not Docker bridge) and derive /24 subnet ────────────
-    lan = _detect_host_lan()
-    if not lan:
+    # ── Detect all physical host LANs ─────────────────────────────────────────
+    lans = _detect_host_lans()
+    if not lans:
         ui_warn("lateral_movement_sim: cannot determine host LAN subnet — skipping")
         _stats.fail()
         return
-    gw_ip, subnet = lan
-    _cidr = os.environ.get("HOST_LAN_CIDR", "").strip()
-    _src = "stager.sh" if _cidr else "auto-detected"
-    _microseg = _cidr.endswith("/32")
 
+    _cidr_env = os.environ.get("HOST_LAN_CIDR", "").strip()
+    _src = "stager.sh" if _cidr_env else "auto-detected"
+    _microseg = _cidr_env.endswith("/32")
     if _microseg:
         ui_warn("Microsegmentation detected (host prefix /32) — scanning /24 to probe east-west policy")
 
+    subnet_list = "  ".join(f"{subnet}" for _, subnet in lans)
     ui_banner("Lateral Movement Simulation",
-              f"gateway={gw_ip}  subnet={subnet}  source={_src}  ports={_LATERAL_PORTS}")
+              f"networks={len(lans)}  subnets={subnet_list}  source={_src}  ports={_LATERAL_PORTS}")
 
-    # ── Phase 1: ping sweep ──────────────────────────────────────────────────
-    console.log(f"[cyan]Phase 1[/] ping sweep → {subnet}")
-    live_hosts: list[str] = []
-    try:
-        sweep = subprocess.run(
-            ["nmap", "-sn", "--send-ip", "-T4",
-             "--max-retries", "1", "--host-timeout", "10s",
-             "-oG", "-", subnet],
-            capture_output=True, text=True, timeout=240,
-        )
-        for line in sweep.stdout.splitlines():
-            if "Status: Up" in line:
-                m = re.search(r"Host:\s+(\d+\.\d+\.\d+\.\d+)", line)
-                if m:
-                    live_hosts.append(m.group(1))
-        console.log(f"  sweep done — {len(live_hosts)} live host(s): "
-                    f"{', '.join(live_hosts[:10]) or 'none'}")
-        _stats.ok()
-    except Exception as e:
-        console.log(f"[yellow]ping sweep error: {e}[/]")
-        _stats.fail()
+    # Thread-safe aggregation
+    _lock = threading.Lock()
+    _total_open = 0
+    _all_live: list[tuple[str, str]] = []   # (subnet, host)
 
-    # ── Phase 2: lateral-movement port scan ──────────────────────────────────
-    scan_targets = (live_hosts[:20] if live_hosts else [gw_ip])
-    console.log(f"[cyan]Phase 2[/] port scan {_LATERAL_PORTS} → "
-                f"{len(scan_targets)} target(s)")
-    total_open = 0
-    for i, host in enumerate(scan_targets, 1):
-        console.log(f"  ({i}/{len(scan_targets)}) scanning {host}")
+    def _scan_network(gw_ip: str, subnet: str) -> None:
+        nonlocal _total_open
+
+        # Phase 1: ping sweep
+        console.log(f"[cyan]Phase 1[/] ping sweep → {subnet}")
+        live_hosts: list[str] = []
         try:
-            port_result = subprocess.run(
-                ["nmap", "-Pn", f"-p{_LATERAL_PORTS}", host, "-T4",
-                 "--max-retries", "0", "--host-timeout", "30s", "-oG", "-"],
-                capture_output=True, text=True, timeout=60,
+            sweep = subprocess.run(
+                ["nmap", "-sn", "--send-ip", "-T4",
+                 "--max-retries", "1", "--host-timeout", "10s",
+                 "-oG", "-", subnet],
+                capture_output=True, text=True, timeout=240,
             )
-            open_ports:     list[str] = []
-            closed_ports:   list[str] = []
-            filtered_ports: list[str] = []
-            for line in port_result.stdout.splitlines():
-                # grepable: "Host: 10.0.0.1 ()  Ports: 22/closed/tcp//ssh///, 445/filtered/tcp//..."
-                if line.startswith("Host:") and "Ports:" in line:
-                    ports_raw = line.split("Ports:", 1)[1]
-                    for entry in ports_raw.split(","):
-                        parts = entry.strip().split("/")
-                        if len(parts) >= 2:
-                            port_num, state = parts[0], parts[1]
-                            if state == "open":
-                                open_ports.append(port_num)
-                            elif state == "closed":
-                                closed_ports.append(port_num)
-                            elif "filtered" in state:
-                                filtered_ports.append(port_num)
-
-            # Log per-host summary
-            summary_parts = []
-            if open_ports:
-                summary_parts.append(f"[red]open: {','.join(open_ports)}[/]")
-            if closed_ports:
-                summary_parts.append(f"[yellow]closed: {len(closed_ports)}[/]")
-            if filtered_ports:
-                summary_parts.append(f"[green]filtered: {len(filtered_ports)}[/]")
-            console.log(f"    ↳ {host}  " + ("  ".join(summary_parts) or "no ports info"))
-
-            total_open += len(open_ports)
-            if open_ports:
-                _stats.ok()       # probe reached open service — no east-west block
-            elif filtered_ports and not closed_ports:
-                _stats.drop()     # all silently dropped — firewall blocking east-west
-            elif closed_ports:
-                _stats.block()    # actively rejected (TCP RST from host or firewall)
-            else:
-                _stats.drop()     # host completely unreachable
+            for line in sweep.stdout.splitlines():
+                if "Status: Up" in line:
+                    m = re.search(r"Host:\s+(\d+\.\d+\.\d+\.\d+)", line)
+                    if m:
+                        live_hosts.append(m.group(1))
+            console.log(f"  [{subnet}] sweep done — {len(live_hosts)} live host(s): "
+                        f"{', '.join(live_hosts[:10]) or 'none'}")
+            _stats.ok()
         except Exception as e:
-            console.log(f"[yellow]  port scan {host}: {e}[/]")
+            console.log(f"[yellow]ping sweep error ({subnet}): {e}[/]")
             _stats.fail()
-        if i < len(scan_targets):
-            time.sleep(random.uniform(0.3, 1.0))
 
+        with _lock:
+            for h in live_hosts:
+                _all_live.append((subnet, h))
+
+        # Phase 2: lateral-movement port scan
+        scan_targets = (live_hosts[:20] if live_hosts else [gw_ip])
+        console.log(f"[cyan]Phase 2[/] port scan {_LATERAL_PORTS} → "
+                    f"{subnet}: {len(scan_targets)} target(s)")
+        net_open = 0
+        for i, host in enumerate(scan_targets, 1):
+            console.log(f"  [{subnet}] ({i}/{len(scan_targets)}) scanning {host}")
+            try:
+                port_result = subprocess.run(
+                    ["nmap", "-Pn", f"-p{_LATERAL_PORTS}", host, "-T4",
+                     "--max-retries", "0", "--host-timeout", "30s", "-oG", "-"],
+                    capture_output=True, text=True, timeout=60,
+                )
+                open_ports:     list[str] = []
+                closed_ports:   list[str] = []
+                filtered_ports: list[str] = []
+                for line in port_result.stdout.splitlines():
+                    if line.startswith("Host:") and "Ports:" in line:
+                        ports_raw = line.split("Ports:", 1)[1]
+                        for entry in ports_raw.split(","):
+                            parts = entry.strip().split("/")
+                            if len(parts) >= 2:
+                                port_num, state = parts[0], parts[1]
+                                if state == "open":
+                                    open_ports.append(port_num)
+                                elif state == "closed":
+                                    closed_ports.append(port_num)
+                                elif "filtered" in state:
+                                    filtered_ports.append(port_num)
+
+                summary_parts = []
+                if open_ports:
+                    summary_parts.append(f"[red]open: {','.join(open_ports)}[/]")
+                if closed_ports:
+                    summary_parts.append(f"[yellow]closed: {len(closed_ports)}[/]")
+                if filtered_ports:
+                    summary_parts.append(f"[green]filtered: {len(filtered_ports)}[/]")
+                console.log(f"    ↳ {host}  " + ("  ".join(summary_parts) or "no ports info"))
+
+                net_open += len(open_ports)
+                if open_ports:
+                    _stats.ok()
+                elif filtered_ports and not closed_ports:
+                    _stats.drop()
+                elif closed_ports:
+                    _stats.block()
+                else:
+                    _stats.drop()
+            except Exception as e:
+                console.log(f"[yellow]  port scan {host} ({subnet}): {e}[/]")
+                _stats.fail()
+            if i < len(scan_targets):
+                time.sleep(random.uniform(0.3, 1.0))
+
+        with _lock:
+            _total_open += net_open
+        console.log(f"  [{subnet}] done — open_ports_found={net_open}")
+
+    # ── Run all networks concurrently ─────────────────────────────────────────
+    if len(lans) == 1:
+        _scan_network(*lans[0])
+    else:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(lans)) as pool:
+            futures = [pool.submit(_scan_network, gw, subnet) for gw, subnet in lans]
+            concurrent.futures.wait(futures)
+
+    subnets_str = ", ".join(subnet for _, subnet in lans)
     ui_ok(f"Lateral movement simulation complete  "
-          f"(subnet={subnet}  live={len(live_hosts)}  open_ports_found={total_open})")
+          f"(subnets=[{subnets_str}]  live={len(_all_live)}  open_ports_found={_total_open})")
 
 
 def voip_sim() -> None:
