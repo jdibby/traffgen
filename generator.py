@@ -667,6 +667,14 @@ def _argv_from_cmd(cmd: dict) -> list:
         argv.append("--loop")
     if cmd.get("nowait", False):
         argv.append("--nowait")
+    # Preserve lateral-movement network filter if provided
+    lat_nets = cmd.get("lateral_networks", [])
+    if isinstance(lat_nets, list):
+        lat_nets = [n for n in lat_nets if isinstance(n, str) and "/" in n]
+    else:
+        lat_nets = []
+    if lat_nets:
+        argv.append(f"--lateral-networks={','.join(lat_nets)}")
     return argv
 
 
@@ -3933,11 +3941,22 @@ def lateral_movement_sim() -> None:
     _LATERAL_PORTS = "22,88,135,137,138,139,389,445,636,3389,5985,5986"
 
     # ── Detect all physical host LANs ─────────────────────────────────────────
-    lans = _detect_host_lans()
-    if not lans:
+    all_lans = _detect_host_lans()
+    if not all_lans:
         ui_warn("lateral_movement_sim: cannot determine host LAN subnet — skipping")
         _stats.fail()
         return
+
+    # Apply network filter from --lateral-networks CLI arg (or web settings)
+    _lat_filter = [n.strip() for n in getattr(ARGS, "lateral_networks", "").split(",") if n.strip()]
+    if _lat_filter:
+        lans = [(ip, cidr) for ip, cidr in all_lans if cidr in _lat_filter]
+        if not lans:
+            ui_warn(f"lateral_movement_sim: none of the specified networks {_lat_filter} "
+                    f"were detected — falling back to all networks")
+            lans = all_lans
+    else:
+        lans = all_lans
 
     _cidr_env = os.environ.get("HOST_LAN_CIDR", "").strip()
     _src = "stager.sh" if _cidr_env else "auto-detected"
@@ -4438,6 +4457,13 @@ def parse_cli() -> argparse.Namespace:
         metavar="URL",
         help="Seed URL for the 'crawl' suite (default: https://data.commoncrawl.org)",
     )
+    specific.add_argument(
+        "--lateral-networks", default="", metavar="CIDRS",
+        help=(
+            "Comma-separated list of CIDRs to target in the 'lateral-movement' suite\n"
+            "(e.g. 192.168.1.0/24,10.0.0.0/24). Omit to scan all detected networks."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -4514,6 +4540,8 @@ if __name__ == "__main__":
         ARGS      = parse_cli()
 
         # Initialise web UI state from CLI arguments
+        _detected_lans = _detect_host_lans()
+        _lat_filter = [n.strip() for n in getattr(ARGS, "lateral_networks", "").split(",") if n.strip()]
         with _WEB_STATE_LOCK:
             _WEB_STATE.update({
                 "version":       VERSION,
@@ -4524,6 +4552,10 @@ if __name__ == "__main__":
                 "loop":          getattr(ARGS, "loop", False),
                 "suites":        [{"name": n, "description": d}
                                   for n, d in _SUITE_DESCRIPTIONS],
+                "lateral_networks_available": [
+                    {"ip": ip, "cidr": cidr} for ip, cidr in _detected_lans
+                ],
+                "lateral_networks": _lat_filter,
             })
         _web_flush()
         _web_log(
