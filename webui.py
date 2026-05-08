@@ -942,6 +942,7 @@ td.nm{font-family:inherit;font-weight:500;font-size:16px}
 .a-h{font-size:14px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--green);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
 .cl-feat{display:inline-block;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:700;background:#1e3a5f;color:#60a5fa;letter-spacing:.4px}
 .cl-fix{display:inline-block;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:700;background:#3d1f1f;color:#f87171;letter-spacing:.4px}
+.cl-chg{display:inline-block;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:700;background:#2d2a1f;color:#fbbf24;letter-spacing:.4px}
 .lk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
 .lk{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--r);background:var(--surf2);text-decoration:none;color:var(--text);transition:border-color .15s;min-width:0}
 .lk:hover{border-color:var(--green)}
@@ -1362,14 +1363,14 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
         <div class="a-h">Test Suite Categories</div>
         <table class="st-table">
           <tr><th>Category</th><th>Suites</th></tr>
-          <tr><td>Connectivity</td><td style="color:var(--text)">dns &middot; icmp &middot; bgp &middot; ntp &middot; ssh &middot; doh &middot; dot &middot; domain-check</td></tr>
-          <tr><td>Web &amp; HTTP</td><td style="color:var(--text)">http &middot; https &middot; http3 &middot; crawl &middot; ftp &middot; bigfile &middot; speedtest &middot; url-response &middot; s3</td></tr>
-          <tr><td>Threat Simulation</td><td style="color:var(--text)">c2-beacon &middot; malware-download &middot; malware-agents &middot; phishing-domains &middot; squatting &middot; virus &middot; ads &middot; pornography</td></tr>
+          <tr><td>Connectivity</td><td style="color:var(--text)">dns &middot; icmp &middot; bgp &middot; ntp &middot; ssh &middot; doh &middot; dot &middot; blocklist-probe</td></tr>
+          <tr><td>Web &amp; HTTP</td><td style="color:var(--text)">http &middot; https &middot; http3 &middot; web-crawl &middot; ftp &middot; bulk-transfer &middot; speedtest &middot; url-latency &middot; s3</td></tr>
+          <tr><td>Threat Simulation</td><td style="color:var(--text)">c2-beacon &middot; malware-samples &middot; c2-useragents &middot; phishing-domains &middot; squatting &middot; av-test &middot; ad-tracker &middot; pornography</td></tr>
           <tr><td>Data Exfiltration</td><td style="color:var(--text)">dns-exfil &middot; data-exfil-http &middot; dlp &middot; llm-dlp</td></tr>
           <tr><td>IDS / IPS / WAF</td><td style="color:var(--text)">ids-trigger &middot; waf-attack &middot; log4shell &middot; nmap &middot; msf-webapp &middot; msf-enterprise &middot; msf-appliance &middot; msf-cisa-kev &middot; msf-middleware &middot; msf-recon &middot; web-scanner</td></tr>
           <tr><td>VoIP / UCaaS</td><td style="color:var(--text)">voip &middot; ucaas</td></tr>
-          <tr><td>SASE / SSE / CASB</td><td style="color:var(--text)">shadow-it &middot; tor-anonymizer &middot; tls-check &middot; lateral-movement</td></tr>
-          <tr><td>Security Tools</td><td style="color:var(--text)">snmp &middot; kyber &middot; ai-browse</td></tr>
+          <tr><td>SASE / SSE / CASB</td><td style="color:var(--text)">shadow-it &middot; tor-anonymizer &middot; tls-inspection &middot; lateral-movement</td></tr>
+          <tr><td>Security Tools</td><td style="color:var(--text)">snmp &middot; post-quantum &middot; ai-browse</td></tr>
           <tr><td>all</td><td style="color:var(--text)">Shuffled rotation of every suite above</td></tr>
         </table>
       </div>
@@ -1406,6 +1407,7 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
             <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Replaced <strong>metasploit-check</strong> with six themed Metasploit suites: <strong>msf-webapp</strong> (Drupal/Joomla/WordPress/GitLab/PHP/Magento), <strong>msf-enterprise</strong> (Exchange/Atlassian/ManageEngine/SAP), <strong>msf-appliance</strong> (Cisco/PAN-OS/Juniper/FortiOS/Ivanti/F5), <strong>msf-cisa-kev</strong> (Log4Shell/GoAnywhere/MOVEit/Barracuda/SolarWinds/Check Point), <strong>msf-middleware</strong> (Struts2/WebLogic/JBoss/Spring/Jenkins/OFBiz/Solr), <strong>msf-recon</strong> (EternalBlue probe, SMB/RDP/MySQL/Redis/HTTP auxiliary scanners)</td></tr>
             <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>MSF suite output now parsed per-module — each check outcome classified as <strong>allow</strong> (reachable, check ran), <strong>drop</strong> (ECONNREFUSED/ETIMEDOUT), or <strong>fail</strong> (module error); results reflected in dashboard stat cards</td></tr>
             <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Tests page suite cards now organized alphabetically within named category sections (Connectivity &amp; Network, Web &amp; HTTP, Encrypted &amp; Modern Protocols, Threat Detection &amp; IDS/IPS, Recon &amp; Lateral Movement, Evasion &amp; C2, UCaaS &amp; Communications, Content Filtering)</td></tr>
+            <tr><td><span class="cl-chg">CHG</span></td><td>Suites</td><td>Renamed 11 suites for clarity: <strong>ids-trigger</strong> → <strong>ids-sigs</strong>, <strong>virus</strong> → <strong>av-test</strong>, <strong>malware-agents</strong> → <strong>c2-useragents</strong>, <strong>malware-download</strong> → <strong>malware-samples</strong>, <strong>url-response</strong> → <strong>url-latency</strong>, <strong>bigfile</strong> → <strong>bulk-transfer</strong>, <strong>crawl</strong> → <strong>web-crawl</strong>, <strong>ads</strong> → <strong>ad-tracker</strong>, <strong>tls-check</strong> → <strong>tls-inspection</strong>, <strong>domain-check</strong> → <strong>blocklist-probe</strong>, <strong>kyber</strong> → <strong>post-quantum</strong></td></tr>
           </table>
         </div>
 
@@ -1753,20 +1755,20 @@ function uptime(t){const s=Math.floor(Date.now()/1000-t);return[Math.floor(s/360
 function elapsed(t){if(!t)return'';const s=Math.floor(Date.now()/1000-t);if(s<60)return s+'s elapsed';if(s<3600)return Math.floor(s/60)+'m '+(s%60)+'s elapsed';return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m elapsed';}
 const PAGE_TITLES={overview:'Overview',security:'Security',tests:'Tests',output:'Live View',health:'Health',about:'About',changelog:'Changelog'};
 const SUITE_ICONS={
-  'ads':'🎯','ai-browse':'🤖','bgp':'🌐','bigfile':'💾',
-  'c2-beacon':'📡','llm-dlp':'🧠','crawl':'🕷️','dlp':'🔒',
-  'dns':'🔍','dns-exfil':'📤','doh':'🔐','domain-check':'🚫',
+  'ad-tracker':'🎯','ai-browse':'🤖','bgp':'🌐','bulk-transfer':'💾',
+  'blocklist-probe':'🚫','c2-beacon':'📡','llm-dlp':'🧠','web-crawl':'🕷️','dlp':'🔒',
+  'dns':'🔍','dns-exfil':'📤','doh':'🔐',
   'dot':'🔑','ftp':'📁','http':'🌍','http3':'⚡',
-  'https':'🛡️','icmp':'🏓','ids-trigger':'🚨','kyber':'🔮',
-  'lateral-movement':'🕵️','log4shell':'💥','tls-check':'🔏',
+  'https':'🛡️','icmp':'🏓','ids-sigs':'🚨','post-quantum':'🔮',
+  'lateral-movement':'🕵️','log4shell':'💥','tls-inspection':'🔏',
   'shadow-it':'👥','waf-attack':'🛑','data-exfil-http':'📬',
   'tor-anonymizer':'🧅',
-  'malware-agents':'👾','malware-download':'🦠',
+  'c2-useragents':'👾','malware-samples':'🦠','av-test':'☣️',
   'msf-webapp':'🌐','msf-enterprise':'🏢','msf-appliance':'📡',
   'msf-cisa-kev':'🚨','msf-middleware':'⚙️','msf-recon':'🔭',
   'speedtest':'🚀','nmap':'🗺️','ntp':'🕐','phishing-domains':'🎣',
   'pornography':'🔞','snmp':'📊','squatting':'🔤','s3':'🪣',
-  'ssh':'💻','url-response':'⏱️','virus':'☣️','web-scanner':'🔬',
+  'ssh':'💻','url-latency':'⏱️','web-scanner':'🔬',
   'voip':'📞','ucaas':'🎥',
   'all':'✨',
 };
@@ -1896,23 +1898,23 @@ function apply(s){
     const _SC={
       'bgp':'Connectivity & Network','dns':'Connectivity & Network','icmp':'Connectivity & Network',
       'ntp':'Connectivity & Network','snmp':'Connectivity & Network','ssh':'Connectivity & Network',
-      'ads':'Web & HTTP','ai-browse':'Web & HTTP','bigfile':'Web & HTTP','crawl':'Web & HTTP',
+      'ad-tracker':'Web & HTTP','ai-browse':'Web & HTTP','bulk-transfer':'Web & HTTP','web-crawl':'Web & HTTP',
       'ftp':'Web & HTTP','http':'Web & HTTP','https':'Web & HTTP','s3':'Web & HTTP',
-      'speedtest':'Web & HTTP','url-response':'Web & HTTP',
+      'speedtest':'Web & HTTP','url-latency':'Web & HTTP',
       'doh':'Encrypted & Modern Protocols','dot':'Encrypted & Modern Protocols',
-      'http3':'Encrypted & Modern Protocols','kyber':'Encrypted & Modern Protocols',
+      'http3':'Encrypted & Modern Protocols','post-quantum':'Encrypted & Modern Protocols',
       'data-exfil-http':'Threat Detection & IDS/IPS','dlp':'Threat Detection & IDS/IPS',
-      'ids-trigger':'Threat Detection & IDS/IPS','log4shell':'Threat Detection & IDS/IPS',
-      'malware-agents':'Threat Detection & IDS/IPS','malware-download':'Threat Detection & IDS/IPS',
+      'ids-sigs':'Threat Detection & IDS/IPS','log4shell':'Threat Detection & IDS/IPS',
+      'c2-useragents':'Threat Detection & IDS/IPS','malware-samples':'Threat Detection & IDS/IPS',
       'msf-appliance':'Threat Detection & IDS/IPS','msf-aux-scan':'Threat Detection & IDS/IPS',
       'msf-cisa-kev':'Threat Detection & IDS/IPS','msf-cred-spray':'Threat Detection & IDS/IPS',
       'msf-enterprise':'Threat Detection & IDS/IPS','msf-middleware':'Threat Detection & IDS/IPS',
       'msf-payload-delivery':'Threat Detection & IDS/IPS','msf-recon':'Threat Detection & IDS/IPS',
       'msf-webapp':'Threat Detection & IDS/IPS',
-      'nmap':'Threat Detection & IDS/IPS','tls-check':'Threat Detection & IDS/IPS',
-      'virus':'Threat Detection & IDS/IPS','waf-attack':'Threat Detection & IDS/IPS',
+      'nmap':'Threat Detection & IDS/IPS','tls-inspection':'Threat Detection & IDS/IPS',
+      'av-test':'Threat Detection & IDS/IPS','waf-attack':'Threat Detection & IDS/IPS',
       'web-scanner':'Threat Detection & IDS/IPS',
-      'domain-check':'Recon & Lateral Movement','lateral-movement':'Recon & Lateral Movement',
+      'blocklist-probe':'Recon & Lateral Movement','lateral-movement':'Recon & Lateral Movement',
       'phishing-domains':'Recon & Lateral Movement','squatting':'Recon & Lateral Movement',
       'c2-beacon':'Evasion & C2','dns-exfil':'Evasion & C2','llm-dlp':'Evasion & C2',
       'shadow-it':'Evasion & C2','tor-anonymizer':'Evasion & C2',

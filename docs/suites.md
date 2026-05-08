@@ -26,10 +26,10 @@ docker run --pull=always -it jdibby/traffgen:latest --list
 |---|---|
 | 🌍 `http` | HTTP HEAD requests to a broad set of plain-HTTP endpoints, followed by ZIP and tar.gz file downloads. Tests HTTP inspection, file-type enforcement, and download logging. |
 | 🛡️ `https` | HTTPS HEAD requests to a wide endpoint pool followed by an iterative TLS crawl. Tests TLS inspection policy, certificate validation enforcement, and HTTPS download logging. |
-| 🕷️ `crawl` | Iterative web crawl from a configurable seed URL (`--crawl-start`). Follows links up to a depth that scales with `--size`. Mimics a browser session for URL categorisation and user-activity analytics testing. |
-| ⏱️ `url-response` | Measures HTTPS response times across a diverse URL set using the Python `requests` library. Populates URL-filter logs and response-time dashboards. |
+| 🕷️ `web-crawl` | Iterative web crawl from a configurable seed URL (`--crawl-start`). Follows links up to a depth that scales with `--size`. Mimics a browser session for URL categorisation and user-activity analytics testing. |
+| ⏱️ `url-latency` | Measures HTTPS response times across a diverse URL set using the Python `requests` library. Populates URL-filter logs and response-time dashboards. |
 | 🪣 `s3` | Simulates S3 bucket upload and download traffic. GET requests target a mix of public AWS datasets and private-style bucket paths (200 or 403 — both generate CASB-visible S3 traffic). PUT requests upload small synthetic payloads containing PII, credentials, and confidential strings to S3 paths — requests return 403 (no credentials) but are fully visible to DLP and CASB engines as cloud-upload/exfiltration attempts. Also targets Wasabi and Backblaze B2 S3-compatible endpoints. |
-| 💾 `bigfile` | Streams an HTTP download to `/dev/null` — file size scales with `--size` (XS=10 MB, S=100 MB, M=1 GB, L=2 GB, XL=5 GB). Tests large-file and bandwidth-cap policies across the full volume range without always hitting the ceiling. |
+| 💾 `bulk-transfer` | Streams an HTTP download to `/dev/null` — file size scales with `--size` (XS=10 MB, S=100 MB, M=1 GB, L=2 GB, XL=5 GB). Tests large-file and bandwidth-cap policies across the full volume range without always hitting the ceiling. |
 | 📁 `ftp` | FTP file download via `curl` with rate limiting against a public test server. Validates FTP inspection, logging, and file-transfer policy enforcement. |
 
 ---
@@ -38,7 +38,7 @@ docker run --pull=always -it jdibby/traffgen:latest --list
 
 | Suite | Description |
 |---|---|
-| 🔮 `kyber` | HTTPS HEAD requests using the post-quantum **X25519MLKEM768** (Kyber) key exchange. Tests whether TLS inspection infrastructure handles hybrid post-quantum cipher suites without breaking connectivity. |
+| 🔮 `post-quantum` | HTTPS HEAD requests using the post-quantum **X25519MLKEM768** (Kyber) key exchange. Tests whether TLS inspection infrastructure handles hybrid post-quantum cipher suites without breaking connectivity. |
 | 🔐 `doh` | DNS over HTTPS (RFC 8484 JSON API) via `curl` to a rotating list of DoH providers. Tests DoH detection and DNS-over-HTTPS bypass policy enforcement. |
 | 🔑 `dot` | DNS over TLS on TCP/853 via `openssl s_client`. Tests whether DoT connections are logged, blocked, or decrypted by TLS inspection. |
 | ⚡ `http3` | HTTP/3 QUIC HEAD requests via a native `aioquic` implementation (`QuicConnectionProtocol` + `H3Connection`). QUIC runs over UDP/443 and is invisible to many legacy inspection stacks. Tests QUIC visibility and QUIC-block policy enforcement without relying on a curl build that supports HTTP/3. |
@@ -49,11 +49,11 @@ docker run --pull=always -it jdibby/traffgen:latest --list
 
 | Suite | Description |
 |---|---|
-| 🚨 `ids-trigger` | Fires a battery of **16 HTTP requests** targeting `testmyids.com` — the Emerging Threats IDS validation service — each matching a distinct Snort/Suricata signature category: **10 scanner user-agents** (BlackSun, ZmEu, Havij, sqlmap, Nikto, Acunetix, w3af, masscan, DirBuster, libwww-perl) and **6 web-attack URL probes** (LFI `../../etc/passwd`, SQLi `UNION SELECT`, XSS `<script>`, `.env` disclosure, wp-admin, cmd-injection). Tests inline IDS/IPS (Snort, Suricata, Cisco FTD, Palo Alto NGFW with IPS rules) signature coverage across multiple rule categories. |
-| 👾 `malware-agents` | HEAD requests to malware-category test URLs using **known C2 framework user-agents**. Destinations include WICAR, AMTSO, and Google Safe Browsing test URLs. UAs cover Cobalt Strike, Metasploit Meterpreter, PowerShell Empire, Sliver, DarkComet RAT, QuasarRAT, Emotet/TrickBot, AgentTesla, njRAT, python-requests, Go-http-client, Java RATs, curl, and PowerShell Invoke-WebRequest. Exercises both URL-category blocking and C2 UA behavioral detection independently. |
-| 🦠 `malware-download` | Downloads known-malware file samples from public repositories to `/dev/null`. Tests whether anti-malware scanning or URL reputation filtering blocks downloads before they reach the endpoint. |
-| ☣️ `virus` | Downloads EICAR anti-virus test files and virus sample markers to `/dev/null`. Confirms that inline AV scanning is active and reporting correctly. |
-| 🚫 `domain-check` | Probes a random sample of domains from the **Hagezi DNS blocklist**. Tests whether DNS-based threat intelligence blocks known bad domains and generates expected SIEM events. |
+| 🚨 `ids-sigs` | Fires a battery of **16 HTTP requests** targeting `testmyids.com` — the Emerging Threats IDS validation service — each matching a distinct Snort/Suricata signature category: **10 scanner user-agents** (BlackSun, ZmEu, Havij, sqlmap, Nikto, Acunetix, w3af, masscan, DirBuster, libwww-perl) and **6 web-attack URL probes** (LFI `../../etc/passwd`, SQLi `UNION SELECT`, XSS `<script>`, `.env` disclosure, wp-admin, cmd-injection). Tests inline IDS/IPS (Snort, Suricata, Cisco FTD, Palo Alto NGFW with IPS rules) signature coverage across multiple rule categories. |
+| 👾 `c2-useragents` | HEAD requests to malware-category test URLs using **known C2 framework user-agents**. Destinations include WICAR, AMTSO, and Google Safe Browsing test URLs. UAs cover Cobalt Strike, Metasploit Meterpreter, PowerShell Empire, Sliver, DarkComet RAT, QuasarRAT, Emotet/TrickBot, AgentTesla, njRAT, python-requests, Go-http-client, Java RATs, curl, and PowerShell Invoke-WebRequest. Exercises both URL-category blocking and C2 UA behavioral detection independently. |
+| 🦠 `malware-samples` | Downloads known-malware file samples from public repositories to `/dev/null`. Tests whether anti-malware scanning or URL reputation filtering blocks downloads before they reach the endpoint. |
+| ☣️ `av-test` | Downloads EICAR anti-virus test files and virus sample markers to `/dev/null`. Confirms that inline AV scanning is active and reporting correctly. |
+| 🚫 `blocklist-probe` | Probes a random sample of domains from the **Hagezi DNS blocklist**. Tests whether DNS-based threat intelligence blocks known bad domains and generates expected SIEM events. |
 | 🎣 `phishing-domains` | Probes a random sample of domains from an active phishing domain feed. Tests anti-phishing DNS/URL filtering, confirms phishing-category blocks appear in firewall logs, and validates events reach the SIEM. |
 | 🔤 `squatting` | Runs `dnstwist` typosquatting generation against popular brand domains. Generates hundreds of lookalike domain variants (homoglyphs, additions, transpositions) and resolves them. Tests whether DNS analytics detect typosquatting lookups. |
 | 🗺️ `nmap` | Nmap port scan covering ports 1–1024 against a target list, followed by an NSE CVE-script scan (`--script=ALL`). Targets are restricted to explicitly authorized public hosts: `scanme.nmap.org`, `testmyids.com`, and `juice-shop.herokuapp.com`. Tests whether IDS/IPS detects and alerts on port-scan patterns and CVE-detection signatures. |
@@ -74,7 +74,7 @@ docker run --pull=always -it jdibby/traffgen:latest --list
 | 📞 `voip` | Two-phase **VoIP/WebRTC signaling simulation**. Phase 1: STUN Binding Requests (UDP/3478 + UDP/19302) to 15 public STUN servers used by Zoom, Google Meet, Teams, and open-source SIP stacks. Phase 2: SIP OPTIONS probes (UDP/5060) to 12 public SIP registrars — the standard SIP "ping" that triggers "SIP-signaling" app-ID signatures. No real calls placed. |
 | 🎥 `ucaas` | HEAD requests to **30+ UCaaS signaling URLs** across 10 platforms: Zoom, Microsoft Teams, Cisco WebEx, Google Meet, Slack, RingCentral, 8x8, GoTo Meeting, Discord (voice channels), WhatsApp, Apple FaceTime, Vonage, Twilio, and Jitsi. Validates UCaaS/video-conferencing app-ID categories on Palo Alto, Cato, Zscaler, and Prisma Access. |
 | 📬 `data-exfil-http` | POSTs **synthetic PII and credential payloads** to public paste and file-drop services. Payload types: SSN lists, Luhn-valid card numbers, RSA private key blocks, password hashes, and CSV PII. Tests DLP outbound content-inspection and CASB upload policies — destinations return 4xx but the outbound POST bodies are visible to inline inspection. |
-| 🔏 `tls-check` | Connects to **20 diverse HTTPS endpoints** and reports the presented TLS certificate for each. Classifies each host as **CLEAN**, **INTERCEPTED** (issuer matches a known SASE/SSE/proxy vendor CA), **UNVERIFIED** (proxy re-signing without a trusted CA installed), or **UNREACHABLE**. Also detects selective bypass: if finance/government hosts are CLEAN while social/developer hosts are INTERCEPTED, the proxy has category or ASN bypass rules active. |
+| 🔏 `tls-inspection` | Connects to **20 diverse HTTPS endpoints** and reports the presented TLS certificate for each. Classifies each host as **CLEAN**, **INTERCEPTED** (issuer matches a known SASE/SSE/proxy vendor CA), **UNVERIFIED** (proxy re-signing without a trusted CA installed), or **UNREACHABLE**. Also detects selective bypass: if finance/government hosts are CLEAN while social/developer hosts are INTERCEPTED, the proxy has category or ASN bypass rules active. |
 | 🕵️ `lateral-movement` | Two-phase east-west reconnaissance against **all physical networks** the Docker host is connected to. Designed to validate **micro-segmentation implementations** — confirms that east-west firewall policy, network ACLs, and host-based controls block lateral movement between segments as intended. When the host has multiple NICs or is multi-homed, all subnets are scanned simultaneously. Phase 1: nmap `-sn` ping sweep of each subnet to enumerate live hosts. Phase 2: port scan every discovered host on 12 lateral-movement ports: SSH (22), Kerberos (88), WMI/RPC (135), NetBIOS (137-139), LDAP (389), SMB (445), LDAPS (636), RDP (3389), WinRM HTTP/HTTPS (5985/5986). See [Deployment Guide](deployment.md#lateral-movement-networking) for required network setup. |
 
 ---
@@ -119,7 +119,7 @@ All requests use a fake `sk-DLPTEST-…` token — responses are HTTP 401/403. T
 
 | Suite | Description |
 |---|---|
-| 🎯 `ads` | HEAD requests to a random sample of domains from the [Hagezi pro blocklist](https://github.com/hagezi/dns-blocklists) (300k+ ad, tracker, telemetry, and malware domains). The list is fetched at first run and cached for the process lifetime. Tests ad-blocker and tracker-block URL filter categories at scale. |
+| 🎯 `ad-tracker` | HEAD requests to a random sample of domains from the [Hagezi pro blocklist](https://github.com/hagezi/dns-blocklists) (300k+ ad, tracker, telemetry, and malware domains). The list is fetched at first run and cached for the process lifetime. Tests ad-blocker and tracker-block URL filter categories at scale. |
 | 🤖 `ai-browse` | HEAD requests to AI and LLM service endpoints (API gateways, model-serving hosts). Tests the AI-category URL filter independently from browser-facing chat UIs. |
 | 🔞 `pornography` | HTTPS crawl of adult-content endpoints. Tests the adult-content URL filter category and confirms policy enforcement is logging correctly. |
 | 🔒 `dlp` | Downloads DLP test files over HTTPS containing structured PII and PCI data patterns (SSNs, credit card numbers, bank account numbers). Tests inline DLP file-scanning and download-inspection policies. |
@@ -187,8 +187,8 @@ Every probe maps to one of three security-relevant outcomes:
 
 | Pattern | What to check |
 |---|---|
-| High `allowed` on `malware-download`, `virus`, `dlp`, `pornography` | Those categories are passing through uninspected |
-| High `blocked` on `llm-dlp`, `c2-beacon`, `malware-agents` | Proxy/CASB is actively blocking — controls are working |
+| High `allowed` on `malware-samples`, `av-test`, `dlp`, `pornography` | Those categories are passing through uninspected |
+| High `blocked` on `llm-dlp`, `c2-beacon`, `c2-useragents` | Proxy/CASB is actively blocking — controls are working |
 | High `dropped` on any suite | Firewall has drop (not reject) rules — effective but produces no user-visible feedback |
 | High `errors` on `dns`, `ntp`, `icmp` | Those protocols may be perimeter-blocked (UDP/53, UDP/123, ICMP) |
 | Mix of `blocked` and `dropped` on same suite | Layered security stack (NGFW + SASE) with both block-and-log and drop rules |
