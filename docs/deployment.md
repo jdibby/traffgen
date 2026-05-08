@@ -136,7 +136,7 @@ docker run --pull=always --detach --restart unless-stopped \
 
 ## Lateral Movement Networking
 
-The `lateral-movement` suite scans **all physical networks** the Docker host is connected to — not the Docker bridge (`172.17.x.x`). When the host has multiple NICs or is multi-homed, all subnets are swept and port-scanned simultaneously. A standard Docker container runs in its own network namespace and cannot see the host's physical interfaces. One of the two methods below is required.
+The `lateral-movement` suite scans **all physical networks** the Docker host is connected to — not the Docker bridge (`172.17.x.x`). It is purpose-built to validate **micro-segmentation implementations**: confirming that east-west firewall policy, network ACLs, and host-based controls block lateral movement between segments as intended. When the host has multiple NICs or is multi-homed, all subnets are swept and port-scanned simultaneously. A standard Docker container runs in its own network namespace and cannot see the host's physical interfaces. One of the two methods below is required.
 
 ### Method 1 — stager.sh (recommended)
 
