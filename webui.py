@@ -1552,11 +1552,12 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
     <div style="font-size:12px;color:var(--muted)">Current configuration:</div>
     <div class="cur-cfg" id="cur-cfg">&#8212;</div>
     <div class="field"><label>Suite</label><select id="cfg-suite" onchange="onSuiteChange(this.value)"><option value="all">all &#8212; run everything</option></select></div>
-    <div id="lateral-nets-section" style="display:none">
-      <div class="field" style="flex-direction:column;align-items:flex-start;gap:6px">
-        <label style="margin-bottom:2px">Networks to scan <span style="font-weight:400;color:var(--muted)">(none = all)</span></label>
-        <div id="lateral-nets-list" style="display:flex;flex-direction:column;gap:5px;width:100%"></div>
-        <div id="lateral-nets-none" style="font-size:12px;color:var(--muted);display:none">No networks detected — will auto-detect at runtime</div>
+    <div id="lateral-nets-section">
+      <div class="modal-sep" style="margin:4px 0 8px">Lateral Movement Networks</div>
+      <div class="field" style="flex-direction:column;align-items:flex-start;gap:5px">
+        <div style="font-size:12px;color:var(--muted)">Select which networks to scan (leave all checked to scan every detected network).</div>
+        <div id="lateral-nets-list" style="display:flex;flex-direction:column;gap:5px;width:100%;margin-top:4px"></div>
+        <div id="lateral-nets-none" style="font-size:12px;color:var(--muted)">No networks detected — will auto-detect at runtime</div>
       </div>
     </div>
     <div class="field"><label>Size</label>
@@ -1600,6 +1601,12 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
           <div class="rngw"><input type="range" id="modal-wait" min="5" max="300" step="5" value="20" oninput="$('modal-wv').textContent=this.value+'s'"><span class="rngv" id="modal-wv">20s</span></div>
         </div>
         <div class="field"><div class="togrow"><span class="toglbl">Loop Mode</span><label class="tog"><input type="checkbox" id="modal-loop"><span class="tslider"></span></label></div></div>
+      </div>
+      <div id="modal-lateral-section" style="display:none">
+        <div class="modal-sep" style="margin-bottom:10px">Networks to Scan</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Select which networks to scan (leave all checked to scan every detected network).</div>
+        <div id="modal-lateral-list" style="display:flex;flex-direction:column;gap:5px"></div>
+        <div id="modal-lateral-none" style="font-size:12px;color:var(--muted);display:none">No networks detected — will auto-detect at runtime</div>
       </div>
     </div>
     <div class="modal-ftr">
@@ -1972,46 +1979,41 @@ function _restoreWidgetOrder(gridId){
   order.forEach(id=>{const c=grid.querySelector('[data-widget="'+id+'"]');if(c)grid.appendChild(c);});
 }
 let _lateralNetsAvailable=[];
-function onSuiteChange(val){
-  const sec=$('lateral-nets-section');
-  if(val==='lateral-movement'){
-    sec.style.display='';
-    fetch('/api/networks').then(r=>r.json()).then(d=>{
-      _lateralNetsAvailable=d.available||[];
-      const selected=new Set(d.selected||[]);
-      const list=$('lateral-nets-list');
-      const none=$('lateral-nets-none');
-      list.innerHTML='';
-      if(!_lateralNetsAvailable.length){none.style.display='';return;}
-      none.style.display='none';
-      _lateralNetsAvailable.forEach(net=>{
-        const lbl=document.createElement('label');
-        lbl.style.cssText='display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:5px 8px;border-radius:6px;background:var(--surf2);border:1px solid var(--border)';
-        const cb=document.createElement('input');
-        cb.type='checkbox';cb.value=net.cidr;cb.checked=selected.size===0||selected.has(net.cidr);
-        const txt=document.createElement('span');
-        txt.innerHTML=`<span style="font-family:monospace;font-weight:600">${H(net.cidr)}</span><span style="color:var(--muted);font-size:11px;margin-left:4px">(${H(net.ip)})</span>`;
-        lbl.appendChild(cb);lbl.appendChild(txt);list.appendChild(lbl);
-      });
-    }).catch(()=>{});
-  }else{
-    sec.style.display='none';
-  }
+function _buildNetCheckboxes(containerId, noneId, nets, selectedSet){
+  const list=$(containerId),none=$(noneId);
+  list.innerHTML='';
+  if(!nets.length){none.style.display='';return;}
+  none.style.display='none';
+  nets.forEach(net=>{
+    const lbl=document.createElement('label');
+    lbl.style.cssText='display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:5px 8px;border-radius:6px;background:var(--surf2);border:1px solid var(--border)';
+    const cb=document.createElement('input');
+    cb.type='checkbox';cb.value=net.cidr;cb.checked=selectedSet.size===0||selectedSet.has(net.cidr);
+    const txt=document.createElement('span');
+    txt.innerHTML=`<span style="font-family:monospace;font-weight:600">${H(net.cidr)}</span><span style="color:var(--muted);font-size:11px;margin-left:4px">(${H(net.ip)})</span>`;
+    lbl.appendChild(cb);lbl.appendChild(txt);list.appendChild(lbl);
+  });
 }
+function _loadDrawerNetworks(){
+  fetch('/api/networks').then(r=>r.json()).then(d=>{
+    _lateralNetsAvailable=d.available||[];
+    const selected=new Set(d.selected||[]);
+    _buildNetCheckboxes('lateral-nets-list','lateral-nets-none',_lateralNetsAvailable,selected);
+  }).catch(()=>{});
+}
+// onSuiteChange kept for compatibility — drawer now always shows the network section
+function onSuiteChange(_val){}
 function openDrawer(){
   $('drawer').classList.add('open');$('overlay').classList.add('open');
-  // Trigger lateral nets section if current suite is lateral-movement
-  onSuiteChange($('cfg-suite').value);
+  _loadDrawerNetworks();
 }
 function closeDrawer(){$('drawer').classList.remove('open');$('overlay').classList.remove('open');}
 function toast(msg,ok){const t=$('toast');t.textContent=msg;t.className='toast '+(ok?'ok':'err');t.style.display='block';setTimeout(()=>t.style.display='none',3500);}
 function applySettings(){
   if(!_isAdmin){toast(_sessionMode?'Another session has control — you are read-only':'Admin access required — click Unlock',false);return;}
-  const suite=$('cfg-suite').value;
-  const body={suite,size:$('cfg-size').value,max_wait_secs:parseInt($('cfg-wait').value),loop:$('cfg-loop').checked,nowait:$('cfg-nowait').checked};
-  if(suite==='lateral-movement'&&_lateralNetsAvailable.length){
+  const body={suite:$('cfg-suite').value,size:$('cfg-size').value,max_wait_secs:parseInt($('cfg-wait').value),loop:$('cfg-loop').checked,nowait:$('cfg-nowait').checked};
+  if(_lateralNetsAvailable.length){
     const checked=[...document.querySelectorAll('#lateral-nets-list input[type=checkbox]:checked')].map(c=>c.value);
-    // If all checked (or none explicitly unchecked), send empty = scan all
     body.lateral_networks=(checked.length===_lateralNetsAvailable.length)?[]:checked;
   }else{
     body.lateral_networks=[];
@@ -2039,12 +2041,25 @@ function restartTests(){
     .catch(()=>toast('Request failed',false));
 }
 function handleLiveClick(){if(_lastState&&_lastState.status==='stopped'){restartTests();return;}stopTests();}
+let _modalLateralNets=[];
 function openModal(name,desc){
   _modalSuite=name;$('modal-name').textContent=name;$('modal-desc').textContent=desc||'No description available.';
   const td=(_lastState&&_lastState.tests&&_lastState.tests[name])||{};
   const ta=td.attempts||0,tok=td.ok||0,tf=td.fail||0;
   $('ms-att').textContent=ta?N(ta):'—';$('ms-ok').textContent=tok?N(tok):'—';$('ms-fail').textContent=tf?N(tf):'—';
   if(_lastState){$('modal-size').value=_lastState.size||'S';$('modal-wait').value=_lastState.max_wait_secs||20;$('modal-wv').textContent=($('modal-wait').value)+'s';$('modal-loop').checked=!!_lastState.loop;}
+  const latSec=$('modal-lateral-section');
+  if(name==='lateral-movement'){
+    latSec.style.display='';
+    fetch('/api/networks').then(r=>r.json()).then(d=>{
+      _modalLateralNets=d.available||[];
+      const selected=new Set(d.selected||[]);
+      _buildNetCheckboxes('modal-lateral-list','modal-lateral-none',_modalLateralNets,selected);
+    }).catch(()=>{});
+  }else{
+    latSec.style.display='none';
+    _modalLateralNets=[];
+  }
   $('modal-ov').classList.add('open');
 }
 function closeModal(){$('modal-ov').classList.remove('open');_modalSuite=null;}
@@ -2052,6 +2067,12 @@ function runFromModal(){
   if(!_modalSuite)return;
   if(!_isAdmin){toast(_sessionMode?'Another session has control — you are read-only':'Admin access required — click Unlock',false);return;}
   const body={suite:_modalSuite,size:$('modal-size').value,max_wait_secs:parseInt($('modal-wait').value),loop:$('modal-loop').checked,nowait:false};
+  if(_modalSuite==='lateral-movement'&&_modalLateralNets.length){
+    const checked=[...document.querySelectorAll('#modal-lateral-list input[type=checkbox]:checked')].map(c=>c.value);
+    body.lateral_networks=(checked.length===_modalLateralNets.length)?[]:checked;
+  }else{
+    body.lateral_networks=[];
+  }
   _ctrl(body).then(r=>r.json()).then(d=>{if(d.ok){toast('Running '+_modalSuite+' — generator restarting…',true);closeModal();navTo('output');}else toast('Error: '+d.error,false);})
     .catch(()=>toast('Request failed',false));
 }
