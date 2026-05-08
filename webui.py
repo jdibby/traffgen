@@ -1323,7 +1323,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div>
           <div class="a-title">traffgen</div>
           <div class="a-ver">v<span id="about-ver">&#8212;</span> &middot; Multi-Protocol Network Traffic Generator</div>
-          <div class="a-sub">Simulates realistic network traffic across 45 test suites &#8212; DNS, HTTP/S, BGP, SSH, VoIP/UCaaS, C2 beacons, DLP, IDS/WAF triggers, lateral movement, TLS inspection checks, and more.<br>Purpose-built to stress-test firewalls, IDS/IPS, URL filters, DLP engines, CASB/SASE/SSE platforms, and SIEM pipelines.</div>
+          <div class="a-sub">Simulates realistic network traffic across 47 test suites &#8212; DNS, HTTP/S, BGP, SSH, VoIP/UCaaS, C2 beacons, DLP, IDS/WAF triggers, lateral movement, TLS inspection, Metasploit vuln scanners, encoded payload delivery, and more.<br>Purpose-built to stress-test firewalls, IDS/IPS, URL filters, DLP engines, CASB/SASE/SSE platforms, and SIEM pipelines.</div>
         </div>
       </div>
       <div class="a-section">
@@ -1396,6 +1396,19 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
     <!-- Changelog -->
     <div id="tab-changelog" class="panel">
       <div style="max-width:900px">
+
+        <div class="a-section">
+          <div class="a-h">v3.3.0 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
+          <table class="st-table" style="margin-top:10px">
+            <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>msf-aux-scan</strong> — Metasploit auxiliary vulnerability scanners (EternalBlue, BlueKeep, Heartbleed, Shellshock, Log4Shell, SMB enum, RDP) against live LAN hosts only; two-phase: ping sweep first, then scan confirmed-live hosts; respects <code>--lateral-networks</code> filter</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>msf-payload-delivery</strong> — msfvenom generates encoded shellcode payloads (shikata-ga-nai, xor_dynamic, powershell_base64, countdown) and delivers them via HTTP to <code>scanme.nmap.org</code> / <code>testmyids.com</code>; tests NGFW/SASE deep-packet inspection of obfuscated malware in transit</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td>Added <strong>msf-cred-spray</strong> — Metasploit credential-testing auxiliary modules (SSH, FTP, SMB, HTTP, Telnet) with fake credentials against public test targets only; generates protocol-level brute-force traffic for UEBA/SIEM/identity-security validation</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Dashboard</td><td>Lateral Movement Networks section in Settings drawer now hidden by default; only shown when <em>lateral-movement</em> suite is selected</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Dashboard</td><td>Stat cards now use <code>auto-fit</code> grid — cards expand to fill available horizontal space on wide screens</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Deployment</td><td><code>stager.sh</code> Note and WARNING lines now print in red for visibility</td></tr>
+          </table>
+        </div>
 
         <div class="a-section">
           <div class="a-h">v3.2.0 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
