@@ -900,13 +900,14 @@ td.nm{font-family:inherit;font-weight:500;font-size:16px}
 .dragging{opacity:.45;outline:2px dashed var(--amber);border-radius:10px}
 .drag-over{outline:2px dashed var(--amber);border-radius:10px;outline-offset:2px}
 
-.tcard2{background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:7px;cursor:pointer;transition:border-color .15s,background .15s,box-shadow .15s;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.tcard2{background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:7px;cursor:pointer;transition:border-color .15s,background .15s,box-shadow .15s;box-shadow:0 1px 4px rgba(0,0,0,.25);overflow:hidden;min-width:0}
 .tcard2:hover{border-color:var(--green);background:var(--gdim)}
 .tcard2.running{border-color:rgba(34,197,94,.4);background:var(--gdim)}
-.tcn{font-weight:600;font-size:15px;display:flex;align-items:center;gap:6px}
+.tcn{font-weight:600;font-size:15px;display:flex;align-items:center;gap:6px;min-width:0}
+.tcn-lbl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .s-ico{font-style:normal;font-size:17px;line-height:1;flex-shrink:0}
-.badge{font-size:12px;padding:1px 6px;border-radius:10px;background:var(--gdim);color:var(--green);border:1px solid rgba(34,197,94,.3)}
-.tcd{font-size:14px;color:var(--muted);line-height:1.4}
+.badge{font-size:12px;padding:1px 6px;border-radius:10px;background:var(--gdim);color:var(--green);border:1px solid rgba(34,197,94,.3);flex-shrink:0}
+.tcd{font-size:13px;color:var(--muted);line-height:1.45;word-break:break-word;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .tcs{display:flex;gap:10px;font-size:13px;font-family:'SF Mono',Consolas,monospace}
 .tcbar{width:100%;height:2px;background:var(--border2);border-radius:1px;overflow:hidden;margin-top:1px}
 .tcbf{height:100%;border-radius:1px;transition:width .4s}
@@ -1868,7 +1869,7 @@ function apply(s){
     const td=tests[su.name]||{},ta=td.attempts||0,tok=td.ok||0,tf=td.fail||0,tp=ta?tok/ta*100:0;
     const bc=RC(tp),act=su.name===cur;
     return`<div class="tcard2${act?' running':''}" data-suite="${H(su.name)}" data-desc="${H(su.description||'')}" onclick="openModal(this.dataset.suite,this.dataset.desc)">
-      <div class="tcn" title="${H(su.description||'')}"><span class="s-ico">${suiteIco(su.name)}</span>${H(su.name)}${act?'<span class="badge">RUNNING</span>':''}</div>
+      <div class="tcn" title="${H(su.description||'')}"><span class="s-ico">${suiteIco(su.name)}</span><span class="tcn-lbl">${H(su.name)}</span>${act?'<span class="badge">RUNNING</span>':''}</div>
       <div class="tcd">${H(su.description||'—')}</div>
       <div class="tcs"><span style="color:var(--muted)">${N(ta)} attempts</span><span style="color:var(--green)">${N(tok)} ok</span><span style="color:${tf?'var(--red)':'var(--muted)'}">${N(tf)} fail</span>${ta?'<span style="color:'+bc+'">'+tp.toFixed(1)+'%</span>':''}</div>
       ${ta?`<div class="tcbar"><div class="tcbf" style="width:${tp}%;background:${bc}"></div></div>`:''}
