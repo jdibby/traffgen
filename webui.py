@@ -837,8 +837,12 @@ body{display:flex;background:var(--bg);color:var(--text);font-family:-apple-syst
 .panel{display:none;flex-direction:column;gap:14px;padding:18px;flex:1;min-height:0;overflow-y:auto}
 .panel.active{display:flex}
 #tab-output.panel{padding:0;gap:0;overflow:hidden}
-.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-@media(max-width:1000px){.cards{grid-template-columns:repeat(2,1fr)}}
+/* Widget grids: capped at 1400px, centered, full-height overflow-y */
+#ov-grid,#sec-grid,#health-grid{display:flex;flex-direction:column;gap:14px;max-width:1400px;width:100%;margin:0 auto}
+/* Max-width cap on other panel content (About, Tests, etc.) */
+.panel>*:not(#ov-grid):not(#sec-grid):not(#health-grid){max-width:1400px;width:100%;box-sizing:border-box;align-self:center}
+/* Stat cards: fully fluid, min 130px per card */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px}
 .card{background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:2px;transition:border-color .15s,box-shadow .15s;box-shadow:0 1px 4px rgba(0,0,0,.25)}
 .card:hover{border-color:var(--border2);box-shadow:0 2px 8px rgba(0,0,0,.35)}
 .card.hi{border-color:rgba(34,197,94,.3);background:var(--gdim)}
@@ -846,8 +850,8 @@ body{display:flex;background:var(--bg);color:var(--text);font-family:-apple-syst
 .cval{font-size:26px;font-weight:700;font-family:'SF Mono',Consolas,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:4px;line-height:1.1}
 .csub{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.4;word-break:break-word}
 .c-green{color:var(--green)}.c-red{color:var(--red)}.c-amber{color:var(--amber)}.c-blue{color:var(--blue)}.c-mut{color:var(--muted)}
-.charts{display:grid;grid-template-columns:230px 1fr;gap:12px}
-@media(max-width:860px){.charts{grid-template-columns:1fr}}
+.charts{display:grid;grid-template-columns:minmax(200px,240px) 1fr;gap:12px}
+@media(max-width:760px){.charts{grid-template-columns:1fr}}
 .cc{background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.25)}
 .ctitle{font-size:14px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
 .donut-wrap{display:flex;flex-direction:column;align-items:center;gap:10px}
@@ -1014,7 +1018,7 @@ html.light .obody{background:#f0f4f8}html.light .obody .llm{color:#24292f}html.l
 html.light .obody .ll:hover{background:rgba(0,0,0,.04)}html.light .cmd-blk{background:#f0f4f8;color:#24292f}
 .h-gauges{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .h-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-@media(max-width:700px){.h-gauges,.h-row{grid-template-columns:1fr}}
+@media(max-width:860px){.h-gauges,.h-row{grid-template-columns:1fr}}
 .gauge-wrap{display:flex;flex-direction:column;align-items:center;padding-top:4px}
 .net-widget{display:flex;gap:16px;padding:6px 0;font-family:'SF Mono',Consolas,monospace;font-size:15px;align-items:center}
 .net-dir{display:flex;flex-direction:column;gap:1px}
@@ -1333,14 +1337,10 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
       <div class="a-section">
         <div class="a-h">Quick Start</div>
         <div class="cmd-blk"><span class="cmt"># With web dashboard (https://&lt;host&gt;:7777)</span>
-docker run --pull=always --detach --restart unless-stopped \
-  <span class="flg">-p 7777:7777</span> --name traffgen jdibby/traffgen:latest \
-  --suite=all --size=S --max-wait-secs=20 --loop
+docker run --pull=always --detach --restart unless-stopped <span class="flg">-p 7777:7777</span> --name traffgen jdibby/traffgen:latest --suite=all --size=S --max-wait-secs=20 --loop
 
 <span class="cmt"># Headless — no web dashboard, log output only</span>
-docker run --pull=always --detach --restart unless-stopped \
-  --name traffgen jdibby/traffgen:latest \
-  --suite=all --size=S --max-wait-secs=20 --loop
+docker run --pull=always --detach --restart unless-stopped --name traffgen jdibby/traffgen:latest --suite=all --size=S --max-wait-secs=20 --loop
 
 <span class="cmt"># One-command install on fresh host (interactive — asks suite, size, UI options)</span>
 sudo bash &lt; &lt;(curl -sk https://raw.githubusercontent.com/jdibby/traffgen/refs/heads/main/stager.sh)
