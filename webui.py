@@ -899,6 +899,8 @@ td.nm{font-family:inherit;font-weight:500;font-size:16px}
 .evdet{display:none;padding:5px 12px 7px 24px;background:var(--surf2);font-size:13px;font-family:'SF Mono',Consolas,monospace;color:var(--muted)}
 .evdet.open{display:block}
 .tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px}
+.tcat-hdr{grid-column:1/-1;display:flex;align-items:center;gap:7px;padding:8px 2px 4px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);margin-top:12px}
+.tcat-hdr:first-child{margin-top:0}
 .drag-handle{cursor:grab;opacity:.35;font-size:16px;padding:0 6px 0 0;user-select:none;flex-shrink:0}
 .drag-handle:hover{opacity:.7}.drag-handle:active{cursor:grabbing}
 .dragging{opacity:.45;outline:2px dashed var(--amber);border-radius:10px}
@@ -1878,16 +1880,55 @@ function apply(s){
   }).join('');
   const suites=s.suites||[],tg=$('test-grid');
   if(!suites.length){tg.innerHTML='<div class="empty">Waiting for data…</div>';}
-  else tg.innerHTML=suites.map(su=>{
-    const td=tests[su.name]||{},ta=td.attempts||0,tok=td.ok||0,tf=td.fail||0,tp=ta?tok/ta*100:0;
-    const bc=RC(tp),act=su.name===cur;
-    return`<div class="tcard2${act?' running':''}" data-suite="${H(su.name)}" data-desc="${H(su.description||'')}" onclick="openModal(this.dataset.suite,this.dataset.desc)">
-      <div class="tcn" title="${H(su.description||'')}"><span class="s-ico">${suiteIco(su.name)}</span><span class="tcn-lbl">${H(su.name)}</span>${act?'<span class="badge">RUNNING</span>':''}</div>
-      <div class="tcd">${H(su.description||'—')}</div>
-      <div class="tcs"><span style="color:var(--muted)">${N(ta)} attempts</span><span style="color:var(--green)">${N(tok)} ok</span><span style="color:${tf?'var(--red)':'var(--muted)'}">${N(tf)} fail</span>${ta?'<span style="color:'+bc+'">'+tp.toFixed(1)+'%</span>':''}</div>
-      ${ta?`<div class="tcbar"><div class="tcbf" style="width:${tp}%;background:${bc}"></div></div>`:''}
-    </div>`;
-  }).join('');
+  else{
+    const _SC={
+      'bgp':'Connectivity & Network','dns':'Connectivity & Network','icmp':'Connectivity & Network',
+      'ntp':'Connectivity & Network','snmp':'Connectivity & Network','ssh':'Connectivity & Network',
+      'ads':'Web & HTTP','ai-browse':'Web & HTTP','bigfile':'Web & HTTP','crawl':'Web & HTTP',
+      'ftp':'Web & HTTP','http':'Web & HTTP','https':'Web & HTTP','s3':'Web & HTTP',
+      'speedtest':'Web & HTTP','url-response':'Web & HTTP',
+      'doh':'Encrypted & Modern Protocols','dot':'Encrypted & Modern Protocols',
+      'http3':'Encrypted & Modern Protocols','kyber':'Encrypted & Modern Protocols',
+      'data-exfil-http':'Threat Detection & IDS/IPS','dlp':'Threat Detection & IDS/IPS',
+      'ids-trigger':'Threat Detection & IDS/IPS','log4shell':'Threat Detection & IDS/IPS',
+      'malware-agents':'Threat Detection & IDS/IPS','malware-download':'Threat Detection & IDS/IPS',
+      'metasploit-check':'Threat Detection & IDS/IPS','msf-aux-scan':'Threat Detection & IDS/IPS',
+      'msf-payload-delivery':'Threat Detection & IDS/IPS','msf-cred-spray':'Threat Detection & IDS/IPS',
+      'nmap':'Threat Detection & IDS/IPS','tls-check':'Threat Detection & IDS/IPS',
+      'virus':'Threat Detection & IDS/IPS','waf-attack':'Threat Detection & IDS/IPS',
+      'web-scanner':'Threat Detection & IDS/IPS',
+      'domain-check':'Recon & Lateral Movement','lateral-movement':'Recon & Lateral Movement',
+      'phishing-domains':'Recon & Lateral Movement','squatting':'Recon & Lateral Movement',
+      'c2-beacon':'Evasion & C2','dns-exfil':'Evasion & C2','llm-dlp':'Evasion & C2',
+      'shadow-it':'Evasion & C2','tor-anonymizer':'Evasion & C2',
+      'ucaas':'UCaaS & Communications','voip':'UCaaS & Communications',
+      'pornography':'Content Filtering',
+    };
+    const _CO=['Connectivity & Network','Web & HTTP','Encrypted & Modern Protocols',
+               'Threat Detection & IDS/IPS','Recon & Lateral Movement','Evasion & C2',
+               'UCaaS & Communications','Content Filtering'];
+    const _CI={'Connectivity & Network':'🌐','Web & HTTP':'🌍',
+               'Encrypted & Modern Protocols':'🔐','Threat Detection & IDS/IPS':'🛡️',
+               'Recon & Lateral Movement':'🕵️','Evasion & C2':'📡',
+               'UCaaS & Communications':'📞','Content Filtering':'🚧'};
+    const cm={};
+    suites.forEach(su=>{const c=_SC[su.name]||'Other';(cm[c]=cm[c]||[]).push(su);});
+    Object.values(cm).forEach(a=>a.sort((a,b)=>a.name.localeCompare(b.name)));
+    const co=_CO.concat(Object.keys(cm).filter(c=>!_CO.includes(c)).sort());
+    const mkCard=su=>{
+      const td=tests[su.name]||{},ta=td.attempts||0,tok=td.ok||0,tf=td.fail||0,tp=ta?tok/ta*100:0;
+      const bc=RC(tp),act=su.name===cur;
+      return`<div class="tcard2${act?' running':''}" data-suite="${H(su.name)}" data-desc="${H(su.description||'')}" onclick="openModal(this.dataset.suite,this.dataset.desc)">
+        <div class="tcn" title="${H(su.description||'')}"><span class="s-ico">${suiteIco(su.name)}</span><span class="tcn-lbl">${H(su.name)}</span>${act?'<span class="badge">RUNNING</span>':''}</div>
+        <div class="tcd">${H(su.description||'—')}</div>
+        <div class="tcs"><span style="color:var(--muted)">${N(ta)} attempts</span><span style="color:var(--green)">${N(tok)} ok</span><span style="color:${tf?'var(--red)':'var(--muted)'}">${N(tf)} fail</span>${ta?'<span style="color:'+bc+'">'+tp.toFixed(1)+'%</span>':''}</div>
+        ${ta?`<div class="tcbar"><div class="tcbf" style="width:${tp}%;background:${bc}"></div></div>`:''}
+      </div>`;
+    };
+    tg.innerHTML=co.filter(c=>cm[c]).map((c,i)=>
+      `<div class="tcat-hdr"${i===0?'':''} >${_CI[c]||'📋'} ${H(c)}</div>`+cm[c].map(mkCard).join('')
+    ).join('');
+  }
   if(!$('drawer').classList.contains('open')){
     const sel=$('cfg-suite');
     if(sel.options.length<=1&&suites.length){suites.forEach(su=>{const o=document.createElement('option');o.value=su.name;o.textContent=su.name+' — '+su.description;sel.appendChild(o);});}
