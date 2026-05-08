@@ -257,13 +257,16 @@ if [ -t 1 ]; then
     BOLD=$(tput bold 2>/dev/null || printf '')
     GREEN=$(tput setaf 2 2>/dev/null || printf '')
     CYAN=$(tput setaf 6 2>/dev/null || printf '')
+    RED=$(tput setaf 1 2>/dev/null || printf '')
     RESET=$(tput sgr0 2>/dev/null || printf '')
 else
-    BOLD=''; GREEN=''; CYAN=''; RESET=''
+    BOLD=''; GREEN=''; CYAN=''; RED=''; RESET=''
 fi
 
 step() { echo ""; echo "${BOLD}${CYAN}▶ $*${RESET}"; }
 ok()   { echo "${GREEN}✔ $*${RESET}"; }
+note() { echo "${RED}  Note: $*${RESET}"; }
+warn() { echo "${RED}WARNING: $*${RESET}"; }
 
 # ── OS detection ──────────────────────────────────────────────────────────────
 step "Detecting operating system"
@@ -533,10 +536,9 @@ if [ "$_UNAME" = "Darwin" ]; then
         fi
         HOST_LAN_CIDR="${HOST_LAN_IP}/${_PREFIX}"
         ok "Host LAN detected: ${HOST_LAN_CIDR} (passed to container for Network Info widget)"
-        echo "  Note: --network=host is not supported on macOS — lateral-movement suite"
-        echo "        will be limited to the Docker bridge network."
+        note "--network=host is not supported on macOS — lateral-movement suite will be limited to the Docker bridge network."
     else
-        echo "WARNING: could not detect host LAN IP"
+        warn "could not detect host LAN IP"
     fi
 else
     HOST_LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
@@ -550,7 +552,7 @@ else
         HOST_LAN_CIDR="${HOST_LAN_IP}/${_PREFIX}"
         ok "Host LAN detected: ${HOST_LAN_CIDR} (passed to container for lateral movement)"
     else
-        echo "WARNING: could not detect host LAN — lateral-movement suite will fall back to container network"
+        warn "could not detect host LAN — lateral-movement suite will fall back to container network"
     fi
 fi
 
