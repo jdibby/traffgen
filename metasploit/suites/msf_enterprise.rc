@@ -1,0 +1,52 @@
+# msf_enterprise.rc — Enterprise software CVE checks.
+# Exercises IDS/IPS signatures for Exchange, Atlassian, ManageEngine, and SAP.
+# WARNING: Use only in a legal, controlled lab environment.
+
+resource /opt/metasploit-framework/ms_checks/checks/_common.rc
+
+# ---- Enterprise Software CVE Checks ----
+
+# Microsoft Exchange ProxyShell — CVE-2021-34473/34523/31207, auth bypass + RCE
+use exploit/windows/http/exchange_proxyshell_rce
+check
+back
+sleep 1
+
+# Microsoft Exchange ProxyLogon — CVE-2021-26855, SSRF + auth bypass
+use exploit/windows/http/exchange_proxylogon_rce
+check
+back
+sleep 1
+
+# Atlassian Confluence Namespace OGNL Injection — CVE-2023-22527 / CVE-2021-26084
+use exploit/multi/http/confluence_namespace_ognl
+check
+back
+sleep 1
+
+# Atlassian Crowd Java Deserialization RCE — CVE-2019-11580
+use exploit/multi/http/atlassian_crowd_deserial_rce
+check
+back
+sleep 1
+
+# ManageEngine ADSelfService Plus Unauthenticated SAML RCE — CVE-2022-47966
+use exploit/multi/http/manageengine_adselfservice_plus_saml_rce_cve_2022_47966
+check
+back
+sleep 1
+
+# SAP WebDynpro Java Deserialization — CVE-2020-6287 (RECON), CVSS 10.0
+use exploit/multi/http/sap_webdynpro_deserialization
+check
+back
+sleep 1
+
+# SaltStack Salt API Command Exec — CVE-2021-25281, unauthenticated wheel API
+use exploit/multi/http/saltstack_salt_api_cmd_exec
+check
+back
+sleep 1
+
+# ---- End ----
+exit

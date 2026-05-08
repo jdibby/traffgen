@@ -227,35 +227,40 @@ def ui_startup_banner() -> None:
 
 # Suite metadata used both for the startup table and the --list flag.
 _SUITE_DESCRIPTIONS: list[tuple[str, str]] = [
-    ("ads",              "HEAD requests to ad-tracker / analytics endpoints"),
+    ("ad-tracker",       "HEAD requests to ad-tracker / analytics endpoints"),
     ("ai-browse",        "HEAD requests to AI/LLM service endpoints for URL-filter validation"),
     ("bgp",              "GoBGP peering session with configured neighbors"),
-    ("bigfile",          "Size-scaled HTTP download: XS=10MB S=100MB M=1GB L=2GB XL=5GB"),
+    ("blocklist-probe",  "Probe random samples from Hagezi DNS blocklist"),
+    ("bulk-transfer",    "Size-scaled HTTP download: XS=10MB S=100MB M=1GB L=2GB XL=5GB"),
     ("c2-beacon",        "C2 beacon: rotating POST formats (form/JSON/raw), bimodal jitter"),
+    ("c2-useragents",    "HEAD requests to malware-category URLs using C2 framework user-agents (SASE/NGFW)"),
     ("llm-dlp",          "POST fake PII to LLM APIs; two-phase: API POSTs + browser endpoint HEAD requests"),
-    ("crawl",            "Iterative web crawl from a configurable start URL"),
+    ("web-crawl",        "Iterative web crawl from a configurable start URL"),
     ("dlp",              "DLP test file downloads over HTTPS"),
     ("dns",              "dig queries across multiple resolvers and domains"),
     ("dns-exfil",        "DNS exfil simulation: TXT queries with base32 encoded subdomains"),
     ("doh",              "DNS over HTTPS (RFC 8484 JSON API via curl)"),
-    ("domain-check",     "Probe random samples from Hagezi DNS blocklist"),
     ("dot",              "DNS over TLS: TCP/853 TLS handshake via openssl s_client"),
     ("ftp",              "FTP download via curl with rate limiting"),
     ("http",             "HTTP HEAD + file downloads (ZIP, tar.gz)"),
     ("http3",            "HTTP/3 QUIC HEAD requests via curl --http3"),
     ("https",            "HTTPS HEAD requests + iterative crawl"),
     ("icmp",             "Ping + traceroute to a set of remote hosts"),
-    ("ids-trigger",      "16 Snort/Suricata signatures: scanner UAs + web-attack URL probes → testmyids.com"),
-    ("tls-check",        "Connect to 20 diverse HTTPS sites and report cert Subject/Issuer/expiry/fingerprint — detects TLS inspection proxy"),
-    ("kyber",            "HTTPS HEAD with X25519MLKEM768 post-quantum curves"),
+    ("ids-sigs",         "16 Snort/Suricata signatures: scanner UAs + web-attack URL probes → testmyids.com"),
+    ("tls-inspection",   "Connect to 20 diverse HTTPS sites and report cert Subject/Issuer/expiry/fingerprint — detects TLS inspection proxy"),
+    ("post-quantum",     "HTTPS HEAD with X25519MLKEM768 post-quantum curves"),
     ("lateral-movement", "Ping sweep /24 subnet + nmap lateral-movement ports (SSH/SMB/RDP/WMI/LDAP/Kerberos)"),
     ("log4shell",        "Log4Shell JNDI header injection probes (CVE-2021-44228) → IDS/WAF/SASE"),
-    ("malware-agents",   "HEAD requests to malware-category URLs using C2 framework user-agents (SASE/NGFW)"),
-    ("malware-download", "Download known-malware file samples (to /dev/null)"),
-    ("metasploit-check", "Run Metasploit .rc check scripts (no exploitation)"),
-    ("msf-aux-scan",    "Metasploit auxiliary vulnerability scanners (EternalBlue/BlueKeep/Heartbleed/Shellshock) → live LAN hosts only"),
-    ("msf-payload-delivery", "msfvenom encoded payloads delivered via HTTP to public test targets — tests NGFW/IDS obfuscated payload detection"),
-    ("msf-cred-spray",  "Metasploit credential-testing modules (SSH/SMB/FTP/HTTP) → public test targets only"),
+    ("malware-samples",  "Download known-malware file samples (to /dev/null)"),
+    ("msf-appliance",       "Metasploit checks: network appliances (Cisco IOS XE, PAN-OS, Juniper, FortiOS, Ivanti, F5) — IDS/NGFW appliance CVE signatures"),
+    ("msf-aux-scan",        "Metasploit auxiliary vulnerability scanners (EternalBlue/BlueKeep/Heartbleed/Shellshock) → live LAN hosts only"),
+    ("msf-cisa-kev",        "Metasploit checks: CISA KEV catalog (Log4Shell, GoAnywhere, MOVEit, Barracuda, SolarWinds, Check Point)"),
+    ("msf-cred-spray",      "Metasploit credential-testing modules (SSH/SMB/FTP/HTTP) → public test targets only"),
+    ("msf-enterprise",      "Metasploit checks: enterprise software (Exchange ProxyShell/ProxyLogon, Atlassian, ManageEngine, SAP)"),
+    ("msf-middleware",      "Metasploit checks: app servers/middleware (Struts2, WebLogic, JBoss, Spring Cloud, Jenkins, OFBiz, Solr)"),
+    ("msf-payload-delivery","msfvenom encoded payloads delivered via HTTP to public test targets — tests NGFW/IDS obfuscated payload detection"),
+    ("msf-recon",           "Metasploit auxiliary recon scanners (EternalBlue probe, SMB/RDP/MySQL/Redis/HTTP fingerprinting)"),
+    ("msf-webapp",          "Metasploit checks: web app CVEs (Drupal, Joomla, WordPress, GitLab, PHP CGI, Magento, Webmin)"),
     ("speedtest",        "fast.com speed-test via fastcli"),
     ("nmap",             "Nmap port scan (1-1024) + CVE script scan"),
     ("ntp",              "NTP UDP probes to a pool of public time servers"),
@@ -267,8 +272,8 @@ _SUITE_DESCRIPTIONS: list[tuple[str, str]] = [
     ("s3",               "S3 upload/download simulation: GET public objects + PUT synthetic DLP payloads"),
     ("ssh",              "Non-interactive SSH connection attempts"),
     ("tor-anonymizer",   "HEAD requests to Tor/VPN/proxy sites → URL-filter anonymizer category"),
-    ("url-response",     "Measure HTTPS response times via requests library"),
-    ("virus",            "Download known-virus samples (to /dev/null)"),
+    ("url-latency",      "Measure HTTPS response times via requests library"),
+    ("av-test",          "Download known-virus/EICAR samples (to /dev/null) — validates inline AV/sandboxing"),
     ("voip",             "STUN Binding Requests (UDP/3478+19302) + SIP OPTIONS probes → VoIP/WebRTC app-ID"),
     ("ucaas",            "HEAD requests to Zoom/Teams/WebEx/Meet/Slack/RingCentral/8x8 → UCaaS/video-conferencing app-ID"),
     ("waf-attack",       "SQLi/XSS/LFI/SSRF/CMDi/XXE/SSTI payloads in query params and POST bodies → WAF inline"),
@@ -813,7 +818,12 @@ def _popen_kill_group(cmd: str, timeout: int,
 # Per-function wall-clock limits (seconds).  Functions not listed fall back to
 # 120 s.  These are upper-bounds; most tests complete well within the limit.
 _SUITE_TIMEOUTS: dict[str, int] = {
-    "metasploit_check":      360,
+    "msf_webapp":            360,
+    "msf_enterprise":        360,
+    "msf_appliance":         360,
+    "msf_cisa_kev":          360,
+    "msf_middleware":        420,
+    "msf_recon":             300,
     "msf_aux_scan":          480,
     "msf_payload_delivery":  180,
     "msf_cred_spray":        300,
@@ -1410,40 +1420,144 @@ def ping_random() -> None:
         ui_error(f"[ping_random] {e}")
 
 
-def metasploit_check() -> None:
-    """
-    Run a random selection of Metasploit .rc resource scripts.  Each script
-    performs *check* operations only (no exploitation) against
-    scanme.nmap.org / testmyids.com.  Exercises IDS/IPS signature coverage.
-    """
-    ui_banner("Metasploit Checks", "Running .rc check scripts")
-    try:
-        n      = _size_to_limits(ARGS.size, 1, 3, 5, 7)
-        rc_dir = "/opt/metasploit-framework/ms_checks/checks"
-        files  = [f for f in os.listdir(rc_dir)
-                  if f.startswith("ms_check_") and f.endswith(".rc")]
-        random.shuffle(files)
-        files  = files[:n]
+_MSF_SUITES_DIR = "/opt/metasploit-framework/ms_checks/suites"
 
-        with Progress(SpinnerColumn(), TextColumn("[cyan]MSF[/]"),
-                      MofNCompleteColumn(), BarColumn(), TimeElapsedColumn(),
-                      console=console) as prog:
-            task = prog.add_task("msf", total=len(files))
-            for i, rc in enumerate(files, 1):
-                rc_path = os.path.join(rc_dir, rc)
-                console.log(f"msfconsole ({i}/{len(files)}): {rc}")
-                try:
-                    _popen_kill_group(f"msfconsole -q -r '{rc_path}'", timeout=300)
-                    _stats.ok()
-                except Exception as e:
-                    console.log(f"[yellow]msf error: {e}[/]")
-                    _stats.fail()
-                finally:
-                    prog.update(task, advance=1)
-        ui_ok("Metasploit checks complete")
-    except Exception as e:
+
+def _msf_run_rc_parsed(rc_name: str, banner: str, subtitle: str, timeout: int) -> None:
+    """
+    Run a themed MSF .rc script from _MSF_SUITES_DIR and parse per-module
+    results into _stats.
+
+    Outcome classification (per msfconsole output line):
+      ok    — check ran; target not exploitable / not vulnerable / vulnerable (reached)
+      drop  — ECONNREFUSED / ETIMEDOUT (firewall dropping or no service)
+      fail  — module error / check raised exception
+      Auxiliary module completions counted as ok if no error on that run.
+    """
+    rc_path = os.path.join(_MSF_SUITES_DIR, rc_name)
+    ui_banner(banner, subtitle)
+    console.log(f"[cyan]msfconsole -q -r {rc_name}[/]")
+
+    proc = subprocess.Popen(
+        f"msfconsole -q -r '{rc_path}'", shell=True,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        preexec_fn=os.setsid, text=True, errors="replace",
+    )
+    try:
+        out, _ = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        ui_warn(f"MSF script timed out after {timeout}s")
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+        except OSError:
+            pass
+        try:
+            proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except OSError:
+                pass
+        out = ""
+
+    found = 0
+    aux_ok: set[int] = set()
+    aux_err: set[int] = set()
+    module_idx = 0
+
+    for line in (out or "").splitlines():
+        ll = line.lower()
+        # Track module boundaries to pair auxiliary completions with modules
+        if ll.strip().startswith("use ") or "using configured payload" in ll:
+            module_idx += 1
+        if any(p in ll for p in (
+            "not exploitable", "not vulnerable",
+            "appears to be vulnerable", "appears vulnerable",
+        )):
+            _stats.ok(); found += 1
+        elif any(p in ll for p in ("econnrefused", "connection refused")):
+            _stats.drop(); found += 1
+        elif any(p in ll for p in ("etimedout", "timed out", "connection timed out")):
+            _stats.drop(); found += 1
+        elif "check failed" in ll:
+            _stats.fail(); found += 1
+        elif "auxiliary module execution completed" in ll:
+            aux_ok.add(module_idx); found += 1
+        elif any(p in ll for p in ("[-] error:", "module failed", "exploit failed")):
+            aux_err.add(module_idx); found += 1
+
+    for idx in aux_ok - aux_err:
+        _stats.ok()
+    for idx in aux_err:
         _stats.fail()
-        ui_error(f"[metasploit_check] {e}")
+
+    if found == 0:
+        if proc.returncode in (0, None):
+            _stats.ok()
+        else:
+            _stats.fail()
+
+    ui_ok(f"{banner} complete")
+
+
+def msf_webapp() -> None:
+    """Metasploit check-mode probes for web application CVEs."""
+    _msf_run_rc_parsed(
+        "msf_webapp.rc",
+        "MSF Web App",
+        "CVE checks: Drupal, Joomla, WordPress, GitLab, PHP CGI, Magento, Webmin",
+        timeout=_SUITE_TIMEOUTS["msf_webapp"],
+    )
+
+
+def msf_enterprise() -> None:
+    """Metasploit check-mode probes for enterprise software CVEs."""
+    _msf_run_rc_parsed(
+        "msf_enterprise.rc",
+        "MSF Enterprise",
+        "CVE checks: Exchange ProxyShell/ProxyLogon, Atlassian, ManageEngine, SAP",
+        timeout=_SUITE_TIMEOUTS["msf_enterprise"],
+    )
+
+
+def msf_appliance() -> None:
+    """Metasploit check-mode probes for network appliance CVEs."""
+    _msf_run_rc_parsed(
+        "msf_appliance.rc",
+        "MSF Appliance",
+        "CVE checks: Cisco IOS XE, PAN-OS, Juniper, FortiOS, Ivanti, F5 BIG-IP",
+        timeout=_SUITE_TIMEOUTS["msf_appliance"],
+    )
+
+
+def msf_cisa_kev() -> None:
+    """Metasploit check-mode probes for CISA Known Exploited Vulnerabilities."""
+    _msf_run_rc_parsed(
+        "msf_cisa_kev.rc",
+        "MSF CISA KEV",
+        "CVE checks: Log4Shell, GoAnywhere, MOVEit, Barracuda, SolarWinds, Check Point",
+        timeout=_SUITE_TIMEOUTS["msf_cisa_kev"],
+    )
+
+
+def msf_middleware() -> None:
+    """Metasploit check-mode probes for app server / middleware CVEs."""
+    _msf_run_rc_parsed(
+        "msf_middleware.rc",
+        "MSF Middleware",
+        "CVE checks: Struts2, WebLogic, JBoss, Spring Cloud, Jenkins, OFBiz, Solr",
+        timeout=_SUITE_TIMEOUTS["msf_middleware"],
+    )
+
+
+def msf_recon() -> None:
+    """Metasploit auxiliary recon scanners for protocol fingerprinting."""
+    _msf_run_rc_parsed(
+        "msf_recon.rc",
+        "MSF Recon",
+        "Auxiliary scanners: EternalBlue probe, SMB/RDP/MySQL/Redis/HTTP fingerprinting",
+        timeout=_SUITE_TIMEOUTS["msf_recon"],
+    )
 
 
 def msf_aux_scan() -> None:
@@ -3965,7 +4079,7 @@ def waf_attack() -> None:
 
     Validates that WAF inline inspection (Cloudflare, F5 AWAF, Imperva,
     AWS WAF, Palo Alto App-ID) fires on query-parameter and body payloads,
-    not just URL-path patterns (which ids-trigger already covers).
+    not just URL-path patterns (which ids-sigs already covers).
     """
     _ATTACKS = [
         # SQL injection — query params
@@ -4515,32 +4629,37 @@ def ucaas_sim() -> None:
 
 # Maps every --suite value to the list of test functions it runs.
 _SUITE_MAP: dict[str, list] = {
-    "ads":              [ads_random],
+    "ad-tracker":       [ads_random],
     "ai-browse":        [ai_https_random],
     "bgp":              [bgp_peering],
-    "bigfile":          [bigfile],
+    "blocklist-probe":  [github_domain_check],
+    "bulk-transfer":    [bigfile],
     "c2-beacon":        [c2_beacon],
+    "c2-useragents":    [malware_random],
     "llm-dlp":          [llm_dlp_sim],
-    "crawl":            [webcrawl],
+    "web-crawl":        [webcrawl],
     "dlp":              [dlp_sim_https],
     "dns":              [dig_random],
     "dns-exfil":        [dns_exfil],
     "doh":              [doh_random],
-    "domain-check":     [github_domain_check],
     "dot":              [dot_random],
     "ftp":              [ftp_random],
     "http":             [http_download_targz, http_download_zip, http_random],
     "http3":            [http3_random],
     "https":            [https_random, https_crawl],
     "icmp":             [ping_random, traceroute_random],
-    "ids-trigger":      [ips],
-    "tls-check":        [tls_inspection_check],
-    "kyber":            [kyber_random],
+    "ids-sigs":         [ips],
+    "tls-inspection":   [tls_inspection_check],
+    "post-quantum":     [kyber_random],
     "lateral-movement": [lateral_movement_sim],
     "log4shell":        [log4shell_probe],
-    "malware-agents":   [malware_random],
-    "malware-download": [malware_download],
-    "metasploit-check":      [metasploit_check],
+    "malware-samples":  [malware_download],
+    "msf-webapp":            [msf_webapp],
+    "msf-enterprise":        [msf_enterprise],
+    "msf-appliance":         [msf_appliance],
+    "msf-cisa-kev":          [msf_cisa_kev],
+    "msf-middleware":        [msf_middleware],
+    "msf-recon":             [msf_recon],
     "msf-aux-scan":          [msf_aux_scan],
     "msf-payload-delivery":  [msf_payload_delivery],
     "msf-cred-spray":        [msf_cred_spray],
@@ -4555,8 +4674,8 @@ _SUITE_MAP: dict[str, list] = {
     "squatting":        [squatting_domains],
     "ssh":              [ssh_random],
     "tor-anonymizer":   [tor_anonymizer],
-    "url-response":     [urlresponse_random],
-    "virus":            [virus_sim],
+    "url-latency":      [urlresponse_random],
+    "av-test":          [virus_sim],
     "voip":             [voip_sim],
     "ucaas":            [ucaas_sim],
     "waf-attack":       [waf_attack],
@@ -4778,7 +4897,7 @@ def parse_cli() -> argparse.Namespace:
     specific.add_argument(
         "--crawl-start", default="https://data.commoncrawl.org",
         metavar="URL",
-        help="Seed URL for the 'crawl' suite (default: https://data.commoncrawl.org)",
+        help="Seed URL for the 'web-crawl' suite (default: https://data.commoncrawl.org)",
     )
     specific.add_argument(
         "--lateral-networks", default="", metavar="CIDRS",

@@ -1,0 +1,52 @@
+# msf_cisa_kev.rc — CISA Known Exploited Vulnerabilities (KEV) checks.
+# High-fidelity probes for CISA KEV catalog entries confirmed exploited in the wild.
+# WARNING: Use only in a legal, controlled lab environment.
+
+resource /opt/metasploit-framework/ms_checks/checks/_common.rc
+
+# ---- CISA KEV Checks ----
+
+# Log4Shell HTTP Header Injection — CVE-2021-44228, CVSS 10.0
+# JNDI lookup in User-Agent/X-Forwarded-For; most widely exploited CVE of 2021-22
+use exploit/multi/http/log4shell_header_injection
+check
+back
+sleep 1
+
+# Fortra GoAnywhere MFT Pre-Auth RCE — CVE-2024-0204, CISA KEV
+# Authentication bypass via path traversal on the administration portal
+use exploit/multi/http/fortra_goanywhere_mft_rce_cve_2024_0204
+check
+back
+sleep 1
+
+# MOVEit Transfer SQL Injection — CVE-2023-34362, CISA KEV
+# Unauthenticated SQLi enabling session hijack and arbitrary file read/write
+use exploit/windows/http/moveit_cve_2023_34362
+check
+back
+sleep 1
+
+# Barracuda Email Security Gateway RCE — CVE-2023-2868, CISA KEV
+# Pre-auth RCE via crafted email attachment header; Mandiant linked to UNC4841
+use exploit/linux/http/barracuda_esg_rce_cve_2023_2868
+check
+back
+sleep 1
+
+# SolarWinds Web Help Desk Java Deserialization — CVE-2024-28986, CISA KEV
+# Unauthenticated deserialization on the helpdesk REST API endpoint
+use exploit/multi/http/solarwinds_web_help_desk_rce_cve_2024_28986
+check
+back
+sleep 1
+
+# Check Point SSL VPN Information Disclosure — CVE-2024-24919, CISA KEV
+# Unauthenticated arbitrary file read on Check Point Security Gateway
+use exploit/multi/http/check_point_ssl_vpn_traversal_cve_2024_24919
+check
+back
+sleep 1
+
+# ---- End ----
+exit

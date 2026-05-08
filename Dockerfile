@@ -135,9 +135,11 @@ WORKDIR /traffgen
 COPY generator.py endpoints.py webui.py healthcheck.sh docker-entrypoint.sh ./
 RUN chmod +x /traffgen/docker-entrypoint.sh
 
-# Ensure checks dir exists; copy RC scripts; move targets.list up one level
-RUN mkdir -p /opt/metasploit-framework/ms_checks/checks
+# Ensure checks/suites dirs exist; copy RC scripts; move targets.list up one level
+RUN mkdir -p /opt/metasploit-framework/ms_checks/checks \
+             /opt/metasploit-framework/ms_checks/suites
 COPY metasploit/checks/ /opt/metasploit-framework/ms_checks/checks/
+COPY metasploit/suites/ /opt/metasploit-framework/ms_checks/suites/
 RUN mv /opt/metasploit-framework/ms_checks/checks/targets.list \
       /opt/metasploit-framework/ms_checks/targets.list
 

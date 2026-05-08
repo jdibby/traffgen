@@ -1,0 +1,67 @@
+# msf_middleware.rc — Application server / middleware CVE checks.
+# Exercises IDS/IPS signatures for Java EE stacks, OGNL/EL injection, and
+# deserialization attacks against Struts2, WebLogic, JBoss, Spring, and Jenkins.
+# WARNING: Use only in a legal, controlled lab environment.
+
+resource /opt/metasploit-framework/ms_checks/checks/_common.rc
+
+# ---- Middleware / App Server CVE Checks ----
+
+# Apache Struts2 REST XStream Deserialization — CVE-2017-9805 (S2-052)
+# Content-Type: application/xml triggers unsafe XStream deserialization
+use exploit/multi/http/struts2_rest_xstream
+check
+back
+sleep 1
+
+# Apache Struts2 Content-Type OGNL Injection — CVE-2017-5638 (S2-045)
+# Malformed Content-Type header triggers OGNL evaluation in error messages
+use exploit/multi/http/struts2_content_type_ognl
+check
+back
+sleep 1
+
+# Oracle WebLogic Server T3 Deserialization — CVE-2019-2725 / CVE-2020-14882
+# Unauthenticated Java deserialization via T3/IIOP protocol on port 7001
+use exploit/multi/misc/weblogic_deserialize
+check
+back
+sleep 1
+
+# JBoss Vulnerable Deployment — CVE-2010-0738 / CVE-2015-7501
+# Unauthenticated deployment via exposed JMX/HTTP invoker servlet
+use exploit/multi/http/jboss_vuln_deploy
+check
+back
+sleep 1
+
+# Apache OFBiz Java Deserialization RCE — CVE-2021-26295 / CVE-2020-9496
+# Unauthenticated deserialization via the XML-RPC/ViewHandlerExt endpoint
+use exploit/multi/http/apache_ofbiz_deserialization
+check
+back
+sleep 1
+
+# Spring Cloud Function SpEL Injection — CVE-2022-22963
+# Routing expression evaluated as SpEL in the spring.cloud.function.routing-expression header
+use exploit/multi/http/spring_cloud_function_spel_injection
+check
+back
+sleep 1
+
+# Jenkins Script Console RCE — CVE-2018-1000861 / no auth required when exposed
+# Unauthenticated Groovy script execution via /script endpoint
+use exploit/multi/http/jenkins_script_console
+check
+back
+sleep 1
+
+# Apache Solr Velocity Template RCE — CVE-2019-17558
+# Enables and exploits the Velocity response writer for SSTI code execution
+use exploit/multi/http/apache_solr_velocity_rce
+check
+back
+sleep 1
+
+# ---- End ----
+exit

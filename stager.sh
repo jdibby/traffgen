@@ -144,12 +144,14 @@ echo ""
 
 # Suite
 echo "  Available suites: all dns http https ftp ssh bgp icmp ntp snmp doh dot"
-echo "                    c2-beacon malware-download malware-agents phishing-domains"
-echo "                    squatting virus ads pornography dlp dns-exfil data-exfil-http"
-echo "                    llm-dlp ids-trigger waf-attack log4shell nmap metasploit-check"
-echo "                    web-scanner shadow-it tor-anonymizer tls-check lateral-movement"
-echo "                    ai-browse kyber http3 crawl bigfile speedtest url-response s3"
-echo "                    domain-check snmp voip ucaas"
+echo "                    c2-beacon malware-samples c2-useragents phishing-domains"
+echo "                    squatting av-test ad-tracker pornography dlp dns-exfil data-exfil-http"
+echo "                    llm-dlp ids-sigs waf-attack log4shell nmap web-scanner"
+echo "                    msf-webapp msf-enterprise msf-appliance msf-cisa-kev msf-middleware"
+echo "                    msf-recon msf-aux-scan msf-payload-delivery msf-cred-spray"
+echo "                    shadow-it tor-anonymizer tls-inspection lateral-movement"
+echo "                    ai-browse post-quantum http3 web-crawl bulk-transfer speedtest url-latency s3"
+echo "                    blocklist-probe snmp voip ucaas"
 echo ""
 _CFG_SUITE=$(_ask_tty "  Suite to run [all]: " "all")
 

@@ -1,0 +1,52 @@
+# msf_appliance.rc — Network security appliance CVE checks.
+# Exercises IDS/IPS signatures for NGFW, VPN, and load-balancer CVEs.
+# WARNING: Use only in a legal, controlled lab environment.
+
+resource /opt/metasploit-framework/ms_checks/checks/_common.rc
+
+# ---- Network Appliance CVE Checks ----
+
+# Cisco IOS XE WebUI Privilege Escalation — CVE-2023-20198/20273, CISA KEV
+# Unauthenticated admin account creation via the web management interface
+use exploit/multi/http/cisco_ios_xe_webui_cmd_exec
+check
+back
+sleep 1
+
+# Palo Alto PAN-OS GlobalProtect OS Command Injection — CVE-2024-3400, CVSS 10.0
+# Pre-auth RCE via crafted SESSID cookie — CISA KEV, exploited in the wild
+use exploit/linux/http/palo_alto_pan_os_rce_cve_2024_3400
+check
+back
+sleep 1
+
+# Juniper SRX/EX J-Web RCE Chain — CVE-2023-36844/36851
+# Unauthenticated PHP environment variable injection leading to RCE
+use exploit/multi/http/juniper_gopher_rce_cve_2023_36844
+check
+back
+sleep 1
+
+# Fortinet FortiOS SSL VPN Heap Buffer Overflow — CVE-2023-27997, CISA KEV
+# Pre-auth RCE against FortiGate SSL VPN (xortigate)
+use exploit/linux/http/fortinet_ssl_vpn_rce_cve_2023_27997
+check
+back
+sleep 1
+
+# Ivanti Connect Secure Command Injection — CVE-2024-21887 + CVE-2023-46805
+# Auth bypass chained with command injection on management interface
+use exploit/linux/http/ivanti_connect_secure_cmd_injection
+check
+back
+sleep 1
+
+# F5 BIG-IP TMUI RCE — CVE-2020-5902, CISA KEV
+# Unauthenticated RCE via Traffic Management User Interface path traversal
+use exploit/linux/http/f5_bigip_tmui_rce
+check
+back
+sleep 1
+
+# ---- End ----
+exit
