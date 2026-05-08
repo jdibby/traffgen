@@ -9,11 +9,15 @@ ARG GOBGP_VERSION=v4.3.0
 WORKDIR /tmp/gobgp
 # --depth 1 --single-branch fetches only the tagged commit, not the full history
 # grpc@v1.79.3  fixes CVE-2026-33186 (gRPC-Go auth bypass via :path)
-# x/net@v0.48.0 fixes CVE-2025-22872, CVE-2025-47911, CVE-2025-58190 (html parser DoS/XSS)
-#   (grpc v1.79.3 itself requires x/net >= v0.48.0; using v0.45.0 causes MVS conflicts)
+# x/net@v0.53.0 fixes CVE-2025-22872, CVE-2025-47911, CVE-2025-58190 (html parser DoS/XSS)
+#               and CVE-2026-33814 (HTTP/2 SETTINGS_MAX_FRAME_SIZE=0 infinite loop DoS)
+#   (grpc v1.79.3 itself requires x/net >= v0.48.0; v0.53.0 satisfies this)
+# CVE-2026-30405 (GoBGP v4.2.0 NEXT_HOP DoS) — fixed in v4.3.0 (this build).
+# CVE-2026-37461 (GoBGP v4.3.0 ParseIP6Extended OOB read) — no upstream patch yet;
+#   mitigate by restricting TCP/179 access to trusted BGP neighbors only.
 RUN git clone --depth 1 --single-branch --branch ${GOBGP_VERSION} \
         https://github.com/osrg/gobgp.git . && \
-    go get google.golang.org/grpc@v1.79.3 golang.org/x/net@v0.48.0 && \
+    go get google.golang.org/grpc@v1.79.3 golang.org/x/net@v0.53.0 && \
     go mod tidy && \
     go build -ldflags="-s -w" -o /tmp/gobgp-bin/gobgp  ./cmd/gobgp  && \
     go build -ldflags="-s -w" -o /tmp/gobgp-bin/gobgpd ./cmd/gobgpd && \
@@ -35,6 +39,12 @@ ENV BUNDLE_PATH=/opt/metasploit-framework/vendor/bundle
 ENV BUNDLE_WITHOUT=development:test
 
 # Core runtime deps only — no dev headers, no build tools
+# apt-get upgrade -y covers system package CVEs at build time:
+#   libgnutls30: CVE-2026-33845 (DTLS OOB heap read), CVE-2026-33846 (DTLS heap overflow),
+#                CVE-2026-42010 (PSK auth bypass), CVE-2026-42011 (X.509 name constraint bypass)
+#                → fixed in GnuTLS 3.8.13
+#   libnghttp2-14: CVE-2026-27135 (assertion failure after session termination)
+#                  → fixed in nghttp2 1.68.1
 RUN apt-get update && apt-get upgrade -y --no-install-recommends && \
     apt-get install -y --no-install-recommends \
     tzdata ca-certificates curl git \
@@ -55,13 +65,22 @@ RUN git clone --depth 1 --branch ${NIKTO_VERSION} \
 
 # Bundler + CVE-patched gems. json has a C extension so build tools are
 # required; install and purge them in the same layer to keep image size down.
-# Gems covered: json (CVE-2026-33210), rexml (CVE-2024-35176 through -49761),
-# erb (CVE-2026-41316), webrick (CVE-2024-47220, CVE-2025-6442),
-# rack (CVE-2025-61780 through CVE-2026-34831, 13 CVEs),
-# uri (CVE-2023-28755, CVE-2023-36617), time (CVE-2023-28756),
-# cgi (CVE-2025-27219, CVE-2025-27220), resolv (CVE-2025-24294),
-# net-imap (CVE-2025-43857, CVE-2026-42256, CVE-2026-42258),
-# addressable (CVE-2026-35611)
+# Gems covered (system gem layer — also patched in MSF vendor bundle via Dockerfile.msf-base):
+#   json        CVE-2026-33210 (format string injection, CVSS 8.3)
+#   rexml       CVE-2024-43398 (deeply-nested XML DoS)
+#   erb         CVE-2026-41316 (CRITICAL: deserialization guard bypass → RCE)
+#   webrick     CVE-2024-47220 (HTTP request smuggling)
+#   rack        CVE-2025-61919 (unbounded form body memory exhaustion),
+#               CVE-2026-22860 (Rack::Directory path traversal),
+#               CVE-2026-34230 (Accept-Encoding ReDoS),
+#               CVE-2026-34785 (Rack::Static prefix bypass → file disclosure),
+#               CVE-2026-34829 (multipart upload disk exhaustion)
+#   uri         CVE-2023-28755 (URI parser ReDoS)
+#   time        CVE-2023-28756 (Time parser ReDoS)
+#   cgi         CVE-2025-27219, CVE-2025-27220
+#   resolv      CVE-2025-24294
+#   net-imap    CVE-2026-42246 (STARTTLS stripping MITM, CVSS 7.6)
+#   addressable CVE-2026-35611 (URI template ReDoS)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends ruby-dev build-essential && \
     gem install --no-document \

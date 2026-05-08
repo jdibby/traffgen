@@ -35,7 +35,22 @@ RUN gem install --no-document bundler && \
        echo "gem 'stringio', '3.1.1'" >> Gemfile) && \
     (grep -Eq "^\s*gem ['\"]parallel['\"]" Gemfile || echo "gem 'parallel'" >> Gemfile) && \
     NOKOGIRI_USE_SYSTEM_LIBRARIES=1 bundle install --jobs 4 --retry 3 && \
-    bundle update --conservative rack rexml webrick json addressable net-imap zlib && \
+    # Security patch updates for vulnerable gems in MSF's vendored bundle.
+    # --conservative keeps all other gems at their current versions to avoid
+    # breaking MSF compatibility while still pulling in security fixes.
+    #   rack        CVE-2025-61919, CVE-2026-22860, CVE-2026-34230, CVE-2026-34785, CVE-2026-34829
+    #   rexml       CVE-2024-43398
+    #   webrick     CVE-2024-47220
+    #   json        CVE-2026-33210 (CVSS 8.3)
+    #   addressable CVE-2026-35611
+    #   net-imap    CVE-2026-42246 (CVSS 7.6)
+    #   uri         CVE-2023-28755
+    #   time        CVE-2023-28756
+    #   erb         CVE-2026-41316 (CRITICAL — deserialization guard bypass → RCE)
+    #   cgi         CVE-2025-27219, CVE-2025-27220
+    bundle update --conservative \
+      rack rexml webrick json addressable net-imap zlib \
+      uri time erb cgi && \
     bundle clean --force && \
     rm -rf ~/.gem ~/.bundle /root/.bundle vendor/bundle/ruby/*/cache tmp/cache && \
     find / -name "stringio-3.0.4.gemspec" -delete 2>/dev/null || true
