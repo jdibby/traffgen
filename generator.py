@@ -1945,10 +1945,9 @@ def s3_sim() -> None:
                 headers={"User-Agent": ua},
                 allow_redirects=True,
             )
-            console.log(
-                f"s3-get ({i}/{n_dl}) {url}  [{_status_style(resp.status_code)}]HTTP {resp.status_code}[/]"
-            )
-            _stats.record(str(resp.status_code))
+            sc = str(resp.status_code)
+            console.log(f"s3-get ({i}/{n_dl}) {url}  [{_status_style(sc)}]HTTP {sc}[/]")
+            _stats.record(sc)
         except requests.exceptions.ConnectionError as e:
             console.log(f"[yellow]s3-get ({i}/{n_dl}) {url}  {e.__class__.__name__}[/]")
             if "Connection refused" in str(e) or "ECONNREFUSED" in str(e) or "Reset" in str(e):
@@ -1976,10 +1975,9 @@ def s3_sim() -> None:
                     "Content-Length": str(len(payload)),
                 },
             )
-            console.log(
-                f"s3-put ({i}/{n_ul}) {url}  [{_status_style(resp.status_code)}]HTTP {resp.status_code}[/]"
-            )
-            _stats.record(str(resp.status_code))
+            sc = str(resp.status_code)
+            console.log(f"s3-put ({i}/{n_ul}) {url}  [{_status_style(sc)}]HTTP {sc}[/]")
+            _stats.record(sc)
         except requests.exceptions.ConnectionError as e:
             console.log(f"[yellow]s3-put ({i}/{n_ul}) {url}  {e.__class__.__name__}[/]")
             if "Connection refused" in str(e) or "ECONNREFUSED" in str(e) or "Reset" in str(e):
