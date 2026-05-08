@@ -842,7 +842,7 @@ body{display:flex;background:var(--bg);color:var(--text);font-family:-apple-syst
 /* Max-width cap on other panel content (About, Tests, etc.) */
 .panel>*:not(#ov-grid):not(#sec-grid):not(#health-grid){max-width:1400px;width:100%;box-sizing:border-box;align-self:center}
 /* Stat cards: fully fluid, min 130px per card */
-.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px}
 .card{background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:2px;transition:border-color .15s,box-shadow .15s;box-shadow:0 1px 4px rgba(0,0,0,.25)}
 .card:hover{border-color:var(--border2);box-shadow:0 2px 8px rgba(0,0,0,.35)}
 .card.hi{border-color:rgba(34,197,94,.3);background:var(--gdim)}
@@ -1102,7 +1102,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
     <!-- Overview -->
     <div id="tab-overview" class="panel active">
       <div id="ov-grid" style="display:flex;flex-direction:column;gap:14px">
-      <div class="cards" data-widget="stat-cards" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr));cursor:default">
+      <div class="cards" data-widget="stat-cards" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));cursor:default">
         <div class="card"><div class="clbl">CPU</div><div class="cval c-green" id="ov-cpu">&#8212;</div></div>
         <div class="card"><div class="clbl">Memory</div><div class="cval c-blue" id="ov-mem">&#8212;</div></div>
         <div class="card"><div class="clbl">Load Average</div><div class="cval c-amber" id="ov-load" style="font-size:16px;white-space:normal;word-break:break-all">&#8212;</div><div class="csub">1m &middot; 5m &middot; 15m</div></div>
@@ -1570,7 +1570,7 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
     <div style="font-size:12px;color:var(--muted)">Current configuration:</div>
     <div class="cur-cfg" id="cur-cfg">&#8212;</div>
     <div class="field"><label>Suite</label><select id="cfg-suite" onchange="onSuiteChange(this.value)"><option value="all">all &#8212; run everything</option></select></div>
-    <div id="lateral-nets-section">
+    <div id="lateral-nets-section" style="display:none">
       <div class="modal-sep" style="margin:4px 0 8px">Lateral Movement Networks</div>
       <div class="field" style="flex-direction:column;align-items:flex-start;gap:5px">
         <div style="font-size:12px;color:var(--muted)">Select which networks to scan (leave all checked to scan every detected network).</div>
@@ -2019,11 +2019,18 @@ function _loadDrawerNetworks(){
     _buildNetCheckboxes('lateral-nets-list','lateral-nets-none',_lateralNetsAvailable,selected);
   }).catch(()=>{});
 }
-// onSuiteChange kept for compatibility — drawer now always shows the network section
-function onSuiteChange(_val){}
+function onSuiteChange(val){
+  const sec=$('lateral-nets-section');
+  if(val==='lateral-movement'){
+    sec.style.display='';
+    _loadDrawerNetworks();
+  }else{
+    sec.style.display='none';
+  }
+}
 function openDrawer(){
   $('drawer').classList.add('open');$('overlay').classList.add('open');
-  _loadDrawerNetworks();
+  onSuiteChange($('cfg-suite').value);
 }
 function closeDrawer(){$('drawer').classList.remove('open');$('overlay').classList.remove('open');}
 function toast(msg,ok){const t=$('toast');t.textContent=msg;t.className='toast '+(ok?'ok':'err');t.style.display='block';setTimeout(()=>t.style.display='none',3500);}
