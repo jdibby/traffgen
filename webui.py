@@ -1793,9 +1793,9 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div id="odr-out" style="margin-top:12px;display:none">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
             <span id="odr-status" style="font-size:12px;color:var(--muted)"></span>
-            <button onclick="$('odr-pre').innerHTML=''" style="background:none;border:none;color:var(--dim);font-size:12px;cursor:pointer">Clear</button>
+            <button onclick="$('odr-body').innerHTML=''" style="background:none;border:none;color:var(--dim);font-size:12px;cursor:pointer">Clear</button>
           </div>
-          <pre id="odr-pre" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 14px;font-family:'SF Mono',Consolas,monospace;font-size:12px;line-height:1.6;color:var(--text);max-height:320px;overflow-y:auto;white-space:pre-wrap;word-break:break-all"></pre>
+          <div id="odr-body" class="obody" style="max-height:420px;border:1px solid var(--border);border-radius:6px;flex:none;overflow-y:auto"></div>
         </div>
       </div>
     </div>
@@ -3369,23 +3369,43 @@ function runDnsLookup(){
 }
 // ── On-demand runner (#216) ───────────────────────────────────────────────
 let _odrSrc=null;
+function _odrAppendLine(body,raw){
+  if(!raw.trim())return;
+  const div=document.createElement('div');
+  const ts=Tc(Date.now()/1000);
+  // Separator lines
+  if(/^[━─—\-=]{4,}/.test(raw.trim())){
+    const txt=raw.replace(/^[━─—\-= ]+/,'').replace(/[━─—\-= ]+$/,'').trim();
+    div.className='ll ll-sep rule';
+    div.innerHTML='<div class="sep-line"></div>'+(txt?'<div class="sep-txt">'+H(txt)+'</div><div class="sep-line"></div>':'');
+    body.appendChild(div);body.scrollTop=body.scrollHeight;return;
+  }
+  // Detect level
+  let lvl='info';
+  if(/\[ok\]|✔|\bokay\b|\bpass(ed)?\b|\bsuccess\b/i.test(raw))lvl='ok';
+  else if(/\[error\]|✗|\bfail(ed)?\b|\berror\b|\bexception\b/i.test(raw))lvl='error';
+  else if(/\[warn\]|⚠|\bwarn(ing)?\b/i.test(raw))lvl='warn';
+  const icon=lvl==='ok'?'✔ ':lvl==='error'?'✗ ':lvl==='warn'?'⚠ ':'';
+  div.className='ll '+lvl;
+  div.innerHTML='<span class="llt">'+ts+'</span><span class="llv">'+H(lvl.toUpperCase().slice(0,5).padEnd(5))+'</span><span class="llm">'+(icon?'<span style="opacity:.7">'+icon+'</span>':'')+H(_fmtMsgUA(raw))+'</span>';
+  body.appendChild(div);body.scrollTop=body.scrollHeight;
+}
 function runOnDemand(){
   const suite=($('odr-suite')?$('odr-suite').value:'dns').trim();
   const size=$('odr-size')?$('odr-size').value:'S';
   stopOnDemand();
-  const out=$('odr-out'),pre=$('odr-pre'),st=$('odr-status');
+  const out=$('odr-out'),body=$('odr-body'),st=$('odr-status');
   if(out)out.style.display='';
-  if(pre)pre.innerHTML='';
+  if(body)body.innerHTML='';
   if(st)st.textContent='Running '+suite+' ('+size+')…';
   if($('odr-btn'))$('odr-btn').disabled=true;
   if($('odr-stop'))$('odr-stop').style.display='';
   _odrSrc=new EventSource('/api/run-test?suite='+encodeURIComponent(suite)+'&size='+encodeURIComponent(size));
   _odrSrc.onmessage=function(e){
     const d=JSON.parse(e.data);
-    if(d.line!==undefined){
-      if(pre){pre.textContent+=(pre.textContent?'\\n':'')+d.line;pre.scrollTop=pre.scrollHeight;}
-    }else if(d.done||d.error){
-      if(d.error&&pre){pre.textContent+='\\n[error] '+d.error;}
+    if(d.line!==undefined){if(body)_odrAppendLine(body,d.line);}
+    else if(d.done||d.error){
+      if(d.error&&body)_odrAppendLine(body,'[error] '+d.error);
       if(st)st.textContent=d.done?'Finished (exit '+d.rc+')':'Error';
       stopOnDemand();
     }
