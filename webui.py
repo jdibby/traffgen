@@ -102,50 +102,22 @@ def _sample_health() -> None:
             now  = time.time()
             data: dict = {}
 
-            # CPU (aggregate + per-core)
+            # CPU
             try:
                 with open("/proc/stat") as f:
-                    stat_lines = [l for l in f if l.startswith("cpu")]
-                def _parse_cpu(raw):
-                    p = raw.split()
-                    tot = sum(int(x) for x in p[1:8])
-                    idle = int(p[4]) + int(p[5])
-                    user = int(p[1]) + int(p[2])
-                    sys_ = int(p[3]) + int(p[6])
-                    return tot, idle, user, sys_
-                agg = _parse_cpu(stat_lines[0])
-                cores = [_parse_cpu(l) for l in stat_lines[1:] if l.split()[0] != "cpu"]
-                cur_c = [agg] + cores
-                if prev_cpu and len(prev_cpu) == len(cur_c):
-                    def _pct(cur, prev):
-                        dt = cur[0] - prev[0]
-                        if dt <= 0:
-                            return 0.0, 0.0, 0.0
-                        di = cur[1] - prev[1]
-                        du = cur[2] - prev[2]
-                        ds = cur[3] - prev[3]
-                        return round((1-di/dt)*100,1), round(du/dt*100,1), round(ds/dt*100,1)
-                    tot_pct, usr_pct, sys_pct = _pct(cur_c[0], prev_cpu[0])
-                    data["cpu_pct"] = tot_pct
-                    data["cpu_user_pct"] = usr_pct
-                    data["cpu_sys_pct"] = sys_pct
-                    data["cpu_cores"] = [
-                        {"idx": i, "total": _pct(cur_c[i+1], prev_cpu[i+1])[0],
-                         "user": _pct(cur_c[i+1], prev_cpu[i+1])[1],
-                         "sys": _pct(cur_c[i+1], prev_cpu[i+1])[2]}
-                        for i in range(len(cores))
-                    ]
+                    raw = f.readline().split()
+                total = sum(int(x) for x in raw[1:8])
+                idle  = int(raw[4]) + int(raw[5])   # idle + iowait
+                cur_c = (total, idle)
+                if prev_cpu:
+                    dt = cur_c[0] - prev_cpu[0]
+                    di = cur_c[1] - prev_cpu[1]
+                    data["cpu_pct"] = round((1 - di / dt) * 100, 1) if dt > 0 else 0.0
                 else:
                     data["cpu_pct"] = 0.0
-                    data["cpu_user_pct"] = 0.0
-                    data["cpu_sys_pct"] = 0.0
-                    data["cpu_cores"] = []
                 prev_cpu = cur_c
             except Exception:
                 data["cpu_pct"] = 0.0
-                data["cpu_user_pct"] = 0.0
-                data["cpu_sys_pct"] = 0.0
-                data["cpu_cores"] = []
 
             # Memory
             total_kb = 0
@@ -159,14 +131,9 @@ def _sample_health() -> None:
                 total_kb = mem_kb.get("MemTotal", 0)
                 avail_kb = mem_kb.get("MemAvailable", mem_kb.get("MemFree", 0))
                 used_kb  = total_kb - avail_kb
-                data["mem_total_mb"]   = round(total_kb / 1024, 1)
-                data["mem_used_mb"]    = round(used_kb  / 1024, 1)
-                data["mem_pct"]        = round(used_kb / total_kb * 100, 1) if total_kb > 0 else 0.0
-                buf_kb    = mem_kb.get("Buffers", 0)
-                cached_kb = mem_kb.get("Cached", 0) + mem_kb.get("SReclaimable", 0) - mem_kb.get("Shmem", 0)
-                data["mem_buffers_mb"] = round(max(0, buf_kb) / 1024, 1)
-                data["mem_cached_mb"]  = round(max(0, cached_kb) / 1024, 1)
-                data["mem_free_mb"]    = round(avail_kb / 1024, 1)
+                data["mem_total_mb"] = round(total_kb / 1024, 1)
+                data["mem_used_mb"]  = round(used_kb  / 1024, 1)
+                data["mem_pct"]      = round(used_kb / total_kb * 100, 1) if total_kb > 0 else 0.0
                 swap_total = mem_kb.get("SwapTotal", 0)
                 swap_free  = mem_kb.get("SwapFree",  0)
                 swap_used  = swap_total - swap_free
@@ -190,17 +157,6 @@ def _sample_health() -> None:
                 data["fd_count"] = len(os.listdir("/proc/self/fd"))
             except Exception:
                 data["fd_count"] = 0
-            try:
-                with open("/proc/self/limits") as f:
-                    for ln in f:
-                        if "Max open files" in ln:
-                            parts = ln.split()
-                            data["fd_limit"] = int(parts[3]) if parts[3].isdigit() else 0
-                            break
-                    else:
-                        data["fd_limit"] = 0
-            except Exception:
-                data["fd_limit"] = 0
 
             # System uptime
             try:
@@ -831,82 +787,6 @@ def api_traceroute():
     )
 
 
-@app.route("/api/tls-check")
-def api_tls_check():
-    host = request.args.get("host", "").strip()
-    if not _TARGET_RE.match(host):
-        return jsonify({"error": "Invalid host"}), 400
-    raw_port = request.args.get("port", "443")
-    if not raw_port.isdigit() or not (1 <= int(raw_port) <= 65535):
-        return jsonify({"error": "Invalid port"}), 400
-    port = int(raw_port)
-    try:
-        ctx = ssl.create_default_context()
-        ctx.minimum_version = ssl.TLSVersion.TLSv1_2
-        with _socket.create_connection((host, port), timeout=8) as sock:
-            with ctx.wrap_socket(sock, server_hostname=host) as ssock:
-                cert = ssock.getpeercert()
-                cipher = ssock.cipher()
-                version = ssock.version()
-        subject  = dict(x[0] for x in cert.get("subject", []))
-        issuer   = dict(x[0] for x in cert.get("issuer", []))
-        sans     = [v for t, v in cert.get("subjectAltName", []) if t == "DNS"]
-        not_before = cert.get("notBefore", "")
-        not_after  = cert.get("notAfter", "")
-        return jsonify({
-            "host": host, "port": port,
-            "tls_version": version,
-            "cipher": cipher[0] if cipher else "",
-            "cn": subject.get("commonName", ""),
-            "issuer_cn": issuer.get("commonName", ""),
-            "issuer_org": issuer.get("organizationName", ""),
-            "not_before": not_before, "not_after": not_after,
-            "sans": sans[:20],
-        })
-    except ssl.SSLCertVerificationError as e:
-        return jsonify({"error": f"Certificate verification failed: {e.reason}"}), 200
-    except (ConnectionRefusedError, TimeoutError, OSError):
-        return jsonify({"error": "Connection failed — check host and port"}), 200
-    except Exception as e:
-        return jsonify({"error": f"TLS error ({type(e).__name__})"}), 200
-
-
-@app.route("/api/dns-lookup")
-def api_dns_lookup():
-    host = request.args.get("host", "").strip()
-    if not _TARGET_RE.match(host):
-        return jsonify({"error": "Invalid host"}), 400
-    resolvers_raw = request.args.get("resolvers", "8.8.8.8,1.1.1.1,9.9.9.9")
-    # Validate each resolver IP
-    _ip_re = __import__('re').compile(r'^(\d{1,3}\.){3}\d{1,3}$')
-    resolvers = [r.strip() for r in resolvers_raw.split(",") if _ip_re.match(r.strip())][:5]
-    if not resolvers:
-        resolvers = ["8.8.8.8", "1.1.1.1"]
-    results = []
-    for resolver in resolvers:
-        try:
-            proc = subprocess.run(
-                ["dig", "+short", "+time=3", f"@{resolver}", host, "A"],
-                capture_output=True, text=True, timeout=5,
-            )
-            addrs = [l.strip() for l in proc.stdout.splitlines() if l.strip()]
-            results.append({"resolver": resolver, "answers": addrs, "error": None})
-        except FileNotFoundError:
-            # Fall back to Python socket if dig unavailable
-            try:
-                infos = _socket.getaddrinfo(host, None, _socket.AF_INET)
-                addrs = list({i[4][0] for i in infos})
-                results.append({"resolver": "system", "answers": addrs, "error": None})
-            except Exception as e2:
-                results.append({"resolver": resolver, "answers": [],
-                                 "error": f"Lookup failed ({type(e2).__name__})"})
-            break
-        except Exception as e:
-            results.append({"resolver": resolver, "answers": [],
-                             "error": f"Query failed ({type(e).__name__})"})
-    return jsonify({"host": host, "results": results})
-
-
 @app.route("/events")
 def sse_state():
     def _gen():
@@ -1303,7 +1183,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
   </div>
   <div class="nav-lbl">Monitor</div>
   <button class="nav-item active" data-tab="overview" onclick="showTab(this)"><span class="nav-ico">◈</span>Overview</button>
-  <button class="nav-item" data-tab="security" onclick="showTab(this)"><span class="nav-ico">&#128737;</span>Security<span id="alert-badge" style="display:none;margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:700;border-radius:10px;padding:1px 6px;letter-spacing:0;text-transform:none;line-height:16px">0</span></button>
+  <button class="nav-item" data-tab="security" onclick="showTab(this)"><span class="nav-ico">&#128737;</span>Security</button>
   <button class="nav-item" id="nav-tests" data-tab="tests" onclick="toggleTestsNav(this)"><span class="nav-ico">⚗</span><span style="flex:1">Tests</span><span class="nav-arr" id="tests-arr" onclick="collapseTestsSub(event)" title="Collapse/expand">&#9656;</span></button>
   <div class="nav-sub" id="tests-sub">
     <button class="nav-sub-item active" onclick="setTestsCat(this,'all')">All Tests</button>
@@ -1371,15 +1251,6 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div class="card"><div class="clbl">Iteration</div><div class="cval c-amber" id="v-iter">&#8212;</div><div class="csub" id="s-iter">&#8212;</div></div>
         <div class="card"><div class="clbl">Probes / min</div><div class="cval c-blue" id="v-ppm">&#8212;</div><div class="csub" id="s-ppm">accumulating&hellip;</div></div>
       </div>
-      <div id="run-progress-wrap" data-widget="run-progress" style="display:none;background:#151b27;border-radius:12px;padding:12px 16px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <span style="font-size:13px;color:var(--muted)" id="prog-label">Suite 0 of 0</span>
-          <span style="font-size:13px;font-weight:600;color:var(--green);font-family:'SF Mono',Consolas,monospace" id="prog-eta"></span>
-        </div>
-        <div style="background:#1e2d3d;border-radius:4px;height:6px;overflow:hidden">
-          <div id="prog-bar" style="height:100%;background:var(--green);width:0%;transition:width .6s ease;border-radius:4px"></div>
-        </div>
-      </div>
       <div class="cc" data-widget="net-io" style="display:flex;flex-direction:column;gap:10px">
         <div class="ctitle">Network I/O <span id="net-iface" style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim);font-size:12px"></span>
           <select class="net-interval" onchange="setNetInterval(+this.value)" title="Refresh interval">
@@ -1419,22 +1290,6 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div class="ehdr">Live Events <span id="ev-cnt" style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none"></span></div>
         <div class="ebody" id="ev-body"><div class="empty">Waiting&#8230;</div></div>
       </div>
-      <div class="tcard" data-widget="top-failing">
-        <div class="thdr">Top Failing Suites</div>
-        <div id="top-fail-body"><div class="empty">Waiting for data&#8230;</div></div>
-      </div>
-      <div class="tcard" data-widget="cat-sparklines">
-        <div class="thdr">Category Success Rate Trends</div>
-        <div id="cat-spark-body" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;padding:4px 0"><div class="empty">Waiting for data&#8230;</div></div>
-      </div>
-      <div class="tcard" data-widget="lat-heatmap">
-        <div class="thdr">Latency Heatmap <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px">avg duration over time &middot; green&lt;500ms amber&lt;2s red≥2s</span></div>
-        <div id="lat-heatmap-body" style="overflow-x:auto"><div class="empty">Waiting for data&#8230;</div></div>
-      </div>
-      <div class="tcard" data-widget="slowest-suites">
-        <div class="thdr">Slowest Suites <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px">by avg duration</span></div>
-        <div id="slowest-body"><div class="empty">Waiting for data&#8230;</div></div>
-      </div>
       </div><!-- /#ov-grid -->
     </div>
     <!-- Security Summary -->
@@ -1470,17 +1325,13 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         </div>
       </div>
       <div class="tcard" data-widget="sec-breakdown">
-        <div class="thdr" style="display:flex;align-items:center;justify-content:space-between">Per-Suite Security Breakdown <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px">sorted by blocked</span><span style="display:flex;gap:6px"><button class="ico-btn" style="font-size:12px;padding:3px 10px" onclick="exportSec('csv')" title="Export CSV">CSV</button><button class="ico-btn" style="font-size:12px;padding:3px 10px" onclick="exportSec('json')" title="Export JSON">JSON</button></span></div>
+        <div class="thdr">Per-Suite Security Breakdown <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px">sorted by blocked</span></div>
         <table><thead><tr><th>Suite</th><th class="r">Probes</th><th class="r" style="color:#22c55e">Allowed</th><th class="r" style="color:var(--amber)">Blocked</th><th class="r" style="color:#818cf8">Dropped</th><th class="r">Block%</th><th class="r">Drop%</th></tr></thead>
         <tbody id="sec-tbl"><tr><td colspan="7" class="empty">Waiting for data&#8230;</td></tr></tbody></table>
       </div>
       <div class="tcard" data-widget="sec-signals">
         <div class="thdr">Block Signal Breakdown <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px">how security controls are signalling blocks</span></div>
         <div id="sec-signals" class="sec-signals"><div class="empty">Waiting for data&#8230;</div></div>
-      </div>
-      <div class="tcard" data-widget="alert-log">
-        <div class="thdr" style="display:flex;align-items:center;justify-content:space-between">Active Alerts <span id="alert-log-clear" onclick="clearAlertLog()" style="font-size:12px;font-weight:400;letter-spacing:0;text-transform:none;cursor:pointer;color:var(--dim)">Clear all</span></div>
-        <div id="alert-log-body"><div class="empty">No active alerts</div></div>
       </div>
       </div><!-- /#sec-grid -->
     </div>
@@ -1509,27 +1360,6 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div style="flex:1;height:1px;background:rgba(245,158,11,.3)"></div>
       </div>
       <div class="obody" id="obody"></div>
-    </div>
-    <!-- Latency -->
-    <div id="tab-latency" class="panel">
-      <div style="max-width:1400px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:14px">
-      <div class="cards" data-widget="latency-kpis" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));cursor:default">
-        <div class="card"><div class="clbl">Fastest Suite</div><div class="cval c-green" id="lat-fastest" style="font-size:18px">&#8212;</div><div class="csub" id="lat-fastest-name" style="max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">&#8212;</div></div>
-        <div class="card"><div class="clbl">Slowest Suite</div><div class="cval" id="lat-slowest" style="font-size:18px">&#8212;</div><div class="csub" id="lat-slowest-name" style="max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">&#8212;</div></div>
-        <div class="card"><div class="clbl">Median Duration</div><div class="cval c-blue" id="lat-median" style="font-size:18px">&#8212;</div><div class="csub">across suites</div></div>
-        <div class="card"><div class="clbl">Suites with Data</div><div class="cval c-amber" id="lat-count">&#8212;</div><div class="csub">have ran</div></div>
-      </div>
-      <div class="tcard">
-        <div class="thdr" style="display:flex;align-items:center;justify-content:space-between">Suite Latency Table <span style="font-size:12px;font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim)">avg duration &middot; click header to sort</span></div>
-        <table><thead><tr>
-          <th onclick="sortLatTbl('name')" style="cursor:pointer">Suite</th>
-          <th class="r" onclick="sortLatTbl('avg')" style="cursor:pointer">Avg Duration</th>
-          <th class="r" onclick="sortLatTbl('att')" style="cursor:pointer">Attempts</th>
-          <th class="r" onclick="sortLatTbl('last')" style="cursor:pointer">Last Run</th>
-        </tr></thead>
-        <tbody id="lat-tbl"><tr><td colspan="4" class="empty">Waiting for data&#8230;</td></tr></tbody></table>
-      </div>
-      </div>
     </div>
     <!-- Health -->
     <div id="tab-health" class="panel">
@@ -1569,7 +1399,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
           <div class="ctitle">Process Internals</div>
           <div style="display:flex;gap:20px;margin-top:6px;font-family:'SF Mono',Consolas,monospace;font-size:14px">
             <span><span style="color:var(--muted)">Threads: </span><span id="h-threads" style="color:var(--text)">&#8212;</span></span>
-            <span><span style="color:var(--muted)">Open FDs: </span><span id="h-fds" style="color:var(--text)">&#8212;</span><span id="h-fds-limit" style="color:var(--dim);font-size:11px"></span></span>
+            <span><span style="color:var(--muted)">Open FDs: </span><span id="h-fds" style="color:var(--text)">&#8212;</span></span>
           </div>
         </div>
       </div>
@@ -1582,15 +1412,9 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
           <div class="gauge-wrap">
             <canvas id="mem-gauge" width="200" height="130"></canvas>
             <div id="mem-detail" style="font-size:13px;color:var(--muted);margin-top:4px">&#8212; MB / &#8212; MB used</div>
-            <div id="mem-stacked-bar" style="display:flex;height:8px;border-radius:4px;overflow:hidden;margin-top:8px;background:#1e2d3d"></div>
-            <div id="mem-stacked-legend" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;font-size:11px;color:var(--muted)"></div>
           </div>
           <canvas id="mem-spark" style="width:100%;height:44px;margin-top:8px"></canvas>
         </div>
-      </div>
-      <div class="tcard" data-widget="h-cpu-cores">
-        <div class="thdr">Per-Core CPU Usage</div>
-        <div id="cpu-cores-body" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;padding:4px 0"><div class="empty">Loading&#8230;</div></div>
       </div>
       <div class="h-row" data-widget="h-load-row">
         <div class="cc">
@@ -1641,39 +1465,6 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
           <button id="tr-stop" class="diag-btn cancel" onclick="stopTrace()" style="display:none">Stop</button>
         </div>
         <div id="tr-results"><div class="tr-status">Enter a hostname or IP address and click Trace.</div></div>
-      </div>
-      <div class="diag-tool">
-        <div class="diag-tool-hdr">&#128274; TLS / Certificate Inspector</div>
-        <div class="diag-input-row">
-          <input id="tls-host" class="diag-input" type="text" placeholder="hostname (e.g. example.com)" spellcheck="false" autocomplete="off" onkeydown="if(event.key==='Enter')runTlsCheck()">
-          <input id="tls-port" class="diag-input" type="text" value="443" style="flex:0 0 64px" title="Port">
-          <button id="tls-btn" class="diag-btn" onclick="runTlsCheck()">Check</button>
-        </div>
-        <div id="tls-results"><div class="tr-status">Enter a hostname and click Check.</div></div>
-      </div>
-      <div class="diag-tool">
-        <div class="diag-tool-hdr">&#128270; DNS Lookup (multi-resolver)</div>
-        <div class="diag-input-row">
-          <input id="dns-host" class="diag-input" type="text" placeholder="hostname (e.g. example.com)" spellcheck="false" autocomplete="off" onkeydown="if(event.key==='Enter')runDnsLookup()">
-          <input id="dns-resolvers" class="diag-input" type="text" value="8.8.8.8,1.1.1.1,9.9.9.9" style="flex:0 0 220px" title="Comma-separated resolver IPs">
-          <button id="dns-btn" class="diag-btn" onclick="runDnsLookup()">Lookup</button>
-        </div>
-        <div id="dns-results"><div class="tr-status">Enter a hostname and click Lookup.</div></div>
-      </div>
-      <div class="diag-tool">
-        <div class="diag-tool-hdr">&#9654; On-Demand Suite Runner</div>
-        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Restart generator running a single suite at chosen size. Current run will be interrupted.</div>
-        <div class="diag-input-row">
-          <select id="odr-suite" class="diag-input" style="flex:1">
-            <option value="">— select a suite —</option>
-          </select>
-          <select id="odr-size" class="diag-input" style="flex:0 0 auto;width:auto">
-            <option value="XS">XS</option><option value="S" selected>S</option>
-            <option value="M">M</option><option value="L">L</option><option value="XL">XL</option>
-          </select>
-          <button id="odr-btn" class="diag-btn" onclick="runOnDemand()">Run Now</button>
-        </div>
-        <div id="odr-result"></div>
       </div>
     </div>
     <!-- About -->
@@ -1756,13 +1547,6 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
           Use <strong style="color:var(--text)">&#9208; Pause</strong> to temporarily halt traffic and <strong style="color:var(--text)">&#9209; Stop</strong> to halt all tests.
           Click the <strong style="color:var(--green)">&#9679; LIVE</strong> indicator in the top-right as a shortcut to stop all tests.
         </div>
-      </div>
-      <div class="a-section" id="run-history-section">
-        <div class="a-h" style="display:flex;align-items:center;justify-content:space-between">
-          Run History
-          <button class="ico-btn" style="font-size:12px;padding:3px 10px" onclick="clearRunHistory()">Clear</button>
-        </div>
-        <div id="run-history-body"><div class="empty" style="padding:12px 0">No completed runs recorded yet.</div></div>
       </div>
     </div>
 
@@ -1989,10 +1773,6 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
     </div>
     <div class="field"><div class="togrow"><span class="toglbl">Loop Mode</span><label class="tog"><input type="checkbox" id="cfg-loop" checked><span class="tslider"></span></label></div></div>
     <div class="field"><div class="togrow"><span class="toglbl">No Wait (skip pauses)</span><label class="tog"><input type="checkbox" id="cfg-nowait"><span class="tslider"></span></label></div></div>
-    <div class="modal-sep" style="margin:12px 0 8px">Alert Thresholds</div>
-    <div class="field"><label style="font-size:12px">Block Rate %</label><div class="rngw"><input type="range" id="thr-block" min="0" max="100" step="5" value="20" oninput="$('thr-block-val').textContent=this.value+'%';saveThresholds()"><span class="rngv" id="thr-block-val">20%</span></div></div>
-    <div class="field"><label style="font-size:12px">Drop Rate %</label><div class="rngw"><input type="range" id="thr-drop" min="0" max="100" step="5" value="30" oninput="$('thr-drop-val').textContent=this.value+'%';saveThresholds()"><span class="rngv" id="thr-drop-val">30%</span></div></div>
-    <div class="field"><label style="font-size:12px">Suite Fail %</label><div class="rngw"><input type="range" id="thr-fail" min="0" max="100" step="5" value="50" oninput="$('thr-fail-val').textContent=this.value+'%';saveThresholds()"><span class="rngv" id="thr-fail-val">50%</span></div></div>
     <button class="btn-p" id="drawer-apply" onclick="applySettings()">Apply &amp; Restart</button>
     <p class="fnote">New settings apply at the next test boundary without restarting the container.</p>
   </div>
@@ -2127,7 +1907,7 @@ let _healthTimer=null,_netInfoTimer=null,_lastHealth=null,_netHist=[],_hNetHist=
 let _cpuHist=[],_memHist=[];
 function uptime(t){const s=Math.floor(Date.now()/1000-t);return[Math.floor(s/3600),Math.floor((s%3600)/60),s%60].map(v=>String(v).padStart(2,'0')).join(':');}
 function elapsed(t){if(!t)return'';const s=Math.floor(Date.now()/1000-t);if(s<60)return s+'s elapsed';if(s<3600)return Math.floor(s/60)+'m '+(s%60)+'s elapsed';return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m elapsed';}
-const PAGE_TITLES={overview:'Overview',security:'Security',tests:'Tests',output:'Live View',diagnostics:'Diagnostics',latency:'Latency',health:'Health',about:'About',changelog:'Changelog'};
+const PAGE_TITLES={overview:'Overview',security:'Security',tests:'Tests',output:'Live View',diagnostics:'Diagnostics',health:'Health',about:'About',changelog:'Changelog'};
 const SUITE_ICONS={
   'ad-tracker':'🎯','ai-browse':'🤖','bgp':'🌐','bulk-transfer':'💾',
   'blocklist-probe':'🚫','c2-beacon':'📡','llm-dlp':'🧠','web-crawl':'🕷️','dlp':'🔒',
@@ -2284,8 +2064,6 @@ function setTestsCat(el,cat){
   if(_lastState)renderState(_lastState);
 }
 function showTab(btn){
-  // Trigger latency render immediately when switching to that tab
-  if(btn.dataset&&btn.dataset.tab==='latency'&&_lastState)setTimeout(()=>renderLatency(_lastState),0);
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   btn.classList.add('active');
@@ -2331,7 +2109,6 @@ const ST_CLS={running:'tp-running',between_tests:'tp-dim',paused:'tp-paused',sto
 const ST_LBL={running:'Running',between_tests:'Between Tests',paused:'Paused',stopped:'Stopped',starting:'Starting'};
 function apply(s){
   _lastState=s;
-  _trackRunHistory(s);
   if(s.suites&&s.suites.length&&!Object.keys(_SD).length){s.suites.forEach(su=>{_SD[su.name]=su.description||'';});}
   const ver=s.version||'—';
   $('s-ver').textContent=ver;$('about-ver').textContent=ver;
@@ -2363,31 +2140,7 @@ function apply(s){
   if(tsa&&cur){clearInterval(_elTimer);const upEl=()=>$('s-test').textContent=elapsed(tsa);upEl();_elTimer=setInterval(upEl,1000);}
   else{clearInterval(_elTimer);$('s-test').textContent=s.loop?'Loop mode':'Single-run';}
   $('v-iter').textContent=s.iteration?'#'+N(s.iteration):'—';$('s-iter').textContent='Suite: '+(s.suite||'—')+' \xb7 Size: '+(s.size||'—');
-  // Progress bar
-  (function(){
-    const wrap=$('run-progress-wrap');if(!wrap)return;
-    const active=st==='running'||st==='between_tests'||st==='paused';
-    if(!active){wrap.style.display='none';return;}
-    const suites=s.suites||[];
-    if(!suites.length){wrap.style.display='none';return;}
-    wrap.style.display='';
-    // Count suites that have run at least once
-    const tests=s.tests||{};
-    const done=suites.filter(su=>(tests[su.name]||{}).attempts>0).length;
-    const total=suites.length;
-    const pct=total?done/total*100:0;
-    $('prog-bar').style.width=pct.toFixed(1)+'%';
-    $('prog-label').textContent='Suite '+done+' of '+total+(s.current_test?' — '+H(s.current_test):'');
-    // ETA: sum avg_dur_ms of remaining suites
-    const remaining=suites.filter(su=>!(tests[su.name]||{}).attempts);
-    const etaMs=remaining.reduce((acc,su)=>acc+((tests[su.name]||{}).avg_dur_ms||30000),0);
-    const etaSec=Math.round(etaMs/1000);
-    const etaStr=etaSec>0?(etaSec>=3600?Math.floor(etaSec/3600)+'h '+(Math.floor((etaSec%3600)/60))+'m':etaSec>=60?Math.floor(etaSec/60)+'m '+(etaSec%60)+'s':etaSec+'s'):'';
-    $('prog-eta').textContent=etaStr?'~'+etaStr+' left':'';
-  })();
   drawDonut(ok,fail);$('leg-ok').textContent=N(ok)+' OK';$('leg-fail').textContent=N(fail)+' Fail';
-  _updateLatHeat(s);
-  if($('tab-latency')&&$('tab-latency').classList.contains('active'))renderLatency(s);
   const hist=s.history||[];drawSpark(hist);if(hist.length>1)$('hist-info').textContent=hist.length+' samples';
   if(hist.length>=2){const h0=hist[hist.length-2],h1=hist[hist.length-1],dt=h1.t-h0.t,dp=(h1.ok+h1.fail)-(h0.ok+h0.fail);if(dt>0){const ppm=Math.round(dp/dt*60);$('v-ppm').textContent=N(ppm);$('s-ppm').textContent='probes per minute';}}else{$('v-ppm').textContent='—';$('s-ppm').textContent='accumulating…';}
   const tests=s.tests||{},names=Object.keys(tests).sort(),tb=$('tbl-body');
@@ -2460,84 +2213,9 @@ function apply(s){
       `<div class="tcat-hdr"${i===0?'':''} >${_CI[c]||'📋'} ${H(c)}</div>`+cm[c].map(mkCard).join('')
     ).join('');
   }
-  // Top failing suites widget
-  (function(){
-    const tfb=$('top-fail-body');if(!tfb)return;
-    const ts=_lastState&&_lastState.tests||{};
-    const rows=Object.entries(ts).filter(([,t])=>(t.attempts||0)>0).map(([n,t])=>{
-      const ta=t.attempts||0,tf=t.fail||0,fp=ta?tf/ta*100:0;
-      return{n,ta,tf,fp};
-    }).filter(r=>r.tf>0).sort((a,b)=>b.fp-a.fp).slice(0,8);
-    if(!rows.length){tfb.innerHTML='<div class="empty" style="color:var(--green)">&#10003; No failures</div>';return;}
-    tfb.innerHTML='<table style="width:100%"><thead><tr><th>Suite</th><th class="r">Attempts</th><th class="r">Fails</th><th class="r">Fail%</th></tr></thead><tbody>'+
-      rows.map(r=>{
-        const c=r.fp>50?'var(--red)':r.fp>20?'var(--amber)':'var(--muted)';
-        return`<tr class="mrow" style="cursor:pointer" onclick="openModal('${H(r.n)}','')"><td><span class="s-ico">${suiteIco(r.n)}</span>${H(r.n)}</td><td class="r">${N(r.ta)}</td><td class="r" style="color:var(--red)">${N(r.tf)}</td><td class="r"><span style="color:${c};font-weight:600">${r.fp.toFixed(1)}%</span></td></tr>`;
-      }).join('')+'</tbody></table>';
-  })();
-  // Category success rate sparklines
-  (function(){
-    const cb=$('cat-spark-body');if(!cb)return;
-    const ts=_lastState&&_lastState.tests||{};
-    const now=Date.now()/1000;
-    // Aggregate by category
-    const catData={};
-    Object.entries(ts).forEach(([n,t])=>{
-      const cat=_SC[n]||'Other';
-      if(!catData[cat])catData[cat]={ok:0,fail:0,att:0};
-      catData[cat].ok+=(t.pass||0);
-      catData[cat].fail+=(t.fail||0);
-      catData[cat].att+=(t.attempts||0);
-    });
-    if(!Object.keys(catData).length){cb.innerHTML='<div class="empty">Waiting for data…</div>';return;}
-    Object.entries(catData).forEach(([cat,d])=>{
-      const rate=d.att?d.ok/d.att*100:0;
-      if(!_catHist[cat])_catHist[cat]=[];
-      _catHist[cat].push({t:now,rate});
-      if(_catHist[cat].length>30)_catHist[cat].shift();
-    });
-    const cats=Object.keys(catData).sort();
-    cb.innerHTML=cats.map(cat=>{
-      const hist=_catHist[cat]||[];
-      const d=catData[cat];
-      const rate=d.att?d.ok/d.att*100:0;
-      const rateC=rate>=90?'#22c55e':rate>=70?'var(--amber)':'var(--red)';
-      let svgHtml='';
-      if(hist.length>=2){
-        const vals=hist.map(h=>h.rate);
-        const mx=Math.max(...vals,100),mn=Math.min(...vals,0);
-        const w=120,h=28,pad=2;
-        const px=i=>pad+i*(w-2*pad)/(vals.length-1||1);
-        const py=v=>h-pad-(mx===mn?h/2:(v-mn)/(mx-mn)*(h-2*pad));
-        const last=vals[vals.length-1],first=vals[0];
-        const trendC=last>first+1?'#22c55e':last<first-1?'var(--red)':'var(--dim)';
-        svgHtml=`<svg width="${w}" height="${h}" style="flex-shrink:0"><polyline fill="none" stroke="${trendC}" stroke-width="1.5" points="${vals.map((v,i)=>px(i).toFixed(1)+','+py(v).toFixed(1)).join(' ')}" /></svg>`;
-      }
-      const shortCat=cat.replace(' & ',' &amp; ').split(' ').slice(0,2).join(' ');
-      return`<div style="display:flex;align-items:center;gap:8px;background:#151b27;border-radius:8px;padding:7px 10px">`+
-        `<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${shortCat}</div>`+
-        `<div style="font-size:16px;font-weight:700;color:${rateC};font-family:'SF Mono',Consolas,monospace">${rate.toFixed(1)}%</div></div>`+
-        svgHtml+`</div>`;
-    }).join('');
-  })();
-  // Slowest suites widget
-  (function(){
-    const sb=$('slowest-body');if(!sb)return;
-    const ts=_lastState&&_lastState.tests||{};
-    const rows=Object.entries(ts).filter(([,t])=>(t.avg_dur_ms||0)>0)
-      .map(([n,t])=>({n,avg:t.avg_dur_ms||0,att:t.attempts||0}))
-      .sort((a,b)=>b.avg-a.avg).slice(0,8);
-    if(!rows.length){sb.innerHTML='<div class="empty">No timing data yet</div>';return;}
-    sb.innerHTML='<table style="width:100%"><thead><tr><th>Suite</th><th class="r">Attempts</th><th class="r">Avg Duration</th></tr></thead><tbody>'+
-      rows.map(r=>{
-        const c=r.avg>2000?'var(--red)':r.avg>500?'var(--amber)':'var(--green)';
-        return`<tr class="mrow"><td><span class="s-ico">${suiteIco(r.n)}</span>${H(r.n)}</td><td class="r">${N(r.att)}</td><td class="r"><span style="color:${c};font-weight:600;font-family:'SF Mono',Consolas,monospace">${Dur(r.avg)}</span></td></tr>`;
-      }).join('')+'</tbody></table>';
-  })();
   if(!$('drawer').classList.contains('open')){
     const sel=$('cfg-suite');
     if(sel.options.length<=1&&suites.length){suites.forEach(su=>{const o=document.createElement('option');o.value=su.name;o.textContent=su.name+' — '+su.description;sel.appendChild(o);});}
-    _populateOdrSuites(suites);
     sel.value=s.suite||'all';$('cfg-size').value=s.size||'S';$('cfg-wait').value=s.max_wait_secs||20;$('wait-val').textContent=(s.max_wait_secs||20)+'s';$('cfg-loop').checked=!!s.loop;
   }
   $('cur-cfg').innerHTML=`<span class="cfg-chip">suite:${H(s.suite||'—')}</span><span class="cfg-chip">size:${H(s.size||'—')}</span><span class="cfg-chip">wait:${s.max_wait_secs||20}s</span><span class="cfg-chip">${s.loop?'loop':'single'}</span>`;
@@ -2851,36 +2529,6 @@ function applyHealth(d){
   if($('cpu-cur'))$('cpu-cur').textContent=cpuPct.toFixed(1)+'%';
   if($('mem-cur'))$('mem-cur').textContent=memPct.toFixed(1)+'%';
   if($('mem-detail'))$('mem-detail').textContent=(d.mem_used_mb||0).toFixed(0)+' MB / '+(d.mem_total_mb||0).toFixed(0)+' MB used';
-  // Stacked memory bar: used(red)|buffers(blue)|cached(amber)|free(dim)
-  (function(){
-    const bar=$('mem-stacked-bar'),leg=$('mem-stacked-legend');
-    if(!bar)return;
-    const tot=d.mem_total_mb||1;
-    const used=d.mem_used_mb||0,buf=d.mem_buffers_mb||0,cach=d.mem_cached_mb||0,free=d.mem_free_mb||0;
-    const segs=[['Used','var(--red)',used],['Buffers','#58a6ff',buf],['Cached','var(--amber)',cach],['Free','#374151',Math.max(0,tot-used-buf-cach)]];
-    bar.innerHTML=segs.map(([,col,v])=>`<div style="flex:${v/tot};background:${col};height:100%"></div>`).join('');
-    if(leg)leg.innerHTML=segs.map(([lbl,col,v])=>`<span style="display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:50%;background:${col};display:inline-block"></span>${lbl}: ${fmtMB(v)}</span>`).join('');
-  })();
-  // Per-core CPU bars
-  (function(){
-    const cb=$('cpu-cores-body');if(!cb)return;
-    const cores=d.cpu_cores||[];
-    if(!cores.length){cb.innerHTML='<div class="empty" style="font-size:12px">Single core or data pending</div>';return;}
-    cb.innerHTML=cores.map(c=>{
-      const col=gaugeHex(c.total);
-      return`<div style="background:#151b27;border-radius:8px;padding:8px 10px">`+
-        `<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--muted)">Core ${c.idx}</span><span style="color:${col};font-weight:600">${c.total.toFixed(1)}%</span></div>`+
-        `<div style="background:#1e2d3d;border-radius:3px;height:6px;overflow:hidden;display:flex">`+
-        `<div style="flex:${c.user};background:#22c55e"></div>`+
-        `<div style="flex:${c.sys};background:var(--amber)"></div>`+
-        `<div style="flex:${Math.max(0,100-c.user-c.sys)};background:transparent"></div>`+
-        `</div>`+
-        `<div style="display:flex;gap:8px;margin-top:3px;font-size:10px;color:var(--dim)">`+
-        `<span style="color:#22c55e">usr ${c.user.toFixed(0)}%</span>`+
-        `<span style="color:var(--amber)">sys ${c.sys.toFixed(0)}%</span>`+
-        `</div></div>`;
-    }).join('');
-  })();
   const la=d.load_avg||[0,0,0];
   if($('h-load'))$('h-load').textContent=la.map(v=>v.toFixed(2)).join('  \xb7  ');
   if($('ov-cpu'))$('ov-cpu').textContent=cpuPct.toFixed(1)+'%';
@@ -2905,14 +2553,7 @@ function applyHealth(d){
   // System uptime + process internals
   if($('sys-uptime'))$('sys-uptime').textContent=fmtUptime(d.uptime_secs||0);
   if($('h-threads'))$('h-threads').textContent=d.thread_count||'—';
-  if($('h-fds')){
-    const fdCount=d.fd_count||0,fdLimit=d.fd_limit||0;
-    const fdPct=fdLimit?fdCount/fdLimit*100:0;
-    const fdC=fdPct>90?'var(--red)':fdPct>70?'var(--amber)':'var(--text)';
-    $('h-fds').textContent=fdCount;
-    $('h-fds').style.color=fdC;
-    if($('h-fds-limit'))$('h-fds-limit').textContent=fdLimit?' / '+fdLimit+' ('+(fdPct.toFixed(0))+'%)':'';
-  }
+  if($('h-fds'))$('h-fds').textContent=d.fd_count||'—';
   const procs=d.processes||[];
   const tb=$('proc-body');
   if(tb)tb.innerHTML=!procs.length?'<tr><td colspan="5" class="empty">No data</td></tr>':
@@ -2962,8 +2603,6 @@ pollNetInfo();
 setInterval(pollNetInfo,30000);
 // ── Security Summary ──────────────────────────────────────────────────────────
 let _secTimer=null,_secInterval=1000,_secHist=[];
-const _suiteHist={};
-const _catHist={};  // category -> [{t, rate}]
 let _diskPeakHist=[];
 function drawSecDonut(allowed,blocked,dropped,other){
   const c=$('sec-donut');if(!c)return;
@@ -3017,35 +2656,16 @@ function updateSecurityTab(){
     if(_secHist.length>120)_secHist.shift();
   }
   drawSecTrend(_secHist);
-  if(typeof _checkAlerts==='function')_checkAlerts(s);
   // per-suite table — sort by blocked desc
   const rows=Object.entries(tests).map(([n,t])=>({n,ta:t.attempts||0,rch:t.allowed||0,blk:t.blocked||0,drp:t.dropped||0,tot:(t.allowed||0)+(t.blocked||0)+(t.dropped||0)}));
   rows.sort((a,b)=>b.blk-a.blk||(b.drp-a.drp));
-  // record per-suite block rate history
-  rows.forEach(r=>{
-    if(!_suiteHist[r.n])_suiteHist[r.n]=[];
-    const bp=r.tot?r.blk/r.tot*100:0;
-    _suiteHist[r.n].push(bp);
-    if(_suiteHist[r.n].length>20)_suiteHist[r.n].shift();
-  });
   const tb=$('sec-tbl');
-  if(!rows.length){tb.innerHTML='<tr><td colspan="8" class="empty">Waiting…</td></tr>';}
+  if(!rows.length){tb.innerHTML='<tr><td colspan="7" class="empty">Waiting…</td></tr>';}
   else tb.innerHTML=rows.map(r=>{
     const bp=r.tot?r.blk/r.tot*100:0,dp=r.tot?r.drp/r.tot*100:0;
     const bpC=bp>50?'var(--red)':bp>10?'var(--amber)':'var(--muted)';
     const dpC=dp>50?'var(--red)':dp>10?'#818cf8':'var(--muted)';
-    const hist=_suiteHist[r.n]||[];
-    let trendSvg='<span style="color:var(--dim);font-size:11px">—</span>';
-    if(hist.length>=3){
-      const pts=hist.slice(-10),mx=Math.max(...pts,1),mn=Math.min(...pts);
-      const last=pts[pts.length-1],first=pts[0];
-      const trendC=last>first+1?'var(--red)':last<first-1?'#22c55e':'var(--dim)';
-      const w=60,h=16,pad=1;
-      const px=(i)=>pad+i*(w-2*pad)/(pts.length-1||1);
-      const py=(v)=>h-pad-(mx===mn?h/2:(v-mn)/(mx-mn)*(h-2*pad));
-      trendSvg=`<svg width="60" height="16" style="vertical-align:middle" title="${hist.map(v=>v.toFixed(1)+'%').join(', ')}"><polyline fill="none" stroke="${trendC}" stroke-width="1.5" points="${pts.map((v,i)=>px(i).toFixed(1)+','+py(v).toFixed(1)).join(' ')}" /></svg>`;
-    }
-    return`<tr class="mrow"><td class="nm" title="${_SD[r.n]||''}" style="cursor:default"><span class="s-ico">${suiteIco(r.n)}</span>${H(r.n)}</td><td class="r">${N(r.tot)}</td><td class="r" style="color:#22c55e">${N(r.rch)}</td><td class="r" style="color:var(--amber)">${N(r.blk)}</td><td class="r" style="color:#818cf8">${N(r.drp)}</td><td class="r"><span style="color:${bpC}">${r.tot?bp.toFixed(1)+'%':'—'}</span></td><td class="r"><span style="color:${dpC}">${r.tot?dp.toFixed(1)+'%':'—'}</span></td><td class="r">${trendSvg}</td></tr>`;
+    return`<tr class="mrow"><td class="nm" title="${_SD[r.n]||''}" style="cursor:default"><span class="s-ico">${suiteIco(r.n)}</span>${H(r.n)}</td><td class="r">${N(r.tot)}</td><td class="r" style="color:#22c55e">${N(r.rch)}</td><td class="r" style="color:var(--amber)">${N(r.blk)}</td><td class="r" style="color:#818cf8">${N(r.drp)}</td><td class="r"><span style="color:${bpC}">${r.tot?bp.toFixed(1)+'%':'—'}</span></td><td class="r"><span style="color:${dpC}">${r.tot?dp.toFixed(1)+'%':'—'}</span></td></tr>`;
   }).join('');
   // block signal breakdown — aggregate codes across filtered tests
   const codeTotals={};
@@ -3130,351 +2750,6 @@ function stopTrace(){
 function trProtoChange(){
   const p=$('tr-proto').value;
   $('tr-port').style.display=p==='tcp'?'':' none';
-}
-// ── TLS Inspector ─────────────────────────────────────────────────────────
-function runTlsCheck(){
-  const host=($('tls-host').value||'').trim(),port=($('tls-port').value||'443').trim();
-  if(!host){$('tls-results').innerHTML='<div class="tr-status" style="color:var(--red)">Enter a hostname.</div>';return;}
-  $('tls-btn').disabled=true;
-  $('tls-results').innerHTML='<div class="tr-status">Connecting&#8230;</div>';
-  fetch('/api/tls-check?host='+encodeURIComponent(host)+'&port='+encodeURIComponent(port))
-    .then(r=>r.json()).then(d=>{
-      $('tls-btn').disabled=false;
-      if(d.error){$('tls-results').innerHTML=`<div class="tr-status" style="color:var(--red)">${H(d.error)}</div>`;return;}
-      const now=new Date(),exp=new Date(d.not_after);
-      const daysLeft=Math.round((exp-now)/86400000);
-      const expC=daysLeft<14?'var(--red)':daysLeft<30?'var(--amber)':'var(--green)';
-      $('tls-results').innerHTML=`
-        <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:8px">
-          <tr><td style="color:var(--muted);padding:4px 0;width:140px">TLS Version</td><td style="color:var(--green);font-weight:600">${H(d.tls_version)}</td></tr>
-          <tr><td style="color:var(--muted);padding:4px 0">Cipher</td><td style="font-family:'SF Mono',Consolas,monospace;font-size:12px">${H(d.cipher)}</td></tr>
-          <tr><td style="color:var(--muted);padding:4px 0">Common Name</td><td>${H(d.cn)}</td></tr>
-          <tr><td style="color:var(--muted);padding:4px 0">Issuer</td><td>${H(d.issuer_cn)}${d.issuer_org?' ('+H(d.issuer_org)+')':''}</td></tr>
-          <tr><td style="color:var(--muted);padding:4px 0">Valid From</td><td style="font-family:'SF Mono',Consolas,monospace;font-size:12px">${H(d.not_before)}</td></tr>
-          <tr><td style="color:var(--muted);padding:4px 0">Expires</td><td><span style="font-family:'SF Mono',Consolas,monospace;font-size:12px">${H(d.not_after)}</span> <span style="color:${expC};font-size:12px;font-weight:600">(${daysLeft}d)</span></td></tr>
-          ${d.sans.length?`<tr><td style="color:var(--muted);padding:4px 0;vertical-align:top">SANs</td><td style="font-family:'SF Mono',Consolas,monospace;font-size:11px;line-height:1.8">${d.sans.map(s=>H(s)).join('<br>')}</td></tr>`:''}
-        </table>`;
-    }).catch(e=>{$('tls-btn').disabled=false;$('tls-results').innerHTML=`<div class="tr-status" style="color:var(--red)">${H(e.message)}</div>`;});
-}
-// ── DNS Lookup ────────────────────────────────────────────────────────────
-function runDnsLookup(){
-  const host=($('dns-host').value||'').trim();
-  if(!host){$('dns-results').innerHTML='<div class="tr-status" style="color:var(--red)">Enter a hostname.</div>';return;}
-  const resolvers=($('dns-resolvers').value||'8.8.8.8,1.1.1.1,9.9.9.9').trim();
-  $('dns-btn').disabled=true;
-  $('dns-results').innerHTML='<div class="tr-status">Looking up&#8230;</div>';
-  fetch('/api/dns-lookup?host='+encodeURIComponent(host)+'&resolvers='+encodeURIComponent(resolvers))
-    .then(r=>r.json()).then(d=>{
-      $('dns-btn').disabled=false;
-      if(d.error){$('dns-results').innerHTML=`<div class="tr-status" style="color:var(--red)">${H(d.error)}</div>`;return;}
-      const rows=d.results.map(r=>{
-        const answers=r.error?`<span style="color:var(--red)">${H(r.error)}</span>`:
-          (r.answers.length?r.answers.map(a=>`<span style="font-family:'SF Mono',Consolas,monospace;color:var(--green)">${H(a)}</span>`).join('  '):
-          '<span style="color:var(--dim)">NXDOMAIN</span>');
-        const match=d.results.length>1&&r.answers.length&&d.results[0].answers.length?
-          (JSON.stringify(r.answers.sort())===JSON.stringify(d.results[0].answers.sort())?
-          '<span style="color:var(--green);font-size:11px"> ✓</span>':'<span style="color:var(--red);font-size:11px"> ✗ mismatch</span>'):'';
-        return`<tr><td style="padding:5px 12px 5px 0;color:var(--muted);font-family:'SF Mono',Consolas,monospace;font-size:12px;white-space:nowrap">${H(r.resolver)}</td><td style="padding:5px 0;font-size:13px">${answers}${match}</td></tr>`;
-      }).join('');
-      $('dns-results').innerHTML=`<table style="width:100%;border-collapse:collapse;margin-top:8px">${rows}</table>`;
-    }).catch(e=>{$('dns-btn').disabled=false;$('dns-results').innerHTML=`<div class="tr-status" style="color:var(--red)">${H(e.message)}</div>`;});
-}
-// ── Security export ───────────────────────────────────────────────────────
-function exportSec(fmt){
-  if(!_lastState)return;
-  const tests=_lastState.tests||{};
-  const rows=Object.entries(tests).map(([n,t])=>{
-    const rch=t.allowed||0,blk=t.blocked||0,drp=t.dropped||0,tot=rch+blk+drp;
-    return{suite:n,probes:tot,allowed:rch,blocked:blk,dropped:drp,
-           block_pct:tot?+(blk/tot*100).toFixed(1):0,drop_pct:tot?+(drp/tot*100).toFixed(1):0};
-  }).sort((a,b)=>b.blocked-a.blocked);
-  const date=new Date().toISOString().slice(0,10);
-  let blob,name;
-  if(fmt==='csv'){
-    const hdr='suite,probes,allowed,blocked,dropped,block_pct,drop_pct\n';
-    const body=rows.map(r=>[r.suite,r.probes,r.allowed,r.blocked,r.dropped,r.block_pct,r.drop_pct].join(',')).join('\n');
-    blob=new Blob([hdr+body],{type:'text/csv'});name='traffgen-security-'+date+'.csv';
-  }else{
-    blob=new Blob([JSON.stringify({date,rows},null,2)],{type:'application/json'});name='traffgen-security-'+date+'.json';
-  }
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();URL.revokeObjectURL(a.href);
-}
-// ── Keyboard shortcuts ────────────────────────────────────────────────────
-(function(){
-  const _TAB_KEYS={'1':'overview','2':'security','3':'tests','4':'output','5':'health','6':'about','7':'changelog'};
-  document.addEventListener('keydown',function(e){
-    if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT'||e.target.isContentEditable)return;
-    if(e.metaKey||e.ctrlKey||e.altKey)return;
-    const k=e.key;
-    if(_TAB_KEYS[k]){e.preventDefault();navTo(_TAB_KEYS[k]);return;}
-    if(k==='r'||k==='R'){const btn=$('btn-restart');if(btn&&btn.style.display!=='none'&&!btn.disabled){btn.click();}return;}
-    if(k==='p'||k==='P'){const btn=$('btn-pause');if(btn&&btn.style.display!=='none'){btn.click();}return;}
-    if(k==='Escape'){if($('drawer').classList.contains('open')){closeDrawer();}const m=$('suite-modal');if(m&&m.style.display!=='none'){closeModal&&closeModal();}return;}
-    if(k==='?'){showKbHelp();return;}
-  });
-  const _KBH_HTML='<div id="kb-overlay" onclick="if(event.target.id===\'kb-overlay\')this.remove()" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;display:flex;align-items:center;justify-content:center"><div style="background:#1a1f2e;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:24px 32px;min-width:340px;max-width:480px"><div style="font-weight:700;font-size:16px;color:#e8eaf0;margin-bottom:16px">Keyboard Shortcuts</div><table style="width:100%;border-collapse:collapse;font-size:14px">'+
-    [['1–7','Navigate tabs'],['R','Restart tests'],['P','Pause / Resume'],['Esc','Close modal / drawer'],['?','This help']]
-    .map(([k,v])=>'<tr><td style="padding:5px 16px 5px 0;font-family:SF Mono,Consolas,monospace;color:#22c55e;white-space:nowrap">'+k+'</td><td style="padding:5px 0;color:#9aa3b8">'+v+'</td></tr>').join('')+
-    '</table><button onclick="document.getElementById(\'kb-overlay\').remove()" style="margin-top:16px;padding:6px 18px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:#e8eaf0;cursor:pointer;font-size:13px">Close</button></div></div>';
-  window.showKbHelp=function(){if(!$('kb-overlay')){document.body.insertAdjacentHTML('beforeend',_KBH_HTML);}};
-})();
-// ── URL fragment routing ─────────────────────────────────────────────────
-(function(){
-  const _TABS=['overview','security','tests','output','diagnostics','latency','health','about','changelog'];
-  function _fragTab(){
-    const h=location.hash.slice(1).split('/')[0];
-    return _TABS.includes(h)?h:null;
-  }
-  const init=_fragTab();
-  if(init){setTimeout(()=>navTo(init),0);}
-  const _origShowTab=window.showTab;
-  window.showTab=function(btn){
-    _origShowTab(btn);
-    if(btn.dataset&&btn.dataset.tab)history.replaceState(null,'','#'+btn.dataset.tab);
-  };
-  const _origToggleTests=window.toggleTestsNav;
-  window.toggleTestsNav=function(btn){
-    _origToggleTests(btn);
-    history.replaceState(null,'','#tests');
-  };
-  window.addEventListener('popstate',function(){
-    const t=_fragTab();if(t)navTo(t);
-  });
-})();
-// ── Threshold alerts ─────────────────────────────────────────────────────
-const _alertState={}; // suite->last breach type
-const _alertLog=JSON.parse(localStorage.getItem('tg_alert_log')||'[]');
-function _loadThresholds(){
-  const s=JSON.parse(localStorage.getItem('tg_thresholds')||'{}');
-  const bv=$('thr-block'),dv=$('thr-drop'),fv=$('thr-fail');
-  if(bv){bv.value=s.block||20;$('thr-block-val').textContent=(s.block||20)+'%';}
-  if(dv){dv.value=s.drop||30;$('thr-drop-val').textContent=(s.drop||30)+'%';}
-  if(fv){fv.value=s.fail||50;$('thr-fail-val').textContent=(s.fail||50)+'%';}
-}
-function saveThresholds(){
-  const s={block:+($('thr-block')||{value:20}).value,drop:+($('thr-drop')||{value:30}).value,fail:+($('thr-fail')||{value:50}).value};
-  localStorage.setItem('tg_thresholds',JSON.stringify(s));
-}
-function _getThresholds(){
-  return JSON.parse(localStorage.getItem('tg_thresholds')||'{"block":20,"drop":30,"fail":50}');
-}
-function _checkAlerts(state){
-  const thr=_getThresholds();
-  const tests=state.tests||{};
-  const newBreaches=[];
-  Object.entries(tests).forEach(([n,t])=>{
-    const rch=t.allowed||0,blk=t.blocked||0,drp=t.dropped||0,tot=rch+blk+drp;
-    const att=t.attempts||0,fail=t.fail||0;
-    const bp=tot?blk/tot*100:0,dp=tot?drp/tot*100:0,fp=att?fail/att*100:0;
-    if(bp>=thr.block&&tot>0)newBreaches.push({suite:n,type:'block',val:bp.toFixed(1),thr:thr.block});
-    else if(dp>=thr.drop&&tot>0)newBreaches.push({suite:n,type:'drop',val:dp.toFixed(1),thr:thr.drop});
-    else if(fp>=thr.fail&&att>0)newBreaches.push({suite:n,type:'fail',val:fp.toFixed(1),thr:thr.fail});
-  });
-  // Fire toast for new breaches
-  newBreaches.forEach(b=>{
-    const key=b.suite+':'+b.type;
-    if(!_alertState[key]){
-      _alertState[key]=true;
-      const msg=`${b.suite} ${b.type} rate ${b.val}% exceeds threshold ${b.thr}%`;
-      _alertLog.unshift({t:Date.now(),msg});
-      if(_alertLog.length>50)_alertLog.length=50;
-      localStorage.setItem('tg_alert_log',JSON.stringify(_alertLog));
-      _showToast(msg);
-    }
-  });
-  // Clear resolved
-  const breachKeys=new Set(newBreaches.map(b=>b.suite+':'+b.type));
-  Object.keys(_alertState).forEach(k=>{if(!breachKeys.has(k))delete _alertState[k];});
-  // Update badge
-  const badge=$('alert-badge');
-  if(badge){badge.textContent=newBreaches.length;badge.style.display=newBreaches.length?'':'none';}
-  _renderAlertLog(newBreaches);
-}
-function _renderAlertLog(breaches){
-  const lb=$('alert-log-body');if(!lb)return;
-  if(!breaches.length&&!_alertLog.length){lb.innerHTML='<div class="empty">No active alerts</div>';return;}
-  const activeHtml=breaches.map(b=>{
-    const c=b.type==='block'?'var(--amber)':b.type==='drop'?'var(--blue)':'var(--red)';
-    return`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)"><span style="background:${c};color:#fff;font-size:10px;font-weight:700;border-radius:4px;padding:1px 5px;text-transform:uppercase">${b.type}</span><span style="flex:1;font-size:13px">${H(b.suite)}</span><span style="font-size:13px;color:${c};font-weight:700">${b.val}%</span><span style="font-size:11px;color:var(--dim)">thr:${b.thr}%</span></div>`;
-  }).join('');
-  const histHtml=_alertLog.slice(0,10).map(e=>{
-    const d=new Date(e.t),ts=d.toLocaleTimeString();
-    return`<div style="font-size:12px;color:var(--muted);padding:3px 0">${ts} — ${H(e.msg)}</div>`;
-  }).join('');
-  lb.innerHTML=(activeHtml||'')+(histHtml?'<div style="margin-top:8px;font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px">Recent</div>'+histHtml:'');
-}
-function clearAlertLog(){
-  _alertLog.length=0;localStorage.removeItem('tg_alert_log');
-  _renderAlertLog(Object.keys(_alertState).length?[]:[] );
-}
-function _showToast(msg){
-  const t=document.createElement('div');
-  t.style.cssText='position:fixed;bottom:24px;right:24px;background:#1e2d3d;border:1px solid var(--red);border-radius:10px;padding:12px 18px;color:#e8eaf0;font-size:13px;z-index:9999;max-width:340px;box-shadow:0 4px 20px rgba(0,0,0,.5);animation:slideUp .25s ease';
-  t.innerHTML='<span style="color:var(--red);font-weight:700;margin-right:6px">&#9888;</span>'+H(msg);
-  document.body.appendChild(t);
-  setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .4s';setTimeout(()=>t.remove(),400);},5000);
-}
-document.addEventListener('DOMContentLoaded',function(){
-  _loadThresholds();
-  const s=document.createElement('style');
-  s.textContent='@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:none;opacity:1}}';
-  document.head.appendChild(s);
-});
-// ── Run history ──────────────────────────────────────────────────────────
-const _RUN_HIST_KEY='tg_run_history';
-let _lastIter=0,_lastIterSnap=null;
-function _loadRunHistory(){return JSON.parse(localStorage.getItem(_RUN_HIST_KEY)||'[]');}
-function _saveRunHistory(h){localStorage.setItem(_RUN_HIST_KEY,JSON.stringify(h.slice(-50)));}
-function clearRunHistory(){
-  localStorage.removeItem(_RUN_HIST_KEY);
-  _renderRunHistory();
-}
-function _trackRunHistory(s){
-  const iter=s.iteration||0;
-  if(!iter)return;
-  if(iter!==_lastIter&&_lastIter>0&&_lastIterSnap){
-    const h=_loadRunHistory();
-    h.push(_lastIterSnap);
-    _saveRunHistory(h);
-    _renderRunHistory();
-  }
-  _lastIter=iter;
-  const tot=s.totals||{},ok=tot.ok||0,att=tot.attempts||0,fail=tot.fail||0;
-  const tests=s.tests||{};
-  const suiteSnap=Object.entries(tests).map(([n,t])=>({n,att:t.attempts||0,ok:t.ok||0,fail:t.fail||0}));
-  _lastIterSnap={
-    t:Date.now(),iter,suite:s.suite||'all',size:s.size||'',
-    ok,att,fail,
-    pass_pct:att?+(ok/att*100).toFixed(1):0,
-    suites:suiteSnap,
-  };
-}
-function _renderRunHistory(){
-  const body=$('run-history-body');if(!body)return;
-  const h=_loadRunHistory();
-  if(!h.length){body.innerHTML='<div class="empty" style="padding:12px 0">No completed runs recorded yet.</div>';return;}
-  const rows=h.slice().reverse().map((r,i)=>{
-    const d=new Date(r.t);
-    const ts=d.toLocaleDateString()+' '+d.toLocaleTimeString();
-    const pc=r.pass_pct>=90?'var(--green)':r.pass_pct>=70?'var(--amber)':'var(--red)';
-    const id='rh-'+i;
-    const detail=r.suites.filter(s=>s.att>0).sort((a,b)=>a.n.localeCompare(b.n)).map(s=>{
-      const sp=s.att?+(s.ok/s.att*100).toFixed(1):0;
-      const sc=sp>=90?'var(--green)':sp>=70?'var(--amber)':'var(--red)';
-      return`<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;border-bottom:1px solid rgba(255,255,255,.03)">`+
-        `<span style="color:var(--muted)">${H(s.n)}</span>`+
-        `<span style="color:${sc};font-family:'SF Mono',Consolas,monospace">${sp}% (${s.ok}/${s.att})</span></div>`;
-    }).join('');
-    return`<div style="border:1px solid var(--border);border-radius:8px;margin-bottom:8px;overflow:hidden">`+
-      `<div style="display:flex;align-items:center;gap:12px;padding:8px 12px;cursor:pointer;background:#151b27" onclick="toggleRunDetail('${id}')">`+
-      `<span style="font-size:12px;color:var(--dim);font-family:'SF Mono',Consolas,monospace;flex-shrink:0">${ts}</span>`+
-      `<span style="font-size:12px;color:var(--muted)">iter #${r.iter} &middot; ${H(r.suite)}</span>`+
-      `<span style="margin-left:auto;font-size:13px;font-weight:700;color:${pc}">${r.pass_pct}%</span>`+
-      `<span style="font-size:11px;color:var(--dim);white-space:nowrap">${r.ok}/${r.att}</span></div>`+
-      `<div id="${id}" style="display:none;padding:8px 12px;font-size:12px;max-height:300px;overflow-y:auto">${detail||'<div class="empty">No suite data</div>'}</div>`+
-      `</div>`;
-  }).join('');
-  body.innerHTML=rows;
-}
-function toggleRunDetail(id){
-  const el=$(id);if(!el)return;
-  el.style.display=el.style.display==='none'?'block':'none';
-}
-document.addEventListener('DOMContentLoaded',_renderRunHistory);
-// ── Latency heatmap ──────────────────────────────────────────────────────
-const _latHeat={};
-function _updateLatHeat(s){
-  const tests=s.tests||{};
-  Object.entries(tests).forEach(([n,t])=>{
-    if(!(t.avg_dur_ms>0))return;
-    if(!_latHeat[n])_latHeat[n]=[];
-    _latHeat[n].push(t.avg_dur_ms);
-    if(_latHeat[n].length>20)_latHeat[n].shift();
-  });
-  const hb=$('lat-heatmap-body');if(!hb)return;
-  const suites=Object.keys(_latHeat).filter(n=>_latHeat[n].length>0)
-    .sort((a,b)=>(_latHeat[b][_latHeat[b].length-1]||0)-(_latHeat[a][_latHeat[a].length-1]||0))
-    .slice(0,15);
-  if(!suites.length){hb.innerHTML='<div class="empty">No timing data yet</div>';return;}
-  const maxCols=Math.max(...suites.map(n=>_latHeat[n].length));
-  const cellW=28,cellH=22;
-  const _heatColor=ms=>ms<500?'#166534':ms<1000?'#22c55e':ms<2000?'#b45309':ms<5000?'#f59e0b':'#ef4444';
-  const rows=suites.map(n=>{
-    const hist=_latHeat[n];
-    const pad=maxCols-hist.length;
-    const cells=Array(pad).fill(null).concat(hist).map((v,i)=>{
-      if(v===null)return`<td style="width:${cellW}px;height:${cellH}px;background:#0f1621"></td>`;
-      const col=_heatColor(v);
-      const tip=v<1000?v.toFixed(0)+'ms':(v/1000).toFixed(1)+'s';
-      return`<td title="${H(n)}: ${tip}" style="width:${cellW}px;height:${cellH}px;background:${col};border-radius:3px;cursor:default"></td>`;
-    }).join('');
-    const last=hist[hist.length-1]||0;
-    const lc=_heatColor(last);
-    const lt=last<1000?last.toFixed(0)+'ms':(last/1000).toFixed(1)+'s';
-    return`<tr><td style="padding-right:8px;font-size:11px;color:var(--muted);white-space:nowrap;max-width:100px;overflow:hidden;text-overflow:ellipsis">${H(n)}</td>${cells}`+
-      `<td style="padding-left:6px;font-size:11px;font-family:'SF Mono',Consolas,monospace;color:${lc};white-space:nowrap">${lt}</td></tr>`;
-  }).join('');
-  hb.innerHTML=`<table style="border-collapse:separate;border-spacing:2px;font-size:11px">${rows}</table>`;
-}
-// ── On-demand suite runner ────────────────────────────────────────────────
-function _populateOdrSuites(suites){
-  const sel=$('odr-suite');if(!sel||sel.options.length>1)return;
-  suites.forEach(su=>{
-    const o=document.createElement('option');o.value=su.name;
-    o.textContent=suiteIco(su.name)+' '+su.name+(su.description?' — '+su.description.slice(0,40):'');
-    sel.appendChild(o);
-  });
-}
-function runOnDemand(){
-  const suite=($('odr-suite').value||'').trim();
-  if(!suite){$('odr-result').innerHTML='<div class="tr-status" style="color:var(--red)">Select a suite first.</div>';return;}
-  const size=$('odr-size').value||'S';
-  $('odr-btn').disabled=true;
-  $('odr-result').innerHTML='<div class="tr-status">Sending command&#8230;</div>';
-  fetch('/api/control'+_sidQs(),{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({suite,size,loop:false,max_wait_secs:5})}).then(r=>r.json()).then(d=>{
-      $('odr-btn').disabled=false;
-      if(d.error){$('odr-result').innerHTML=`<div class="tr-status" style="color:var(--red)">${H(d.error)}</div>`;return;}
-      $('odr-result').innerHTML='<div class="tr-status" style="color:var(--green)">&#10003; Suite <strong>'+H(suite)+'</strong> queued at size '+H(size)+'. Switching to Live View&#8230;</div>';
-      setTimeout(()=>navTo('output'),1200);
-  }).catch(e=>{
-    $('odr-btn').disabled=false;
-    $('odr-result').innerHTML=`<div class="tr-status" style="color:var(--red)">${H(e.message)}</div>`;
-  });
-}
-// ── Latency tab ──────────────────────────────────────────────────────────
-let _latSort='avg',_latDir=-1;
-function _durColor(ms){return ms<500?'var(--green)':ms<2000?'var(--amber)':'var(--red)';}
-function renderLatency(s){
-  if(!s)return;
-  const tests=s.tests||{};
-  const rows=Object.entries(tests)
-    .filter(([,t])=>(t.avg_dur_ms||0)>0)
-    .map(([n,t])=>({n,avg:t.avg_dur_ms||0,att:t.attempts||0,last:t.last_run_at||0}));
-  if(rows.length){
-    rows.sort((a,b)=>a.avg-b.avg);
-    const fastest=rows[0],slowest=rows[rows.length-1];
-    if($('lat-fastest')){$('lat-fastest').textContent=Dur(fastest.avg);$('lat-fastest').style.color=_durColor(fastest.avg);$('lat-fastest-name').textContent=fastest.n;}
-    if($('lat-slowest')){$('lat-slowest').textContent=Dur(slowest.avg);$('lat-slowest').style.color=_durColor(slowest.avg);$('lat-slowest-name').textContent=slowest.n;}
-    const meds=rows.map(r=>r.avg).sort((a,b)=>a-b);
-    const med=meds[Math.floor(meds.length/2)];
-    if($('lat-median')){$('lat-median').textContent=Dur(med);$('lat-median').style.color=_durColor(med);}
-    if($('lat-count'))$('lat-count').textContent=rows.length;
-  }
-  const tb=$('lat-tbl');if(!tb)return;
-  if(!rows.length){tb.innerHTML='<tr><td colspan="4" class="empty">No data yet — suites accumulate duration after their first run</td></tr>';return;}
-  const sorted=[...rows].sort((a,b)=>_latDir*((_latSort==='avg'?a.avg-b.avg:_latSort==='att'?a.att-b.att:_latSort==='last'?a.last-b.last:a.n.localeCompare(b.n))));
-  tb.innerHTML=sorted.map(r=>{
-    const col=_durColor(r.avg);
-    return`<tr class="mrow"><td class="nm" style="cursor:default"><span class="s-ico">${suiteIco(r.n)}</span>${H(r.n)}</td>`+
-      `<td class="r"><span style="color:${col};font-weight:600;font-family:'SF Mono',Consolas,monospace">${Dur(r.avg)}</span></td>`+
-      `<td class="r">${N(r.att)}</td>`+
-      `<td class="r" style="color:var(--muted)">${r.last?Tc(r.last):'—'}</td></tr>`;
-  }).join('');
-}
-function sortLatTbl(col){
-  if(_latSort===col)_latDir*=-1;else{_latSort=col;_latDir=col==='name'?1:-1;}
-  if(_lastState)renderLatency(_lastState);
 }
 window.addEventListener('resize',()=>{
   if(_lastState){drawSpark(_lastState.history||[]);drawSecTrend(_secHist);}
