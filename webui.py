@@ -1651,6 +1651,14 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
       <div style="max-width:900px">
 
         <div class="a-section">
+          <div class="a-h">v3.4.2 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
+          <table class="st-table" style="margin-top:10px">
+            <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>UX</td><td>URL fragment routing — the active tab is reflected in the URL hash (e.g. <code>#health</code>) and navigating to a bookmarked URL or using the browser Back/Forward buttons restores the correct tab</td></tr>
+          </table>
+        </div>
+
+        <div class="a-section">
           <div class="a-h">v3.4.1 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
           <table class="st-table" style="margin-top:10px">
             <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
@@ -3031,6 +3039,14 @@ document.addEventListener('DOMContentLoaded',_renderRunHistory);
     .map(([k,v])=>'<tr><td style="padding:5px 16px 5px 0;font-family:SF Mono,Consolas,monospace;color:#22c55e;white-space:nowrap">'+k+'</td><td style="padding:5px 0;color:#9aa3b8">'+v+'</td></tr>').join('')+
     '</table><button onclick="document.getElementById(\'kb-overlay\').remove()" style="margin-top:16px;padding:6px 18px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:#e8eaf0;cursor:pointer;font-size:13px">Close</button></div></div>';
   window.showKbHelp=function(){if(!$('kb-overlay')){document.body.insertAdjacentHTML('beforeend',_KBH_HTML);}};
+})();
+(function(){
+  const _VALID_TABS=new Set(['overview','security','tests','output','diagnostics','health','about','changelog']);
+  const _origShowTab=showTab;
+  window.showTab=function(btn){_origShowTab(btn);const t=btn&&btn.dataset&&btn.dataset.tab;if(t)history.replaceState(null,'','#'+t);};
+  function _navHash(){const t=(location.hash||'').replace('#','');if(_VALID_TABS.has(t))navTo(t);}
+  window.addEventListener('hashchange',_navHash);
+  document.addEventListener('DOMContentLoaded',_navHash);
 })();
 window.addEventListener('resize',()=>{
   if(_lastState){drawSpark(_lastState.history||[]);drawSecTrend(_secHist);}
