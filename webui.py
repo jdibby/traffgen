@@ -718,6 +718,8 @@ def _parse_hop(line):
 @app.route("/api/traceroute")
 def api_traceroute():
     target = request.args.get("target", "").strip()
+    proto  = request.args.get("proto", "tcp").lower()
+    port   = request.args.get("port", "443")
 
     def _err(msg):
         yield f'data: {json.dumps({"error": msg})}\n\n'
@@ -726,9 +728,21 @@ def api_traceroute():
         if not _TARGET_RE.match(target):
             yield from _err("Invalid target — use a hostname or IP address")
             return
+        if proto not in ("udp", "tcp", "icmp"):
+            yield from _err("Invalid proto")
+            return
+        if not port.isdigit() or not (1 <= int(port) <= 65535):
+            yield from _err("Invalid port")
+            return
+        cmd = ["traceroute", "-n", "-q", "3", "-w", "1", "-m", "30"]
+        if proto == "tcp":
+            cmd += ["-T", "-p", port]
+        elif proto == "icmp":
+            cmd += ["-I"]
+        cmd.append(target)
         try:
             proc = subprocess.Popen(
-                ["traceroute", "-n", "-q", "3", "-w", "1", "-m", "30", target],
+                cmd,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                 text=True, errors="replace",
             )
@@ -1422,6 +1436,12 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div class="diag-tool-hdr">&#128300; Traceroute</div>
         <div class="diag-input-row">
           <input id="tr-target" class="diag-input" type="text" placeholder="hostname or IP (e.g. 8.8.8.8)" spellcheck="false" autocomplete="off" onkeydown="if(event.key==='Enter')runTrace()">
+          <select id="tr-proto" class="diag-input" style="flex:0 0 auto;width:auto;padding-right:24px" onchange="trProtoChange()">
+            <option value="tcp">TCP</option>
+            <option value="udp">UDP</option>
+            <option value="icmp">ICMP</option>
+          </select>
+          <input id="tr-port" class="diag-input" type="text" value="443" style="flex:0 0 64px" title="Destination port (TCP mode)">
           <button id="tr-btn" class="diag-btn" onclick="runTrace()">Trace</button>
           <button id="tr-stop" class="diag-btn cancel" onclick="stopTrace()" style="display:none">Stop</button>
         </div>
@@ -2686,10 +2706,11 @@ function renderHop(hop){
 function runTrace(){
   const t=$('tr-target').value.trim();
   if(!t)return;
+  const proto=$('tr-proto').value,port=$('tr-port').value||'443';
   stopTrace();
-  $('tr-results').innerHTML='<div class="tr-status">Tracing '+H(t)+'…</div>';
+  $('tr-results').innerHTML='<div class="tr-status">Tracing '+H(t)+' via '+proto.toUpperCase()+'…</div>';
   $('tr-btn').disabled=true;$('tr-stop').style.display='';
-  _trSrc=new EventSource('/api/traceroute?target='+encodeURIComponent(t));
+  _trSrc=new EventSource('/api/traceroute?target='+encodeURIComponent(t)+'&proto='+proto+'&port='+encodeURIComponent(port));
   _trSrc.onmessage=e=>{
     const d=JSON.parse(e.data);
     if(d.header){
@@ -2706,6 +2727,10 @@ function runTrace(){
 function stopTrace(){
   if(_trSrc){_trSrc.close();_trSrc=null;}
   $('tr-btn').disabled=false;$('tr-stop').style.display='none';
+}
+function trProtoChange(){
+  const p=$('tr-proto').value;
+  $('tr-port').style.display=p==='tcp'?'':' none';
 }
 window.addEventListener('resize',()=>{
   if(_lastState){drawSpark(_lastState.history||[]);drawSecTrend(_secHist);}
