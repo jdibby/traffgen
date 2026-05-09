@@ -715,31 +715,50 @@ def _parse_hop(line):
             "timeout": not rtts, "raw": rest}
 
 
+# Explicit allowlist maps for traceroute proto flags — keeps user input
+# fully out of the command list; only these literal strings ever reach Popen.
+_TR_PROTO_FLAGS: "dict[str, list[str]]" = {
+    "tcp":  ["-T"],
+    "udp":  [],
+    "icmp": ["-I"],
+}
+
+
 @app.route("/api/traceroute")
 def api_traceroute():
-    target = request.args.get("target", "").strip()
-    proto  = request.args.get("proto", "tcp").lower()
-    port   = request.args.get("port", "443")
+    def _sse_err(msg: str) -> "Response":
+        return Response(
+            f'data: {json.dumps({"error": msg})}\n\ndone: true\n\n',
+            mimetype="text/event-stream",
+            headers={"Cache-Control": "no-cache"},
+        )
 
-    def _err(msg):
-        yield f'data: {json.dumps({"error": msg})}\n\n'
+    # ── Validate all inputs eagerly before touching the generator ──────────
+    raw_target = request.args.get("target", "").strip()
+    if not _TARGET_RE.match(raw_target):
+        return _sse_err("Invalid target — use a hostname or IP address")
+
+    raw_proto = request.args.get("proto", "tcp").lower()
+    if raw_proto not in _TR_PROTO_FLAGS:
+        return _sse_err("Invalid proto — use tcp, udp, or icmp")
+
+    raw_port = request.args.get("port", "443")
+    if not raw_port.isdigit() or not (1 <= int(raw_port) <= 65535):
+        return _sse_err("Invalid port")
+
+    # ── Only validated literals reach this point ───────────────────────────
+    # Build the command from allowlisted values; raw user input is never
+    # concatenated into the argument list.
+    safe_target: str = raw_target                        # regex-validated
+    safe_proto_flags: list = _TR_PROTO_FLAGS[raw_proto]  # allowlist lookup
+    safe_port: str = str(int(raw_port))                  # re-serialised int
 
     def _gen():
-        if not _TARGET_RE.match(target):
-            yield from _err("Invalid target — use a hostname or IP address")
-            return
-        if proto not in ("udp", "tcp", "icmp"):
-            yield from _err("Invalid proto")
-            return
-        if not port.isdigit() or not (1 <= int(port) <= 65535):
-            yield from _err("Invalid port")
-            return
         cmd = ["traceroute", "-n", "-q", "3", "-w", "1", "-m", "30"]
-        if proto == "tcp":
-            cmd += ["-T", "-p", port]
-        elif proto == "icmp":
-            cmd += ["-I"]
-        cmd.append(target)
+        cmd += safe_proto_flags
+        if raw_proto == "tcp":
+            cmd += ["-p", safe_port]
+        cmd.append(safe_target)
         try:
             proc = subprocess.Popen(
                 cmd,
@@ -757,9 +776,9 @@ def api_traceroute():
             proc.wait()
             yield f'data: {json.dumps({"done": True, "code": proc.returncode})}\n\n'
         except FileNotFoundError:
-            yield from _err("traceroute not found on this system")
+            yield f'data: {json.dumps({"error": "traceroute not found on this system"})}\n\n'
         except Exception as exc:
-            yield from _err(str(exc))
+            yield f'data: {json.dumps({"error": str(exc)})}\n\n'
 
     return Response(
         _gen(),
