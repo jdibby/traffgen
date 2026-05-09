@@ -1599,6 +1599,11 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
     </div>
     <!-- Tests -->
     <div id="tab-tests" class="panel">
+      <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
+        <input id="test-search" type="text" placeholder="&#128269; Search suites&#8230;" oninput="_onTestSearch(this.value)" autocomplete="off" spellcheck="false" style="flex:1;max-width:340px;background:var(--surf2);border:1px solid var(--border2);border-radius:8px;padding:7px 12px;color:var(--text);font-size:14px;font-family:inherit;outline:none">
+        <span id="test-search-count" style="font-size:13px;color:var(--muted)"></span>
+        <button id="test-search-clear" onclick="_onTestSearch('');$('test-search').value=''" style="display:none;background:none;border:none;color:var(--dim);font-size:18px;cursor:pointer;line-height:1;padding:0 4px" title="Clear search">&#10005;</button>
+      </div>
       <div class="tgrid" id="test-grid"><div class="empty">Waiting for data&#8230;</div></div>
     </div>
     <!-- Output -->
@@ -2460,7 +2465,7 @@ const _SC={
   'ucaas':'UCaaS & Communications','voip':'UCaaS & Communications',
   'pornography':'Content Filtering',
 };
-let _testsCat='all';
+let _testsCat='all',_testSearch='';
 function _openTestsSub(){$('tests-sub').classList.add('open');$('tests-arr').classList.add('open');}
 function _closeTestsSub(){$('tests-sub').classList.remove('open');$('tests-arr').classList.remove('open');}
 function toggleTestsNav(btn){
@@ -2505,6 +2510,12 @@ function toggleOvSec(hdr){
   var wasCollapsed=body.classList.contains('collapsed');
   if(wasCollapsed){body.classList.remove('collapsed');if(arr)arr.classList.add('open');}
   else{body.classList.add('collapsed');if(arr)arr.classList.remove('open');}
+}
+function _onTestSearch(q){
+  _testSearch=q;
+  const clr=$('test-search-clear');if(clr)clr.style.display=q?'':'none';
+  const inp=$('test-search');if(inp)inp.style.borderColor=q?'var(--green)':'';
+  if(_lastState)renderState(_lastState);
 }
 function setTestsCat(el,cat){
   _testsCat=cat;
@@ -2645,7 +2656,11 @@ function apply(s){
                'Recon & Lateral Movement':'🕵️','Evasion & C2':'📡',
                'UCaaS & Communications':'📞','Content Filtering':'🚧'};
     const cm={};
-    const filtSuites=_testsCat==='all'?suites:suites.filter(su=>(_SC[su.name]||'')===_testsCat);
+    const catFiltered=_testsCat==='all'?suites:suites.filter(su=>(_SC[su.name]||'')===_testsCat);
+    const sq=_testSearch.toLowerCase().trim();
+    const filtSuites=sq?catFiltered.filter(su=>su.name.toLowerCase().includes(sq)||(su.description||'').toLowerCase().includes(sq)):catFiltered;
+    const cnt=$('test-search-count');
+    if(cnt){if(sq)cnt.textContent=filtSuites.length+' of '+suites.length+' suite'+(suites.length!==1?'s':'');else cnt.textContent=suites.length+' suite'+(suites.length!==1?'s':'');}
     filtSuites.forEach(su=>{const c=_SC[su.name]||'Other';(cm[c]=cm[c]||[]).push(su);});
     Object.values(cm).forEach(a=>a.sort((a,b)=>a.name.localeCompare(b.name)));
     const co=_CO.concat(Object.keys(cm).filter(c=>!_CO.includes(c)).sort());
@@ -2659,7 +2674,7 @@ function apply(s){
         ${ta?`<div class="tcbar"><div class="tcbf" style="width:${tp}%;background:${bc}"></div></div>`:''}
       </div>`;
     };
-    if(!filtSuites.length){tg.innerHTML='<div class="empty">No suites in this category</div>';}
+    if(!filtSuites.length){tg.innerHTML='<div class="empty">'+(sq?'No suites match &ldquo;'+H(sq)+'&rdquo;':'No suites in this category')+'</div>';}
     else tg.innerHTML=co.filter(c=>cm[c]).map((c,i)=>
       `<div class="tcat-hdr"${i===0?'':''} >${_CI[c]||'📋'} ${H(c)}</div>`+cm[c].map(mkCard).join('')
     ).join('');
