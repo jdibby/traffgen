@@ -2743,22 +2743,22 @@ function setFilter(btn,lvl){
   });
 }
 function _fmtMsgUA(msg){
-  return msg.replace(/Mozilla\/5\.0[^\s"'\\)]*(?:\([^)]*\)[^\s"'\\)]*)?/g,function(ua){
+  return msg.replace(/Mozilla\/5\.0[^\s"']*(?:\([^)]*\)[^\s"']*)*/g,function(ua){
     let os='';
-    const am=ua.match(/Android (\d+)/);if(am)os='Android '+am[1];
-    else if(/iPhone/.test(ua))os='iOS';
-    else if(/iPad/.test(ua))os='iPadOS';
-    else if(/Windows NT/.test(ua))os='Windows';
-    else if(/Macintosh/.test(ua))os='macOS';
-    else if(/Linux/.test(ua))os='Linux';
-    else os='UA';
+    const am=ua.match(/Android (\d+(?:\.\d+)*)/);if(am)os='Android '+am[1];
+    else{const im=ua.match(/iPhone OS (\d+[_\d]*)/);if(im)os='iOS '+im[1].replace(/_/g,'.');}
+    if(!os){const ipm=ua.match(/iPad.*OS (\d+[_\d]*)/);if(ipm)os='iPadOS '+ipm[1].replace(/_/g,'.');}
+    if(!os){const wm=ua.match(/Windows NT (\d+\.\d+)/);if(wm){const wv={'10.0':'10','6.3':'8.1','6.2':'8','6.1':'7'};os='Windows '+(wv[wm[1]]||wm[1]);}}
+    if(!os&&/Macintosh/.test(ua)){const mm=ua.match(/Mac OS X (\d+[_.\d]*)/);os='macOS'+(mm?' '+mm[1].replace(/_/g,'.'):'');}
+    if(!os&&/Linux/.test(ua))os='Linux';
+    if(!os)os='Unknown';
     let br='';
     const em=ua.match(/Edg\/(\d+)/);if(em)br='Edge/'+em[1];
     else{const cm=ua.match(/Chrome\/(\d+)/);if(cm)br='Chrome/'+cm[1];}
     if(!br){const fm=ua.match(/Firefox\/(\d+)/);if(fm)br='Firefox/'+fm[1];}
-    if(!br&&/Safari/.test(ua))br='Safari';
-    if(!br)br='UA';
-    return '['+br+(os?'/'+os:'')+']';
+    if(!br&&/Safari\//.test(ua)){const sm=ua.match(/Version\/(\d+)/);br='Safari'+(sm?'/'+sm[1]:'');}
+    if(!br)br='Browser';
+    return '['+br+'/'+os+']';
   });
 }
 function appendLog(d){
@@ -3120,11 +3120,11 @@ function applyHealth(d){
     coreBars.innerHTML=cores.map(function(pct,i){
       const c=pct>=90?'var(--red)':pct>=70?'var(--amber)':'var(--green)';
       return'<div style="display:flex;flex-direction:column;align-items:center;gap:3px">'+
-        '<div style="font-size:11px;color:var(--muted);font-family:\'SF Mono\',Consolas,monospace">CPU'+i+'</div>'+
+        '<div style="font-size:11px;color:var(--muted);font-family:monospace">CPU'+i+'</div>'+
         '<div style="width:100%;background:var(--border);border-radius:3px;height:5px;overflow:hidden">'+
           '<div style="height:100%;width:'+Math.min(100,pct).toFixed(1)+'%;background:'+c+';transition:width .4s ease"></div>'+
         '</div>'+
-        '<div style="font-size:11px;color:'+c+';font-family:\'SF Mono\',Consolas,monospace">'+pct.toFixed(1)+'%</div>'+
+        '<div style="font-size:11px;color:'+c+';font-family:monospace">'+pct.toFixed(1)+'%</div>'+
       '</div>';
     }).join('');
   }
