@@ -3083,8 +3083,7 @@ document.addEventListener('DOMContentLoaded',_renderRunHistory);
         +'</div>';
     }).join('');
   }
-  const _origApply=apply;
-  window.apply=function(s){_origApply(s);_render(s);};
+  setInterval(function(){if(_lastState)_render(_lastState);},1000);
 })();
 function exportResults(fmt){
   if(!_lastState){toast('No data to export yet',false);return;}
@@ -3105,8 +3104,10 @@ function exportResults(fmt){
 }
 (function(){
   const _VALID_TABS=new Set(['overview','security','tests','output','diagnostics','health','about','changelog']);
-  const _origShowTab=showTab;
-  window.showTab=function(btn){_origShowTab(btn);const t=btn&&btn.dataset&&btn.dataset.tab;if(t)history.replaceState(null,'','#'+t);};
+  document.addEventListener('click',function(e){
+    const btn=e.target.closest('.nav-item[data-tab]');
+    if(btn&&_VALID_TABS.has(btn.dataset.tab))history.replaceState(null,'','#'+btn.dataset.tab);
+  },true);
   function _navHash(){const t=(location.hash||'').replace('#','');if(_VALID_TABS.has(t))navTo(t);}
   window.addEventListener('hashchange',_navHash);
   document.addEventListener('DOMContentLoaded',_navHash);
