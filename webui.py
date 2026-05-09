@@ -1325,6 +1325,14 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div class="card"><div class="clbl">Iteration</div><div class="cval c-amber" id="v-iter">&#8212;</div><div class="csub" id="s-iter">&#8212;</div></div>
         <div class="card"><div class="clbl">Probes / min</div><div class="cval c-blue" id="v-ppm">&#8212;</div><div class="csub" id="s-ppm">accumulating&hellip;</div></div>
       </div>
+      <div id="eta-bar-wrap" style="display:none;flex-direction:column;gap:5px;padding:2px 0">
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted)">
+          <span id="eta-label">—</span><span id="eta-time" style="font-family:'SF Mono',Consolas,monospace;font-size:12px;color:var(--dim)">—</span>
+        </div>
+        <div style="height:6px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden">
+          <div id="eta-fill" style="height:100%;width:0%;border-radius:3px;transition:width .8s linear"></div>
+        </div>
+      </div>
       <div class="cc" data-widget="net-io" style="display:flex;flex-direction:column;gap:10px">
         <div class="ctitle">Network I/O <span id="net-iface" style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim);font-size:12px"></span>
           <select class="net-interval" onchange="setNetInterval(+this.value)" title="Refresh interval">
@@ -1367,6 +1375,10 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
       <div class="tcard" data-widget="cat-sparklines">
         <div class="thdr">Category Success Rate Trends</div>
         <div id="cat-spark-body" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;padding:4px 0"><div class="empty">Waiting for data&#8230;</div></div>
+      </div>
+      <div class="tcard" data-widget="slowest-suites">
+        <div class="thdr">Slowest Suites</div>
+        <div id="slowest-body" style="padding:8px 16px"><div class="empty">Waiting for data&#8230;</div></div>
       </div>
       <div class="tcard" data-widget="top-failing-suites">
         <div class="thdr">Top Failing Suites</div>
@@ -1662,6 +1674,15 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
     <!-- Changelog -->
     <div id="tab-changelog" class="panel">
       <div style="max-width:900px">
+
+        <div class="a-section">
+          <div class="a-h">v3.4.5 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
+          <table class="st-table" style="margin-top:10px">
+            <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>ETA/progress bar on the Overview tab — amber countdown bar between tests (shows seconds until next suite), green elapsed bar while running (scales against avg suite duration)</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Slowest Suites widget on the Overview tab — shows up to 8 suites ranked by average duration with a proportional purple bar</td></tr>
+          </table>
+        </div>
 
         <div class="a-section">
           <div class="a-h">v3.4.4 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
@@ -3117,6 +3138,60 @@ function exportResults(fmt){
   function _navHash(){const t=(location.hash||'').replace('#','');if(_VALID_TABS.has(t))navTo(t);}
   window.addEventListener('hashchange',_navHash);
   document.addEventListener('DOMContentLoaded',_navHash);
+})();
+(function(){
+  var _etaTimer=null;
+  function _hide(){
+    var w=$('eta-bar-wrap');if(w)w.style.display='none';
+    if(_etaTimer){clearInterval(_etaTimer);_etaTimer=null;}
+  }
+  function _show(label,pct,color,timeStr){
+    var w=$('eta-bar-wrap');if(!w)return;
+    w.style.display='flex';
+    $('eta-label').textContent=label;
+    $('eta-time').textContent=timeStr;
+    $('eta-fill').style.width=Math.min(100,Math.max(0,pct))+'%';
+    $('eta-fill').style.background=color;
+  }
+  function _tick(){
+    var s=_lastState;if(!s){_hide();return;}
+    var st=s.status||'';
+    if(st==='between_tests'&&s.pause_until){
+      var total=s.max_wait_secs||20,rem=Math.max(0,s.pause_until-Date.now()/1000),elapsed=total-rem,pct=total>0?elapsed/total*100:0;
+      _show('Next suite in',''+pct,'#f59e0b',Math.ceil(rem)+'s');
+    } else if(st==='running'&&s.test_started_at){
+      var elapsed2=Math.max(0,Date.now()/1000-s.test_started_at);
+      var est=(s.tests&&s.current_test&&s.tests[s.current_test]&&s.tests[s.current_test].avg_dur_ms)?s.tests[s.current_test].avg_dur_ms/1000:60;
+      var pct2=est>0?elapsed2/est*100:0;
+      _show('Running: '+(s.current_test||'—'),Math.min(pct2,95),'#22c55e','+'+Math.round(elapsed2)+'s');
+    } else {
+      _hide();
+    }
+  }
+  setInterval(_tick,500);
+})();
+(function(){
+  var TOP_N=8;
+  function _render(){
+    var s=_lastState;if(!s)return;
+    var el=$('slowest-body');if(!el)return;
+    var tests=s.tests||{};
+    var rows=Object.keys(tests).filter(function(n){return tests[n].avg_dur_ms;})
+      .map(function(n){return{n:n,ms:tests[n].avg_dur_ms||0};})
+      .sort(function(a,b){return b.ms-a.ms;}).slice(0,TOP_N);
+    if(!rows.length){el.innerHTML='<div class="empty">No data yet</div>';return;}
+    var maxMs=rows[0].ms||1;
+    el.innerHTML=rows.map(function(r){
+      var bar=Math.round(r.ms/maxMs*100);
+      var durStr=r.ms>=1000?(r.ms/1000).toFixed(1)+'s':Math.round(r.ms)+'ms';
+      return '<div style="display:flex;align-items:center;gap:12px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06)">'
+        +'<div style="width:160px;font-size:14px;color:#e8eaf0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+H(r.n)+'">'+H(r.n)+'</div>'
+        +'<div style="flex:1;height:6px;background:rgba(255,255,255,.08);border-radius:3px"><div style="height:100%;width:'+bar+'%;background:#818cf8;border-radius:3px"></div></div>'
+        +'<div style="width:60px;text-align:right;font-size:13px;color:#818cf8;font-family:SF Mono,Consolas,monospace">'+durStr+'</div>'
+        +'</div>';
+    }).join('');
+  }
+  setInterval(_render,2000);
 })();
 window.addEventListener('resize',()=>{
   if(_lastState){drawSpark(_lastState.history||[]);drawSecTrend(_secHist);}
