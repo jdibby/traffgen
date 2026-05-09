@@ -1290,6 +1290,10 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div class="ehdr">Live Events <span id="ev-cnt" style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none"></span></div>
         <div class="ebody" id="ev-body"><div class="empty">Waiting&#8230;</div></div>
       </div>
+      <div class="tcard" data-widget="top-failing">
+        <div class="thdr">Top Failing Suites</div>
+        <div id="top-fail-body"><div class="empty">Waiting for data&#8230;</div></div>
+      </div>
       </div><!-- /#ov-grid -->
     </div>
     <!-- Security Summary -->
@@ -2213,6 +2217,21 @@ function apply(s){
       `<div class="tcat-hdr"${i===0?'':''} >${_CI[c]||'📋'} ${H(c)}</div>`+cm[c].map(mkCard).join('')
     ).join('');
   }
+  // Top failing suites widget
+  (function(){
+    const tfb=$('top-fail-body');if(!tfb)return;
+    const ts=_lastState&&_lastState.tests||{};
+    const rows=Object.entries(ts).filter(([,t])=>(t.attempts||0)>0).map(([n,t])=>{
+      const ta=t.attempts||0,tf=t.fail||0,fp=ta?tf/ta*100:0;
+      return{n,ta,tf,fp};
+    }).filter(r=>r.tf>0).sort((a,b)=>b.fp-a.fp).slice(0,8);
+    if(!rows.length){tfb.innerHTML='<div class="empty" style="color:var(--green)">&#10003; No failures</div>';return;}
+    tfb.innerHTML='<table style="width:100%"><thead><tr><th>Suite</th><th class="r">Attempts</th><th class="r">Fails</th><th class="r">Fail%</th></tr></thead><tbody>'+
+      rows.map(r=>{
+        const c=r.fp>50?'var(--red)':r.fp>20?'var(--amber)':'var(--muted)';
+        return`<tr class="mrow" style="cursor:pointer" onclick="openModal('${H(r.n)}','')"><td><span class="s-ico">${suiteIco(r.n)}</span>${H(r.n)}</td><td class="r">${N(r.ta)}</td><td class="r" style="color:var(--red)">${N(r.tf)}</td><td class="r"><span style="color:${c};font-weight:600">${r.fp.toFixed(1)}%</span></td></tr>`;
+      }).join('')+'</tbody></table>';
+  })();
   if(!$('drawer').classList.contains('open')){
     const sel=$('cfg-suite');
     if(sel.options.length<=1&&suites.length){suites.forEach(su=>{const o=document.createElement('option');o.value=su.name;o.textContent=su.name+' — '+su.description;sel.appendChild(o);});}
