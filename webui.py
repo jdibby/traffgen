@@ -2443,7 +2443,7 @@ function apply(s){
     Object.entries(ts).forEach(([n,t])=>{
       const cat=_SC[n]||'Other';
       if(!catData[cat])catData[cat]={ok:0,fail:0,att:0};
-      catData[cat].ok+=(t.pass||0);
+      catData[cat].ok+=(t.ok||0);
       catData[cat].fail+=(t.fail||0);
       catData[cat].att+=(t.attempts||0);
     });
