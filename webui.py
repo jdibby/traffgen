@@ -1651,6 +1651,14 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
       <div style="max-width:900px">
 
         <div class="a-section">
+          <div class="a-h">v3.4.1 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
+          <table class="st-table" style="margin-top:10px">
+            <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>UX</td><td>Keyboard shortcuts: press <strong>1–7</strong> to jump to any tab, <strong>R</strong> to restart tests, <strong>P</strong> to pause/resume, <strong>Esc</strong> to close modal or drawer, <strong>?</strong> to show shortcut help overlay</td></tr>
+          </table>
+        </div>
+
+        <div class="a-section">
           <div class="a-h">v3.4.0 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
           <table class="st-table" style="margin-top:10px">
             <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
@@ -3005,6 +3013,25 @@ function toggleRunDetail(id){
   el.style.display=el.style.display==='none'?'block':'none';
 }
 document.addEventListener('DOMContentLoaded',_renderRunHistory);
+// ── Keyboard shortcuts ───────────────────────────────────────────────────
+(function(){
+  const _TAB_KEYS={'1':'overview','2':'security','3':'tests','4':'output','5':'health','6':'about','7':'changelog'};
+  document.addEventListener('keydown',function(e){
+    if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT'||e.target.isContentEditable)return;
+    if(e.metaKey||e.ctrlKey||e.altKey)return;
+    const k=e.key;
+    if(_TAB_KEYS[k]){e.preventDefault();navTo(_TAB_KEYS[k]);return;}
+    if(k==='r'||k==='R'){const btn=$('btn-restart');if(btn&&btn.style.display!=='none'&&!btn.disabled){btn.click();}return;}
+    if(k==='p'||k==='P'){const btn=$('btn-pause');if(btn&&btn.style.display!=='none'){btn.click();}return;}
+    if(k==='Escape'){if($('drawer').classList.contains('open')){closeDrawer();}const m=$('suite-modal');if(m&&m.style.display!=='none'){closeModal&&closeModal();}return;}
+    if(k==='?'){showKbHelp();return;}
+  });
+  const _KBH_HTML='<div id="kb-overlay" onclick="if(event.target.id===\'kb-overlay\')this.remove()" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;display:flex;align-items:center;justify-content:center"><div style="background:#1a1f2e;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:24px 32px;min-width:340px;max-width:480px"><div style="font-weight:700;font-size:16px;color:#e8eaf0;margin-bottom:16px">Keyboard Shortcuts</div><table style="width:100%;border-collapse:collapse;font-size:14px">'+
+    [['1–7','Navigate tabs'],['R','Restart tests'],['P','Pause / Resume'],['Esc','Close modal / drawer'],['?','This help']]
+    .map(([k,v])=>'<tr><td style="padding:5px 16px 5px 0;font-family:SF Mono,Consolas,monospace;color:#22c55e;white-space:nowrap">'+k+'</td><td style="padding:5px 0;color:#9aa3b8">'+v+'</td></tr>').join('')+
+    '</table><button onclick="document.getElementById(\'kb-overlay\').remove()" style="margin-top:16px;padding:6px 18px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:#e8eaf0;cursor:pointer;font-size:13px">Close</button></div></div>';
+  window.showKbHelp=function(){if(!$('kb-overlay')){document.body.insertAdjacentHTML('beforeend',_KBH_HTML);}};
+})();
 window.addEventListener('resize',()=>{
   if(_lastState){drawSpark(_lastState.history||[]);drawSecTrend(_secHist);}
   if(_lastHealth){drawDiskBars(_lastHealth.disk_read_kbps||0,_lastHealth.disk_write_kbps||0);drawNetSpark('net-spark',_netHist);drawNetSpark('h-net-spark',_hNetHist);}
