@@ -1294,6 +1294,10 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div class="thdr">Top Failing Suites</div>
         <div id="top-fail-body"><div class="empty">Waiting for data&#8230;</div></div>
       </div>
+      <div class="tcard" data-widget="cat-sparklines">
+        <div class="thdr">Category Success Rate Trends</div>
+        <div id="cat-spark-body" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;padding:4px 0"><div class="empty">Waiting for data&#8230;</div></div>
+      </div>
       </div><!-- /#ov-grid -->
     </div>
     <!-- Security Summary -->
@@ -2240,6 +2244,51 @@ function apply(s){
         return`<tr class="mrow" style="cursor:pointer" onclick="openModal('${H(r.n)}','')"><td><span class="s-ico">${suiteIco(r.n)}</span>${H(r.n)}</td><td class="r">${N(r.ta)}</td><td class="r" style="color:var(--red)">${N(r.tf)}</td><td class="r"><span style="color:${c};font-weight:600">${r.fp.toFixed(1)}%</span></td></tr>`;
       }).join('')+'</tbody></table>';
   })();
+  // Category success rate sparklines
+  (function(){
+    const cb=$('cat-spark-body');if(!cb)return;
+    const ts=_lastState&&_lastState.tests||{};
+    const now=Date.now()/1000;
+    // Aggregate by category
+    const catData={};
+    Object.entries(ts).forEach(([n,t])=>{
+      const cat=_SC[n]||'Other';
+      if(!catData[cat])catData[cat]={ok:0,fail:0,att:0};
+      catData[cat].ok+=(t.pass||0);
+      catData[cat].fail+=(t.fail||0);
+      catData[cat].att+=(t.attempts||0);
+    });
+    if(!Object.keys(catData).length){cb.innerHTML='<div class="empty">Waiting for data…</div>';return;}
+    Object.entries(catData).forEach(([cat,d])=>{
+      const rate=d.att?d.ok/d.att*100:0;
+      if(!_catHist[cat])_catHist[cat]=[];
+      _catHist[cat].push({t:now,rate});
+      if(_catHist[cat].length>30)_catHist[cat].shift();
+    });
+    const cats=Object.keys(catData).sort();
+    cb.innerHTML=cats.map(cat=>{
+      const hist=_catHist[cat]||[];
+      const d=catData[cat];
+      const rate=d.att?d.ok/d.att*100:0;
+      const rateC=rate>=90?'#22c55e':rate>=70?'var(--amber)':'var(--red)';
+      let svgHtml='';
+      if(hist.length>=2){
+        const vals=hist.map(h=>h.rate);
+        const mx=Math.max(...vals,100),mn=Math.min(...vals,0);
+        const w=120,h=28,pad=2;
+        const px=i=>pad+i*(w-2*pad)/(vals.length-1||1);
+        const py=v=>h-pad-(mx===mn?h/2:(v-mn)/(mx-mn)*(h-2*pad));
+        const last=vals[vals.length-1],first=vals[0];
+        const trendC=last>first+1?'#22c55e':last<first-1?'var(--red)':'var(--dim)';
+        svgHtml=`<svg width="${w}" height="${h}" style="flex-shrink:0"><polyline fill="none" stroke="${trendC}" stroke-width="1.5" points="${vals.map((v,i)=>px(i).toFixed(1)+','+py(v).toFixed(1)).join(' ')}" /></svg>`;
+      }
+      const shortCat=cat.replace(' & ',' &amp; ').split(' ').slice(0,2).join(' ');
+      return`<div style="display:flex;align-items:center;gap:8px;background:#151b27;border-radius:8px;padding:7px 10px">`+
+        `<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${shortCat}</div>`+
+        `<div style="font-size:16px;font-weight:700;color:${rateC};font-family:'SF Mono',Consolas,monospace">${rate.toFixed(1)}%</div></div>`+
+        svgHtml+`</div>`;
+    }).join('');
+  })();
   if(!$('drawer').classList.contains('open')){
     const sel=$('cfg-suite');
     if(sel.options.length<=1&&suites.length){suites.forEach(su=>{const o=document.createElement('option');o.value=su.name;o.textContent=su.name+' — '+su.description;sel.appendChild(o);});}
@@ -2631,6 +2680,7 @@ setInterval(pollNetInfo,30000);
 // ── Security Summary ──────────────────────────────────────────────────────────
 let _secTimer=null,_secInterval=1000,_secHist=[];
 const _suiteHist={};
+const _catHist={};  // category -> [{t, rate}]
 let _diskPeakHist=[];
 function drawSecDonut(allowed,blocked,dropped,other){
   const c=$('sec-donut');if(!c)return;
