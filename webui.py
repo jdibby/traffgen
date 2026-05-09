@@ -1329,7 +1329,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         </div>
       </div>
       <div class="tcard" data-widget="sec-breakdown">
-        <div class="thdr">Per-Suite Security Breakdown <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px">sorted by blocked</span></div>
+        <div class="thdr" style="display:flex;align-items:center;justify-content:space-between">Per-Suite Security Breakdown <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px">sorted by blocked</span><span style="display:flex;gap:6px"><button class="ico-btn" style="font-size:12px;padding:3px 10px" onclick="exportSec('csv')" title="Export CSV">CSV</button><button class="ico-btn" style="font-size:12px;padding:3px 10px" onclick="exportSec('json')" title="Export JSON">JSON</button></span></div>
         <table><thead><tr><th>Suite</th><th class="r">Probes</th><th class="r" style="color:#22c55e">Allowed</th><th class="r" style="color:var(--amber)">Blocked</th><th class="r" style="color:#818cf8">Dropped</th><th class="r">Block%</th><th class="r">Drop%</th></tr></thead>
         <tbody id="sec-tbl"><tr><td colspan="7" class="empty">Waiting for data&#8230;</td></tr></tbody></table>
       </div>
@@ -2769,6 +2769,26 @@ function stopTrace(){
 function trProtoChange(){
   const p=$('tr-proto').value;
   $('tr-port').style.display=p==='tcp'?'':' none';
+}
+// ── Security export ───────────────────────────────────────────────────────
+function exportSec(fmt){
+  if(!_lastState)return;
+  const tests=_lastState.tests||{};
+  const rows=Object.entries(tests).map(([n,t])=>{
+    const rch=t.allowed||0,blk=t.blocked||0,drp=t.dropped||0,tot=rch+blk+drp;
+    return{suite:n,probes:tot,allowed:rch,blocked:blk,dropped:drp,
+           block_pct:tot?+(blk/tot*100).toFixed(1):0,drop_pct:tot?+(drp/tot*100).toFixed(1):0};
+  }).sort((a,b)=>b.blocked-a.blocked);
+  const date=new Date().toISOString().slice(0,10);
+  let blob,name;
+  if(fmt==='csv'){
+    const hdr='suite,probes,allowed,blocked,dropped,block_pct,drop_pct\n';
+    const body=rows.map(r=>[r.suite,r.probes,r.allowed,r.blocked,r.dropped,r.block_pct,r.drop_pct].join(',')).join('\n');
+    blob=new Blob([hdr+body],{type:'text/csv'});name='traffgen-security-'+date+'.csv';
+  }else{
+    blob=new Blob([JSON.stringify({date,rows},null,2)],{type:'application/json'});name='traffgen-security-'+date+'.json';
+  }
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();URL.revokeObjectURL(a.href);
 }
 window.addEventListener('resize',()=>{
   if(_lastState){drawSpark(_lastState.history||[]);drawSecTrend(_secHist);}
