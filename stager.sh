@@ -558,26 +558,51 @@ else
     fi
 fi
 
-# Build docker run command from user-selected configuration
-_DOCKER_NET_ARGS=""
+# Ensure no stale container with this name blocks the new one
+docker rm -f traffgen 2>/dev/null || true
+
+# Build docker run args as an array to avoid word-splitting issues
+_DOCKER_ARGS=(
+    --detach
+    --restart unless-stopped
+)
 if [ "$_CFG_WEBUI" -eq 1 ]; then
     if [ "$_CFG_NET_HOST" -eq 1 ]; then
-        _DOCKER_NET_ARGS="--network=host"
+        _DOCKER_ARGS+=(--network=host)
     else
-        _DOCKER_NET_ARGS="-p ${_CFG_PORT}:7777"
+        _DOCKER_ARGS+=(-p "${_CFG_PORT}:7777")
     fi
 fi
+if [ -n "${HOST_LAN_CIDR:-}" ]; then
+    _DOCKER_ARGS+=(-e "HOST_LAN_CIDR=${HOST_LAN_CIDR}")
+fi
+_DOCKER_ARGS+=(--name traffgen jdibby/traffgen:latest)
+_DOCKER_ARGS+=(--suite="${_CFG_SUITE}" --size="${_CFG_SIZE}" --max-wait-secs="${_CFG_WAIT}")
+[ -n "${_CFG_LOOP:-}" ] && _DOCKER_ARGS+=("${_CFG_LOOP}")
 
-_DOCKER_GEN_ARGS="--suite=${_CFG_SUITE} --size=${_CFG_SIZE} --max-wait-secs=${_CFG_WAIT}${_CFG_LOOP:+ $_CFG_LOOP}"
+_RUN_LOG=$(mktemp)
+if ! docker run "${_DOCKER_ARGS[@]}" 2>"$_RUN_LOG"; then
+    echo "" >&2
+    echo "ERROR: docker run failed." >&2
+    cat "$_RUN_LOG" >&2
+    rm -f "$_RUN_LOG"
+    # Show any container that may have been partially created
+    _STALE=$(docker ps -a --filter "name=^traffgen$" --format "{{.ID}} {{.Status}}" 2>/dev/null || true)
+    [ -n "$_STALE" ] && echo "Stale container state: $_STALE" >&2
+    exit 1
+fi
+rm -f "$_RUN_LOG"
 
-docker run \
-    --detach \
-    --restart unless-stopped \
-    ${_DOCKER_NET_ARGS:+$_DOCKER_NET_ARGS} \
-    ${HOST_LAN_CIDR:+-e HOST_LAN_CIDR="$HOST_LAN_CIDR"} \
-    --name traffgen \
-    jdibby/traffgen:latest \
-    ${_DOCKER_GEN_ARGS}
+# Brief wait and verify the container is actually running
+sleep 2
+if ! docker ps --filter "name=^traffgen$" --filter "status=running" --format "{{.Names}}" | grep -q traffgen; then
+    echo "" >&2
+    echo "ERROR: container 'traffgen' started but is not running." >&2
+    docker ps -a --filter "name=^traffgen$" --format "  Status: {{.Status}}" >&2
+    echo "  Logs:" >&2
+    docker logs --tail 20 traffgen 2>&1 | sed 's/^/    /' >&2
+    exit 1
+fi
 
 ok "Container started"
 

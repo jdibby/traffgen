@@ -2266,6 +2266,7 @@ let _start=null,_uptimer=null,_elTimer=null,_pauseTimer=null,_autoScroll=true,_s
 let _waitBannerTimer=null,_waitBannerUntil=0;
 function _showWaitBanner(until){
   const wb=$('wait-banner'),txt=$('wait-banner-txt');if(!wb||!txt)return;
+  if(wb.style.display==='flex'&&_waitBannerUntil===until)return;
   _waitBannerUntil=until;
   wb.style.display='flex';
   if(_waitBannerTimer)clearInterval(_waitBannerTimer);
