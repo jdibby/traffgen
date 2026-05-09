@@ -3095,8 +3095,8 @@ function exportResults(fmt){
     const payload={exported_at:new Date().toISOString(),status:_lastState.status||'',totals:tot,suites:rows};
     content=JSON.stringify(payload,null,2);mime='application/json';ext='json';
   } else {
-    const hdr='suite,attempts,ok,fail,allowed,blocked,dropped\n';
-    content=hdr+rows.map(r=>[r.suite,r.attempts,r.ok,r.fail,r.allowed,r.blocked,r.dropped].join(',')).join('\n');
+    const hdr='suite,attempts,ok,fail,allowed,blocked,dropped\\n';
+    content=hdr+rows.map(r=>[r.suite,r.attempts,r.ok,r.fail,r.allowed,r.blocked,r.dropped].join(',')).join('\\n');
     mime='text/csv';ext='csv';
   }
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type:mime}));
