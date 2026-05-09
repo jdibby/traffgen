@@ -3058,10 +3058,11 @@ document.addEventListener('DOMContentLoaded',_renderRunHistory);
     if(k==='Escape'){if($('drawer').classList.contains('open')){closeDrawer();}const m=$('suite-modal');if(m&&m.style.display!=='none'){closeModal&&closeModal();}return;}
     if(k==='?'){showKbHelp();return;}
   });
-  const _KBH_HTML='<div id="kb-overlay" onclick="if(event.target.id===\'kb-overlay\')this.remove()" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;display:flex;align-items:center;justify-content:center"><div style="background:#1a1f2e;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:24px 32px;min-width:340px;max-width:480px"><div style="font-weight:700;font-size:16px;color:#e8eaf0;margin-bottom:16px">Keyboard Shortcuts</div><table style="width:100%;border-collapse:collapse;font-size:14px">'+
+  window._closeKbHelp=function(){const o=document.getElementById('kb-overlay');if(o)o.remove();};
+  const _KBH_HTML='<div id="kb-overlay" onclick="if(event.target===this)_closeKbHelp()" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;display:flex;align-items:center;justify-content:center"><div style="background:#1a1f2e;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:24px 32px;min-width:340px;max-width:480px"><div style="font-weight:700;font-size:16px;color:#e8eaf0;margin-bottom:16px">Keyboard Shortcuts</div><table style="width:100%;border-collapse:collapse;font-size:14px">'+
     [['1–7','Navigate tabs'],['R','Restart tests'],['P','Pause / Resume'],['Esc','Close modal / drawer'],['?','This help']]
     .map(([k,v])=>'<tr><td style="padding:5px 16px 5px 0;font-family:SF Mono,Consolas,monospace;color:#22c55e;white-space:nowrap">'+k+'</td><td style="padding:5px 0;color:#9aa3b8">'+v+'</td></tr>').join('')+
-    '</table><button onclick="document.getElementById(\'kb-overlay\').remove()" style="margin-top:16px;padding:6px 18px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:#e8eaf0;cursor:pointer;font-size:13px">Close</button></div></div>';
+    '</table><button onclick="_closeKbHelp()" style="margin-top:16px;padding:6px 18px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:#e8eaf0;cursor:pointer;font-size:13px">Close</button></div></div>';
   window.showKbHelp=function(){if(!$('kb-overlay')){document.body.insertAdjacentHTML('beforeend',_KBH_HTML);}};
 })();
 (function(){
