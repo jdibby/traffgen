@@ -1431,6 +1431,10 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div class="thdr">Latency Heatmap <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px">avg duration over time &middot; green&lt;500ms amber&lt;2s red≥2s</span></div>
         <div id="lat-heatmap-body" style="overflow-x:auto"><div class="empty">Waiting for data&#8230;</div></div>
       </div>
+      <div class="tcard" data-widget="slowest-suites">
+        <div class="thdr">Slowest Suites <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px">by avg duration</span></div>
+        <div id="slowest-body"><div class="empty">Waiting for data&#8230;</div></div>
+      </div>
       </div><!-- /#ov-grid -->
     </div>
     <!-- Security Summary -->
@@ -1505,6 +1509,27 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div style="flex:1;height:1px;background:rgba(245,158,11,.3)"></div>
       </div>
       <div class="obody" id="obody"></div>
+    </div>
+    <!-- Latency -->
+    <div id="tab-latency" class="panel">
+      <div style="max-width:1400px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:14px">
+      <div class="cards" data-widget="latency-kpis" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));cursor:default">
+        <div class="card"><div class="clbl">Fastest Suite</div><div class="cval c-green" id="lat-fastest" style="font-size:18px">&#8212;</div><div class="csub" id="lat-fastest-name" style="max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">&#8212;</div></div>
+        <div class="card"><div class="clbl">Slowest Suite</div><div class="cval" id="lat-slowest" style="font-size:18px">&#8212;</div><div class="csub" id="lat-slowest-name" style="max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">&#8212;</div></div>
+        <div class="card"><div class="clbl">Median Duration</div><div class="cval c-blue" id="lat-median" style="font-size:18px">&#8212;</div><div class="csub">across suites</div></div>
+        <div class="card"><div class="clbl">Suites with Data</div><div class="cval c-amber" id="lat-count">&#8212;</div><div class="csub">have ran</div></div>
+      </div>
+      <div class="tcard">
+        <div class="thdr" style="display:flex;align-items:center;justify-content:space-between">Suite Latency Table <span style="font-size:12px;font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim)">avg duration &middot; click header to sort</span></div>
+        <table><thead><tr>
+          <th onclick="sortLatTbl('name')" style="cursor:pointer">Suite</th>
+          <th class="r" onclick="sortLatTbl('avg')" style="cursor:pointer">Avg Duration</th>
+          <th class="r" onclick="sortLatTbl('att')" style="cursor:pointer">Attempts</th>
+          <th class="r" onclick="sortLatTbl('last')" style="cursor:pointer">Last Run</th>
+        </tr></thead>
+        <tbody id="lat-tbl"><tr><td colspan="4" class="empty">Waiting for data&#8230;</td></tr></tbody></table>
+      </div>
+      </div>
     </div>
     <!-- Health -->
     <div id="tab-health" class="panel">
@@ -2102,7 +2127,7 @@ let _healthTimer=null,_netInfoTimer=null,_lastHealth=null,_netHist=[],_hNetHist=
 let _cpuHist=[],_memHist=[];
 function uptime(t){const s=Math.floor(Date.now()/1000-t);return[Math.floor(s/3600),Math.floor((s%3600)/60),s%60].map(v=>String(v).padStart(2,'0')).join(':');}
 function elapsed(t){if(!t)return'';const s=Math.floor(Date.now()/1000-t);if(s<60)return s+'s elapsed';if(s<3600)return Math.floor(s/60)+'m '+(s%60)+'s elapsed';return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m elapsed';}
-const PAGE_TITLES={overview:'Overview',security:'Security',tests:'Tests',output:'Live View',diagnostics:'Diagnostics',health:'Health',about:'About',changelog:'Changelog'};
+const PAGE_TITLES={overview:'Overview',security:'Security',tests:'Tests',output:'Live View',diagnostics:'Diagnostics',latency:'Latency',health:'Health',about:'About',changelog:'Changelog'};
 const SUITE_ICONS={
   'ad-tracker':'🎯','ai-browse':'🤖','bgp':'🌐','bulk-transfer':'💾',
   'blocklist-probe':'🚫','c2-beacon':'📡','llm-dlp':'🧠','web-crawl':'🕷️','dlp':'🔒',
@@ -2259,6 +2284,8 @@ function setTestsCat(el,cat){
   if(_lastState)renderState(_lastState);
 }
 function showTab(btn){
+  // Trigger latency render immediately when switching to that tab
+  if(btn.dataset&&btn.dataset.tab==='latency'&&_lastState)setTimeout(()=>renderLatency(_lastState),0);
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   btn.classList.add('active');
@@ -2360,6 +2387,7 @@ function apply(s){
   })();
   drawDonut(ok,fail);$('leg-ok').textContent=N(ok)+' OK';$('leg-fail').textContent=N(fail)+' Fail';
   _updateLatHeat(s);
+  if($('tab-latency')&&$('tab-latency').classList.contains('active'))renderLatency(s);
   const hist=s.history||[];drawSpark(hist);if(hist.length>1)$('hist-info').textContent=hist.length+' samples';
   if(hist.length>=2){const h0=hist[hist.length-2],h1=hist[hist.length-1],dt=h1.t-h0.t,dp=(h1.ok+h1.fail)-(h0.ok+h0.fail);if(dt>0){const ppm=Math.round(dp/dt*60);$('v-ppm').textContent=N(ppm);$('s-ppm').textContent='probes per minute';}}else{$('v-ppm').textContent='—';$('s-ppm').textContent='accumulating…';}
   const tests=s.tests||{},names=Object.keys(tests).sort(),tb=$('tbl-body');
@@ -2491,6 +2519,20 @@ function apply(s){
         `<div style="font-size:16px;font-weight:700;color:${rateC};font-family:'SF Mono',Consolas,monospace">${rate.toFixed(1)}%</div></div>`+
         svgHtml+`</div>`;
     }).join('');
+  })();
+  // Slowest suites widget
+  (function(){
+    const sb=$('slowest-body');if(!sb)return;
+    const ts=_lastState&&_lastState.tests||{};
+    const rows=Object.entries(ts).filter(([,t])=>(t.avg_dur_ms||0)>0)
+      .map(([n,t])=>({n,avg:t.avg_dur_ms||0,att:t.attempts||0}))
+      .sort((a,b)=>b.avg-a.avg).slice(0,8);
+    if(!rows.length){sb.innerHTML='<div class="empty">No timing data yet</div>';return;}
+    sb.innerHTML='<table style="width:100%"><thead><tr><th>Suite</th><th class="r">Attempts</th><th class="r">Avg Duration</th></tr></thead><tbody>'+
+      rows.map(r=>{
+        const c=r.avg>2000?'var(--red)':r.avg>500?'var(--amber)':'var(--green)';
+        return`<tr class="mrow"><td><span class="s-ico">${suiteIco(r.n)}</span>${H(r.n)}</td><td class="r">${N(r.att)}</td><td class="r"><span style="color:${c};font-weight:600;font-family:'SF Mono',Consolas,monospace">${Dur(r.avg)}</span></td></tr>`;
+      }).join('')+'</tbody></table>';
   })();
   if(!$('drawer').classList.contains('open')){
     const sel=$('cfg-suite');
@@ -3178,7 +3220,7 @@ function exportSec(fmt){
 })();
 // ── URL fragment routing ─────────────────────────────────────────────────
 (function(){
-  const _TABS=['overview','security','tests','output','diagnostics','health','about','changelog'];
+  const _TABS=['overview','security','tests','output','diagnostics','latency','health','about','changelog'];
   function _fragTab(){
     const h=location.hash.slice(1).split('/')[0];
     return _TABS.includes(h)?h:null;
@@ -3291,14 +3333,12 @@ function _trackRunHistory(s){
   const iter=s.iteration||0;
   if(!iter)return;
   if(iter!==_lastIter&&_lastIter>0&&_lastIterSnap){
-    // Iteration rolled over — save snapshot of completed run
     const h=_loadRunHistory();
     h.push(_lastIterSnap);
     _saveRunHistory(h);
     _renderRunHistory();
   }
   _lastIter=iter;
-  // Snapshot current state for when next iteration begins
   const tot=s.totals||{},ok=tot.ok||0,att=tot.attempts||0,fail=tot.fail||0;
   const tests=s.tests||{};
   const suiteSnap=Object.entries(tests).map(([n,t])=>({n,att:t.attempts||0,ok:t.ok||0,fail:t.fail||0}));
@@ -3342,7 +3382,7 @@ function toggleRunDetail(id){
 }
 document.addEventListener('DOMContentLoaded',_renderRunHistory);
 // ── Latency heatmap ──────────────────────────────────────────────────────
-const _latHeat={};  // suite -> [avg_dur_ms, ...]  (rolling 20)
+const _latHeat={};
 function _updateLatHeat(s){
   const tests=s.tests||{};
   Object.entries(tests).forEach(([n,t])=>{
@@ -3361,7 +3401,6 @@ function _updateLatHeat(s){
   const _heatColor=ms=>ms<500?'#166534':ms<1000?'#22c55e':ms<2000?'#b45309':ms<5000?'#f59e0b':'#ef4444';
   const rows=suites.map(n=>{
     const hist=_latHeat[n];
-    // Pad left so all rows align to same rightmost column
     const pad=maxCols-hist.length;
     const cells=Array(pad).fill(null).concat(hist).map((v,i)=>{
       if(v===null)return`<td style="width:${cellW}px;height:${cellH}px;background:#0f1621"></td>`;
@@ -3402,6 +3441,40 @@ function runOnDemand(){
     $('odr-btn').disabled=false;
     $('odr-result').innerHTML=`<div class="tr-status" style="color:var(--red)">${H(e.message)}</div>`;
   });
+}
+// ── Latency tab ──────────────────────────────────────────────────────────
+let _latSort='avg',_latDir=-1;
+function _durColor(ms){return ms<500?'var(--green)':ms<2000?'var(--amber)':'var(--red)';}
+function renderLatency(s){
+  if(!s)return;
+  const tests=s.tests||{};
+  const rows=Object.entries(tests)
+    .filter(([,t])=>(t.avg_dur_ms||0)>0)
+    .map(([n,t])=>({n,avg:t.avg_dur_ms||0,att:t.attempts||0,last:t.last_run_at||0}));
+  if(rows.length){
+    rows.sort((a,b)=>a.avg-b.avg);
+    const fastest=rows[0],slowest=rows[rows.length-1];
+    if($('lat-fastest')){$('lat-fastest').textContent=Dur(fastest.avg);$('lat-fastest').style.color=_durColor(fastest.avg);$('lat-fastest-name').textContent=fastest.n;}
+    if($('lat-slowest')){$('lat-slowest').textContent=Dur(slowest.avg);$('lat-slowest').style.color=_durColor(slowest.avg);$('lat-slowest-name').textContent=slowest.n;}
+    const meds=rows.map(r=>r.avg).sort((a,b)=>a-b);
+    const med=meds[Math.floor(meds.length/2)];
+    if($('lat-median')){$('lat-median').textContent=Dur(med);$('lat-median').style.color=_durColor(med);}
+    if($('lat-count'))$('lat-count').textContent=rows.length;
+  }
+  const tb=$('lat-tbl');if(!tb)return;
+  if(!rows.length){tb.innerHTML='<tr><td colspan="4" class="empty">No data yet — suites accumulate duration after their first run</td></tr>';return;}
+  const sorted=[...rows].sort((a,b)=>_latDir*((_latSort==='avg'?a.avg-b.avg:_latSort==='att'?a.att-b.att:_latSort==='last'?a.last-b.last:a.n.localeCompare(b.n))));
+  tb.innerHTML=sorted.map(r=>{
+    const col=_durColor(r.avg);
+    return`<tr class="mrow"><td class="nm" style="cursor:default"><span class="s-ico">${suiteIco(r.n)}</span>${H(r.n)}</td>`+
+      `<td class="r"><span style="color:${col};font-weight:600;font-family:'SF Mono',Consolas,monospace">${Dur(r.avg)}</span></td>`+
+      `<td class="r">${N(r.att)}</td>`+
+      `<td class="r" style="color:var(--muted)">${r.last?Tc(r.last):'—'}</td></tr>`;
+  }).join('');
+}
+function sortLatTbl(col){
+  if(_latSort===col)_latDir*=-1;else{_latSort=col;_latDir=col==='name'?1:-1;}
+  if(_lastState)renderLatency(_lastState);
 }
 window.addEventListener('resize',()=>{
   if(_lastState){drawSpark(_lastState.history||[]);drawSecTrend(_secHist);}
