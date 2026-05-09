@@ -2356,7 +2356,8 @@ function drawDiskBars(r,w){
   c.width=Math.floor(rect.width)||300;c.height=58;
   const ctx=c.getContext('2d'),W=c.width,bh=16,lw=48,gy=6;
   ctx.clearRect(0,0,W,58);
-  const mx=Math.max(r,w,1);
+  _diskPeakHist.push(Math.max(r,w));if(_diskPeakHist.length>60)_diskPeakHist.shift();
+  const mx=Math.max(..._diskPeakHist,500);
   const drawBar=(y,v,col,lbl)=>{
     ctx.fillStyle=_canvasMuted();ctx.font='12px SF Mono,Consolas,monospace';ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText(lbl,lw-4,y+bh/2);
     ctx.fillStyle=_canvasBg();ctx.fillRect(lw,y,W-lw-gy,bh);
@@ -2479,6 +2480,7 @@ pollNetInfo();
 setInterval(pollNetInfo,30000);
 // ── Security Summary ──────────────────────────────────────────────────────────
 let _secTimer=null,_secInterval=1000,_secHist=[];
+let _diskPeakHist=[];
 function drawSecDonut(allowed,blocked,dropped,other){
   const c=$('sec-donut');if(!c)return;
   const ctx=c.getContext('2d'),W=c.width,H2=c.height,cx=W/2,cy=H2/2,r=66,ri=46;
