@@ -2325,7 +2325,7 @@ function drawSpark(history){
   if(failV.some(v=>v>0)){ctx.beginPath();history.forEach((p,i)=>{const x=xOf(i),y=yOf(p.fail||0);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});ctx.strokeStyle='#f85149';ctx.lineWidth=1.5;ctx.setLineDash([4,3]);ctx.stroke();ctx.setLineDash([]);}
   ctx.fillStyle=_canvasMuted();ctx.font='12px SF Mono,Consolas,monospace';ctx.textAlign='left';ctx.fillText(Ts(history[0].t),P.l,H2-3);ctx.textAlign='right';ctx.fillText(Ts(history[history.length-1].t),P.l+IW,H2-3);
 }
-const ST_CLS={running:'tp-running',between_tests:'tp-dim',paused:'tp-paused',stopped:'tp-stopped',starting:'tp-dim'};
+const ST_CLS={running:'tp-running',between_tests:'tp-paused',paused:'tp-paused',stopped:'tp-stopped',starting:'tp-dim'};
 const ST_LBL={running:'Running',between_tests:'Between Tests',paused:'Paused',stopped:'Stopped',starting:'Starting'};
 function apply(s){
   _lastState=s;
