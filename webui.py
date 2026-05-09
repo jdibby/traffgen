@@ -1183,7 +1183,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
   </div>
   <div class="nav-lbl">Monitor</div>
   <button class="nav-item active" data-tab="overview" onclick="showTab(this)"><span class="nav-ico">◈</span>Overview</button>
-  <button class="nav-item" data-tab="security" onclick="showTab(this)"><span class="nav-ico">&#128737;</span>Security</button>
+  <button class="nav-item" data-tab="security" onclick="showTab(this)"><span class="nav-ico">&#128737;</span>Security<span id="alert-badge" style="display:none;margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:700;border-radius:10px;padding:1px 6px;letter-spacing:0;text-transform:none;line-height:16px">0</span></button>
   <button class="nav-item" id="nav-tests" data-tab="tests" onclick="toggleTestsNav(this)"><span class="nav-ico">⚗</span><span style="flex:1">Tests</span><span class="nav-arr" id="tests-arr" onclick="collapseTestsSub(event)" title="Collapse/expand">&#9656;</span></button>
   <div class="nav-sub" id="tests-sub">
     <button class="nav-sub-item active" onclick="setTestsCat(this,'all')">All Tests</button>
@@ -1336,6 +1336,10 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
       <div class="tcard" data-widget="sec-signals">
         <div class="thdr">Block Signal Breakdown <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px">how security controls are signalling blocks</span></div>
         <div id="sec-signals" class="sec-signals"><div class="empty">Waiting for data&#8230;</div></div>
+      </div>
+      <div class="tcard" data-widget="alert-log">
+        <div class="thdr" style="display:flex;align-items:center;justify-content:space-between">Active Alerts <span id="alert-log-clear" onclick="clearAlertLog()" style="font-size:12px;font-weight:400;letter-spacing:0;text-transform:none;cursor:pointer;color:var(--dim)">Clear all</span></div>
+        <div id="alert-log-body"><div class="empty">No active alerts</div></div>
       </div>
       </div><!-- /#sec-grid -->
     </div>
@@ -1777,6 +1781,10 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
     </div>
     <div class="field"><div class="togrow"><span class="toglbl">Loop Mode</span><label class="tog"><input type="checkbox" id="cfg-loop" checked><span class="tslider"></span></label></div></div>
     <div class="field"><div class="togrow"><span class="toglbl">No Wait (skip pauses)</span><label class="tog"><input type="checkbox" id="cfg-nowait"><span class="tslider"></span></label></div></div>
+    <div class="modal-sep" style="margin:12px 0 8px">Alert Thresholds</div>
+    <div class="field"><label style="font-size:12px">Block Rate %</label><div class="rngw"><input type="range" id="thr-block" min="0" max="100" step="5" value="20" oninput="$('thr-block-val').textContent=this.value+'%';saveThresholds()"><span class="rngv" id="thr-block-val">20%</span></div></div>
+    <div class="field"><label style="font-size:12px">Drop Rate %</label><div class="rngw"><input type="range" id="thr-drop" min="0" max="100" step="5" value="30" oninput="$('thr-drop-val').textContent=this.value+'%';saveThresholds()"><span class="rngv" id="thr-drop-val">30%</span></div></div>
+    <div class="field"><label style="font-size:12px">Suite Fail %</label><div class="rngw"><input type="range" id="thr-fail" min="0" max="100" step="5" value="50" oninput="$('thr-fail-val').textContent=this.value+'%';saveThresholds()"><span class="rngv" id="thr-fail-val">50%</span></div></div>
     <button class="btn-p" id="drawer-apply" onclick="applySettings()">Apply &amp; Restart</button>
     <p class="fnote">New settings apply at the next test boundary without restarting the container.</p>
   </div>
@@ -2675,6 +2683,7 @@ function updateSecurityTab(){
     if(_secHist.length>120)_secHist.shift();
   }
   drawSecTrend(_secHist);
+  if(typeof _checkAlerts==='function')_checkAlerts(s);
   // per-suite table — sort by blocked desc
   const rows=Object.entries(tests).map(([n,t])=>({n,ta:t.attempts||0,rch:t.allowed||0,blk:t.blocked||0,drp:t.dropped||0,tot:(t.allowed||0)+(t.blocked||0)+(t.dropped||0)}));
   rows.sort((a,b)=>b.blk-a.blk||(b.drp-a.drp));
@@ -2832,6 +2841,85 @@ function exportSec(fmt){
     const t=_fragTab();if(t)navTo(t);
   });
 })();
+// ── Threshold alerts ─────────────────────────────────────────────────────
+const _alertState={}; // suite->last breach type
+const _alertLog=JSON.parse(localStorage.getItem('tg_alert_log')||'[]');
+function _loadThresholds(){
+  const s=JSON.parse(localStorage.getItem('tg_thresholds')||'{}');
+  const bv=$('thr-block'),dv=$('thr-drop'),fv=$('thr-fail');
+  if(bv){bv.value=s.block||20;$('thr-block-val').textContent=(s.block||20)+'%';}
+  if(dv){dv.value=s.drop||30;$('thr-drop-val').textContent=(s.drop||30)+'%';}
+  if(fv){fv.value=s.fail||50;$('thr-fail-val').textContent=(s.fail||50)+'%';}
+}
+function saveThresholds(){
+  const s={block:+($('thr-block')||{value:20}).value,drop:+($('thr-drop')||{value:30}).value,fail:+($('thr-fail')||{value:50}).value};
+  localStorage.setItem('tg_thresholds',JSON.stringify(s));
+}
+function _getThresholds(){
+  return JSON.parse(localStorage.getItem('tg_thresholds')||'{"block":20,"drop":30,"fail":50}');
+}
+function _checkAlerts(state){
+  const thr=_getThresholds();
+  const tests=state.tests||{};
+  const newBreaches=[];
+  Object.entries(tests).forEach(([n,t])=>{
+    const rch=t.allowed||0,blk=t.blocked||0,drp=t.dropped||0,tot=rch+blk+drp;
+    const att=t.attempts||0,fail=t.fail||0;
+    const bp=tot?blk/tot*100:0,dp=tot?drp/tot*100:0,fp=att?fail/att*100:0;
+    if(bp>=thr.block&&tot>0)newBreaches.push({suite:n,type:'block',val:bp.toFixed(1),thr:thr.block});
+    else if(dp>=thr.drop&&tot>0)newBreaches.push({suite:n,type:'drop',val:dp.toFixed(1),thr:thr.drop});
+    else if(fp>=thr.fail&&att>0)newBreaches.push({suite:n,type:'fail',val:fp.toFixed(1),thr:thr.fail});
+  });
+  // Fire toast for new breaches
+  newBreaches.forEach(b=>{
+    const key=b.suite+':'+b.type;
+    if(!_alertState[key]){
+      _alertState[key]=true;
+      const msg=`${b.suite} ${b.type} rate ${b.val}% exceeds threshold ${b.thr}%`;
+      _alertLog.unshift({t:Date.now(),msg});
+      if(_alertLog.length>50)_alertLog.length=50;
+      localStorage.setItem('tg_alert_log',JSON.stringify(_alertLog));
+      _showToast(msg);
+    }
+  });
+  // Clear resolved
+  const breachKeys=new Set(newBreaches.map(b=>b.suite+':'+b.type));
+  Object.keys(_alertState).forEach(k=>{if(!breachKeys.has(k))delete _alertState[k];});
+  // Update badge
+  const badge=$('alert-badge');
+  if(badge){badge.textContent=newBreaches.length;badge.style.display=newBreaches.length?'':'none';}
+  _renderAlertLog(newBreaches);
+}
+function _renderAlertLog(breaches){
+  const lb=$('alert-log-body');if(!lb)return;
+  if(!breaches.length&&!_alertLog.length){lb.innerHTML='<div class="empty">No active alerts</div>';return;}
+  const activeHtml=breaches.map(b=>{
+    const c=b.type==='block'?'var(--amber)':b.type==='drop'?'var(--blue)':'var(--red)';
+    return`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)"><span style="background:${c};color:#fff;font-size:10px;font-weight:700;border-radius:4px;padding:1px 5px;text-transform:uppercase">${b.type}</span><span style="flex:1;font-size:13px">${H(b.suite)}</span><span style="font-size:13px;color:${c};font-weight:700">${b.val}%</span><span style="font-size:11px;color:var(--dim)">thr:${b.thr}%</span></div>`;
+  }).join('');
+  const histHtml=_alertLog.slice(0,10).map(e=>{
+    const d=new Date(e.t),ts=d.toLocaleTimeString();
+    return`<div style="font-size:12px;color:var(--muted);padding:3px 0">${ts} — ${H(e.msg)}</div>`;
+  }).join('');
+  lb.innerHTML=(activeHtml||'')+(histHtml?'<div style="margin-top:8px;font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px">Recent</div>'+histHtml:'');
+}
+function clearAlertLog(){
+  _alertLog.length=0;localStorage.removeItem('tg_alert_log');
+  _renderAlertLog(Object.keys(_alertState).length?[]:[] );
+}
+function _showToast(msg){
+  const t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:24px;right:24px;background:#1e2d3d;border:1px solid var(--red);border-radius:10px;padding:12px 18px;color:#e8eaf0;font-size:13px;z-index:9999;max-width:340px;box-shadow:0 4px 20px rgba(0,0,0,.5);animation:slideUp .25s ease';
+  t.innerHTML='<span style="color:var(--red);font-weight:700;margin-right:6px">&#9888;</span>'+H(msg);
+  document.body.appendChild(t);
+  setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .4s';setTimeout(()=>t.remove(),400);},5000);
+}
+document.addEventListener('DOMContentLoaded',function(){
+  _loadThresholds();
+  const s=document.createElement('style');
+  s.textContent='@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:none;opacity:1}}';
+  document.head.appendChild(s);
+});
 window.addEventListener('resize',()=>{
   if(_lastState){drawSpark(_lastState.history||[]);drawSecTrend(_secHist);}
   if(_lastHealth){drawDiskBars(_lastHealth.disk_read_kbps||0,_lastHealth.disk_write_kbps||0);drawNetSpark('net-spark',_netHist);drawNetSpark('h-net-spark',_hNetHist);}
