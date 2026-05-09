@@ -1368,6 +1368,10 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div class="thdr">Category Success Rate Trends</div>
         <div id="cat-spark-body" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;padding:4px 0"><div class="empty">Waiting for data&#8230;</div></div>
       </div>
+      <div class="tcard" data-widget="top-failing-suites">
+        <div class="thdr">Top Failing Suites</div>
+        <div id="top-fail-body" style="padding:4px 0"><div class="empty">Waiting for data&#8230;</div></div>
+      </div>
       <div style="display:flex;gap:8px;justify-content:flex-end;padding:4px 0">
         <button onclick="exportResults('csv')" title="Download results as CSV" style="padding:5px 14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:#e8eaf0;cursor:pointer;font-size:13px">&#11123; CSV</button>
         <button onclick="exportResults('json')" title="Download results as JSON" style="padding:5px 14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:#e8eaf0;cursor:pointer;font-size:13px">&#11123; JSON</button>
@@ -1653,6 +1657,14 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
     <!-- Changelog -->
     <div id="tab-changelog" class="panel">
       <div style="max-width:900px">
+
+        <div class="a-section">
+          <div class="a-h">v3.4.4 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
+          <table class="st-table" style="margin-top:10px">
+            <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td>Top Failing Suites widget on the Overview tab — shows up to 8 suites ranked by failure count with a proportional bar and failure percentage</td></tr>
+          </table>
+        </div>
 
         <div class="a-section">
           <div class="a-h">v3.4.3 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
@@ -3051,6 +3063,28 @@ document.addEventListener('DOMContentLoaded',_renderRunHistory);
     .map(([k,v])=>'<tr><td style="padding:5px 16px 5px 0;font-family:SF Mono,Consolas,monospace;color:#22c55e;white-space:nowrap">'+k+'</td><td style="padding:5px 0;color:#9aa3b8">'+v+'</td></tr>').join('')+
     '</table><button onclick="document.getElementById(\'kb-overlay\').remove()" style="margin-top:16px;padding:6px 18px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:#e8eaf0;cursor:pointer;font-size:13px">Close</button></div></div>';
   window.showKbHelp=function(){if(!$('kb-overlay')){document.body.insertAdjacentHTML('beforeend',_KBH_HTML);}};
+})();
+(function(){
+  const TOP_N=8;
+  function _render(s){
+    const el=$('top-fail-body');if(!el)return;
+    const tests=s.tests||{};
+    const rows=Object.keys(tests).map(n=>{const t=tests[n];return{n,fail:t.fail||0,att:t.attempts||0};})
+      .filter(r=>r.fail>0).sort((a,b)=>b.fail-a.fail).slice(0,TOP_N);
+    if(!rows.length){el.innerHTML='<div class="empty">No failures yet</div>';return;}
+    const maxF=rows[0].fail||1;
+    el.innerHTML=rows.map(r=>{
+      const pct=r.att?Math.round(r.fail/r.att*100):0;
+      const bar=Math.round(r.fail/maxF*100);
+      return '<div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.06)">'
+        +'<div style="width:140px;font-size:13px;color:#e8eaf0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+H(r.n)+'">'+H(r.n)+'</div>'
+        +'<div style="flex:1;height:6px;background:rgba(255,255,255,.08);border-radius:3px"><div style="height:100%;width:'+bar+'%;background:#f85149;border-radius:3px"></div></div>'
+        +'<div style="width:70px;text-align:right;font-size:12px;color:#f85149;font-family:SF Mono,Consolas,monospace">'+N(r.fail)+' ('+pct+'%)</div>'
+        +'</div>';
+    }).join('');
+  }
+  const _origApply=apply;
+  window.apply=function(s){_origApply(s);_render(s);};
 })();
 function exportResults(fmt){
   if(!_lastState){toast('No data to export yet',false);return;}
