@@ -787,6 +787,80 @@ def api_traceroute():
     )
 
 
+@app.route("/api/tls-check")
+def api_tls_check():
+    host = request.args.get("host", "").strip()
+    if not _TARGET_RE.match(host):
+        return jsonify({"error": "Invalid host"}), 400
+    raw_port = request.args.get("port", "443")
+    if not raw_port.isdigit() or not (1 <= int(raw_port) <= 65535):
+        return jsonify({"error": "Invalid port"}), 400
+    port = int(raw_port)
+    try:
+        ctx = ssl.create_default_context()
+        ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+        with _socket.create_connection((host, port), timeout=8) as sock:
+            with ctx.wrap_socket(sock, server_hostname=host) as ssock:
+                cert = ssock.getpeercert()
+                cipher = ssock.cipher()
+                version = ssock.version()
+        subject  = dict(x[0] for x in cert.get("subject", []))
+        issuer   = dict(x[0] for x in cert.get("issuer", []))
+        sans     = [v for t, v in cert.get("subjectAltName", []) if t == "DNS"]
+        not_before = cert.get("notBefore", "")
+        not_after  = cert.get("notAfter", "")
+        return jsonify({
+            "host": host, "port": port,
+            "tls_version": version,
+            "cipher": cipher[0] if cipher else "",
+            "cn": subject.get("commonName", ""),
+            "issuer_cn": issuer.get("commonName", ""),
+            "issuer_org": issuer.get("organizationName", ""),
+            "not_before": not_before, "not_after": not_after,
+            "sans": sans[:20],
+        })
+    except ssl.SSLCertVerificationError as e:
+        return jsonify({"error": f"Certificate verification failed: {e.reason}"}), 200
+    except (ConnectionRefusedError, TimeoutError, OSError):
+        return jsonify({"error": "Connection failed — check host and port"}), 200
+    except Exception as e:
+        return jsonify({"error": f"TLS error ({type(e).__name__})"}), 200
+
+
+@app.route("/api/dns-lookup")
+def api_dns_lookup():
+    host = request.args.get("host", "").strip()
+    if not _TARGET_RE.match(host):
+        return jsonify({"error": "Invalid host"}), 400
+    resolvers_raw = request.args.get("resolvers", "8.8.8.8,1.1.1.1,9.9.9.9")
+    _ip_re = __import__('re').compile(r'^(\d{1,3}\.){3}\d{1,3}$')
+    resolvers = [r.strip() for r in resolvers_raw.split(",") if _ip_re.match(r.strip())][:5]
+    if not resolvers:
+        resolvers = ["8.8.8.8", "1.1.1.1"]
+    results = []
+    for resolver in resolvers:
+        try:
+            proc = subprocess.run(
+                ["dig", "+short", "+time=3", f"@{resolver}", host, "A"],
+                capture_output=True, text=True, timeout=5,
+            )
+            addrs = [l.strip() for l in proc.stdout.splitlines() if l.strip()]
+            results.append({"resolver": resolver, "answers": addrs, "error": None})
+        except FileNotFoundError:
+            try:
+                infos = _socket.getaddrinfo(host, None, _socket.AF_INET)
+                addrs = list({i[4][0] for i in infos})
+                results.append({"resolver": "system", "answers": addrs, "error": None})
+            except Exception as e2:
+                results.append({"resolver": resolver, "answers": [],
+                                 "error": f"Lookup failed ({type(e2).__name__})"})
+            break
+        except Exception as e:
+            results.append({"resolver": resolver, "answers": [],
+                             "error": f"Query failed ({type(e).__name__})"})
+    return jsonify({"host": host, "results": results})
+
+
 @app.route("/events")
 def sse_state():
     def _gen():
@@ -1290,6 +1364,10 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div class="ehdr">Live Events <span id="ev-cnt" style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none"></span></div>
         <div class="ebody" id="ev-body"><div class="empty">Waiting&#8230;</div></div>
       </div>
+      <div class="tcard" data-widget="cat-sparklines">
+        <div class="thdr">Category Success Rate Trends</div>
+        <div id="cat-spark-body" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;padding:4px 0"><div class="empty">Waiting for data&#8230;</div></div>
+      </div>
       </div><!-- /#ov-grid -->
     </div>
     <!-- Security Summary -->
@@ -1465,6 +1543,24 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
           <button id="tr-stop" class="diag-btn cancel" onclick="stopTrace()" style="display:none">Stop</button>
         </div>
         <div id="tr-results"><div class="tr-status">Enter a hostname or IP address and click Trace.</div></div>
+      </div>
+      <div class="diag-tool">
+        <div class="diag-tool-hdr">&#128274; TLS / Certificate Inspector</div>
+        <div class="diag-input-row">
+          <input id="tls-host" class="diag-input" type="text" placeholder="hostname (e.g. example.com)" spellcheck="false" autocomplete="off" onkeydown="if(event.key==='Enter')runTlsCheck()">
+          <input id="tls-port" class="diag-input" type="text" value="443" style="flex:0 0 64px" title="Port">
+          <button id="tls-btn" class="diag-btn" onclick="runTlsCheck()">Check</button>
+        </div>
+        <div id="tls-results"><div class="tr-status">Enter a hostname and click Check.</div></div>
+      </div>
+      <div class="diag-tool">
+        <div class="diag-tool-hdr">&#128270; DNS Lookup (multi-resolver)</div>
+        <div class="diag-input-row">
+          <input id="dns-host" class="diag-input" type="text" placeholder="hostname (e.g. example.com)" spellcheck="false" autocomplete="off" onkeydown="if(event.key==='Enter')runDnsLookup()">
+          <input id="dns-resolvers" class="diag-input" type="text" value="8.8.8.8,1.1.1.1,9.9.9.9" style="flex:0 0 220px" title="Comma-separated resolver IPs">
+          <button id="dns-btn" class="diag-btn" onclick="runDnsLookup()">Lookup</button>
+        </div>
+        <div id="dns-results"><div class="tr-status">Enter a hostname and click Lookup.</div></div>
       </div>
     </div>
     <!-- About -->
@@ -1737,6 +1833,13 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
             <tr><td><span class="cl-feat">FEAT</span></td><td>Deployment</td><td>Multi-arch build: <code>linux/amd64</code> · <code>linux/arm64</code> · <code>linux/arm/v7</code> (Raspberry Pi)</td></tr>
           </table>
         </div>
+      <div class="a-section" id="run-history-section">
+        <div class="a-h" style="display:flex;align-items:center;justify-content:space-between">
+          Run History
+          <button class="ico-btn" style="font-size:12px;padding:3px 10px" onclick="clearRunHistory()">Clear</button>
+        </div>
+        <div id="run-history-body"><div class="empty" style="padding:12px 0">No completed runs recorded yet.</div></div>
+      </div>
 
       </div>
     </div>
@@ -2109,6 +2212,7 @@ const ST_CLS={running:'tp-running',between_tests:'tp-dim',paused:'tp-paused',sto
 const ST_LBL={running:'Running',between_tests:'Between Tests',paused:'Paused',stopped:'Stopped',starting:'Starting'};
 function apply(s){
   _lastState=s;
+  _trackRunHistory(s);
   if(s.suites&&s.suites.length&&!Object.keys(_SD).length){s.suites.forEach(su=>{_SD[su.name]=su.description||'';});}
   const ver=s.version||'—';
   $('s-ver').textContent=ver;$('about-ver').textContent=ver;
@@ -2213,6 +2317,50 @@ function apply(s){
       `<div class="tcat-hdr"${i===0?'':''} >${_CI[c]||'📋'} ${H(c)}</div>`+cm[c].map(mkCard).join('')
     ).join('');
   }
+  // Category success rate sparklines
+  (function(){
+    const cb=$('cat-spark-body');if(!cb)return;
+    const ts=_lastState&&_lastState.tests||{};
+    const now=Date.now()/1000;
+    const catData={};
+    Object.entries(ts).forEach(([n,t])=>{
+      const cat=_SC[n]||'Other';
+      if(!catData[cat])catData[cat]={ok:0,fail:0,att:0};
+      catData[cat].ok+=(t.pass||0);
+      catData[cat].fail+=(t.fail||0);
+      catData[cat].att+=(t.attempts||0);
+    });
+    if(!Object.keys(catData).length){cb.innerHTML='<div class="empty">Waiting for data…</div>';return;}
+    Object.entries(catData).forEach(([cat,d])=>{
+      const rate=d.att?d.ok/d.att*100:0;
+      if(!_catHist[cat])_catHist[cat]=[];
+      _catHist[cat].push({t:now,rate});
+      if(_catHist[cat].length>30)_catHist[cat].shift();
+    });
+    const cats=Object.keys(catData).sort();
+    cb.innerHTML=cats.map(cat=>{
+      const hist=_catHist[cat]||[];
+      const d=catData[cat];
+      const rate=d.att?d.ok/d.att*100:0;
+      const rateC=rate>=90?'#22c55e':rate>=70?'var(--amber)':'var(--red)';
+      let svgHtml='';
+      if(hist.length>=2){
+        const vals=hist.map(h=>h.rate);
+        const mx=Math.max(...vals,100),mn=Math.min(...vals,0);
+        const w=120,h=28,pad=2;
+        const px=i=>pad+i*(w-2*pad)/(vals.length-1||1);
+        const py=v=>h-pad-(mx===mn?h/2:(v-mn)/(mx-mn)*(h-2*pad));
+        const last=vals[vals.length-1],first=vals[0];
+        const trendC=last>first+1?'#22c55e':last<first-1?'var(--red)':'var(--dim)';
+        svgHtml=`<svg width="${w}" height="${h}" style="flex-shrink:0"><polyline fill="none" stroke="${trendC}" stroke-width="1.5" points="${vals.map((v,i)=>px(i).toFixed(1)+','+py(v).toFixed(1)).join(' ')}" /></svg>`;
+      }
+      const shortCat=cat.replace(' & ',' &amp; ').split(' ').slice(0,2).join(' ');
+      return`<div style="display:flex;align-items:center;gap:8px;background:#151b27;border-radius:8px;padding:7px 10px">`+
+        `<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${shortCat}</div>`+
+        `<div style="font-size:16px;font-weight:700;color:${rateC};font-family:'SF Mono',Consolas,monospace">${rate.toFixed(1)}%</div></div>`+
+        svgHtml+`</div>`;
+    }).join('');
+  })();
   if(!$('drawer').classList.contains('open')){
     const sel=$('cfg-suite');
     if(sel.options.length<=1&&suites.length){suites.forEach(su=>{const o=document.createElement('option');o.value=su.name;o.textContent=su.name+' — '+su.description;sel.appendChild(o);});}
@@ -2603,6 +2751,7 @@ pollNetInfo();
 setInterval(pollNetInfo,30000);
 // ── Security Summary ──────────────────────────────────────────────────────────
 let _secTimer=null,_secInterval=1000,_secHist=[];
+const _catHist={};
 let _diskPeakHist=[];
 function drawSecDonut(allowed,blocked,dropped,other){
   const c=$('sec-donut');if(!c)return;
@@ -2751,6 +2900,111 @@ function trProtoChange(){
   const p=$('tr-proto').value;
   $('tr-port').style.display=p==='tcp'?'':' none';
 }
+// ── TLS Inspector ─────────────────────────────────────────────────────────
+function runTlsCheck(){
+  const host=($('tls-host').value||'').trim(),port=($('tls-port').value||'443').trim();
+  if(!host){$('tls-results').innerHTML='<div class="tr-status" style="color:var(--red)">Enter a hostname.</div>';return;}
+  $('tls-btn').disabled=true;
+  $('tls-results').innerHTML='<div class="tr-status">Connecting&#8230;</div>';
+  fetch('/api/tls-check?host='+encodeURIComponent(host)+'&port='+encodeURIComponent(port))
+    .then(r=>r.json()).then(d=>{
+      $('tls-btn').disabled=false;
+      if(d.error){$('tls-results').innerHTML=`<div class="tr-status" style="color:var(--red)">${H(d.error)}</div>`;return;}
+      const now=new Date(),exp=new Date(d.not_after);
+      const daysLeft=Math.round((exp-now)/86400000);
+      const expC=daysLeft<14?'var(--red)':daysLeft<30?'var(--amber)':'var(--green)';
+      $('tls-results').innerHTML=`
+        <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:8px">
+          <tr><td style="color:var(--muted);padding:4px 0;width:140px">TLS Version</td><td style="color:var(--green);font-weight:600">${H(d.tls_version)}</td></tr>
+          <tr><td style="color:var(--muted);padding:4px 0">Cipher</td><td style="font-family:'SF Mono',Consolas,monospace;font-size:12px">${H(d.cipher)}</td></tr>
+          <tr><td style="color:var(--muted);padding:4px 0">Common Name</td><td>${H(d.cn)}</td></tr>
+          <tr><td style="color:var(--muted);padding:4px 0">Issuer</td><td>${H(d.issuer_cn)}${d.issuer_org?' ('+H(d.issuer_org)+')':''}</td></tr>
+          <tr><td style="color:var(--muted);padding:4px 0">Valid From</td><td style="font-family:'SF Mono',Consolas,monospace;font-size:12px">${H(d.not_before)}</td></tr>
+          <tr><td style="color:var(--muted);padding:4px 0">Expires</td><td><span style="font-family:'SF Mono',Consolas,monospace;font-size:12px">${H(d.not_after)}</span> <span style="color:${expC};font-size:12px;font-weight:600">(${daysLeft}d)</span></td></tr>
+          ${d.sans.length?`<tr><td style="color:var(--muted);padding:4px 0;vertical-align:top">SANs</td><td style="font-family:'SF Mono',Consolas,monospace;font-size:11px;line-height:1.8">${d.sans.map(s=>H(s)).join('<br>')}</td></tr>`:''}
+        </table>`;
+    }).catch(e=>{$('tls-btn').disabled=false;$('tls-results').innerHTML=`<div class="tr-status" style="color:var(--red)">${H(e.message)}</div>`;});
+}
+// ── DNS Lookup ────────────────────────────────────────────────────────────
+function runDnsLookup(){
+  const host=($('dns-host').value||'').trim();
+  if(!host){$('dns-results').innerHTML='<div class="tr-status" style="color:var(--red)">Enter a hostname.</div>';return;}
+  const resolvers=($('dns-resolvers').value||'8.8.8.8,1.1.1.1,9.9.9.9').trim();
+  $('dns-btn').disabled=true;
+  $('dns-results').innerHTML='<div class="tr-status">Looking up&#8230;</div>';
+  fetch('/api/dns-lookup?host='+encodeURIComponent(host)+'&resolvers='+encodeURIComponent(resolvers))
+    .then(r=>r.json()).then(d=>{
+      $('dns-btn').disabled=false;
+      if(d.error){$('dns-results').innerHTML=`<div class="tr-status" style="color:var(--red)">${H(d.error)}</div>`;return;}
+      const rows=d.results.map(r=>{
+        if(r.error)return`<tr><td style="font-family:'SF Mono',Consolas,monospace;color:var(--muted)">${H(r.resolver)}</td><td colspan="2" style="color:var(--red)">${H(r.error)}</td></tr>`;
+        const addrs=r.answers.length?r.answers.map(a=>`<span style="font-family:'SF Mono',Consolas,monospace">${H(a)}</span>`).join(', '):'<span style="color:var(--dim)">NXDOMAIN</span>';
+        return`<tr><td style="font-family:'SF Mono',Consolas,monospace;color:var(--muted);padding:4px 8px 4px 0">${H(r.resolver)}</td><td>${addrs}</td></tr>`;
+      }).join('');
+      $('dns-results').innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:8px">${rows}</table>`;
+    }).catch(e=>{$('dns-btn').disabled=false;$('dns-results').innerHTML=`<div class="tr-status" style="color:var(--red)">${H(e.message)}</div>`;});
+}
+// ── Run history ──────────────────────────────────────────────────────────
+const _RUN_HIST_KEY='tg_run_history';
+let _lastIter=0,_lastIterSnap=null;
+function _loadRunHistory(){return JSON.parse(localStorage.getItem(_RUN_HIST_KEY)||'[]');}
+function _saveRunHistory(h){localStorage.setItem(_RUN_HIST_KEY,JSON.stringify(h.slice(-50)));}
+function clearRunHistory(){
+  localStorage.removeItem(_RUN_HIST_KEY);
+  _renderRunHistory();
+}
+function _trackRunHistory(s){
+  const iter=s.iteration||0;
+  if(!iter)return;
+  if(iter!==_lastIter&&_lastIter>0&&_lastIterSnap){
+    const h=_loadRunHistory();
+    h.push(_lastIterSnap);
+    _saveRunHistory(h);
+    _renderRunHistory();
+  }
+  _lastIter=iter;
+  const tot=s.totals||{},ok=tot.ok||0,att=tot.attempts||0,fail=tot.fail||0;
+  const tests=s.tests||{};
+  const suiteSnap=Object.entries(tests).map(([n,t])=>({n,att:t.attempts||0,ok:t.ok||0,fail:t.fail||0}));
+  _lastIterSnap={
+    t:Date.now(),iter,suite:s.suite||'all',size:s.size||'',
+    ok,att,fail,
+    pass_pct:att?+(ok/att*100).toFixed(1):0,
+    suites:suiteSnap,
+  };
+}
+function _renderRunHistory(){
+  const body=$('run-history-body');if(!body)return;
+  const h=_loadRunHistory();
+  if(!h.length){body.innerHTML='<div class="empty" style="padding:12px 0">No completed runs recorded yet.</div>';return;}
+  const rows=h.slice().reverse().map((r,i)=>{
+    const d=new Date(r.t);
+    const ts=d.toLocaleDateString()+' '+d.toLocaleTimeString();
+    const pc=r.pass_pct>=90?'var(--green)':r.pass_pct>=70?'var(--amber)':'var(--red)';
+    const id='rh-'+i;
+    const detail=r.suites.filter(s=>s.att>0).sort((a,b)=>a.n.localeCompare(b.n)).map(s=>{
+      const sp=s.att?+(s.ok/s.att*100).toFixed(1):0;
+      const sc=sp>=90?'var(--green)':sp>=70?'var(--amber)':'var(--red)';
+      return`<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;border-bottom:1px solid rgba(255,255,255,.03)">`+
+        `<span style="color:var(--muted)">${H(s.n)}</span>`+
+        `<span style="color:${sc};font-family:'SF Mono',Consolas,monospace">${sp}% (${s.ok}/${s.att})</span></div>`;
+    }).join('');
+    return`<div style="border:1px solid var(--border);border-radius:8px;margin-bottom:8px;overflow:hidden">`+
+      `<div style="display:flex;align-items:center;gap:12px;padding:8px 12px;cursor:pointer;background:#151b27" onclick="toggleRunDetail('${id}')">`+
+      `<span style="font-size:12px;color:var(--dim);font-family:'SF Mono',Consolas,monospace;flex-shrink:0">${ts}</span>`+
+      `<span style="font-size:12px;color:var(--muted)">iter #${r.iter} &middot; ${H(r.suite)}</span>`+
+      `<span style="margin-left:auto;font-size:13px;font-weight:700;color:${pc}">${r.pass_pct}%</span>`+
+      `<span style="font-size:11px;color:var(--dim);white-space:nowrap">${r.ok}/${r.att}</span></div>`+
+      `<div id="${id}" style="display:none;padding:8px 12px;font-size:12px;max-height:300px;overflow-y:auto">${detail||'<div class="empty">No suite data</div>'}</div>`+
+      `</div>`;
+  }).join('');
+  body.innerHTML=rows;
+}
+function toggleRunDetail(id){
+  const el=$(id);if(!el)return;
+  el.style.display=el.style.display==='none'?'block':'none';
+}
+document.addEventListener('DOMContentLoaded',_renderRunHistory);
 window.addEventListener('resize',()=>{
   if(_lastState){drawSpark(_lastState.history||[]);drawSecTrend(_secHist);}
   if(_lastHealth){drawDiskBars(_lastHealth.disk_read_kbps||0,_lastHealth.disk_write_kbps||0);drawNetSpark('net-spark',_netHist);drawNetSpark('h-net-spark',_hNetHist);}
