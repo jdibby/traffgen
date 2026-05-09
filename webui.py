@@ -696,6 +696,64 @@ def api_networks():
     })
 
 
+
+_TARGET_RE = __import__('re').compile(r'^[a-zA-Z0-9._\-:]{1,253}$')
+
+def _parse_hop(line):
+    """Parse one traceroute output line into a hop dict, or return None."""
+    import re
+    m = re.match(r'^\s*(\d+)\s+(.*)', line)
+    if not m:
+        return None
+    hop_num = int(m.group(1))
+    rest = m.group(2).strip()
+    rtts = [float(x) for x in re.findall(r'(\d+\.\d+)\s+ms', rest)]
+    ip_m = re.search(r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|(?:[0-9a-fA-F]{1,4}:){2,}[0-9a-fA-F:]{0,4})', rest)
+    ip = ip_m.group(1) if ip_m else None
+    avg_rtt = round(sum(rtts) / len(rtts), 2) if rtts else None
+    return {"hop": hop_num, "ip": ip, "rtts": rtts, "avg_rtt": avg_rtt,
+            "timeout": not rtts, "raw": rest}
+
+
+@app.route("/api/traceroute")
+def api_traceroute():
+    target = request.args.get("target", "").strip()
+
+    def _err(msg):
+        yield f'data: {json.dumps({"error": msg})}\n\n'
+
+    def _gen():
+        if not _TARGET_RE.match(target):
+            yield from _err("Invalid target — use a hostname or IP address")
+            return
+        try:
+            proc = subprocess.Popen(
+                ["traceroute", "-n", "-q", "3", "-w", "1", "-m", "30", target],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, errors="replace",
+            )
+            for line in proc.stdout:
+                line = line.rstrip()
+                if line.startswith("traceroute to"):
+                    yield f'data: {json.dumps({"header": line})}\n\n'
+                    continue
+                hop = _parse_hop(line)
+                if hop:
+                    yield f'data: {json.dumps({"hop": hop})}\n\n'
+            proc.wait()
+            yield f'data: {json.dumps({"done": True, "code": proc.returncode})}\n\n'
+        except FileNotFoundError:
+            yield from _err("traceroute not found on this system")
+        except Exception as exc:
+            yield from _err(str(exc))
+
+    return Response(
+        _gen(),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 @app.route("/events")
 def sse_state():
     def _gen():
@@ -816,6 +874,28 @@ body{display:flex;background:var(--bg);color:var(--text);font-family:-apple-syst
 .nav-sub-item{display:flex;align-items:center;gap:8px;padding:5px 16px 5px 36px;color:var(--dim);cursor:pointer;border:none;background:none;width:100%;text-align:left;font-size:14px;border-left:3px solid transparent;transition:all .12s}
 .nav-sub-item:hover{color:var(--text);background:rgba(255,255,255,.04)}
 .nav-sub-item.active{color:var(--green);border-left-color:var(--green);background:var(--gdim)}
+.diag-tool{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:14px}
+.diag-tool-hdr{font-size:13px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+.diag-input-row{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.diag-input{flex:1;min-width:180px;background:var(--input-bg,rgba(255,255,255,.06));border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:14px;font-family:'SF Mono',Consolas,monospace;outline:none}
+.diag-input:focus{border-color:var(--green);box-shadow:0 0 0 2px rgba(34,197,94,.15)}
+.diag-btn{padding:8px 18px;background:var(--green);color:#0a0f1a;font-weight:700;font-size:14px;border:none;border-radius:8px;cursor:pointer;white-space:nowrap;transition:opacity .12s}
+.diag-btn:hover{opacity:.85}
+.diag-btn:disabled{opacity:.4;cursor:default}
+.diag-btn.cancel{background:var(--amber)}
+.tr-results{font-family:'SF Mono',Consolas,monospace;font-size:13px}
+.tr-header{color:var(--muted);font-size:12px;margin-bottom:8px;padding:4px 0}
+.tr-hop{display:grid;grid-template-columns:28px 160px 80px 1fr;align-items:center;gap:10px;padding:5px 6px;border-radius:6px}
+.tr-hop:nth-child(even){background:rgba(255,255,255,.025)}
+.tr-hop-num{color:var(--dim);text-align:right;font-size:11px}
+.tr-hop-ip{color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tr-hop-ip.timeout{color:var(--muted);font-style:italic}
+.tr-hop-rtt{text-align:right;font-size:12px;font-weight:600}
+.tr-bar-wrap{height:6px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden}
+.tr-bar-fill{height:100%;border-radius:3px;transition:width .4s ease}
+.tr-status{padding:10px 6px;color:var(--muted);font-style:italic;font-size:13px}
+.tr-error{padding:10px 6px;color:var(--red,#ef4444);font-size:13px}
+
 .nav-ico{width:18px;text-align:center;font-size:19px;opacity:.75}
 .sb-foot{margin-top:auto;padding:12px 16px;border-top:1px solid var(--border)}
 .sb-foot div{font-size:16px;color:var(--dim);margin-top:2px}
@@ -1084,6 +1164,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
     <button class="nav-sub-item" onclick="setTestsCat(this,'Content Filtering')">🚧 Content Filtering</button>
   </div>
   <button class="nav-item" data-tab="output" onclick="showTab(this)"><span class="nav-ico">⬛</span>Live View</button>
+  <button class="nav-item" data-tab="diagnostics" onclick="showTab(this)"><span class="nav-ico">&#128300;</span>Diagnostics</button>
   <div class="nav-lbl">System</div>
   <button class="nav-item" data-tab="health" onclick="showTab(this)"><span class="nav-ico">&#9889;</span>Health</button>
   <div class="nav-lbl">Info</div>
@@ -1334,6 +1415,18 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <tbody id="proc-body"><tr><td colspan="5" class="empty">Loading&#8230;</td></tr></tbody></table>
       </div>
       </div><!-- /#health-grid -->
+    </div>
+    <!-- Diagnostics -->
+    <div id="tab-diagnostics" class="panel">
+      <div class="diag-tool">
+        <div class="diag-tool-hdr">&#128300; Traceroute</div>
+        <div class="diag-input-row">
+          <input id="tr-target" class="diag-input" type="text" placeholder="hostname or IP (e.g. 8.8.8.8)" spellcheck="false" autocomplete="off" onkeydown="if(event.key==='Enter')runTrace()">
+          <button id="tr-btn" class="diag-btn" onclick="runTrace()">Trace</button>
+          <button id="tr-stop" class="diag-btn cancel" onclick="stopTrace()" style="display:none">Stop</button>
+        </div>
+        <div id="tr-results"><div class="tr-status">Enter a hostname or IP address and click Trace.</div></div>
+      </div>
     </div>
     <!-- About -->
     <div id="tab-about" class="panel">
@@ -1775,7 +1868,7 @@ let _healthTimer=null,_netInfoTimer=null,_lastHealth=null,_netHist=[],_hNetHist=
 let _cpuHist=[],_memHist=[];
 function uptime(t){const s=Math.floor(Date.now()/1000-t);return[Math.floor(s/3600),Math.floor((s%3600)/60),s%60].map(v=>String(v).padStart(2,'0')).join(':');}
 function elapsed(t){if(!t)return'';const s=Math.floor(Date.now()/1000-t);if(s<60)return s+'s elapsed';if(s<3600)return Math.floor(s/60)+'m '+(s%60)+'s elapsed';return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m elapsed';}
-const PAGE_TITLES={overview:'Overview',security:'Security',tests:'Tests',output:'Live View',health:'Health',about:'About',changelog:'Changelog'};
+const PAGE_TITLES={overview:'Overview',security:'Security',tests:'Tests',output:'Live View',diagnostics:'Diagnostics',health:'Health',about:'About',changelog:'Changelog'};
 const SUITE_ICONS={
   'ad-tracker':'🎯','ai-browse':'🤖','bgp':'🌐','bulk-transfer':'💾',
   'blocklist-probe':'🚫','c2-beacon':'📡','llm-dlp':'🧠','web-crawl':'🕷️','dlp':'🔒',
@@ -2568,6 +2661,52 @@ function toggleTheme(){
 }
 // Restore saved theme preference
 try{if(localStorage.getItem('tg-theme')==='light'){document.documentElement.classList.add('light');$('btn-theme').innerHTML='&#9788;';}}catch(e){}
+// ── Traceroute visualizer ──────────────────────────────────────────────────
+let _trSrc=null;
+function _trColor(ms){
+  if(ms===null)return'var(--muted)';
+  if(ms<10)return'#22c55e';
+  if(ms<50)return'#06b6d4';
+  if(ms<100)return'#f59e0b';
+  if(ms<200)return'#f97316';
+  return'#ef4444';
+}
+function _trBarW(ms){return ms===null?0:Math.min(100,ms/300*100);}
+function renderHop(hop){
+  const res=$('tr-results');
+  if(res.querySelector('.tr-status'))res.innerHTML='';
+  const avg=hop.avg_rtt,col=_trColor(avg);
+  const ipLbl=hop.timeout?'* timeout':(hop.ip||'—');
+  const rttLbl=hop.timeout?'*':avg!==null?avg.toFixed(1)+' ms':'—';
+  const row=document.createElement('div');
+  row.className='tr-hop';
+  row.innerHTML=`<span class="tr-hop-num">${hop.hop}</span><span class="tr-hop-ip${hop.timeout?' timeout':''}" title="${H(hop.ip||'')}">${H(ipLbl)}</span><span class="tr-hop-rtt" style="color:${col}">${H(rttLbl)}</span><div class="tr-bar-wrap"><div class="tr-bar-fill" style="width:${_trBarW(avg)}%;background:${col}"></div></div>`;
+  res.appendChild(row);
+}
+function runTrace(){
+  const t=$('tr-target').value.trim();
+  if(!t)return;
+  stopTrace();
+  $('tr-results').innerHTML='<div class="tr-status">Tracing '+H(t)+'…</div>';
+  $('tr-btn').disabled=true;$('tr-stop').style.display='';
+  _trSrc=new EventSource('/api/traceroute?target='+encodeURIComponent(t));
+  _trSrc.onmessage=e=>{
+    const d=JSON.parse(e.data);
+    if(d.header){
+      const hdr=document.createElement('div');hdr.className='tr-header';hdr.textContent=d.header;
+      $('tr-results').innerHTML='';$('tr-results').appendChild(hdr);
+    }else if(d.hop){renderHop(d.hop);}
+    else if(d.done||d.error){
+      if(d.error){const el=document.createElement('div');el.className='tr-error';el.textContent=d.error;$('tr-results').appendChild(el);}
+      _trSrc.close();_trSrc=null;$('tr-btn').disabled=false;$('tr-stop').style.display='none';
+    }
+  };
+  _trSrc.onerror=()=>{stopTrace();};
+}
+function stopTrace(){
+  if(_trSrc){_trSrc.close();_trSrc=null;}
+  $('tr-btn').disabled=false;$('tr-stop').style.display='none';
+}
 window.addEventListener('resize',()=>{
   if(_lastState){drawSpark(_lastState.history||[]);drawSecTrend(_secHist);}
   if(_lastHealth){drawDiskBars(_lastHealth.disk_read_kbps||0,_lastHealth.disk_write_kbps||0);drawNetSpark('net-spark',_netHist);drawNetSpark('h-net-spark',_hNetHist);}
