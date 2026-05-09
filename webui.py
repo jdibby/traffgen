@@ -1370,11 +1370,16 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
       </div>
       <div class="tcard" data-widget="top-failing-suites">
         <div class="thdr">Top Failing Suites</div>
-        <div id="top-fail-body" style="padding:4px 0"><div class="empty">Waiting for data&#8230;</div></div>
+        <div id="top-fail-body" style="padding:8px 16px"><div class="empty">Waiting for data&#8230;</div></div>
       </div>
-      <div style="display:flex;gap:8px;justify-content:flex-end;padding:4px 0">
-        <button onclick="exportResults('csv')" title="Download results as CSV" style="padding:5px 14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:#e8eaf0;cursor:pointer;font-size:13px">&#11123; CSV</button>
-        <button onclick="exportResults('json')" title="Download results as JSON" style="padding:5px 14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:#e8eaf0;cursor:pointer;font-size:13px">&#11123; JSON</button>
+      <div class="tcard" data-widget="export-results">
+        <div class="thdr" style="justify-content:space-between">Export Results
+          <div style="display:flex;gap:8px">
+            <button onclick="exportResults('csv')" title="Download results as CSV" style="padding:4px 14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:7px;color:#e8eaf0;cursor:pointer;font-size:13px;font-weight:400;letter-spacing:0;text-transform:none">&#11123; CSV</button>
+            <button onclick="exportResults('json')" title="Download results as JSON" style="padding:4px 14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:7px;color:#e8eaf0;cursor:pointer;font-size:13px;font-weight:400;letter-spacing:0;text-transform:none">&#11123; JSON</button>
+          </div>
+        </div>
+        <div style="padding:10px 16px;font-size:13px;color:var(--muted)">Download a per-suite snapshot of current results.</div>
       </div>
       </div><!-- /#ov-grid -->
     </div>
@@ -3077,10 +3082,10 @@ document.addEventListener('DOMContentLoaded',_renderRunHistory);
     el.innerHTML=rows.map(r=>{
       const pct=r.att?Math.round(r.fail/r.att*100):0;
       const bar=Math.round(r.fail/maxF*100);
-      return '<div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.06)">'
-        +'<div style="width:140px;font-size:13px;color:#e8eaf0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+H(r.n)+'">'+H(r.n)+'</div>'
+      return '<div style="display:flex;align-items:center;gap:12px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06)">'
+        +'<div style="width:160px;font-size:14px;color:#e8eaf0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+H(r.n)+'">'+H(r.n)+'</div>'
         +'<div style="flex:1;height:6px;background:rgba(255,255,255,.08);border-radius:3px"><div style="height:100%;width:'+bar+'%;background:#f85149;border-radius:3px"></div></div>'
-        +'<div style="width:70px;text-align:right;font-size:12px;color:#f85149;font-family:SF Mono,Consolas,monospace">'+N(r.fail)+' ('+pct+'%)</div>'
+        +'<div style="width:80px;text-align:right;font-size:13px;color:#f85149;font-family:SF Mono,Consolas,monospace">'+N(r.fail)+' ('+pct+'%)</div>'
         +'</div>';
     }).join('');
   }
