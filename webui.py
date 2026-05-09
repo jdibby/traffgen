@@ -974,7 +974,7 @@ body{display:flex;background:var(--bg);color:var(--text);font-family:-apple-syst
 .nav-item{display:flex;align-items:center;gap:9px;padding:8px 16px 8px 13px;color:var(--muted);cursor:pointer;border:none;background:none;width:100%;text-align:left;font-size:19px;border-left:3px solid transparent;transition:all .12s}
 .nav-item:hover{color:var(--text);background:rgba(255,255,255,.04)}
 .nav-item.active{color:var(--green);background:var(--gdim);border-left-color:var(--green);font-weight:500}
-.nav-arr{font-size:12px;transition:transform .2s;display:inline-block;line-height:1;padding:4px 6px;margin:-4px -6px;border-radius:4px}.nav-arr:hover{background:rgba(255,255,255,.1)}
+.nav-arr{font-size:15px;transition:transform .2s;display:inline-block;line-height:1;padding:4px 6px;margin:-4px -6px;border-radius:4px}.nav-arr:hover{background:rgba(255,255,255,.1)}
 .nav-arr.open{transform:rotate(90deg)}
 .nav-sub{max-height:0;overflow:hidden;transition:max-height .28s ease}
 .nav-sub.open{max-height:500px}
@@ -1015,11 +1015,12 @@ body{display:flex;background:var(--bg);color:var(--text);font-family:-apple-syst
 .tb-test{display:none;align-items:center;gap:6px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.35);border-radius:20px;padding:3px 12px 3px 8px;min-width:0;overflow:hidden}
 .tb-test.visible{display:inline-flex}
 .tb-test-name{font-size:14px;font-weight:600;color:var(--green);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;font-family:'SF Mono',Consolas,monospace;letter-spacing:.2px}
-.tp-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 11px;border-radius:20px;font-size:17px;font-weight:500;border:1px solid;white-space:nowrap}
+.tp-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 11px;border-radius:20px;font-size:17px;font-weight:500;border:1px solid;white-space:nowrap;position:relative;overflow:hidden}
 .tp-running{border-color:var(--green);color:var(--green)}
 .tp-paused{border-color:var(--amber);color:var(--amber)}
 .tp-stopped{border-color:var(--red);color:var(--red)}
 .tp-dim{border-color:var(--muted);color:var(--muted)}
+.ov-section{display:flex;flex-direction:column;gap:8px}.ov-sec-hdr{display:flex;align-items:center;justify-content:space-between;padding:5px 2px;cursor:pointer;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.07);user-select:none}.ov-sec-hdr:hover{color:var(--text)}.ov-sec-arr{font-size:11px;transition:transform .22s;display:inline-block;opacity:.7}.ov-sec-arr.open{transform:rotate(90deg)}.ov-sec-body{display:flex;flex-direction:column;gap:14px}.ov-sec-body.collapsed{display:none}
 .pulse{width:6px;height:6px;border-radius:50%;background:currentColor;animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 .ico-btn{width:33px;height:33px;border-radius:var(--r);border:1px solid var(--border2);background:var(--surf);color:var(--muted);cursor:pointer;display:grid;place-items:center;font-size:20px;transition:all .12s;flex-shrink:0}
@@ -1256,7 +1257,13 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
     <span class="logo-name">traffgen</span>
   </div>
   <div class="nav-lbl">Monitor</div>
-  <button class="nav-item active" data-tab="overview" onclick="showTab(this)"><span class="nav-ico">◈</span>Overview</button>
+  <button class="nav-item active" id="nav-overview" data-tab="overview" onclick="toggleOvNav(this)"><span class="nav-ico">◈</span><span style="flex:1">Overview</span><span class="nav-arr open" id="ov-arr" onclick="collapseOvSub(event)" title="Collapse/expand">&#9656;</span></button>
+  <div class="nav-sub open" id="ov-sub">
+    <button class="nav-sub-item" onclick="ovJump('ov-sec-perf',this)">Performance</button>
+    <button class="nav-sub-item" onclick="ovJump('ov-sec-results',this)">Results</button>
+    <button class="nav-sub-item" onclick="ovJump('ov-sec-analytics',this)">Analytics</button>
+    <button class="nav-sub-item" onclick="ovJump('ov-sec-tools',this)">Tools</button>
+  </div>
   <button class="nav-item" data-tab="security" onclick="showTab(this)"><span class="nav-ico">&#128737;</span>Security</button>
   <button class="nav-item" id="nav-tests" data-tab="tests" onclick="toggleTestsNav(this)"><span class="nav-ico">⚗</span><span style="flex:1">Tests</span><span class="nav-arr" id="tests-arr" onclick="collapseTestsSub(event)" title="Collapse/expand">&#9656;</span></button>
   <div class="nav-sub" id="tests-sub">
@@ -1325,73 +1332,85 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div class="card"><div class="clbl">Iteration</div><div class="cval c-amber" id="v-iter">&#8212;</div><div class="csub" id="s-iter">&#8212;</div></div>
         <div class="card"><div class="clbl">Probes / min</div><div class="cval c-blue" id="v-ppm">&#8212;</div><div class="csub" id="s-ppm">accumulating&hellip;</div></div>
       </div>
-      <div id="eta-bar-wrap" style="display:none;flex-direction:column;gap:5px;padding:2px 0">
-        <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted)">
-          <span id="eta-label">—</span><span id="eta-time" style="font-family:'SF Mono',Consolas,monospace;font-size:12px;color:var(--dim)">—</span>
-        </div>
-        <div style="height:6px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden">
-          <div id="eta-fill" style="height:100%;width:0%;border-radius:3px;transition:width .8s linear"></div>
-        </div>
-      </div>
-      <div class="cc" data-widget="net-io" style="display:flex;flex-direction:column;gap:10px">
-        <div class="ctitle">Network I/O <span id="net-iface" style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim);font-size:12px"></span>
-          <select class="net-interval" onchange="setNetInterval(+this.value)" title="Refresh interval">
-            <option value="1000" selected>1s</option><option value="2000">2s</option>
-            <option value="5000">5s</option><option value="10000">10s</option>
-            <option value="15000">15s</option><option value="30000">30s</option>
-          </select>
-        </div>
-        <div class="net-widget">
-          <div class="net-dir"><div class="net-lbl">&#9650; TX</div><div class="net-val c-blue" id="ov-tx">&#8212;</div></div>
-          <div style="width:1px;background:var(--border);align-self:stretch"></div>
-          <div class="net-dir"><div class="net-lbl">&#9660; RX</div><div class="net-val c-green" id="ov-rx">&#8212;</div></div>
-        </div>
-        <canvas id="net-spark" style="width:100%;height:50px"></canvas>
-      </div>
-      <div class="charts" data-widget="charts">
-        <div class="cc"><div class="ctitle">Success / Failure</div>
-          <div class="donut-wrap">
-            <canvas id="donut" width="170" height="170"></canvas>
-            <div class="legend">
-              <div class="leg"><div class="leg-dot" style="background:var(--green)"></div><span id="leg-ok">&#8212;</span></div>
-              <div class="leg"><div class="leg-dot" style="background:var(--red)"></div><span id="leg-fail">&#8212;</span></div>
+      <div class="ov-section" id="ov-sec-perf">
+        <div class="ov-sec-hdr" onclick="toggleOvSec(this)"><span>Performance</span><span class="ov-sec-arr open">&#9656;</span></div>
+        <div class="ov-sec-body">
+          <div class="cc" data-widget="net-io" style="display:flex;flex-direction:column;gap:10px">
+            <div class="ctitle">Network I/O <span id="net-iface" style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim);font-size:12px"></span>
+              <select class="net-interval" onchange="setNetInterval(+this.value)" title="Refresh interval">
+                <option value="1000" selected>1s</option><option value="2000">2s</option>
+                <option value="5000">5s</option><option value="10000">10s</option>
+                <option value="15000">15s</option><option value="30000">30s</option>
+              </select>
+            </div>
+            <div class="net-widget">
+              <div class="net-dir"><div class="net-lbl">&#9650; TX</div><div class="net-val c-blue" id="ov-tx">&#8212;</div></div>
+              <div style="width:1px;background:var(--border);align-self:stretch"></div>
+              <div class="net-dir"><div class="net-lbl">&#9660; RX</div><div class="net-val c-green" id="ov-rx">&#8212;</div></div>
+            </div>
+            <canvas id="net-spark" style="width:100%;height:50px"></canvas>
+          </div>
+          <div class="charts" data-widget="charts">
+            <div class="cc"><div class="ctitle">Success / Failure</div>
+              <div class="donut-wrap">
+                <canvas id="donut" width="170" height="170"></canvas>
+                <div class="legend">
+                  <div class="leg"><div class="leg-dot" style="background:var(--green)"></div><span id="leg-ok">&#8212;</span></div>
+                  <div class="leg"><div class="leg-dot" style="background:var(--red)"></div><span id="leg-fail">&#8212;</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="cc">
+              <div class="ctitle">Requests Over Time <span id="hist-info" style="font-weight:400;letter-spacing:0;text-transform:none;font-size:12px;color:var(--dim)"></span></div>
+              <canvas id="spark" style="width:100%;height:160px"></canvas>
             </div>
           </div>
         </div>
-        <div class="cc">
-          <div class="ctitle">Requests Over Time <span id="hist-info" style="font-weight:400;letter-spacing:0;text-transform:none;font-size:12px;color:var(--dim)"></span></div>
-          <canvas id="spark" style="width:100%;height:160px"></canvas>
-        </div>
       </div>
-      <div class="tcard" data-widget="test-breakdown">
-        <div class="thdr">Test Breakdown <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px">&#8250; click row to expand</span></div>
-        <table><thead><tr><th></th><th>Test</th><th class="r">Attempts</th><th class="r">OK</th><th class="r">Fail</th><th class="r">Rate</th><th class="r">Avg</th><th class="r">Last Run</th></tr></thead>
-        <tbody id="tbl-body"><tr><td colspan="8" class="empty">Waiting for data&#8230;</td></tr></tbody></table>
-      </div>
-      <div class="ecard" data-widget="live-events">
-        <div class="ehdr">Live Events <span id="ev-cnt" style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none"></span></div>
-        <div class="ebody" id="ev-body"><div class="empty">Waiting&#8230;</div></div>
-      </div>
-      <div class="tcard" data-widget="cat-sparklines">
-        <div class="thdr">Category Success Rate Trends</div>
-        <div id="cat-spark-body" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;padding:4px 0"><div class="empty">Waiting for data&#8230;</div></div>
-      </div>
-      <div class="tcard" data-widget="slowest-suites">
-        <div class="thdr">Slowest Suites</div>
-        <div id="slowest-body" style="padding:8px 16px"><div class="empty">Waiting for data&#8230;</div></div>
-      </div>
-      <div class="tcard" data-widget="top-failing-suites">
-        <div class="thdr">Top Failing Suites</div>
-        <div id="top-fail-body" style="padding:8px 16px"><div class="empty">Waiting for data&#8230;</div></div>
-      </div>
-      <div class="tcard" data-widget="export-results">
-        <div class="thdr" style="justify-content:space-between">Export Results
-          <div style="display:flex;gap:8px">
-            <button onclick="exportResults('csv')" title="Download results as CSV" style="padding:4px 14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:7px;color:#e8eaf0;cursor:pointer;font-size:13px;font-weight:400;letter-spacing:0;text-transform:none">&#11123; CSV</button>
-            <button onclick="exportResults('json')" title="Download results as JSON" style="padding:4px 14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:7px;color:#e8eaf0;cursor:pointer;font-size:13px;font-weight:400;letter-spacing:0;text-transform:none">&#11123; JSON</button>
+      <div class="ov-section" id="ov-sec-results">
+        <div class="ov-sec-hdr" onclick="toggleOvSec(this)"><span>Results</span><span class="ov-sec-arr open">&#9656;</span></div>
+        <div class="ov-sec-body">
+          <div class="tcard" data-widget="test-breakdown">
+            <div class="thdr">Test Breakdown <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px">&#8250; click row to expand</span></div>
+            <table><thead><tr><th></th><th>Test</th><th class="r">Attempts</th><th class="r">OK</th><th class="r">Fail</th><th class="r">Rate</th><th class="r">Avg</th><th class="r">Last Run</th></tr></thead>
+            <tbody id="tbl-body"><tr><td colspan="8" class="empty">Waiting for data&#8230;</td></tr></tbody></table>
+          </div>
+          <div class="ecard" data-widget="live-events">
+            <div class="ehdr">Live Events <span id="ev-cnt" style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none"></span></div>
+            <div class="ebody" id="ev-body"><div class="empty">Waiting&#8230;</div></div>
           </div>
         </div>
-        <div style="padding:10px 16px;font-size:13px;color:var(--muted)">Download a per-suite snapshot of current results.</div>
+      </div>
+      <div class="ov-section" id="ov-sec-analytics">
+        <div class="ov-sec-hdr" onclick="toggleOvSec(this)"><span>Analytics</span><span class="ov-sec-arr">&#9656;</span></div>
+        <div class="ov-sec-body collapsed">
+          <div class="tcard" data-widget="cat-sparklines">
+            <div class="thdr">Category Success Rate Trends</div>
+            <div id="cat-spark-body" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;padding:4px 0"><div class="empty">Waiting for data&#8230;</div></div>
+          </div>
+          <div class="tcard" data-widget="slowest-suites">
+            <div class="thdr">Slowest Suites</div>
+            <div id="slowest-body" style="padding:8px 16px"><div class="empty">Waiting for data&#8230;</div></div>
+          </div>
+          <div class="tcard" data-widget="top-failing-suites">
+            <div class="thdr">Top Failing Suites</div>
+            <div id="top-fail-body" style="padding:8px 16px"><div class="empty">Waiting for data&#8230;</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="ov-section" id="ov-sec-tools">
+        <div class="ov-sec-hdr" onclick="toggleOvSec(this)"><span>Tools</span><span class="ov-sec-arr">&#9656;</span></div>
+        <div class="ov-sec-body collapsed">
+          <div class="tcard" data-widget="export-results">
+            <div class="thdr" style="justify-content:space-between">Export Results
+              <div style="display:flex;gap:8px">
+                <button onclick="exportResults('csv')" title="Download results as CSV" style="padding:4px 14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:7px;color:#e8eaf0;cursor:pointer;font-size:13px;font-weight:400;letter-spacing:0;text-transform:none">&#11123; CSV</button>
+                <button onclick="exportResults('json')" title="Download results as JSON" style="padding:4px 14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:7px;color:#e8eaf0;cursor:pointer;font-size:13px;font-weight:400;letter-spacing:0;text-transform:none">&#11123; JSON</button>
+              </div>
+            </div>
+            <div style="padding:10px 16px;font-size:13px;color:var(--muted)">Download a per-suite snapshot of current results.</div>
+          </div>
+        </div>
       </div>
       </div><!-- /#ov-grid -->
     </div>
@@ -2226,6 +2245,37 @@ function collapseTestsSub(e){
   e.stopPropagation();
   if($('tests-sub').classList.contains('open')){_closeTestsSub();}else{_openTestsSub();}
 }
+function _openOvSub(){$('ov-sub').classList.add('open');$('ov-arr').classList.add('open');}
+function _closeOvSub(){$('ov-sub').classList.remove('open');$('ov-arr').classList.remove('open');}
+function toggleOvNav(btn){
+  _openOvSub();
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  btn.classList.add('active');
+  $('tab-overview').classList.add('active');
+  $('pg-title').textContent='Overview';
+}
+function collapseOvSub(e){
+  e.stopPropagation();
+  if($('ov-sub').classList.contains('open')){_closeOvSub();}else{_openOvSub();}
+}
+function ovJump(secId,btn){
+  const ovBtn=$('nav-overview');if(ovBtn)toggleOvNav(ovBtn);
+  const sec=$(secId);if(!sec)return;
+  const body=sec.querySelector('.ov-sec-body');
+  const arr=sec.querySelector('.ov-sec-arr');
+  if(body&&body.classList.contains('collapsed')){body.classList.remove('collapsed');if(arr)arr.classList.add('open');}
+  setTimeout(()=>sec.scrollIntoView({behavior:'smooth',block:'start'}),50);
+  document.querySelectorAll('#ov-sub .nav-sub-item').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+}
+function toggleOvSec(hdr){
+  var body=hdr.nextElementSibling;
+  var arr=hdr.querySelector('.ov-sec-arr');
+  var wasCollapsed=body.classList.contains('collapsed');
+  if(wasCollapsed){body.classList.remove('collapsed');if(arr)arr.classList.add('open');}
+  else{body.classList.add('collapsed');if(arr)arr.classList.remove('open');}
+}
 function setTestsCat(el,cat){
   _testsCat=cat;
   document.querySelectorAll('.nav-sub-item').forEach(b=>b.classList.remove('active'));
@@ -2239,6 +2289,7 @@ function showTab(btn){
   $('tab-'+btn.dataset.tab).classList.add('active');
   $('pg-title').textContent=PAGE_TITLES[btn.dataset.tab]||btn.dataset.tab;
   if(btn.dataset.tab!=='tests')_closeTestsSub();
+  if(btn.dataset.tab!=='overview')_closeOvSub();
   if(btn.dataset.tab==='output')connectLog();
   clearInterval(_healthTimer);_healthTimer=null;
   clearInterval(_netInfoTimer);_netInfoTimer=null;
@@ -2246,7 +2297,7 @@ function showTab(btn){
   if(btn.dataset.tab==='health'){pollHealth();pollNetInfo();_healthTimer=setInterval(()=>{pollHealth();},2500);_netInfoTimer=setInterval(pollNetInfo,15000);_initDrag('health-grid');}
   if(btn.dataset.tab==='security'){updateSecurityTab();_secTimer=setInterval(updateSecurityTab,_secInterval);_initDrag('sec-grid');}
 }
-function navTo(tab){if(tab==='tests'){const btn=$('nav-tests');if(btn)toggleTestsNav(btn);return;}const btn=document.querySelector('.nav-item[data-tab="'+tab+'"]');if(btn)showTab(btn);}
+function navTo(tab){if(tab==='tests'){const btn=$('nav-tests');if(btn)toggleTestsNav(btn);return;}if(tab==='overview'){const btn=$('nav-overview');if(btn)toggleOvNav(btn);return;}const btn=document.querySelector('.nav-item[data-tab="'+tab+'"]');if(btn)showTab(btn);}
 function drawDonut(ok,fail){
   const c=$('donut'),ctx=c.getContext('2d'),W=c.width,H2=c.height,cx=W/2,cy=H2/2,r=66,ri=46;
   const tot=ok+fail;ctx.clearRect(0,0,W,H2);
@@ -3140,35 +3191,22 @@ function exportResults(fmt){
   document.addEventListener('DOMContentLoaded',_navHash);
 })();
 (function(){
-  var _etaTimer=null;
-  function _hide(){
-    var w=$('eta-bar-wrap');if(w)w.style.display='none';
-    if(_etaTimer){clearInterval(_etaTimer);_etaTimer=null;}
-  }
-  function _show(label,pct,color,timeStr){
-    var w=$('eta-bar-wrap');if(!w)return;
-    w.style.display='flex';
-    $('eta-label').textContent=label;
-    $('eta-time').textContent=timeStr;
-    $('eta-fill').style.width=Math.min(100,Math.max(0,pct))+'%';
-    $('eta-fill').style.background=color;
-  }
-  function _tick(){
-    var s=_lastState;if(!s){_hide();return;}
-    var st=s.status||'';
+  setInterval(function(){
+    var s=_lastState;
+    var pill=$('status-pill');if(!pill)return;
+    var st=s?s.status||'':'';
     if(st==='between_tests'&&s.pause_until){
       var total=s.max_wait_secs||20,rem=Math.max(0,s.pause_until-Date.now()/1000),elapsed=total-rem,pct=total>0?elapsed/total*100:0;
-      _show('Next suite in',''+pct,'#f59e0b',Math.ceil(rem)+'s');
+      pill.style.background='linear-gradient(to right,rgba(245,158,11,.22) '+pct+'%,transparent '+pct+'%)';
     } else if(st==='running'&&s.test_started_at){
-      var elapsed2=Math.max(0,Date.now()/1000-s.test_started_at);
+      var el=Math.max(0,Date.now()/1000-s.test_started_at);
       var est=(s.tests&&s.current_test&&s.tests[s.current_test]&&s.tests[s.current_test].avg_dur_ms)?s.tests[s.current_test].avg_dur_ms/1000:60;
-      var pct2=est>0?elapsed2/est*100:0;
-      _show('Running: '+(s.current_test||'—'),Math.min(pct2,95),'#22c55e','+'+Math.round(elapsed2)+'s');
+      var pct2=est>0?Math.min(95,el/est*100):0;
+      pill.style.background='linear-gradient(to right,rgba(34,197,94,.18) '+pct2+'%,transparent '+pct2+'%)';
     } else {
-      _hide();
+      pill.style.background='';
     }
-  }
-  setInterval(_tick,500);
+  },300);
 })();
 (function(){
   var TOP_N=8;
