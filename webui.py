@@ -809,6 +809,13 @@ body{display:flex;background:var(--bg);color:var(--text);font-family:-apple-syst
 .nav-item{display:flex;align-items:center;gap:9px;padding:8px 16px 8px 13px;color:var(--muted);cursor:pointer;border:none;background:none;width:100%;text-align:left;font-size:19px;border-left:3px solid transparent;transition:all .12s}
 .nav-item:hover{color:var(--text);background:rgba(255,255,255,.04)}
 .nav-item.active{color:var(--green);background:var(--gdim);border-left-color:var(--green);font-weight:500}
+.nav-arr{font-size:11px;transition:transform .2s;display:inline-block;line-height:1}
+.nav-arr.open{transform:rotate(90deg)}
+.nav-sub{max-height:0;overflow:hidden;transition:max-height .28s ease}
+.nav-sub.open{max-height:500px}
+.nav-sub-item{display:flex;align-items:center;gap:8px;padding:5px 16px 5px 36px;color:var(--dim);cursor:pointer;border:none;background:none;width:100%;text-align:left;font-size:14px;border-left:3px solid transparent;transition:all .12s}
+.nav-sub-item:hover{color:var(--text);background:rgba(255,255,255,.04)}
+.nav-sub-item.active{color:var(--green);border-left-color:var(--green);background:var(--gdim)}
 .nav-ico{width:18px;text-align:center;font-size:19px;opacity:.75}
 .sb-foot{margin-top:auto;padding:12px 16px;border-top:1px solid var(--border)}
 .sb-foot div{font-size:16px;color:var(--dim);margin-top:2px}
@@ -1063,7 +1070,18 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
   </div>
   <div class="nav-lbl">Monitor</div>
   <button class="nav-item active" data-tab="overview" onclick="showTab(this)"><span class="nav-ico">◈</span>Overview</button>
-  <button class="nav-item" data-tab="security" onclick="showTab(this)"><span class="nav-ico">&#128737;</span>Security</button>
+  <button class="nav-item" id="nav-security" data-tab="security" onclick="toggleSecNav(this)"><span class="nav-ico">&#128737;</span><span style="flex:1">Security</span><span class="nav-arr" id="sec-arr">&#9656;</span></button>
+  <div class="nav-sub" id="sec-sub">
+    <button class="nav-sub-item active" onclick="setSecCat(this,'all')">All Categories</button>
+    <button class="nav-sub-item" onclick="setSecCat(this,'Connectivity & Network')">🌐 Connectivity</button>
+    <button class="nav-sub-item" onclick="setSecCat(this,'Web & HTTP')">🌍 Web & HTTP</button>
+    <button class="nav-sub-item" onclick="setSecCat(this,'Encrypted & Modern Protocols')">🔐 Encrypted</button>
+    <button class="nav-sub-item" onclick="setSecCat(this,'Threat Detection & IDS/IPS')">🛡️ Threat Detection</button>
+    <button class="nav-sub-item" onclick="setSecCat(this,'Recon & Lateral Movement')">🕵️ Recon</button>
+    <button class="nav-sub-item" onclick="setSecCat(this,'Evasion & C2')">📡 Evasion & C2</button>
+    <button class="nav-sub-item" onclick="setSecCat(this,'UCaaS & Communications')">📞 UCaaS</button>
+    <button class="nav-sub-item" onclick="setSecCat(this,'Content Filtering')">🚧 Content Filtering</button>
+  </div>
   <button class="nav-item" data-tab="tests" onclick="showTab(this)"><span class="nav-ico">⚗</span>Tests</button>
   <button class="nav-item" data-tab="output" onclick="showTab(this)"><span class="nav-ico">⬛</span>Live View</button>
   <div class="nav-lbl">System</div>
@@ -1866,6 +1884,54 @@ const _SDL={
     clearTimeout(_tid);tip.classList.remove('show');
   });
 })();
+const _SC={
+  'bgp':'Connectivity & Network','dns':'Connectivity & Network','icmp':'Connectivity & Network',
+  'ntp':'Connectivity & Network','snmp':'Connectivity & Network','ssh':'Connectivity & Network',
+  'ad-tracker':'Web & HTTP','ai-browse':'Web & HTTP','bulk-transfer':'Web & HTTP','web-crawl':'Web & HTTP',
+  'ftp':'Web & HTTP','http':'Web & HTTP','https':'Web & HTTP','s3':'Web & HTTP',
+  'speedtest':'Web & HTTP','url-latency':'Web & HTTP',
+  'doh':'Encrypted & Modern Protocols','dot':'Encrypted & Modern Protocols',
+  'http3':'Encrypted & Modern Protocols','post-quantum':'Encrypted & Modern Protocols',
+  'data-exfil-http':'Threat Detection & IDS/IPS','dlp':'Threat Detection & IDS/IPS',
+  'ids-sigs':'Threat Detection & IDS/IPS','log4shell':'Threat Detection & IDS/IPS',
+  'c2-useragents':'Threat Detection & IDS/IPS','malware-samples':'Threat Detection & IDS/IPS',
+  'msf-appliance':'Threat Detection & IDS/IPS','msf-aux-scan':'Threat Detection & IDS/IPS',
+  'msf-cisa-kev':'Threat Detection & IDS/IPS','msf-cred-spray':'Threat Detection & IDS/IPS',
+  'msf-enterprise':'Threat Detection & IDS/IPS','msf-middleware':'Threat Detection & IDS/IPS',
+  'msf-payload-delivery':'Threat Detection & IDS/IPS','msf-recon':'Threat Detection & IDS/IPS',
+  'msf-webapp':'Threat Detection & IDS/IPS',
+  'nmap':'Threat Detection & IDS/IPS','tls-inspection':'Threat Detection & IDS/IPS',
+  'av-test':'Threat Detection & IDS/IPS','waf-attack':'Threat Detection & IDS/IPS',
+  'web-scanner':'Threat Detection & IDS/IPS',
+  'blocklist-probe':'Recon & Lateral Movement','lateral-movement':'Recon & Lateral Movement',
+  'phishing-domains':'Recon & Lateral Movement','squatting':'Recon & Lateral Movement',
+  'c2-beacon':'Evasion & C2','dns-exfil':'Evasion & C2','llm-dlp':'Evasion & C2',
+  'shadow-it':'Evasion & C2','tor-anonymizer':'Evasion & C2',
+  'ucaas':'UCaaS & Communications','voip':'UCaaS & Communications',
+  'pornography':'Content Filtering',
+};
+let _secCat='all';
+function toggleSecNav(btn){
+  const sub=$('sec-sub'),arr=$('sec-arr');
+  const opening=!sub.classList.contains('open');
+  sub.classList.toggle('open',opening);
+  arr.classList.toggle('open',opening);
+  // navigate to security tab
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  btn.classList.add('active');
+  $('tab-security').classList.add('active');
+  $('pg-title').textContent='Security';
+  clearInterval(_secTimer);_secTimer=null;
+  updateSecurityTab();_secTimer=setInterval(updateSecurityTab,_secInterval);
+  _initDrag('sec-grid');
+}
+function setSecCat(el,cat){
+  _secCat=cat;
+  document.querySelectorAll('.nav-sub-item').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  updateSecurityTab();
+}
 function showTab(btn){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -1879,7 +1945,7 @@ function showTab(btn){
   if(btn.dataset.tab==='health'){pollHealth();pollNetInfo();_healthTimer=setInterval(()=>{pollHealth();},2500);_netInfoTimer=setInterval(pollNetInfo,15000);_initDrag('health-grid');}
   if(btn.dataset.tab==='security'){updateSecurityTab();_secTimer=setInterval(updateSecurityTab,_secInterval);_initDrag('sec-grid');}
 }
-function navTo(tab){const btn=document.querySelector('.nav-item[data-tab="'+tab+'"]');if(btn)showTab(btn);}
+function navTo(tab){if(tab==='security'){const btn=$('nav-security');if(btn)toggleSecNav(btn);return;}const btn=document.querySelector('.nav-item[data-tab="'+tab+'"]');if(btn)showTab(btn);}
 function drawDonut(ok,fail){
   const c=$('donut'),ctx=c.getContext('2d'),W=c.width,H2=c.height,cx=W/2,cy=H2/2,r=66,ri=46;
   const tot=ok+fail;ctx.clearRect(0,0,W,H2);
@@ -1988,32 +2054,6 @@ function apply(s){
   const suites=s.suites||[],tg=$('test-grid');
   if(!suites.length){tg.innerHTML='<div class="empty">Waiting for data…</div>';}
   else{
-    const _SC={
-      'bgp':'Connectivity & Network','dns':'Connectivity & Network','icmp':'Connectivity & Network',
-      'ntp':'Connectivity & Network','snmp':'Connectivity & Network','ssh':'Connectivity & Network',
-      'ad-tracker':'Web & HTTP','ai-browse':'Web & HTTP','bulk-transfer':'Web & HTTP','web-crawl':'Web & HTTP',
-      'ftp':'Web & HTTP','http':'Web & HTTP','https':'Web & HTTP','s3':'Web & HTTP',
-      'speedtest':'Web & HTTP','url-latency':'Web & HTTP',
-      'doh':'Encrypted & Modern Protocols','dot':'Encrypted & Modern Protocols',
-      'http3':'Encrypted & Modern Protocols','post-quantum':'Encrypted & Modern Protocols',
-      'data-exfil-http':'Threat Detection & IDS/IPS','dlp':'Threat Detection & IDS/IPS',
-      'ids-sigs':'Threat Detection & IDS/IPS','log4shell':'Threat Detection & IDS/IPS',
-      'c2-useragents':'Threat Detection & IDS/IPS','malware-samples':'Threat Detection & IDS/IPS',
-      'msf-appliance':'Threat Detection & IDS/IPS','msf-aux-scan':'Threat Detection & IDS/IPS',
-      'msf-cisa-kev':'Threat Detection & IDS/IPS','msf-cred-spray':'Threat Detection & IDS/IPS',
-      'msf-enterprise':'Threat Detection & IDS/IPS','msf-middleware':'Threat Detection & IDS/IPS',
-      'msf-payload-delivery':'Threat Detection & IDS/IPS','msf-recon':'Threat Detection & IDS/IPS',
-      'msf-webapp':'Threat Detection & IDS/IPS',
-      'nmap':'Threat Detection & IDS/IPS','tls-inspection':'Threat Detection & IDS/IPS',
-      'av-test':'Threat Detection & IDS/IPS','waf-attack':'Threat Detection & IDS/IPS',
-      'web-scanner':'Threat Detection & IDS/IPS',
-      'blocklist-probe':'Recon & Lateral Movement','lateral-movement':'Recon & Lateral Movement',
-      'phishing-domains':'Recon & Lateral Movement','squatting':'Recon & Lateral Movement',
-      'c2-beacon':'Evasion & C2','dns-exfil':'Evasion & C2','llm-dlp':'Evasion & C2',
-      'shadow-it':'Evasion & C2','tor-anonymizer':'Evasion & C2',
-      'ucaas':'UCaaS & Communications','voip':'UCaaS & Communications',
-      'pornography':'Content Filtering',
-    };
     const _CO=['Connectivity & Network','Web & HTTP','Encrypted & Modern Protocols',
                'Threat Detection & IDS/IPS','Recon & Lateral Movement','Evasion & C2',
                'UCaaS & Communications','Content Filtering'];
@@ -2458,12 +2498,17 @@ function drawSecTrend(hist){
 }
 function updateSecurityTab(){
   if(!_lastState)return;
-  const tot=_lastState.totals||{};
-  const blk=tot.blocked||0,drp=tot.dropped||0,rch=tot.allowed||0;
+  // apply category filter
+  const allTests=_lastState.tests||{};
+  const tests=_secCat==='all'?allTests:Object.fromEntries(Object.entries(allTests).filter(([n])=>(_SC[n]||'')===_secCat));
+  // aggregate totals from filtered tests
+  let rch=0,blk=0,drp=0,att=0;
+  Object.values(tests).forEach(t=>{rch+=(t.allowed||0);blk+=(t.blocked||0);drp+=(t.dropped||0);att+=(t.attempts||0);});
   const totalProbes=rch+blk+drp;
-  const other=Math.max(0,(tot.attempts||0)-totalProbes);
+  const other=Math.max(0,att-totalProbes);
   const pct=(n,d)=>d?((n/d)*100).toFixed(1)+'%':'—';
-  $('sec-total').textContent=N(totalProbes);$('sec-total-sub').textContent=totalProbes?'total probes':'No data yet';
+  const catLbl=_secCat==='all'?'total probes':_secCat+' probes';
+  $('sec-total').textContent=N(totalProbes);$('sec-total-sub').textContent=totalProbes?catLbl:'No data yet';
   $('sec-blocked').textContent=N(blk);$('sec-blocked-sub').textContent=totalProbes?pct(blk,totalProbes)+' of probes':'—';
   $('sec-dropped').textContent=N(drp);$('sec-dropped-sub').textContent=totalProbes?pct(drp,totalProbes)+' of probes':'—';
   $('sec-allowed').textContent=N(rch);$('sec-allowed-sub').textContent=totalProbes?pct(rch,totalProbes)+' of probes':'—';
@@ -2480,7 +2525,6 @@ function updateSecurityTab(){
   }
   drawSecTrend(_secHist);
   // per-suite table — sort by blocked desc
-  const tests=_lastState.tests||{};
   const rows=Object.entries(tests).map(([n,t])=>({n,ta:t.attempts||0,rch:t.allowed||0,blk:t.blocked||0,drp:t.dropped||0,tot:(t.allowed||0)+(t.blocked||0)+(t.dropped||0)}));
   rows.sort((a,b)=>b.blk-a.blk||(b.drp-a.drp));
   const tb=$('sec-tbl');
@@ -2491,7 +2535,7 @@ function updateSecurityTab(){
     const dpC=dp>50?'var(--red)':dp>10?'#818cf8':'var(--muted)';
     return`<tr class="mrow"><td class="nm" title="${_SD[r.n]||''}" style="cursor:default"><span class="s-ico">${suiteIco(r.n)}</span>${H(r.n)}</td><td class="r">${N(r.tot)}</td><td class="r" style="color:#22c55e">${N(r.rch)}</td><td class="r" style="color:var(--amber)">${N(r.blk)}</td><td class="r" style="color:#818cf8">${N(r.drp)}</td><td class="r"><span style="color:${bpC}">${r.tot?bp.toFixed(1)+'%':'—'}</span></td><td class="r"><span style="color:${dpC}">${r.tot?dp.toFixed(1)+'%':'—'}</span></td></tr>`;
   }).join('');
-  // block signal breakdown — aggregate codes across all tests
+  // block signal breakdown — aggregate codes across filtered tests
   const codeTotals={};
   Object.values(tests).forEach(t=>{Object.entries(t.codes||{}).forEach(([k,v])=>{codeTotals[k]=(codeTotals[k]||0)+v;});});
   // also add pseudo-codes for TCP-level blocks (exit codes stored as exitN)
