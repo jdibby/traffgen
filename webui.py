@@ -1766,6 +1766,7 @@ const SUITE_ICONS={
   'c2-useragents':'👾','malware-samples':'🦠','av-test':'☣️',
   'msf-webapp':'🌐','msf-enterprise':'🏢','msf-appliance':'📡',
   'msf-cisa-kev':'🚨','msf-middleware':'⚙️','msf-recon':'🔭',
+  'msf-aux-scan':'🔍','msf-payload-delivery':'📦','msf-cred-spray':'🔑',
   'speedtest':'🚀','nmap':'🗺️','ntp':'🕐','phishing-domains':'🎣',
   'pornography':'🔞','snmp':'📊','squatting':'🔤','s3':'🪣',
   'ssh':'💻','url-latency':'⏱️','web-scanner':'🔬',
