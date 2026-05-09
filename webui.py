@@ -1427,6 +1427,10 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div class="thdr">Category Success Rate Trends</div>
         <div id="cat-spark-body" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;padding:4px 0"><div class="empty">Waiting for data&#8230;</div></div>
       </div>
+      <div class="tcard" data-widget="lat-heatmap">
+        <div class="thdr">Latency Heatmap <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px">avg duration over time &middot; green&lt;500ms amber&lt;2s red≥2s</span></div>
+        <div id="lat-heatmap-body" style="overflow-x:auto"><div class="empty">Waiting for data&#8230;</div></div>
+      </div>
       </div><!-- /#ov-grid -->
     </div>
     <!-- Security Summary -->
@@ -1630,6 +1634,21 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
           <button id="dns-btn" class="diag-btn" onclick="runDnsLookup()">Lookup</button>
         </div>
         <div id="dns-results"><div class="tr-status">Enter a hostname and click Lookup.</div></div>
+      </div>
+      <div class="diag-tool">
+        <div class="diag-tool-hdr">&#9654; On-Demand Suite Runner</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Restart generator running a single suite at chosen size. Current run will be interrupted.</div>
+        <div class="diag-input-row">
+          <select id="odr-suite" class="diag-input" style="flex:1">
+            <option value="">— select a suite —</option>
+          </select>
+          <select id="odr-size" class="diag-input" style="flex:0 0 auto;width:auto">
+            <option value="XS">XS</option><option value="S" selected>S</option>
+            <option value="M">M</option><option value="L">L</option><option value="XL">XL</option>
+          </select>
+          <button id="odr-btn" class="diag-btn" onclick="runOnDemand()">Run Now</button>
+        </div>
+        <div id="odr-result"></div>
       </div>
     </div>
     <!-- About -->
@@ -2340,6 +2359,7 @@ function apply(s){
     $('prog-eta').textContent=etaStr?'~'+etaStr+' left':'';
   })();
   drawDonut(ok,fail);$('leg-ok').textContent=N(ok)+' OK';$('leg-fail').textContent=N(fail)+' Fail';
+  _updateLatHeat(s);
   const hist=s.history||[];drawSpark(hist);if(hist.length>1)$('hist-info').textContent=hist.length+' samples';
   if(hist.length>=2){const h0=hist[hist.length-2],h1=hist[hist.length-1],dt=h1.t-h0.t,dp=(h1.ok+h1.fail)-(h0.ok+h0.fail);if(dt>0){const ppm=Math.round(dp/dt*60);$('v-ppm').textContent=N(ppm);$('s-ppm').textContent='probes per minute';}}else{$('v-ppm').textContent='—';$('s-ppm').textContent='accumulating…';}
   const tests=s.tests||{},names=Object.keys(tests).sort(),tb=$('tbl-body');
@@ -2475,6 +2495,7 @@ function apply(s){
   if(!$('drawer').classList.contains('open')){
     const sel=$('cfg-suite');
     if(sel.options.length<=1&&suites.length){suites.forEach(su=>{const o=document.createElement('option');o.value=su.name;o.textContent=su.name+' — '+su.description;sel.appendChild(o);});}
+    _populateOdrSuites(suites);
     sel.value=s.suite||'all';$('cfg-size').value=s.size||'S';$('cfg-wait').value=s.max_wait_secs||20;$('wait-val').textContent=(s.max_wait_secs||20)+'s';$('cfg-loop').checked=!!s.loop;
   }
   $('cur-cfg').innerHTML=`<span class="cfg-chip">suite:${H(s.suite||'—')}</span><span class="cfg-chip">size:${H(s.size||'—')}</span><span class="cfg-chip">wait:${s.max_wait_secs||20}s</span><span class="cfg-chip">${s.loop?'loop':'single'}</span>`;
@@ -3320,6 +3341,68 @@ function toggleRunDetail(id){
   el.style.display=el.style.display==='none'?'block':'none';
 }
 document.addEventListener('DOMContentLoaded',_renderRunHistory);
+// ── Latency heatmap ──────────────────────────────────────────────────────
+const _latHeat={};  // suite -> [avg_dur_ms, ...]  (rolling 20)
+function _updateLatHeat(s){
+  const tests=s.tests||{};
+  Object.entries(tests).forEach(([n,t])=>{
+    if(!(t.avg_dur_ms>0))return;
+    if(!_latHeat[n])_latHeat[n]=[];
+    _latHeat[n].push(t.avg_dur_ms);
+    if(_latHeat[n].length>20)_latHeat[n].shift();
+  });
+  const hb=$('lat-heatmap-body');if(!hb)return;
+  const suites=Object.keys(_latHeat).filter(n=>_latHeat[n].length>0)
+    .sort((a,b)=>(_latHeat[b][_latHeat[b].length-1]||0)-(_latHeat[a][_latHeat[a].length-1]||0))
+    .slice(0,15);
+  if(!suites.length){hb.innerHTML='<div class="empty">No timing data yet</div>';return;}
+  const maxCols=Math.max(...suites.map(n=>_latHeat[n].length));
+  const cellW=28,cellH=22;
+  const _heatColor=ms=>ms<500?'#166534':ms<1000?'#22c55e':ms<2000?'#b45309':ms<5000?'#f59e0b':'#ef4444';
+  const rows=suites.map(n=>{
+    const hist=_latHeat[n];
+    // Pad left so all rows align to same rightmost column
+    const pad=maxCols-hist.length;
+    const cells=Array(pad).fill(null).concat(hist).map((v,i)=>{
+      if(v===null)return`<td style="width:${cellW}px;height:${cellH}px;background:#0f1621"></td>`;
+      const col=_heatColor(v);
+      const tip=v<1000?v.toFixed(0)+'ms':(v/1000).toFixed(1)+'s';
+      return`<td title="${H(n)}: ${tip}" style="width:${cellW}px;height:${cellH}px;background:${col};border-radius:3px;cursor:default"></td>`;
+    }).join('');
+    const last=hist[hist.length-1]||0;
+    const lc=_heatColor(last);
+    const lt=last<1000?last.toFixed(0)+'ms':(last/1000).toFixed(1)+'s';
+    return`<tr><td style="padding-right:8px;font-size:11px;color:var(--muted);white-space:nowrap;max-width:100px;overflow:hidden;text-overflow:ellipsis">${H(n)}</td>${cells}`+
+      `<td style="padding-left:6px;font-size:11px;font-family:'SF Mono',Consolas,monospace;color:${lc};white-space:nowrap">${lt}</td></tr>`;
+  }).join('');
+  hb.innerHTML=`<table style="border-collapse:separate;border-spacing:2px;font-size:11px">${rows}</table>`;
+}
+// ── On-demand suite runner ────────────────────────────────────────────────
+function _populateOdrSuites(suites){
+  const sel=$('odr-suite');if(!sel||sel.options.length>1)return;
+  suites.forEach(su=>{
+    const o=document.createElement('option');o.value=su.name;
+    o.textContent=suiteIco(su.name)+' '+su.name+(su.description?' — '+su.description.slice(0,40):'');
+    sel.appendChild(o);
+  });
+}
+function runOnDemand(){
+  const suite=($('odr-suite').value||'').trim();
+  if(!suite){$('odr-result').innerHTML='<div class="tr-status" style="color:var(--red)">Select a suite first.</div>';return;}
+  const size=$('odr-size').value||'S';
+  $('odr-btn').disabled=true;
+  $('odr-result').innerHTML='<div class="tr-status">Sending command&#8230;</div>';
+  fetch('/api/control'+_sidQs(),{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({suite,size,loop:false,max_wait_secs:5})}).then(r=>r.json()).then(d=>{
+      $('odr-btn').disabled=false;
+      if(d.error){$('odr-result').innerHTML=`<div class="tr-status" style="color:var(--red)">${H(d.error)}</div>`;return;}
+      $('odr-result').innerHTML='<div class="tr-status" style="color:var(--green)">&#10003; Suite <strong>'+H(suite)+'</strong> queued at size '+H(size)+'. Switching to Live View&#8230;</div>';
+      setTimeout(()=>navTo('output'),1200);
+  }).catch(e=>{
+    $('odr-btn').disabled=false;
+    $('odr-result').innerHTML=`<div class="tr-status" style="color:var(--red)">${H(e.message)}</div>`;
+  });
+}
 window.addEventListener('resize',()=>{
   if(_lastState){drawSpark(_lastState.history||[]);drawSecTrend(_secHist);}
   if(_lastHealth){drawDiskBars(_lastHealth.disk_read_kbps||0,_lastHealth.disk_write_kbps||0);drawNetSpark('net-spark',_netHist);drawNetSpark('h-net-spark',_hNetHist);}
