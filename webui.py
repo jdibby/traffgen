@@ -908,6 +908,10 @@ td.nm{font-family:inherit;font-weight:500;font-size:16px}
 
 .tcard2{background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:7px;cursor:pointer;transition:border-color .15s,background .15s,box-shadow .15s;box-shadow:0 1px 4px rgba(0,0,0,.25);overflow:hidden;min-width:0}
 .tcard2:hover{border-color:var(--green);background:var(--gdim)}
+#suite-tip{position:fixed;z-index:9999;max-width:340px;background:#1a1f2e;border:1px solid rgba(34,197,94,.35);border-radius:10px;padding:13px 16px;box-shadow:0 8px 28px rgba(0,0,0,.55);pointer-events:none;opacity:0;transition:opacity .12s;font-size:13px;line-height:1.55;color:#c9d3e8}
+#suite-tip.show{opacity:1}
+#suite-tip .st-name{font-size:14px;font-weight:700;color:#e8eaf0;margin-bottom:6px;display:flex;align-items:center;gap:7px}
+#suite-tip .st-body{color:#9aa3b8}
 .tcard2.running{border-color:rgba(34,197,94,.4);background:var(--gdim)}
 .tcn{font-weight:600;font-size:15px;display:flex;align-items:center;gap:6px;min-width:0}
 .tcn-lbl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
@@ -1326,7 +1330,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div>
           <div class="a-title">traffgen</div>
           <div class="a-ver">v<span id="about-ver">&#8212;</span> &middot; Multi-Protocol Network Traffic Generator</div>
-          <div class="a-sub">Simulates realistic network traffic across 47 test suites &#8212; DNS, HTTP/S, BGP, SSH, VoIP/UCaaS, C2 beacons, DLP, IDS/WAF triggers, lateral movement, TLS inspection, Metasploit vuln scanners, encoded payload delivery, and more.<br>Purpose-built to stress-test firewalls, IDS/IPS, URL filters, DLP engines, CASB/SASE/SSE platforms, and SIEM pipelines.</div>
+          <div class="a-sub">Simulates realistic network traffic across 52 test suites &#8212; DNS, HTTP/S, BGP, SSH, VoIP/UCaaS, C2 beacons, DLP, IDS/WAF triggers, lateral movement, TLS inspection, Metasploit vuln scanners, encoded payload delivery, and more.<br>Purpose-built to stress-test firewalls, IDS/IPS, URL filters, DLP engines, CASB/SASE/SSE platforms, and SIEM pipelines.</div>
         </div>
       </div>
       <div class="a-section">
@@ -1774,6 +1778,39 @@ const SUITE_ICONS={
   'all':'✨',
 };
 function suiteIco(n){const k=n.replace(/_/g,'-');return(SUITE_ICONS[k]||SUITE_ICONS[n]||'◈')+' ';}
+(function(){
+  const tip=document.createElement('div');
+  tip.id='suite-tip';
+  document.body.appendChild(tip);
+  let _tid=null;
+  const GAP=14;
+  function rePos(x,y){
+    const tw=tip.offsetWidth||340,th=tip.offsetHeight||80;
+    const vw=window.innerWidth,vh=window.innerHeight;
+    let l=x+GAP,t=y+GAP;
+    if(l+tw>vw-8)l=x-tw-GAP;
+    if(t+th>vh-8)t=y-th-GAP;
+    tip.style.left=Math.max(8,l)+'px';
+    tip.style.top=Math.max(8,t)+'px';
+  }
+  document.addEventListener('mouseover',e=>{
+    const card=e.target.closest('.tcard2');
+    if(!card)return;
+    clearTimeout(_tid);
+    const nm=card.dataset.suite||'',desc=card.dataset.desc||'';
+    if(!desc)return;
+    tip.innerHTML='<div class="st-name">'+suiteIco(nm)+'<span>'+nm+'</span></div><div class="st-body">'+desc+'</div>';
+    rePos(e.clientX,e.clientY);
+    _tid=setTimeout(()=>tip.classList.add('show'),80);
+  });
+  document.addEventListener('mousemove',e=>{
+    if(tip.classList.contains('show'))rePos(e.clientX,e.clientY);
+  });
+  document.addEventListener('mouseout',e=>{
+    if(!e.target.closest('.tcard2'))return;
+    clearTimeout(_tid);tip.classList.remove('show');
+  });
+})();
 function showTab(btn){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
