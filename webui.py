@@ -1808,7 +1808,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
           <canvas id="lat-heatmap"></canvas>
         </div>
       </div>
-      <div class="tcard" data-widget="lat-table">
+      <div class="tcard" data-widget="lat-table" style="flex-shrink:0">
         <div class="thdr">Suite Latency <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px">P50 · P95 · P99 from observed avg_dur_ms samples</span></div>
         <table><thead><tr><th>Suite</th><th class="r">Samples</th><th class="r">Min</th><th class="r">P50</th><th class="r">P95</th><th class="r">P99</th><th class="r">Max</th></tr></thead>
         <tbody id="lat-tbody"><tr><td colspan="7" class="empty">Waiting for data&#8230; Run at least one test to begin tracking.</td></tr></tbody></table>
