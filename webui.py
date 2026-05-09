@@ -1371,6 +1371,15 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div class="card"><div class="clbl">Iteration</div><div class="cval c-amber" id="v-iter">&#8212;</div><div class="csub" id="s-iter">&#8212;</div></div>
         <div class="card"><div class="clbl">Probes / min</div><div class="cval c-blue" id="v-ppm">&#8212;</div><div class="csub" id="s-ppm">accumulating&hellip;</div></div>
       </div>
+      <div id="run-progress-wrap" data-widget="run-progress" style="display:none;background:#151b27;border-radius:12px;padding:12px 16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <span style="font-size:13px;color:var(--muted)" id="prog-label">Suite 0 of 0</span>
+          <span style="font-size:13px;font-weight:600;color:var(--green);font-family:'SF Mono',Consolas,monospace" id="prog-eta"></span>
+        </div>
+        <div style="background:#1e2d3d;border-radius:4px;height:6px;overflow:hidden">
+          <div id="prog-bar" style="height:100%;background:var(--green);width:0%;transition:width .6s ease;border-radius:4px"></div>
+        </div>
+      </div>
       <div class="cc" data-widget="net-io" style="display:flex;flex-direction:column;gap:10px">
         <div class="ctitle">Network I/O <span id="net-iface" style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim);font-size:12px"></span>
           <select class="net-interval" onchange="setNetInterval(+this.value)" title="Refresh interval">
@@ -2300,6 +2309,28 @@ function apply(s){
   if(tsa&&cur){clearInterval(_elTimer);const upEl=()=>$('s-test').textContent=elapsed(tsa);upEl();_elTimer=setInterval(upEl,1000);}
   else{clearInterval(_elTimer);$('s-test').textContent=s.loop?'Loop mode':'Single-run';}
   $('v-iter').textContent=s.iteration?'#'+N(s.iteration):'—';$('s-iter').textContent='Suite: '+(s.suite||'—')+' \xb7 Size: '+(s.size||'—');
+  // Progress bar
+  (function(){
+    const wrap=$('run-progress-wrap');if(!wrap)return;
+    const active=st==='running'||st==='between_tests'||st==='paused';
+    if(!active){wrap.style.display='none';return;}
+    const suites=s.suites||[];
+    if(!suites.length){wrap.style.display='none';return;}
+    wrap.style.display='';
+    // Count suites that have run at least once
+    const tests=s.tests||{};
+    const done=suites.filter(su=>(tests[su.name]||{}).attempts>0).length;
+    const total=suites.length;
+    const pct=total?done/total*100:0;
+    $('prog-bar').style.width=pct.toFixed(1)+'%';
+    $('prog-label').textContent='Suite '+done+' of '+total+(s.current_test?' — '+H(s.current_test):'');
+    // ETA: sum avg_dur_ms of remaining suites
+    const remaining=suites.filter(su=>!(tests[su.name]||{}).attempts);
+    const etaMs=remaining.reduce((acc,su)=>acc+((tests[su.name]||{}).avg_dur_ms||30000),0);
+    const etaSec=Math.round(etaMs/1000);
+    const etaStr=etaSec>0?(etaSec>=3600?Math.floor(etaSec/3600)+'h '+(Math.floor((etaSec%3600)/60))+'m':etaSec>=60?Math.floor(etaSec/60)+'m '+(etaSec%60)+'s':etaSec+'s'):'';
+    $('prog-eta').textContent=etaStr?'~'+etaStr+' left':'';
+  })();
   drawDonut(ok,fail);$('leg-ok').textContent=N(ok)+' OK';$('leg-fail').textContent=N(fail)+' Fail';
   const hist=s.history||[];drawSpark(hist);if(hist.length>1)$('hist-info').textContent=hist.length+' samples';
   if(hist.length>=2){const h0=hist[hist.length-2],h1=hist[hist.length-1],dt=h1.t-h0.t,dp=(h1.ok+h1.fail)-(h0.ok+h0.fail);if(dt>0){const ppm=Math.round(dp/dt*60);$('v-ppm').textContent=N(ppm);$('s-ppm').textContent='probes per minute';}}else{$('v-ppm').textContent='—';$('s-ppm').textContent='accumulating…';}
