@@ -318,14 +318,51 @@ else
     echo "WARNING: could not detect host LAN — lateral-movement suite will fall back to container network"
 fi
 
-docker run \
-    --detach \
-    --restart unless-stopped \
-    -p 7777:7777 \
-    ${HOST_LAN_CIDR:+-e HOST_LAN_CIDR="$HOST_LAN_CIDR"} \
-    --name traffgen \
-    jdibby/traffgen:latest \
-    --suite=all --size=S --max-wait-secs=20 --loop
+# Ensure no stale container with this name blocks the new one
+docker rm -f traffgen 2>/dev/null || true
+
+# Build docker run args as an array to avoid word-splitting issues
+_DOCKER_ARGS=(
+    --detach
+    --restart unless-stopped
+)
+if [ "$_CFG_WEBUI" -eq 1 ]; then
+    if [ "$_CFG_NET_HOST" -eq 1 ]; then
+        _DOCKER_ARGS+=(--network=host)
+    else
+        _DOCKER_ARGS+=(-p "${_CFG_PORT}:7777")
+    fi
+fi
+if [ -n "${HOST_LAN_CIDR:-}" ]; then
+    _DOCKER_ARGS+=(-e "HOST_LAN_CIDR=${HOST_LAN_CIDR}")
+fi
+_DOCKER_ARGS+=(--name traffgen jdibby/traffgen:latest)
+_DOCKER_ARGS+=(--suite="${_CFG_SUITE}" --size="${_CFG_SIZE}" --max-wait-secs="${_CFG_WAIT}")
+[ -n "${_CFG_LOOP:-}" ] && _DOCKER_ARGS+=("${_CFG_LOOP}")
+
+_RUN_LOG=$(mktemp)
+if ! docker run "${_DOCKER_ARGS[@]}" 2>"$_RUN_LOG"; then
+    echo "" >&2
+    echo "ERROR: docker run failed." >&2
+    cat "$_RUN_LOG" >&2
+    rm -f "$_RUN_LOG"
+    # Show any container that may have been partially created
+    _STALE=$(docker ps -a --filter "name=^traffgen$" --format "{{.ID}} {{.Status}}" 2>/dev/null || true)
+    [ -n "$_STALE" ] && echo "Stale container state: $_STALE" >&2
+    exit 1
+fi
+rm -f "$_RUN_LOG"
+
+# Brief wait and verify the container is actually running
+sleep 2
+if ! docker ps --filter "name=^traffgen$" --filter "status=running" --format "{{.Names}}" | grep -q traffgen; then
+    echo "" >&2
+    echo "ERROR: container 'traffgen' started but is not running." >&2
+    docker ps -a --filter "name=^traffgen$" --format "  Status: {{.Status}}" >&2
+    echo "  Logs:" >&2
+    docker logs --tail 20 traffgen 2>&1 | sed 's/^/    /' >&2
+    exit 1
+fi
 
 ok "Container started"
 
