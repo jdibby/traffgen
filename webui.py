@@ -1368,6 +1368,10 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div class="thdr">Category Success Rate Trends</div>
         <div id="cat-spark-body" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;padding:4px 0"><div class="empty">Waiting for data&#8230;</div></div>
       </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;padding:4px 0">
+        <button onclick="exportResults('csv')" title="Download results as CSV" style="padding:5px 14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:#e8eaf0;cursor:pointer;font-size:13px">&#11123; CSV</button>
+        <button onclick="exportResults('json')" title="Download results as JSON" style="padding:5px 14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:#e8eaf0;cursor:pointer;font-size:13px">&#11123; JSON</button>
+      </div>
       </div><!-- /#ov-grid -->
     </div>
     <!-- Security Summary -->
@@ -1649,6 +1653,14 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
     <!-- Changelog -->
     <div id="tab-changelog" class="panel">
       <div style="max-width:900px">
+
+        <div class="a-section">
+          <div class="a-h">v3.4.3 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
+          <table class="st-table" style="margin-top:10px">
+            <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Export</td><td>CSV and JSON export buttons on the Overview tab — downloads a per-suite results snapshot (attempts, ok, fail, allowed, blocked, dropped) with a timestamped filename</td></tr>
+          </table>
+        </div>
 
         <div class="a-section">
           <div class="a-h">v3.4.2 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
@@ -3040,6 +3052,23 @@ document.addEventListener('DOMContentLoaded',_renderRunHistory);
     '</table><button onclick="document.getElementById(\'kb-overlay\').remove()" style="margin-top:16px;padding:6px 18px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:#e8eaf0;cursor:pointer;font-size:13px">Close</button></div></div>';
   window.showKbHelp=function(){if(!$('kb-overlay')){document.body.insertAdjacentHTML('beforeend',_KBH_HTML);}};
 })();
+function exportResults(fmt){
+  if(!_lastState){toast('No data to export yet',false);return;}
+  const tests=_lastState.tests||{},tot=_lastState.totals||{};
+  const rows=Object.keys(tests).sort().map(n=>{const t=tests[n];return{suite:n,attempts:t.attempts||0,ok:t.ok||0,fail:t.fail||0,allowed:t.allowed||0,blocked:t.blocked||0,dropped:t.dropped||0};});
+  let content,mime,ext;
+  if(fmt==='json'){
+    const payload={exported_at:new Date().toISOString(),status:_lastState.status||'',totals:tot,suites:rows};
+    content=JSON.stringify(payload,null,2);mime='application/json';ext='json';
+  } else {
+    const hdr='suite,attempts,ok,fail,allowed,blocked,dropped\n';
+    content=hdr+rows.map(r=>[r.suite,r.attempts,r.ok,r.fail,r.allowed,r.blocked,r.dropped].join(',')).join('\n');
+    mime='text/csv';ext='csv';
+  }
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type:mime}));
+  a.download='traffgen-results-'+new Date().toISOString().slice(0,19).replace(/[T:]/g,'-')+'.'+ext;
+  a.click();URL.revokeObjectURL(a.href);
+}
 (function(){
   const _VALID_TABS=new Set(['overview','security','tests','output','diagnostics','health','about','changelog']);
   const _origShowTab=showTab;
