@@ -91,6 +91,7 @@ def _sample_health() -> None:
     """Background daemon: sample /proc metrics every 2 s and cache results."""
     prev_cpu   = None
     prev_disk  = None
+    prev_cores: list = []
     prev_procs: dict = {}
     prev_ts    = 0.0
     net_start:  tuple | None = None   # (rx_bytes, tx_bytes) at first sample
@@ -118,6 +119,32 @@ def _sample_health() -> None:
                 prev_cpu = cur_c
             except Exception:
                 data["cpu_pct"] = 0.0
+
+            # Per-core CPU (#220)
+            try:
+                with open("/proc/stat") as f:
+                    stat_lines = f.readlines()
+                cur_cores = []
+                for ln in stat_lines:
+                    parts = ln.split()
+                    if len(parts) < 8 or not parts[0].startswith("cpu") or parts[0] == "cpu":
+                        continue
+                    c_total = sum(int(x) for x in parts[1:8])
+                    c_idle  = int(parts[4]) + int(parts[5])
+                    cur_cores.append((c_total, c_idle))
+                core_pcts = []
+                for i, (c_total, c_idle) in enumerate(cur_cores):
+                    if i < len(prev_cores):
+                        pt, pi = prev_cores[i]
+                        dt = c_total - pt
+                        di = c_idle  - pi
+                        core_pcts.append(round((1 - di / dt) * 100, 1) if dt > 0 else 0.0)
+                    else:
+                        core_pcts.append(0.0)
+                data["core_pcts"] = core_pcts
+                prev_cores = cur_cores
+            except Exception:
+                data["core_pcts"] = []
 
             # Memory
             total_kb = 0
@@ -882,33 +909,104 @@ def api_dns_lookup():
     host = request.args.get("host", "").strip()
     if not _TARGET_RE.match(host):
         return jsonify({"error": "Invalid host"}), 400
+    rtype = request.args.get("rtype", "A").upper()
+    if rtype not in {"A", "AAAA", "MX", "TXT", "CNAME", "NS", "ANY"}:
+        rtype = "A"
+    include_doh = request.args.get("doh", "0") == "1"
     resolvers_raw = request.args.get("resolvers", "8.8.8.8,1.1.1.1,9.9.9.9")
     _ip_re = __import__('re').compile(r'^(\d{1,3}\.){3}\d{1,3}$')
     resolvers = [r.strip() for r in resolvers_raw.split(",") if _ip_re.match(r.strip())][:5]
     if not resolvers:
         resolvers = ["8.8.8.8", "1.1.1.1"]
+    if include_doh:
+        resolvers = resolvers + ["doh-cloudflare", "doh-google"]
     results = []
     for resolver in resolvers:
-        try:
-            proc = subprocess.run(
-                ["dig", "+short", "+time=3", f"@{resolver}", host, "A"],
-                capture_output=True, text=True, timeout=5,
-            )
-            addrs = [l.strip() for l in proc.stdout.splitlines() if l.strip()]
-            results.append({"resolver": resolver, "answers": addrs, "error": None})
-        except FileNotFoundError:
+        t0 = time.time()
+        if resolver.startswith("doh-"):
             try:
-                infos = _socket.getaddrinfo(host, None, _socket.AF_INET)
-                addrs = list({i[4][0] for i in infos})
-                results.append({"resolver": "system", "answers": addrs, "error": None})
-            except Exception as e2:
+                import urllib.request as _urlreq, urllib.parse as _urlparse
+                name = _urlparse.quote(host)
+                if resolver == "doh-cloudflare":
+                    url = f"https://cloudflare-dns.com/dns-query?name={name}&type={rtype}"
+                    label = "Cloudflare DoH"
+                else:
+                    url = f"https://dns.google/resolve?name={name}&type={rtype}"
+                    label = "Google DoH"
+                req = _urlreq.Request(url, headers={"Accept": "application/dns-json"})
+                with _urlreq.urlopen(req, timeout=5) as resp:
+                    doh_data = json.loads(resp.read())
+                rtt_ms = round((time.time() - t0) * 1000)
+                answers = [str(a["data"]) for a in doh_data.get("Answer", []) if "data" in a]
+                results.append({"resolver": label, "answers": answers, "rtt_ms": rtt_ms, "error": None})
+            except Exception as e:
+                label = "Cloudflare DoH" if resolver == "doh-cloudflare" else "Google DoH"
+                results.append({"resolver": label, "answers": [],
+                                 "rtt_ms": round((time.time() - t0) * 1000),
+                                 "error": str(e)[:80]})
+        else:
+            try:
+                proc = subprocess.run(
+                    ["dig", "+short", "+time=3", f"@{resolver}", host, rtype],
+                    capture_output=True, text=True, timeout=5,
+                )
+                rtt_ms = round((time.time() - t0) * 1000)
+                addrs = [l.strip() for l in proc.stdout.splitlines() if l.strip()]
+                results.append({"resolver": resolver, "answers": addrs, "rtt_ms": rtt_ms, "error": None})
+            except FileNotFoundError:
+                try:
+                    infos = _socket.getaddrinfo(host, None, _socket.AF_INET)
+                    rtt_ms = round((time.time() - t0) * 1000)
+                    addrs = list({i[4][0] for i in infos})
+                    results.append({"resolver": "system", "answers": addrs, "rtt_ms": rtt_ms, "error": None})
+                except Exception as e2:
+                    results.append({"resolver": resolver, "answers": [],
+                                     "rtt_ms": round((time.time() - t0) * 1000),
+                                     "error": f"Lookup failed ({type(e2).__name__})"})
+                break
+            except Exception as e:
                 results.append({"resolver": resolver, "answers": [],
-                                 "error": f"Lookup failed ({type(e2).__name__})"})
-            break
-        except Exception as e:
-            results.append({"resolver": resolver, "answers": [],
-                             "error": f"Query failed ({type(e).__name__})"})
-    return jsonify({"host": host, "results": results})
+                                 "rtt_ms": round((time.time() - t0) * 1000),
+                                 "error": f"Query failed ({type(e).__name__})"})
+    non_empty = [r for r in results if not r.get("error") and r["answers"]]
+    answer_sets = [frozenset(r["answers"]) for r in non_empty]
+    mismatch = len(set(answer_sets)) > 1 if len(answer_sets) > 1 else False
+    return jsonify({"host": host, "results": results, "rtype": rtype, "mismatch": mismatch})
+
+
+@app.route("/api/run-test")
+def api_run_test():
+    """On-demand test runner (#216): stream generator output as SSE."""
+    suite = request.args.get("suite", "").strip()
+    size  = request.args.get("size",  "S").upper()
+    if size not in _VALID_SIZES:
+        size = "S"
+    st    = _read_state()
+    known = {s["name"] for s in st.get("suites", [])} | {"all"}
+    if not suite or suite not in known:
+        return jsonify({"error": f"Unknown suite: {suite}"}), 400
+    gen_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "generator.py")
+
+    def _gen():
+        try:
+            proc = subprocess.Popen(
+                [__import__("sys").executable, "-u", gen_path,
+                 f"--suite={suite}", f"--size={size}"],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, errors="replace", bufsize=1,
+            )
+            for line in iter(proc.stdout.readline, ""):
+                yield f'data: {json.dumps({"line": line.rstrip()})}\n\n'
+            proc.wait()
+            yield f'data: {json.dumps({"done": True, "rc": proc.returncode})}\n\n'
+        except Exception as exc:
+            yield f'data: {json.dumps({"error": str(exc)})}\n\n'
+
+    return Response(
+        _gen(),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.route("/events")
@@ -1327,6 +1425,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
     <button class="nav-sub-item" onclick="setTestsCat(this,'Content Filtering')">🚧 Content Filtering</button>
   </div>
   <button class="nav-item" data-tab="output" onclick="showTab(this)"><span class="nav-ico">⬛</span>Live View</button>
+  <button class="nav-item" data-tab="latency" onclick="showTab(this)"><span class="nav-ico">&#128202;</span>Latency</button>
   <button class="nav-item" data-tab="diagnostics" onclick="showTab(this)"><span class="nav-ico">&#128300;</span>Diagnostics</button>
   <div class="nav-lbl">System</div>
   <button class="nav-item" data-tab="health" onclick="showTab(this)"><span class="nav-ico">&#9889;</span>Health</button>
@@ -1594,6 +1693,10 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
           <canvas id="mem-spark" style="width:100%;height:44px;margin-top:8px"></canvas>
         </div>
       </div>
+      <div class="cc" data-widget="h-core-cpu">
+        <div class="ctitle">Per-Core CPU <span id="core-cnt" style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim);font-size:12px"></span></div>
+        <div id="core-bars" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:10px;margin-top:10px"></div>
+      </div>
       <div class="h-row" data-widget="h-load-row">
         <div class="cc">
           <div class="ctitle">Load Average <span style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim)">1m &middot; 5m &middot; 15m</span></div>
@@ -1660,12 +1763,55 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
       </div>
       <div class="diag-tool">
         <div class="diag-tool-hdr">&#128270; DNS Lookup (multi-resolver)</div>
-        <div class="diag-input-row">
+        <div class="diag-input-row" style="flex-wrap:wrap">
           <input id="dns-host" class="diag-input" type="text" placeholder="hostname (e.g. example.com)" spellcheck="false" autocomplete="off" onkeydown="if(event.key==='Enter')runDnsLookup()">
-          <input id="dns-resolvers" class="diag-input" type="text" value="8.8.8.8,1.1.1.1,9.9.9.9" style="flex:0 0 220px" title="Comma-separated resolver IPs">
+          <select id="dns-rtype" class="diag-input" style="flex:0 0 auto;width:auto;padding-right:20px" title="Record type">
+            <option value="A">A</option><option value="AAAA">AAAA</option>
+            <option value="MX">MX</option><option value="TXT">TXT</option>
+            <option value="CNAME">CNAME</option><option value="NS">NS</option>
+            <option value="ANY">ANY</option>
+          </select>
+          <input id="dns-resolvers" class="diag-input" type="text" value="8.8.8.8,1.1.1.1,9.9.9.9" style="flex:0 0 200px" title="Comma-separated resolver IPs">
+          <label style="display:flex;align-items:center;gap:5px;white-space:nowrap;font-size:13px;color:var(--muted);cursor:pointer;padding:0 4px"><input type="checkbox" id="dns-doh" style="accent-color:var(--green)"> DoH</label>
           <button id="dns-btn" class="diag-btn" onclick="runDnsLookup()">Lookup</button>
         </div>
         <div id="dns-results"><div class="tr-status">Enter a hostname and click Lookup.</div></div>
+      </div>
+      <div class="diag-tool">
+        <div class="diag-tool-hdr">&#9654; On-Demand Test Runner</div>
+        <div class="diag-input-row">
+          <select id="odr-suite" class="diag-input" style="flex:0 0 auto;width:auto;padding-right:20px" title="Test suite">
+            <option value="all" selected>all</option>
+          </select>
+          <select id="odr-size" class="diag-input" style="flex:0 0 auto;width:auto;padding-right:20px" title="Traffic size">
+            <option value="XS">XS</option><option value="S" selected>S</option>
+            <option value="M">M</option><option value="L">L</option><option value="XL">XL</option>
+          </select>
+          <button id="odr-btn" class="diag-btn" onclick="runOnDemand()">&#9654; Run</button>
+          <button id="odr-stop" class="diag-btn cancel" onclick="stopOnDemand()" style="display:none">&#9209; Stop</button>
+        </div>
+        <div id="odr-out" style="margin-top:12px;display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <span id="odr-status" style="font-size:12px;color:var(--muted)"></span>
+            <button onclick="$('odr-pre').innerHTML=''" style="background:none;border:none;color:var(--dim);font-size:12px;cursor:pointer">Clear</button>
+          </div>
+          <pre id="odr-pre" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 14px;font-family:'SF Mono',Consolas,monospace;font-size:12px;line-height:1.6;color:var(--text);max-height:320px;overflow-y:auto;white-space:pre-wrap;word-break:break-all"></pre>
+        </div>
+      </div>
+    </div>
+    <!-- Latency -->
+    <div id="tab-latency" class="panel">
+      <div class="tcard" data-widget="lat-table">
+        <div class="thdr">Suite Latency <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px">P50 · P95 · P99 from observed avg_dur_ms samples</span></div>
+        <table><thead><tr><th>Suite</th><th class="r">Samples</th><th class="r">Min</th><th class="r">P50</th><th class="r">P95</th><th class="r">P99</th><th class="r">Max</th></tr></thead>
+        <tbody id="lat-tbody"><tr><td colspan="7" class="empty">Waiting for data&#8230; Run at least one test to begin tracking.</td></tr></tbody></table>
+      </div>
+      <div class="tcard" data-widget="lat-heatmap">
+        <div class="thdr">Time-of-Day Latency <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px">average duration by suite and hour of day</span></div>
+        <div id="lat-hm-empty" class="empty" style="padding:20px">No data yet — latency heatmap builds as tests run.</div>
+        <div id="lat-hm-wrap" style="overflow-x:auto;display:none">
+          <canvas id="lat-heatmap"></canvas>
+        </div>
       </div>
     </div>
     <!-- About -->
@@ -1754,6 +1900,19 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
     <!-- Changelog -->
     <div id="tab-changelog" class="panel">
       <div style="max-width:900px">
+
+        <div class="a-section">
+          <div class="a-h">v3.5.0 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
+          <table class="st-table" style="margin-top:10px">
+            <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Diagnostics</td><td><strong>DNS multi-resolver enhancements</strong> — record type selector (A/AAAA/MX/TXT/CNAME/NS/ANY), per-resolver RTT column, DNS-over-HTTPS support (Cloudflare &amp; Google DoH), and automatic mismatch detection with amber warning when resolvers disagree</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Health</td><td><strong>Per-core CPU breakdown</strong> — new Health widget shows individual utilization bar and percentage for each logical CPU core, reading /proc/stat cpu0…cpuN lines every 2s</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Dashboard</td><td><strong>Latency tab</strong> — new Monitor page with P50/P95/P99 latency table per suite (sampled from avg_dur_ms over time) and a time-of-day heatmap showing average test duration by suite and hour</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Diagnostics</td><td><strong>On-demand test runner</strong> — run any suite on-demand from the Diagnostics page with selectable size; live output streamed via SSE directly in the browser</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Live View</td><td><strong>User-Agent condensing</strong> — long Mozilla/5.0 UA strings in log lines are condensed to compact labels (e.g. <code>[Chrome/Android]</code>, <code>[Firefox/Windows]</code>) for readability</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Settings</td><td>Suite dropdown in Settings drawer now sorted alphabetically</td></tr>
+          </table>
+        </div>
 
         <div class="a-section">
           <div class="a-h">v3.4.6 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
@@ -2166,7 +2325,7 @@ let _healthTimer=null,_netInfoTimer=null,_lastHealth=null,_netHist=[],_hNetHist=
 let _cpuHist=[],_memHist=[];
 function uptime(t){const s=Math.floor(Date.now()/1000-t);return[Math.floor(s/3600),Math.floor((s%3600)/60),s%60].map(v=>String(v).padStart(2,'0')).join(':');}
 function elapsed(t){if(!t)return'';const s=Math.floor(Date.now()/1000-t);if(s<60)return s+'s elapsed';if(s<3600)return Math.floor(s/60)+'m '+(s%60)+'s elapsed';return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m elapsed';}
-const PAGE_TITLES={overview:'Overview',security:'Security',tests:'Tests',output:'Live View',diagnostics:'Diagnostics',health:'Health',about:'About',changelog:'Changelog'};
+const PAGE_TITLES={overview:'Overview',security:'Security',tests:'Tests',output:'Live View',latency:'Latency',diagnostics:'Diagnostics',health:'Health',about:'About',changelog:'Changelog'};
 const SUITE_ICONS={
   'ad-tracker':'🎯','ai-browse':'🤖','bgp':'🌐','bulk-transfer':'💾',
   'blocklist-probe':'🚫','c2-beacon':'📡','llm-dlp':'🧠','web-crawl':'🕷️','dlp':'🔒',
@@ -2551,7 +2710,7 @@ function apply(s){
   })();
   if(!$('drawer').classList.contains('open')){
     const sel=$('cfg-suite');
-    if(sel.options.length<=1&&suites.length){suites.forEach(su=>{const o=document.createElement('option');o.value=su.name;o.textContent=su.name+' — '+su.description;sel.appendChild(o);});}
+    if(sel.options.length<=1&&suites.length){const sorted=suites.slice().sort((a,b)=>a.name<b.name?-1:a.name>b.name?1:0);sorted.forEach(su=>{const o=document.createElement('option');o.value=su.name;o.textContent=su.name+' — '+su.description;sel.appendChild(o);});const odr=$('odr-suite');if(odr&&odr.options.length<=1){sorted.forEach(su=>{const o=document.createElement('option');o.value=su.name;o.textContent=su.name;odr.appendChild(o);});}}
     sel.value=s.suite||'all';$('cfg-size').value=s.size||'S';$('cfg-wait').value=s.max_wait_secs||20;$('wait-val').textContent=(s.max_wait_secs||20)+'s';$('cfg-loop').checked=!!s.loop;
   }
   $('cur-cfg').innerHTML=`<span class="cfg-chip">suite:${H(s.suite||'—')}</span><span class="cfg-chip">size:${H(s.size||'—')}</span><span class="cfg-chip">wait:${s.max_wait_secs||20}s</span><span class="cfg-chip">${s.loop?'loop':'single'}</span>`;
@@ -2583,6 +2742,25 @@ function setFilter(btn,lvl){
     el.style.display=(lvl==='all'||el.classList.contains(lvl))?'':'none';
   });
 }
+function _fmtMsgUA(msg){
+  return msg.replace(/Mozilla\/5\.0[^\s"'\\)]*(?:\([^)]*\)[^\s"'\\)]*)?/g,function(ua){
+    let os='';
+    const am=ua.match(/Android (\d+)/);if(am)os='Android '+am[1];
+    else if(/iPhone/.test(ua))os='iOS';
+    else if(/iPad/.test(ua))os='iPadOS';
+    else if(/Windows NT/.test(ua))os='Windows';
+    else if(/Macintosh/.test(ua))os='macOS';
+    else if(/Linux/.test(ua))os='Linux';
+    else os='UA';
+    let br='';
+    const em=ua.match(/Edg\/(\d+)/);if(em)br='Edge/'+em[1];
+    else{const cm=ua.match(/Chrome\/(\d+)/);if(cm)br='Chrome/'+cm[1];}
+    if(!br){const fm=ua.match(/Firefox\/(\d+)/);if(fm)br='Firefox/'+fm[1];}
+    if(!br&&/Safari/.test(ua))br='Safari';
+    if(!br)br='UA';
+    return '['+br+(os?'/'+os:'')+']';
+  });
+}
 function appendLog(d){
   const b=$('obody'),lvl=d.level||'info';
   // rule and banner are always shown as structural context; others respect the filter
@@ -2612,7 +2790,7 @@ function appendLog(d){
   } else {
     div.className='ll '+lvl;
     const icon=lvl==='ok'?'✔ ':lvl==='error'?'✗ ':lvl==='warn'?'⚠ ':'';
-    div.innerHTML=`<span class="llt">${ts}</span><span class="llv">${H(lvl.toUpperCase().slice(0,5).padEnd(5))}</span><span class="llm">${icon?`<span style="opacity:.7">${icon}</span>`:''}${H(msg)}</span>`;
+    div.innerHTML=`<span class="llt">${ts}</span><span class="llv">${H(lvl.toUpperCase().slice(0,5).padEnd(5))}</span><span class="llm">${icon?`<span style="opacity:.7">${icon}</span>`:''}${H(_fmtMsgUA(msg))}</span>`;
   }
   if(!structural&&_logFilter!=='all'&&!div.classList.contains(_logFilter))div.style.display='none';
   b.appendChild(div);
@@ -2934,6 +3112,22 @@ function applyHealth(d){
         `<td class="r" style="color:var(--muted)">${p.rss_mb.toFixed(0)} MB</td>`+
         `<td class="r" style="color:var(--muted)">${fmtUptime(p.runtime_s)}</td></tr>`;
     }).join('');
+  // Per-core CPU (#220)
+  const cores=d.core_pcts||[];
+  if($('core-cnt'))$('core-cnt').textContent=cores.length?'('+cores.length+' core'+(cores.length!==1?'s':'')+')'  :'';
+  const coreBars=$('core-bars');
+  if(coreBars&&cores.length){
+    coreBars.innerHTML=cores.map(function(pct,i){
+      const c=pct>=90?'var(--red)':pct>=70?'var(--amber)':'var(--green)';
+      return'<div style="display:flex;flex-direction:column;align-items:center;gap:3px">'+
+        '<div style="font-size:11px;color:var(--muted);font-family:\'SF Mono\',Consolas,monospace">CPU'+i+'</div>'+
+        '<div style="width:100%;background:var(--border);border-radius:3px;height:5px;overflow:hidden">'+
+          '<div style="height:100%;width:'+Math.min(100,pct).toFixed(1)+'%;background:'+c+';transition:width .4s ease"></div>'+
+        '</div>'+
+        '<div style="font-size:11px;color:'+c+';font-family:\'SF Mono\',Consolas,monospace">'+pct.toFixed(1)+'%</div>'+
+      '</div>';
+    }).join('');
+  }
 }
 function pollHealth(){
   fetch('/api/health').then(r=>r.json()).then(d=>applyHealth(d)).catch(()=>{});
@@ -3154,19 +3348,54 @@ function runDnsLookup(){
   const host=($('dns-host').value||'').trim();
   if(!host){$('dns-results').innerHTML='<div class="tr-status" style="color:var(--red)">Enter a hostname.</div>';return;}
   const resolvers=($('dns-resolvers').value||'8.8.8.8,1.1.1.1,9.9.9.9').trim();
+  const rtype=$('dns-rtype')?$('dns-rtype').value:'A';
+  const doh=$('dns-doh')&&$('dns-doh').checked?'1':'0';
   $('dns-btn').disabled=true;
   $('dns-results').innerHTML='<div class="tr-status">Looking up&#8230;</div>';
-  fetch('/api/dns-lookup?host='+encodeURIComponent(host)+'&resolvers='+encodeURIComponent(resolvers))
+  fetch('/api/dns-lookup?host='+encodeURIComponent(host)+'&resolvers='+encodeURIComponent(resolvers)+'&rtype='+encodeURIComponent(rtype)+'&doh='+doh)
     .then(r=>r.json()).then(d=>{
       $('dns-btn').disabled=false;
       if(d.error){$('dns-results').innerHTML=`<div class="tr-status" style="color:var(--red)">${H(d.error)}</div>`;return;}
+      const mismatch=d.mismatch;
       const rows=d.results.map(r=>{
-        if(r.error)return`<tr><td style="font-family:'SF Mono',Consolas,monospace;color:var(--muted)">${H(r.resolver)}</td><td colspan="2" style="color:var(--red)">${H(r.error)}</td></tr>`;
-        const addrs=r.answers.length?r.answers.map(a=>`<span style="font-family:'SF Mono',Consolas,monospace">${H(a)}</span>`).join(', '):'<span style="color:var(--dim)">NXDOMAIN</span>';
-        return`<tr><td style="font-family:'SF Mono',Consolas,monospace;color:var(--muted);padding:4px 8px 4px 0">${H(r.resolver)}</td><td>${addrs}</td></tr>`;
+        if(r.error)return`<tr><td style="font-family:'SF Mono',Consolas,monospace;color:var(--muted);padding:4px 8px 4px 0">${H(r.resolver)}</td><td colspan="2" style="color:var(--red)">${H(r.error)}</td><td style="color:var(--dim);text-align:right;padding-left:12px">${r.rtt_ms!=null?r.rtt_ms+'ms':'—'}</td></tr>`;
+        const addrs=r.answers.length?r.answers.map(a=>`<span style="font-family:'SF Mono',Consolas,monospace">${H(a)}</span>`).join(', '):`<span style="color:var(--dim)">NXDOMAIN</span>`;
+        const rowC=mismatch&&r.answers.length?'color:var(--amber)':'';
+        return`<tr><td style="font-family:'SF Mono',Consolas,monospace;color:var(--muted);padding:4px 8px 4px 0">${H(r.resolver)}</td><td style="${rowC}">${addrs}</td><td style="font-family:'SF Mono',Consolas,monospace;font-size:12px;color:var(--dim);text-align:right;padding-left:12px;white-space:nowrap">${r.rtt_ms!=null?r.rtt_ms+'ms':'—'}</td></tr>`;
       }).join('');
-      $('dns-results').innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:8px">${rows}</table>`;
+      const warn=mismatch?`<div style="padding:6px 10px;margin-bottom:8px;background:rgba(245,158,11,.1);border:1px solid var(--amber);border-radius:6px;font-size:13px;color:var(--amber)">&#9888; Mismatch — resolvers returned different answers</div>`:'';
+      $('dns-results').innerHTML=warn+`<table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:4px"><thead><tr><th style="text-align:left;padding:0 8px 6px 0;color:var(--muted);font-size:12px">Resolver</th><th style="text-align:left;padding:0 8px 6px 0;color:var(--muted);font-size:12px">Answers (${H(d.rtype)})</th><th style="text-align:right;padding:0 0 6px 12px;color:var(--muted);font-size:12px">RTT</th></tr>${rows}</table>`;
     }).catch(e=>{$('dns-btn').disabled=false;$('dns-results').innerHTML=`<div class="tr-status" style="color:var(--red)">${H(e.message)}</div>`;});
+}
+// ── On-demand runner (#216) ───────────────────────────────────────────────
+let _odrSrc=null;
+function runOnDemand(){
+  const suite=($('odr-suite')?$('odr-suite').value:'dns').trim();
+  const size=$('odr-size')?$('odr-size').value:'S';
+  stopOnDemand();
+  const out=$('odr-out'),pre=$('odr-pre'),st=$('odr-status');
+  if(out)out.style.display='';
+  if(pre)pre.innerHTML='';
+  if(st)st.textContent='Running '+suite+' ('+size+')…';
+  if($('odr-btn'))$('odr-btn').disabled=true;
+  if($('odr-stop'))$('odr-stop').style.display='';
+  _odrSrc=new EventSource('/api/run-test?suite='+encodeURIComponent(suite)+'&size='+encodeURIComponent(size));
+  _odrSrc.onmessage=function(e){
+    const d=JSON.parse(e.data);
+    if(d.line!==undefined){
+      if(pre){pre.textContent+=(pre.textContent?'\\n':'')+d.line;pre.scrollTop=pre.scrollHeight;}
+    }else if(d.done||d.error){
+      if(d.error&&pre){pre.textContent+='\\n[error] '+d.error;}
+      if(st)st.textContent=d.done?'Finished (exit '+d.rc+')':'Error';
+      stopOnDemand();
+    }
+  };
+  _odrSrc.onerror=function(){if(st)st.textContent='Connection lost';stopOnDemand();};
+}
+function stopOnDemand(){
+  if(_odrSrc){_odrSrc.close();_odrSrc=null;}
+  if($('odr-btn'))$('odr-btn').disabled=false;
+  if($('odr-stop'))$('odr-stop').style.display='none';
 }
 // ── Run history ──────────────────────────────────────────────────────────
 const _RUN_HIST_KEY='tg_run_history';
@@ -3231,7 +3460,7 @@ function toggleRunDetail(id){
 document.addEventListener('DOMContentLoaded',_renderRunHistory);
 // ── Keyboard shortcuts ───────────────────────────────────────────────────
 (function(){
-  const _TAB_KEYS={'1':'overview','2':'security','3':'tests','4':'output','5':'health','6':'about','7':'changelog'};
+  const _TAB_KEYS={'1':'overview','2':'security','3':'tests','4':'output','5':'latency','6':'health','7':'about'};
   document.addEventListener('keydown',function(e){
     if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT'||e.target.isContentEditable)return;
     if(e.metaKey||e.ctrlKey||e.altKey)return;
@@ -3288,7 +3517,7 @@ function exportResults(fmt){
   a.click();URL.revokeObjectURL(a.href);
 }
 (function(){
-  const _VALID_TABS=new Set(['overview','security','tests','output','diagnostics','health','about','changelog']);
+  const _VALID_TABS=new Set(['overview','security','tests','output','latency','diagnostics','health','about','changelog']);
   document.addEventListener('click',function(e){
     const btn=e.target.closest('.nav-item[data-tab]');
     if(btn&&_VALID_TABS.has(btn.dataset.tab))history.replaceState(null,'','#'+btn.dataset.tab);
@@ -3337,6 +3566,108 @@ function exportResults(fmt){
     }).join('');
   }
   setInterval(_render,2000);
+})();
+// ── Latency tracking (#213 / #214) ────────────────────────────────────────
+(function(){
+  const MAX_SAMPLES=300;
+  const _lat={};   // suiteName -> [ms, ...]
+  const _hmData={}; // suiteName -> [24 arrays of ms values]
+  function _pct(arr,p){
+    if(!arr||!arr.length)return 0;
+    const s=arr.slice().sort(function(a,b){return a-b;});
+    const idx=Math.min(s.length-1,Math.floor(p/100*s.length));
+    return s[idx];
+  }
+  function _fmtMs(ms){return ms>=1000?(ms/1000).toFixed(2)+'s':Math.round(ms)+'ms';}
+  function _collectSamples(s){
+    const tests=s.tests||{};
+    Object.keys(tests).forEach(function(n){
+      const t=tests[n];
+      const ms=t.avg_dur_ms;
+      if(!ms||ms<=0)return;
+      if(!_lat[n])_lat[n]=[];
+      _lat[n].push(ms);
+      if(_lat[n].length>MAX_SAMPLES)_lat[n].shift();
+      // heatmap bucket: hour of day
+      const hr=new Date().getHours();
+      if(!_hmData[n])_hmData[n]=Array.from({length:24},function(){return[];});
+      _hmData[n][hr].push(ms);
+      if(_hmData[n][hr].length>60)_hmData[n][hr].shift();
+    });
+  }
+  function _renderTable(){
+    const tb=$('lat-tbody');if(!tb)return;
+    const keys=Object.keys(_lat);
+    if(!keys.length){tb.innerHTML='<tr><td colspan="7" class="empty">Waiting for data&#8230;</td></tr>';return;}
+    keys.sort();
+    tb.innerHTML=keys.map(function(n){
+      const arr=_lat[n];const cnt=arr.length;
+      if(!cnt)return'';
+      const mn=_pct(arr,0),p50=_pct(arr,50),p95=_pct(arr,95),p99=_pct(arr,99),mx=arr.reduce(function(a,b){return Math.max(a,b);},0);
+      const c=p99>5000?'var(--red)':p99>2000?'var(--amber)':'var(--green)';
+      return'<tr class="mrow"><td class="nm">'+H(n)+'</td>'
+        +'<td class="r" style="color:var(--muted)">'+cnt+'</td>'
+        +'<td class="r" style="color:var(--dim)">'+_fmtMs(mn)+'</td>'
+        +'<td class="r" style="color:var(--text)">'+_fmtMs(p50)+'</td>'
+        +'<td class="r" style="color:var(--amber)">'+_fmtMs(p95)+'</td>'
+        +'<td class="r" style="color:'+c+'">'+_fmtMs(p99)+'</td>'
+        +'<td class="r" style="color:var(--dim)">'+_fmtMs(mx)+'</td></tr>';
+    }).join('');
+  }
+  function _renderHeatmap(){
+    const suites=Object.keys(_hmData);
+    const wrap=$('lat-hm-wrap'),empty=$('lat-hm-empty');
+    if(!suites.length||!wrap){if(empty)empty.style.display='';if(wrap)wrap.style.display='none';return;}
+    if(empty)empty.style.display='none';wrap.style.display='';
+    const cv=$('lat-heatmap');if(!cv)return;
+    const CELL_W=28,CELL_H=22,LABEL_W=130,HOURS=24,PAD_TOP=24,PAD_BOT=4;
+    const W=LABEL_W+HOURS*CELL_W,H_px=PAD_TOP+suites.length*CELL_H+PAD_BOT;
+    cv.width=W;cv.height=H_px;cv.style.width=W+'px';cv.style.height=H_px+'px';
+    const ctx=cv.getContext('2d');
+    if(!ctx)return;
+    const isDark=!document.documentElement.classList.contains('light');
+    ctx.clearRect(0,0,W,H_px);
+    // Hour labels
+    ctx.font='10px SF Mono,Consolas,monospace';
+    ctx.fillStyle=isDark?'rgba(255,255,255,.35)':'rgba(0,0,0,.4)';
+    for(let h=0;h<HOURS;h+=3){
+      ctx.fillText(h.toString().padStart(2,'0'),LABEL_W+h*CELL_W+2,PAD_TOP-6);
+    }
+    // Find global max for color scale
+    let gMax=0;
+    suites.forEach(function(n){_hmData[n].forEach(function(a){const avg=a.length?a.reduce(function(s,v){return s+v;},0)/a.length:0;if(avg>gMax)gMax=avg;});});
+    if(gMax<1)gMax=1;
+    suites.forEach(function(n,si){
+      const y=PAD_TOP+si*CELL_H;
+      // Suite label
+      ctx.font='11px SF Mono,Consolas,monospace';
+      ctx.fillStyle=isDark?'rgba(255,255,255,.7)':'rgba(0,0,0,.7)';
+      ctx.fillText(n.length>17?n.slice(0,15)+'…':n,4,y+CELL_H/2+4);
+      for(let h=0;h<HOURS;h++){
+        const a=_hmData[n][h];
+        if(!a||!a.length){
+          ctx.fillStyle=isDark?'rgba(255,255,255,.04)':'rgba(0,0,0,.04)';
+          ctx.fillRect(LABEL_W+h*CELL_W+1,y+1,CELL_W-2,CELL_H-2);
+          continue;
+        }
+        const avg=a.reduce(function(s,v){return s+v;},0)/a.length;
+        const ratio=Math.min(1,avg/gMax);
+        // Green=fast, Amber=mid, Red=slow
+        const r=ratio<0.5?Math.round(ratio*2*245):245;
+        const g=ratio<0.5?158+Math.round((1-ratio*2)*77):Math.round((1-ratio)*158);
+        const b=11;
+        ctx.fillStyle='rgba('+r+','+g+','+b+',.75)';
+        ctx.beginPath();
+        ctx.roundRect(LABEL_W+h*CELL_W+1,y+1,CELL_W-2,CELL_H-2,3);
+        ctx.fill();
+      }
+    });
+  }
+  setInterval(function(){
+    if(_lastState){_collectSamples(_lastState);}
+    if($('lat-tbody'))_renderTable();
+    if($('lat-heatmap'))_renderHeatmap();
+  },3000);
 })();
 window.addEventListener('resize',()=>{
   if(_lastState){drawSpark(_lastState.history||[]);drawSecTrend(_secHist);}
