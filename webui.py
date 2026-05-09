@@ -102,22 +102,50 @@ def _sample_health() -> None:
             now  = time.time()
             data: dict = {}
 
-            # CPU
+            # CPU (aggregate + per-core)
             try:
                 with open("/proc/stat") as f:
-                    raw = f.readline().split()
-                total = sum(int(x) for x in raw[1:8])
-                idle  = int(raw[4]) + int(raw[5])   # idle + iowait
-                cur_c = (total, idle)
-                if prev_cpu:
-                    dt = cur_c[0] - prev_cpu[0]
-                    di = cur_c[1] - prev_cpu[1]
-                    data["cpu_pct"] = round((1 - di / dt) * 100, 1) if dt > 0 else 0.0
+                    stat_lines = [l for l in f if l.startswith("cpu")]
+                def _parse_cpu(raw):
+                    p = raw.split()
+                    tot = sum(int(x) for x in p[1:8])
+                    idle = int(p[4]) + int(p[5])
+                    user = int(p[1]) + int(p[2])
+                    sys_ = int(p[3]) + int(p[6])
+                    return tot, idle, user, sys_
+                agg = _parse_cpu(stat_lines[0])
+                cores = [_parse_cpu(l) for l in stat_lines[1:] if l.split()[0] != "cpu"]
+                cur_c = [agg] + cores
+                if prev_cpu and len(prev_cpu) == len(cur_c):
+                    def _pct(cur, prev):
+                        dt = cur[0] - prev[0]
+                        if dt <= 0:
+                            return 0.0, 0.0, 0.0
+                        di = cur[1] - prev[1]
+                        du = cur[2] - prev[2]
+                        ds = cur[3] - prev[3]
+                        return round((1-di/dt)*100,1), round(du/dt*100,1), round(ds/dt*100,1)
+                    tot_pct, usr_pct, sys_pct = _pct(cur_c[0], prev_cpu[0])
+                    data["cpu_pct"] = tot_pct
+                    data["cpu_user_pct"] = usr_pct
+                    data["cpu_sys_pct"] = sys_pct
+                    data["cpu_cores"] = [
+                        {"idx": i, "total": _pct(cur_c[i+1], prev_cpu[i+1])[0],
+                         "user": _pct(cur_c[i+1], prev_cpu[i+1])[1],
+                         "sys": _pct(cur_c[i+1], prev_cpu[i+1])[2]}
+                        for i in range(len(cores))
+                    ]
                 else:
                     data["cpu_pct"] = 0.0
+                    data["cpu_user_pct"] = 0.0
+                    data["cpu_sys_pct"] = 0.0
+                    data["cpu_cores"] = []
                 prev_cpu = cur_c
             except Exception:
                 data["cpu_pct"] = 0.0
+                data["cpu_user_pct"] = 0.0
+                data["cpu_sys_pct"] = 0.0
+                data["cpu_cores"] = []
 
             # Memory
             total_kb = 0
@@ -131,9 +159,14 @@ def _sample_health() -> None:
                 total_kb = mem_kb.get("MemTotal", 0)
                 avail_kb = mem_kb.get("MemAvailable", mem_kb.get("MemFree", 0))
                 used_kb  = total_kb - avail_kb
-                data["mem_total_mb"] = round(total_kb / 1024, 1)
-                data["mem_used_mb"]  = round(used_kb  / 1024, 1)
-                data["mem_pct"]      = round(used_kb / total_kb * 100, 1) if total_kb > 0 else 0.0
+                data["mem_total_mb"]   = round(total_kb / 1024, 1)
+                data["mem_used_mb"]    = round(used_kb  / 1024, 1)
+                data["mem_pct"]        = round(used_kb / total_kb * 100, 1) if total_kb > 0 else 0.0
+                buf_kb    = mem_kb.get("Buffers", 0)
+                cached_kb = mem_kb.get("Cached", 0) + mem_kb.get("SReclaimable", 0) - mem_kb.get("Shmem", 0)
+                data["mem_buffers_mb"] = round(max(0, buf_kb) / 1024, 1)
+                data["mem_cached_mb"]  = round(max(0, cached_kb) / 1024, 1)
+                data["mem_free_mb"]    = round(avail_kb / 1024, 1)
                 swap_total = mem_kb.get("SwapTotal", 0)
                 swap_free  = mem_kb.get("SwapFree",  0)
                 swap_used  = swap_total - swap_free
@@ -157,6 +190,17 @@ def _sample_health() -> None:
                 data["fd_count"] = len(os.listdir("/proc/self/fd"))
             except Exception:
                 data["fd_count"] = 0
+            try:
+                with open("/proc/self/limits") as f:
+                    for ln in f:
+                        if "Max open files" in ln:
+                            parts = ln.split()
+                            data["fd_limit"] = int(parts[3]) if parts[3].isdigit() else 0
+                            break
+                    else:
+                        data["fd_limit"] = 0
+            except Exception:
+                data["fd_limit"] = 0
 
             # System uptime
             try:
@@ -1403,7 +1447,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
           <div class="ctitle">Process Internals</div>
           <div style="display:flex;gap:20px;margin-top:6px;font-family:'SF Mono',Consolas,monospace;font-size:14px">
             <span><span style="color:var(--muted)">Threads: </span><span id="h-threads" style="color:var(--text)">&#8212;</span></span>
-            <span><span style="color:var(--muted)">Open FDs: </span><span id="h-fds" style="color:var(--text)">&#8212;</span></span>
+            <span><span style="color:var(--muted)">Open FDs: </span><span id="h-fds" style="color:var(--text)">&#8212;</span><span id="h-fds-limit" style="color:var(--dim);font-size:11px"></span></span>
           </div>
         </div>
       </div>
@@ -1416,9 +1460,15 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
           <div class="gauge-wrap">
             <canvas id="mem-gauge" width="200" height="130"></canvas>
             <div id="mem-detail" style="font-size:13px;color:var(--muted);margin-top:4px">&#8212; MB / &#8212; MB used</div>
+            <div id="mem-stacked-bar" style="display:flex;height:8px;border-radius:4px;overflow:hidden;margin-top:8px;background:#1e2d3d"></div>
+            <div id="mem-stacked-legend" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;font-size:11px;color:var(--muted)"></div>
           </div>
           <canvas id="mem-spark" style="width:100%;height:44px;margin-top:8px"></canvas>
         </div>
+      </div>
+      <div class="tcard" data-widget="h-cpu-cores">
+        <div class="thdr">Per-Core CPU Usage</div>
+        <div id="cpu-cores-body" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;padding:4px 0"><div class="empty">Loading&#8230;</div></div>
       </div>
       <div class="h-row" data-widget="h-load-row">
         <div class="cc">
@@ -2548,6 +2598,36 @@ function applyHealth(d){
   if($('cpu-cur'))$('cpu-cur').textContent=cpuPct.toFixed(1)+'%';
   if($('mem-cur'))$('mem-cur').textContent=memPct.toFixed(1)+'%';
   if($('mem-detail'))$('mem-detail').textContent=(d.mem_used_mb||0).toFixed(0)+' MB / '+(d.mem_total_mb||0).toFixed(0)+' MB used';
+  // Stacked memory bar: used(red)|buffers(blue)|cached(amber)|free(dim)
+  (function(){
+    const bar=$('mem-stacked-bar'),leg=$('mem-stacked-legend');
+    if(!bar)return;
+    const tot=d.mem_total_mb||1;
+    const used=d.mem_used_mb||0,buf=d.mem_buffers_mb||0,cach=d.mem_cached_mb||0,free=d.mem_free_mb||0;
+    const segs=[['Used','var(--red)',used],['Buffers','#58a6ff',buf],['Cached','var(--amber)',cach],['Free','#374151',Math.max(0,tot-used-buf-cach)]];
+    bar.innerHTML=segs.map(([,col,v])=>`<div style="flex:${v/tot};background:${col};height:100%"></div>`).join('');
+    if(leg)leg.innerHTML=segs.map(([lbl,col,v])=>`<span style="display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:50%;background:${col};display:inline-block"></span>${lbl}: ${fmtMB(v)}</span>`).join('');
+  })();
+  // Per-core CPU bars
+  (function(){
+    const cb=$('cpu-cores-body');if(!cb)return;
+    const cores=d.cpu_cores||[];
+    if(!cores.length){cb.innerHTML='<div class="empty" style="font-size:12px">Single core or data pending</div>';return;}
+    cb.innerHTML=cores.map(c=>{
+      const col=gaugeHex(c.total);
+      return`<div style="background:#151b27;border-radius:8px;padding:8px 10px">`+
+        `<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--muted)">Core ${c.idx}</span><span style="color:${col};font-weight:600">${c.total.toFixed(1)}%</span></div>`+
+        `<div style="background:#1e2d3d;border-radius:3px;height:6px;overflow:hidden;display:flex">`+
+        `<div style="flex:${c.user};background:#22c55e"></div>`+
+        `<div style="flex:${c.sys};background:var(--amber)"></div>`+
+        `<div style="flex:${Math.max(0,100-c.user-c.sys)};background:transparent"></div>`+
+        `</div>`+
+        `<div style="display:flex;gap:8px;margin-top:3px;font-size:10px;color:var(--dim)">`+
+        `<span style="color:#22c55e">usr ${c.user.toFixed(0)}%</span>`+
+        `<span style="color:var(--amber)">sys ${c.sys.toFixed(0)}%</span>`+
+        `</div></div>`;
+    }).join('');
+  })();
   const la=d.load_avg||[0,0,0];
   if($('h-load'))$('h-load').textContent=la.map(v=>v.toFixed(2)).join('  \xb7  ');
   if($('ov-cpu'))$('ov-cpu').textContent=cpuPct.toFixed(1)+'%';
@@ -2572,7 +2652,14 @@ function applyHealth(d){
   // System uptime + process internals
   if($('sys-uptime'))$('sys-uptime').textContent=fmtUptime(d.uptime_secs||0);
   if($('h-threads'))$('h-threads').textContent=d.thread_count||'—';
-  if($('h-fds'))$('h-fds').textContent=d.fd_count||'—';
+  if($('h-fds')){
+    const fdCount=d.fd_count||0,fdLimit=d.fd_limit||0;
+    const fdPct=fdLimit?fdCount/fdLimit*100:0;
+    const fdC=fdPct>90?'var(--red)':fdPct>70?'var(--amber)':'var(--text)';
+    $('h-fds').textContent=fdCount;
+    $('h-fds').style.color=fdC;
+    if($('h-fds-limit'))$('h-fds-limit').textContent=fdLimit?' / '+fdLimit+' ('+(fdPct.toFixed(0))+'%)':'';
+  }
   const procs=d.processes||[];
   const tb=$('proc-body');
   if(tb)tb.innerHTML=!procs.length?'<tr><td colspan="5" class="empty">No data</td></tr>':
