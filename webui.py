@@ -809,7 +809,7 @@ body{display:flex;background:var(--bg);color:var(--text);font-family:-apple-syst
 .nav-item{display:flex;align-items:center;gap:9px;padding:8px 16px 8px 13px;color:var(--muted);cursor:pointer;border:none;background:none;width:100%;text-align:left;font-size:19px;border-left:3px solid transparent;transition:all .12s}
 .nav-item:hover{color:var(--text);background:rgba(255,255,255,.04)}
 .nav-item.active{color:var(--green);background:var(--gdim);border-left-color:var(--green);font-weight:500}
-.nav-arr{font-size:11px;transition:transform .2s;display:inline-block;line-height:1}
+.nav-arr{font-size:12px;transition:transform .2s;display:inline-block;line-height:1;padding:4px 6px;margin:-4px -6px;border-radius:4px}.nav-arr:hover{background:rgba(255,255,255,.1)}
 .nav-arr.open{transform:rotate(90deg)}
 .nav-sub{max-height:0;overflow:hidden;transition:max-height .28s ease}
 .nav-sub.open{max-height:500px}
@@ -1070,7 +1070,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
   </div>
   <div class="nav-lbl">Monitor</div>
   <button class="nav-item active" data-tab="overview" onclick="showTab(this)"><span class="nav-ico">◈</span>Overview</button>
-  <button class="nav-item" id="nav-security" data-tab="security" onclick="toggleSecNav(this)"><span class="nav-ico">&#128737;</span><span style="flex:1">Security</span><span class="nav-arr" id="sec-arr">&#9656;</span></button>
+  <button class="nav-item" id="nav-security" data-tab="security" onclick="toggleSecNav(this)"><span class="nav-ico">&#128737;</span><span style="flex:1">Security</span><span class="nav-arr" id="sec-arr" onclick="collapseSecSub(event)" title="Collapse/expand">&#9656;</span></button>
   <div class="nav-sub" id="sec-sub">
     <button class="nav-sub-item active" onclick="setSecCat(this,'all')">All Categories</button>
     <button class="nav-sub-item" onclick="setSecCat(this,'Connectivity & Network')">🌐 Connectivity</button>
@@ -1911,12 +1911,17 @@ const _SC={
   'pornography':'Content Filtering',
 };
 let _secCat='all';
+function _openSecSub(){
+  $('sec-sub').classList.add('open');
+  $('sec-arr').classList.add('open');
+}
+function _closeSecSub(){
+  $('sec-sub').classList.remove('open');
+  $('sec-arr').classList.remove('open');
+}
 function toggleSecNav(btn){
-  const sub=$('sec-sub'),arr=$('sec-arr');
-  const opening=!sub.classList.contains('open');
-  sub.classList.toggle('open',opening);
-  arr.classList.toggle('open',opening);
-  // navigate to security tab
+  // always open submenu + navigate to security
+  _openSecSub();
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   btn.classList.add('active');
@@ -1925,6 +1930,11 @@ function toggleSecNav(btn){
   clearInterval(_secTimer);_secTimer=null;
   updateSecurityTab();_secTimer=setInterval(updateSecurityTab,_secInterval);
   _initDrag('sec-grid');
+}
+function collapseSecSub(e){
+  e.stopPropagation();
+  const sub=$('sec-sub'),arr=$('sec-arr');
+  if(sub.classList.contains('open')){_closeSecSub();}else{_openSecSub();}
 }
 function setSecCat(el,cat){
   _secCat=cat;
@@ -1938,6 +1948,7 @@ function showTab(btn){
   btn.classList.add('active');
   $('tab-'+btn.dataset.tab).classList.add('active');
   $('pg-title').textContent=PAGE_TITLES[btn.dataset.tab]||btn.dataset.tab;
+  if(btn.dataset.tab!=='security')_closeSecSub();
   if(btn.dataset.tab==='output')connectLog();
   clearInterval(_healthTimer);_healthTimer=null;
   clearInterval(_netInfoTimer);_netInfoTimer=null;
