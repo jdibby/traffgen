@@ -2809,6 +2809,29 @@ function exportSec(fmt){
     '</table><button onclick="document.getElementById(\'kb-overlay\').remove()" style="margin-top:16px;padding:6px 18px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:#e8eaf0;cursor:pointer;font-size:13px">Close</button></div></div>';
   window.showKbHelp=function(){if(!$('kb-overlay')){document.body.insertAdjacentHTML('beforeend',_KBH_HTML);}};
 })();
+// ── URL fragment routing ─────────────────────────────────────────────────
+(function(){
+  const _TABS=['overview','security','tests','output','diagnostics','health','about','changelog'];
+  function _fragTab(){
+    const h=location.hash.slice(1).split('/')[0];
+    return _TABS.includes(h)?h:null;
+  }
+  const init=_fragTab();
+  if(init){setTimeout(()=>navTo(init),0);}
+  const _origShowTab=window.showTab;
+  window.showTab=function(btn){
+    _origShowTab(btn);
+    if(btn.dataset&&btn.dataset.tab)history.replaceState(null,'','#'+btn.dataset.tab);
+  };
+  const _origToggleTests=window.toggleTestsNav;
+  window.toggleTestsNav=function(btn){
+    _origToggleTests(btn);
+    history.replaceState(null,'','#tests');
+  };
+  window.addEventListener('popstate',function(){
+    const t=_fragTab();if(t)navTo(t);
+  });
+})();
 window.addEventListener('resize',()=>{
   if(_lastState){drawSpark(_lastState.history||[]);drawSecTrend(_secHist);}
   if(_lastHealth){drawDiskBars(_lastHealth.disk_read_kbps||0,_lastHealth.disk_write_kbps||0);drawNetSpark('net-spark',_netHist);drawNetSpark('h-net-spark',_hNetHist);}
