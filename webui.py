@@ -798,6 +798,7 @@ def api_tls_check():
     port = int(raw_port)
     try:
         ctx = ssl.create_default_context()
+        ctx.minimum_version = ssl.TLSVersion.TLSv1_2
         with _socket.create_connection((host, port), timeout=8) as sock:
             with ctx.wrap_socket(sock, server_hostname=host) as ssock:
                 cert = ssock.getpeercert()
@@ -820,8 +821,10 @@ def api_tls_check():
         })
     except ssl.SSLCertVerificationError as e:
         return jsonify({"error": f"Certificate verification failed: {e.reason}"}), 200
+    except (ConnectionRefusedError, TimeoutError, OSError):
+        return jsonify({"error": "Connection failed — check host and port"}), 200
     except Exception as e:
-        return jsonify({"error": str(e)}), 200
+        return jsonify({"error": f"TLS error ({type(e).__name__})"}), 200
 
 
 @app.route("/api/dns-lookup")
@@ -851,10 +854,12 @@ def api_dns_lookup():
                 addrs = list({i[4][0] for i in infos})
                 results.append({"resolver": "system", "answers": addrs, "error": None})
             except Exception as e2:
-                results.append({"resolver": resolver, "answers": [], "error": str(e2)})
+                results.append({"resolver": resolver, "answers": [],
+                                 "error": f"Lookup failed ({type(e2).__name__})"})
             break
         except Exception as e:
-            results.append({"resolver": resolver, "answers": [], "error": str(e)})
+            results.append({"resolver": resolver, "answers": [],
+                             "error": f"Query failed ({type(e).__name__})"})
     return jsonify({"host": host, "results": results})
 
 
