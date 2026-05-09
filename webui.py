@@ -140,9 +140,13 @@ def _sample_health() -> None:
                 data["swap_total_mb"] = round(swap_total / 1024, 1)
                 data["swap_used_mb"]  = round(swap_used  / 1024, 1)
                 data["swap_pct"]      = round(swap_used / swap_total * 100, 1) if swap_total > 0 else 0.0
+                data["mem_free_mb"]    = round(mem_kb.get("MemFree", 0) / 1024, 1)
+                data["mem_buffers_mb"] = round(mem_kb.get("Buffers", 0) / 1024, 1)
+                data["mem_cached_mb"]  = round((mem_kb.get("Cached", 0) + mem_kb.get("SReclaimable", 0)) / 1024, 1)
             except Exception:
                 data.update({"mem_total_mb": 0, "mem_used_mb": 0, "mem_pct": 0.0,
-                             "swap_total_mb": 0, "swap_used_mb": 0, "swap_pct": 0.0})
+                             "swap_total_mb": 0, "swap_used_mb": 0, "swap_pct": 0.0,
+                             "mem_free_mb": 0, "mem_buffers_mb": 0, "mem_cached_mb": 0})
 
             # Thread count + open FDs (self)
             try:
@@ -157,6 +161,20 @@ def _sample_health() -> None:
                 data["fd_count"] = len(os.listdir("/proc/self/fd"))
             except Exception:
                 data["fd_count"] = 0
+            try:
+                fd_limit = 0
+                with open("/proc/self/limits") as f:
+                    for ln in f:
+                        if "Max open files" in ln:
+                            p2 = ln.split()
+                            if len(p2) >= 4 and p2[3].isdigit():
+                                fd_limit = int(p2[3])
+                            break
+                data["fd_limit"] = fd_limit
+            except Exception:
+                data["fd_limit"] = 0
+            prev_fd = _health_cache.get("fd_count", 0)
+            data["fd_rate"] = round((data["fd_count"] - prev_fd) / 2.0, 1)
 
             # System uptime
             try:
@@ -204,13 +222,15 @@ def _sample_health() -> None:
             except Exception:
                 data["load_avg"] = [0.0, 0.0, 0.0]
 
-            # Top processes by CPU
+            # Processes: top by CPU + child process table
             try:
                 hz = 100
                 try:
                     hz = os.sysconf("SC_CLK_TCK")
                 except Exception:
                     pass
+                my_pid = os.getpid()
+                up = data.get("uptime_secs", 0)
                 procs = []
                 for pid_s in os.listdir("/proc"):
                     if not pid_s.isdigit():
@@ -218,34 +238,64 @@ def _sample_health() -> None:
                     pid = int(pid_s)
                     try:
                         with open(f"/proc/{pid}/stat") as f:
-                            st = f.read().split()
-                        name  = st[1].strip("()")
-                        cpu_t = int(st[13]) + int(st[14])
+                            raw = f.read()
+                        ri = raw.rfind(")")
+                        stat_name = raw[raw.find("(")+1:ri]
+                        rest = raw[ri+2:].split()
+                        state = rest[0]
+                        ppid = int(rest[1])
+                        cpu_t = int(rest[11]) + int(rest[12])
+                        start_ticks = int(rest[19])
+                        runtime_s = int(max(0, up - start_ticks / hz))
                         vmrss = 0
                         with open(f"/proc/{pid}/status") as f:
                             for ln in f:
                                 if ln.startswith("VmRSS:"):
                                     vmrss = int(ln.split()[1])
                                     break
-                        procs.append({"pid": pid, "name": name, "cpu_t": cpu_t,
+                        try:
+                            with open(f"/proc/{pid}/cmdline", "rb") as f:
+                                parts = f.read().split(b"\x00")
+                            cmd_s = (parts[0].decode("utf-8", errors="replace")
+                                     .split("/")[-1] if parts and parts[0] else stat_name)
+                        except Exception:
+                            cmd_s = stat_name
+                        procs.append({"pid": pid, "name": stat_name, "cmd": cmd_s[:40],
+                                      "state": state, "ppid": ppid, "cpu_t": cpu_t,
+                                      "runtime_s": runtime_s,
                                       "mem_mb": round(vmrss / 1024, 1)})
                     except Exception:
                         continue
 
                 dt3 = now - prev_ts if prev_ts else 2.0
                 for p in procs:
-                    prev_t   = prev_procs.get(p["pid"], p["cpu_t"])
-                    delta    = p["cpu_t"] - prev_t
+                    prev_t = prev_procs.get(p["pid"], p["cpu_t"])
+                    delta  = p["cpu_t"] - prev_t
                     p["cpu_pct"] = round(delta / hz / dt3 * 100, 1) if dt3 > 0 else 0.0
                     p["mem_pct"] = round(p["mem_mb"] * 1024 / total_kb * 100, 1) if total_kb > 0 else 0.0
 
                 prev_procs = {p["pid"]: p["cpu_t"] for p in procs}
-                for p in procs:
-                    del p["cpu_t"]
-                procs.sort(key=lambda x: (-x["cpu_pct"], -x["mem_mb"]))
-                data["processes"] = procs[:12]
+
+                sorted_all = sorted(procs, key=lambda x: (-x["cpu_pct"], -x["mem_mb"]))
+                data["processes"] = [
+                    {"pid": p["pid"], "name": p["name"], "cpu_pct": p["cpu_pct"],
+                     "mem_pct": p["mem_pct"], "mem_mb": p["mem_mb"]}
+                    for p in sorted_all[:12]
+                ]
+
+                _STATES = {"R": "Running", "S": "Sleeping", "D": "Disk Wait",
+                           "Z": "Zombie", "T": "Stopped", "I": "Idle", "X": "Dead"}
+                data["child_procs"] = sorted([
+                    {"pid": p["pid"], "cmd": p["cmd"] or p["name"],
+                     "state": _STATES.get(p["state"], p["state"]),
+                     "is_zombie": p["state"] == "Z",
+                     "cpu_pct": p["cpu_pct"], "rss_mb": p["mem_mb"],
+                     "runtime_s": p["runtime_s"]}
+                    for p in procs if p["ppid"] == my_pid
+                ], key=lambda x: x["pid"])
             except Exception:
                 data["processes"] = []
+                data["child_procs"] = []
 
             # Network I/O — read /proc/net/dev, sum across non-loopback interfaces
             try:
@@ -970,8 +1020,8 @@ body{display:flex;background:var(--bg);color:var(--text);font-family:-apple-syst
 .sidebar{width:var(--sw);background:var(--sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;height:100vh;overflow-y:auto}
 .sb-logo{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--border)}
 .logo-name{font-weight:700;font-size:19px;letter-spacing:-.3px;color:var(--text)}
-.nav-lbl{padding:14px 16px 4px;font-size:15px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
-.nav-item{display:flex;align-items:center;gap:9px;padding:8px 16px 8px 13px;color:var(--muted);cursor:pointer;border:none;background:none;width:100%;text-align:left;font-size:19px;border-left:3px solid transparent;transition:all .12s}
+.nav-lbl{padding:14px 16px 4px;font-size:17px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 16px 8px 13px;color:var(--muted);cursor:pointer;border:none;background:none;width:100%;text-align:left;font-size:15px;border-left:3px solid transparent;transition:all .12s}
 .nav-item:hover{color:var(--text);background:rgba(255,255,255,.04)}
 .nav-item.active{color:var(--green);background:var(--gdim);border-left-color:var(--green);font-weight:500}
 .nav-arr{font-size:15px;transition:transform .2s;display:inline-block;line-height:1;padding:4px 6px;margin:-4px -6px;border-radius:4px}.nav-arr:hover{background:rgba(255,255,255,.1)}
@@ -1509,10 +1559,16 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
           <div id="sys-uptime" style="font-family:'SF Mono',Consolas,monospace;font-size:20px;color:var(--green);padding:8px 0 4px">&#8212;</div>
         </div>
         <div class="cc">
-          <div class="ctitle">Process Internals</div>
-          <div style="display:flex;gap:20px;margin-top:6px;font-family:'SF Mono',Consolas,monospace;font-size:14px">
-            <span><span style="color:var(--muted)">Threads: </span><span id="h-threads" style="color:var(--text)">&#8212;</span></span>
-            <span><span style="color:var(--muted)">Open FDs: </span><span id="h-fds" style="color:var(--text)">&#8212;</span></span>
+          <div class="ctitle">Open File Descriptors <span id="fd-rate-txt" style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim);font-size:12px"></span></div>
+          <div style="display:flex;align-items:baseline;gap:8px;margin-top:4px">
+            <span id="h-fds" style="font-family:'SF Mono',Consolas,monospace;font-size:22px;font-weight:700;color:var(--text)">&#8212;</span>
+            <span id="fd-limit-txt" style="font-family:'SF Mono',Consolas,monospace;font-size:14px;color:var(--muted)"></span>
+          </div>
+          <div style="background:var(--border);border-radius:4px;height:6px;margin-top:8px;overflow:hidden">
+            <div id="fd-bar" style="height:100%;width:0%;background:var(--green);transition:width .4s ease;border-radius:4px"></div>
+          </div>
+          <div style="margin-top:8px;font-size:13px;font-family:'SF Mono',Consolas,monospace">
+            <span style="color:var(--muted)">Threads: </span><span id="h-threads" style="color:var(--text)">&#8212;</span>
           </div>
         </div>
       </div>
@@ -1525,6 +1581,15 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
           <div class="gauge-wrap">
             <canvas id="mem-gauge" width="200" height="130"></canvas>
             <div id="mem-detail" style="font-size:13px;color:var(--muted);margin-top:4px">&#8212; MB / &#8212; MB used</div>
+          </div>
+          <div style="margin-top:8px">
+            <div style="height:6px;border-radius:3px;overflow:hidden;display:flex">
+              <div id="mem-bar-used" style="height:100%;background:#f85149;transition:width .4s ease;width:0%"></div>
+              <div id="mem-bar-buf" style="height:100%;background:#58a6ff;transition:width .4s ease;width:0%"></div>
+              <div id="mem-bar-cache" style="height:100%;background:#f59e0b;transition:width .4s ease;width:0%"></div>
+              <div style="height:100%;background:var(--border);flex:1"></div>
+            </div>
+            <div id="mem-breakdown" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:5px;font-size:11px;font-family:'SF Mono',Consolas,monospace"></div>
           </div>
           <canvas id="mem-spark" style="width:100%;height:44px;margin-top:8px"></canvas>
         </div>
@@ -1559,6 +1624,11 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div class="thdr">Top Processes <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px">sorted by CPU</span></div>
         <table><thead><tr><th class="r">PID</th><th>Name</th><th class="r">CPU%</th><th class="r">Mem%</th><th class="r">RSS</th></tr></thead>
         <tbody id="proc-body"><tr><td colspan="5" class="empty">Loading&#8230;</td></tr></tbody></table>
+      </div>
+      <div class="tcard" data-widget="h-child-procs">
+        <div class="thdr">Child Processes <span id="child-cnt" style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px"></span></div>
+        <table><thead><tr><th class="r">PID</th><th>Command</th><th class="r">State</th><th class="r">CPU%</th><th class="r">RSS</th><th class="r">Runtime</th></tr></thead>
+        <tbody id="child-body"><tr><td colspan="6" class="empty">No child processes</td></tr></tbody></table>
       </div>
       </div><!-- /#health-grid -->
     </div>
@@ -1684,6 +1754,16 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
     <!-- Changelog -->
     <div id="tab-changelog" class="panel">
       <div style="max-width:900px">
+
+        <div class="a-section">
+          <div class="a-h">v3.4.6 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
+          <table class="st-table" style="margin-top:10px">
+            <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Health</td><td><strong>Memory breakdown</strong> — stacked bar in the Memory gauge card splits usage into Used (red), Buffers (blue), Cached/reclaimable (amber), and Free (gray); reads MemFree, Buffers, Cached, SReclaimable from /proc/meminfo</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Health</td><td><strong>File descriptor gauge</strong> — replaces simple FD count text with a count/soft-limit bar (green → amber at 70% → red at 90%), rate-of-change per second, and soft limit from /proc/self/limits</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Health</td><td><strong>Child processes table</strong> — new widget lists direct child processes (PID, command, state, CPU%, RSS, runtime); zombie processes highlighted in red; state decoded from /proc/[pid]/stat</td></tr>
+          </table>
+        </div>
 
         <div class="a-section">
           <div class="a-h">v3.4.5 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
@@ -2806,10 +2886,30 @@ function applyHealth(d){
   if($('swap-detail'))$('swap-detail').textContent=(d.swap_used_mb||0).toFixed(0)+' MB / '+(d.swap_total_mb||0).toFixed(0)+' MB used';
   if($('swap-bar'))$('swap-bar').style.width=Math.min(100,swapPct)+'%';
   if($('swap-pct'))$('swap-pct').textContent=swapPct.toFixed(1)+'%';
-  // System uptime + process internals
+  // Memory breakdown stacked bar (#221)
+  const mtot=d.mem_total_mb||1;
+  const mUsed=Math.max(0,(d.mem_used_mb||0)-(d.mem_buffers_mb||0)-(d.mem_cached_mb||0));
+  const mBuf=d.mem_buffers_mb||0,mCache=d.mem_cached_mb||0,mFree=d.mem_free_mb||0;
+  if($('mem-bar-used'))$('mem-bar-used').style.width=(mUsed/mtot*100).toFixed(1)+'%';
+  if($('mem-bar-buf'))$('mem-bar-buf').style.width=(mBuf/mtot*100).toFixed(1)+'%';
+  if($('mem-bar-cache'))$('mem-bar-cache').style.width=(mCache/mtot*100).toFixed(1)+'%';
+  if($('mem-breakdown'))$('mem-breakdown').innerHTML=
+    '<span style="color:#f85149">&#9632; Used '+fmtMB(mUsed)+'</span>'+
+    '<span style="color:#58a6ff">&#9632; Buffers '+fmtMB(mBuf)+'</span>'+
+    '<span style="color:#f59e0b">&#9632; Cached '+fmtMB(mCache)+'</span>'+
+    '<span style="color:var(--muted)">&#9632; Free '+fmtMB(mFree)+'</span>';
+  // FD count/limit with bar and rate (#222)
+  const fdC=d.fd_count||0,fdL=d.fd_limit||0,fdPct=fdL>0?fdC/fdL*100:0;
+  const fdColor=fdPct>=90?'var(--red)':fdPct>=70?'var(--amber)':'var(--green)';
+  if($('h-fds'))$('h-fds').textContent=N(fdC);
+  if($('fd-limit-txt'))$('fd-limit-txt').textContent=fdL>0?'/ '+N(fdL)+' soft limit':'';
+  if($('fd-bar')){$('fd-bar').style.width=Math.min(100,fdPct).toFixed(1)+'%';$('fd-bar').style.background=fdColor;}
+  const fdRate=d.fd_rate||0;
+  if($('fd-rate-txt'))$('fd-rate-txt').textContent=fdRate?(fdRate>0?'+':'')+fdRate.toFixed(1)+'/s':'';
+  // System uptime + threads
   if($('sys-uptime'))$('sys-uptime').textContent=fmtUptime(d.uptime_secs||0);
   if($('h-threads'))$('h-threads').textContent=d.thread_count||'—';
-  if($('h-fds'))$('h-fds').textContent=d.fd_count||'—';
+  // Top processes
   const procs=d.processes||[];
   const tb=$('proc-body');
   if(tb)tb.innerHTML=!procs.length?'<tr><td colspan="5" class="empty">No data</td></tr>':
@@ -2817,6 +2917,22 @@ function applyHealth(d){
       const cpuC=p.cpu_pct>50?'var(--red)':p.cpu_pct>20?'var(--amber)':'var(--green)';
       const memC=p.mem_pct>30?'var(--amber)':'var(--muted)';
       return`<tr class="mrow"><td class="r" style="color:var(--muted)">${p.pid}</td><td class="nm">${H(p.name)}</td><td class="r"><span style="color:${cpuC}">${p.cpu_pct.toFixed(1)}%</span></td><td class="r"><span style="color:${memC}">${p.mem_pct.toFixed(1)}%</span></td><td class="r" style="color:var(--muted)">${p.mem_mb.toFixed(0)} MB</td></tr>`;
+    }).join('');
+  // Child processes (#223)
+  const children=d.child_procs||[];
+  if($('child-cnt'))$('child-cnt').textContent=children.length?children.length+' process'+(children.length!==1?'es':''):'none';
+  const cb=$('child-body');
+  if(cb)cb.innerHTML=!children.length?'<tr><td colspan="6" class="empty">No child processes</td></tr>':
+    children.map(p=>{
+      const stC=p.is_zombie?'var(--red)':p.state==='Running'?'var(--green)':'var(--muted)';
+      const cpuC=p.cpu_pct>50?'var(--red)':p.cpu_pct>20?'var(--amber)':'var(--text)';
+      return`<tr class="mrow"${p.is_zombie?' style="background:rgba(248,81,73,.06)"':''}>`+
+        `<td class="r" style="color:var(--muted)">${p.pid}</td>`+
+        `<td class="nm">${H(p.cmd)}</td>`+
+        `<td class="r"><span style="color:${stC}">${H(p.state)}</span></td>`+
+        `<td class="r"><span style="color:${cpuC}">${p.cpu_pct.toFixed(1)}%</span></td>`+
+        `<td class="r" style="color:var(--muted)">${p.rss_mb.toFixed(0)} MB</td>`+
+        `<td class="r" style="color:var(--muted)">${fmtUptime(p.runtime_s)}</td></tr>`;
     }).join('');
 }
 function pollHealth(){
