@@ -1262,7 +1262,6 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
     <button class="nav-sub-item" onclick="ovJump('ov-sec-perf',this)">Performance</button>
     <button class="nav-sub-item" onclick="ovJump('ov-sec-results',this)">Results</button>
     <button class="nav-sub-item" onclick="ovJump('ov-sec-analytics',this)">Analytics</button>
-    <button class="nav-sub-item" onclick="ovJump('ov-sec-tools',this)">Tools</button>
   </div>
   <button class="nav-item" data-tab="security" onclick="showTab(this)"><span class="nav-ico">&#128737;</span>Security</button>
   <button class="nav-item" id="nav-tests" data-tab="tests" onclick="toggleTestsNav(this)"><span class="nav-ico">⚗</span><span style="flex:1">Tests</span><span class="nav-arr" id="tests-arr" onclick="collapseTestsSub(event)" title="Collapse/expand">&#9656;</span></button>
@@ -1371,7 +1370,13 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div class="ov-sec-hdr" onclick="toggleOvSec(this)"><span>Results</span><span class="ov-sec-arr open">&#9656;</span></div>
         <div class="ov-sec-body">
           <div class="tcard" data-widget="test-breakdown">
-            <div class="thdr">Test Breakdown <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px">&#8250; click row to expand</span></div>
+            <div class="thdr" style="justify-content:space-between">
+              <span>Test Breakdown <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px">&#8250; click row to expand</span></span>
+              <div style="display:flex;gap:6px">
+                <button onclick="exportResults('csv')" title="Download results as CSV" style="padding:3px 11px;background:var(--surf2);border:1px solid var(--border2);border-radius:6px;color:var(--text);cursor:pointer;font-size:12px;font-weight:400;letter-spacing:0;text-transform:none">&#11123; CSV</button>
+                <button onclick="exportResults('json')" title="Download results as JSON" style="padding:3px 11px;background:var(--surf2);border:1px solid var(--border2);border-radius:6px;color:var(--text);cursor:pointer;font-size:12px;font-weight:400;letter-spacing:0;text-transform:none">&#11123; JSON</button>
+              </div>
+            </div>
             <table><thead><tr><th></th><th>Test</th><th class="r">Attempts</th><th class="r">OK</th><th class="r">Fail</th><th class="r">Rate</th><th class="r">Avg</th><th class="r">Last Run</th></tr></thead>
             <tbody id="tbl-body"><tr><td colspan="8" class="empty">Waiting for data&#8230;</td></tr></tbody></table>
           </div>
@@ -1395,20 +1400,6 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
           <div class="tcard" data-widget="top-failing-suites">
             <div class="thdr">Top Failing Suites</div>
             <div id="top-fail-body" style="padding:8px 16px"><div class="empty">Waiting for data&#8230;</div></div>
-          </div>
-        </div>
-      </div>
-      <div class="ov-section" id="ov-sec-tools">
-        <div class="ov-sec-hdr" onclick="toggleOvSec(this)"><span>Tools</span><span class="ov-sec-arr">&#9656;</span></div>
-        <div class="ov-sec-body collapsed">
-          <div class="tcard" data-widget="export-results">
-            <div class="thdr" style="justify-content:space-between">Export Results
-              <div style="display:flex;gap:8px">
-                <button onclick="exportResults('csv')" title="Download results as CSV" style="padding:4px 14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:7px;color:#e8eaf0;cursor:pointer;font-size:13px;font-weight:400;letter-spacing:0;text-transform:none">&#11123; CSV</button>
-                <button onclick="exportResults('json')" title="Download results as JSON" style="padding:4px 14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:7px;color:#e8eaf0;cursor:pointer;font-size:13px;font-weight:400;letter-spacing:0;text-transform:none">&#11123; JSON</button>
-              </div>
-            </div>
-            <div style="padding:10px 16px;font-size:13px;color:var(--muted)">Download a per-suite snapshot of current results.</div>
           </div>
         </div>
       </div>
@@ -1500,7 +1491,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div class="cc">
           <div class="ctitle">Swap Usage <span id="swap-pct" style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim)"></span></div>
           <div id="swap-detail" style="font-family:'SF Mono',Consolas,monospace;font-size:14px;color:var(--muted);margin-top:4px">&#8212; MB / &#8212; MB used</div>
-          <div style="background:#1e2d3d;border-radius:4px;height:8px;margin-top:8px;overflow:hidden">
+          <div style="background:var(--border);border-radius:4px;height:8px;margin-top:8px;overflow:hidden">
             <div id="swap-bar" style="height:100%;background:var(--amber);width:0%;transition:width .4s ease"></div>
           </div>
         </div>
@@ -2472,7 +2463,7 @@ function apply(s){
         svgHtml=`<svg width="${w}" height="${h}" style="flex-shrink:0"><polyline fill="none" stroke="${trendC}" stroke-width="1.5" points="${vals.map((v,i)=>px(i).toFixed(1)+','+py(v).toFixed(1)).join(' ')}" /></svg>`;
       }
       const shortCat=cat.replace(' & ',' &amp; ').split(' ').slice(0,2).join(' ');
-      return`<div style="display:flex;align-items:center;gap:8px;background:#151b27;border-radius:8px;padding:7px 10px">`+
+      return`<div style="display:flex;align-items:center;gap:8px;background:var(--surf2);border-radius:8px;padding:7px 10px">`+
         `<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${shortCat}</div>`+
         `<div style="font-size:16px;font-weight:700;color:${rateC};font-family:'SF Mono',Consolas,monospace">${rate.toFixed(1)}%</div></div>`+
         svgHtml+`</div>`;
@@ -3107,7 +3098,7 @@ function _renderRunHistory(){
         `<span style="color:${sc};font-family:'SF Mono',Consolas,monospace">${sp}% (${s.ok}/${s.att})</span></div>`;
     }).join('');
     return`<div style="border:1px solid var(--border);border-radius:8px;margin-bottom:8px;overflow:hidden">`+
-      `<div style="display:flex;align-items:center;gap:12px;padding:8px 12px;cursor:pointer;background:#151b27" onclick="toggleRunDetail('${id}')">`+
+      `<div style="display:flex;align-items:center;gap:12px;padding:8px 12px;cursor:pointer;background:var(--surf2)" onclick="toggleRunDetail('${id}')">`+
       `<span style="font-size:12px;color:var(--dim);font-family:'SF Mono',Consolas,monospace;flex-shrink:0">${ts}</span>`+
       `<span style="font-size:12px;color:var(--muted)">iter #${r.iter} &middot; ${H(r.suite)}</span>`+
       `<span style="margin-left:auto;font-size:13px;font-weight:700;color:${pc}">${r.pass_pct}%</span>`+
@@ -3154,9 +3145,9 @@ document.addEventListener('DOMContentLoaded',_renderRunHistory);
     el.innerHTML=rows.map(r=>{
       const pct=r.att?Math.round(r.fail/r.att*100):0;
       const bar=Math.round(r.fail/maxF*100);
-      return '<div style="display:flex;align-items:center;gap:12px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06)">'
-        +'<div style="width:160px;font-size:14px;color:#e8eaf0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+H(r.n)+'">'+H(r.n)+'</div>'
-        +'<div style="flex:1;height:6px;background:rgba(255,255,255,.08);border-radius:3px"><div style="height:100%;width:'+bar+'%;background:#f85149;border-radius:3px"></div></div>'
+      return '<div style="display:flex;align-items:center;gap:12px;padding:7px 0;border-bottom:1px solid var(--border)">'
+        +'<div style="width:160px;font-size:14px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+H(r.n)+'">'+H(r.n)+'</div>'
+        +'<div style="flex:1;height:6px;background:var(--border);border-radius:3px"><div style="height:100%;width:'+bar+'%;background:#f85149;border-radius:3px"></div></div>'
         +'<div style="width:80px;text-align:right;font-size:13px;color:#f85149;font-family:SF Mono,Consolas,monospace">'+N(r.fail)+' ('+pct+'%)</div>'
         +'</div>';
     }).join('');
@@ -3222,9 +3213,9 @@ function exportResults(fmt){
     el.innerHTML=rows.map(function(r){
       var bar=Math.round(r.ms/maxMs*100);
       var durStr=r.ms>=1000?(r.ms/1000).toFixed(1)+'s':Math.round(r.ms)+'ms';
-      return '<div style="display:flex;align-items:center;gap:12px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06)">'
-        +'<div style="width:160px;font-size:14px;color:#e8eaf0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+H(r.n)+'">'+H(r.n)+'</div>'
-        +'<div style="flex:1;height:6px;background:rgba(255,255,255,.08);border-radius:3px"><div style="height:100%;width:'+bar+'%;background:#818cf8;border-radius:3px"></div></div>'
+      return '<div style="display:flex;align-items:center;gap:12px;padding:7px 0;border-bottom:1px solid var(--border)">'
+        +'<div style="width:160px;font-size:14px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+H(r.n)+'">'+H(r.n)+'</div>'
+        +'<div style="flex:1;height:6px;background:var(--border);border-radius:3px"><div style="height:100%;width:'+bar+'%;background:#818cf8;border-radius:3px"></div></div>'
         +'<div style="width:60px;text-align:right;font-size:13px;color:#818cf8;font-family:SF Mono,Consolas,monospace">'+durStr+'</div>'
         +'</div>';
     }).join('');
@@ -3283,7 +3274,7 @@ wireTip('sec-trend',36,10,()=>_secHist,p=>[
 ]);
 connect();
 setInterval(checkRole,5000);
-_initDrag('ov-grid');
+try{localStorage.removeItem('tg-widget-order-ov-grid');}catch(e){}
 _initDrag('sec-grid');
 _initDrag('health-grid');
 
