@@ -1606,6 +1606,13 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
           Click the <strong style="color:var(--green)">&#9679; LIVE</strong> indicator in the top-right as a shortcut to stop all tests.
         </div>
       </div>
+      <div class="a-section" id="run-history-section">
+        <div class="a-h" style="display:flex;align-items:center;justify-content:space-between">
+          Run History
+          <button class="ico-btn" style="font-size:12px;padding:3px 10px" onclick="clearRunHistory()">Clear</button>
+        </div>
+        <div id="run-history-body"><div class="empty" style="padding:12px 0">No completed runs recorded yet.</div></div>
+      </div>
     </div>
 
     <!-- Changelog -->
@@ -2171,6 +2178,7 @@ const ST_CLS={running:'tp-running',between_tests:'tp-dim',paused:'tp-paused',sto
 const ST_LBL={running:'Running',between_tests:'Between Tests',paused:'Paused',stopped:'Stopped',starting:'Starting'};
 function apply(s){
   _lastState=s;
+  _trackRunHistory(s);
   if(s.suites&&s.suites.length&&!Object.keys(_SD).length){s.suites.forEach(su=>{_SD[su.name]=su.description||'';});}
   const ver=s.version||'—';
   $('s-ver').textContent=ver;$('about-ver').textContent=ver;
@@ -3026,6 +3034,69 @@ document.addEventListener('DOMContentLoaded',function(){
   s.textContent='@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:none;opacity:1}}';
   document.head.appendChild(s);
 });
+// ── Run history ──────────────────────────────────────────────────────────
+const _RUN_HIST_KEY='tg_run_history';
+let _lastIter=0,_lastIterSnap=null;
+function _loadRunHistory(){return JSON.parse(localStorage.getItem(_RUN_HIST_KEY)||'[]');}
+function _saveRunHistory(h){localStorage.setItem(_RUN_HIST_KEY,JSON.stringify(h.slice(-50)));}
+function clearRunHistory(){
+  localStorage.removeItem(_RUN_HIST_KEY);
+  _renderRunHistory();
+}
+function _trackRunHistory(s){
+  const iter=s.iteration||0;
+  if(!iter)return;
+  if(iter!==_lastIter&&_lastIter>0&&_lastIterSnap){
+    // Iteration rolled over — save snapshot of completed run
+    const h=_loadRunHistory();
+    h.push(_lastIterSnap);
+    _saveRunHistory(h);
+    _renderRunHistory();
+  }
+  _lastIter=iter;
+  // Snapshot current state for when next iteration begins
+  const tot=s.totals||{},ok=tot.ok||0,att=tot.attempts||0,fail=tot.fail||0;
+  const tests=s.tests||{};
+  const suiteSnap=Object.entries(tests).map(([n,t])=>({n,att:t.attempts||0,ok:t.ok||0,fail:t.fail||0}));
+  _lastIterSnap={
+    t:Date.now(),iter,suite:s.suite||'all',size:s.size||'',
+    ok,att,fail,
+    pass_pct:att?+(ok/att*100).toFixed(1):0,
+    suites:suiteSnap,
+  };
+}
+function _renderRunHistory(){
+  const body=$('run-history-body');if(!body)return;
+  const h=_loadRunHistory();
+  if(!h.length){body.innerHTML='<div class="empty" style="padding:12px 0">No completed runs recorded yet.</div>';return;}
+  const rows=h.slice().reverse().map((r,i)=>{
+    const d=new Date(r.t);
+    const ts=d.toLocaleDateString()+' '+d.toLocaleTimeString();
+    const pc=r.pass_pct>=90?'var(--green)':r.pass_pct>=70?'var(--amber)':'var(--red)';
+    const id='rh-'+i;
+    const detail=r.suites.filter(s=>s.att>0).sort((a,b)=>a.n.localeCompare(b.n)).map(s=>{
+      const sp=s.att?+(s.ok/s.att*100).toFixed(1):0;
+      const sc=sp>=90?'var(--green)':sp>=70?'var(--amber)':'var(--red)';
+      return`<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;border-bottom:1px solid rgba(255,255,255,.03)">`+
+        `<span style="color:var(--muted)">${H(s.n)}</span>`+
+        `<span style="color:${sc};font-family:'SF Mono',Consolas,monospace">${sp}% (${s.ok}/${s.att})</span></div>`;
+    }).join('');
+    return`<div style="border:1px solid var(--border);border-radius:8px;margin-bottom:8px;overflow:hidden">`+
+      `<div style="display:flex;align-items:center;gap:12px;padding:8px 12px;cursor:pointer;background:#151b27" onclick="toggleRunDetail('${id}')">`+
+      `<span style="font-size:12px;color:var(--dim);font-family:'SF Mono',Consolas,monospace;flex-shrink:0">${ts}</span>`+
+      `<span style="font-size:12px;color:var(--muted)">iter #${r.iter} &middot; ${H(r.suite)}</span>`+
+      `<span style="margin-left:auto;font-size:13px;font-weight:700;color:${pc}">${r.pass_pct}%</span>`+
+      `<span style="font-size:11px;color:var(--dim);white-space:nowrap">${r.ok}/${r.att}</span></div>`+
+      `<div id="${id}" style="display:none;padding:8px 12px;font-size:12px;max-height:300px;overflow-y:auto">${detail||'<div class="empty">No suite data</div>'}</div>`+
+      `</div>`;
+  }).join('');
+  body.innerHTML=rows;
+}
+function toggleRunDetail(id){
+  const el=$(id);if(!el)return;
+  el.style.display=el.style.display==='none'?'block':'none';
+}
+document.addEventListener('DOMContentLoaded',_renderRunHistory);
 window.addEventListener('resize',()=>{
   if(_lastState){drawSpark(_lastState.history||[]);drawSecTrend(_secHist);}
   if(_lastHealth){drawDiskBars(_lastHealth.disk_read_kbps||0,_lastHealth.disk_write_kbps||0);drawNetSpark('net-spark',_netHist);drawNetSpark('h-net-spark',_hNetHist);}
