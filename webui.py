@@ -1070,19 +1070,19 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
   </div>
   <div class="nav-lbl">Monitor</div>
   <button class="nav-item active" data-tab="overview" onclick="showTab(this)"><span class="nav-ico">◈</span>Overview</button>
-  <button class="nav-item" id="nav-security" data-tab="security" onclick="toggleSecNav(this)"><span class="nav-ico">&#128737;</span><span style="flex:1">Security</span><span class="nav-arr" id="sec-arr" onclick="collapseSecSub(event)" title="Collapse/expand">&#9656;</span></button>
-  <div class="nav-sub" id="sec-sub">
-    <button class="nav-sub-item active" onclick="setSecCat(this,'all')">All Categories</button>
-    <button class="nav-sub-item" onclick="setSecCat(this,'Connectivity & Network')">🌐 Connectivity</button>
-    <button class="nav-sub-item" onclick="setSecCat(this,'Web & HTTP')">🌍 Web & HTTP</button>
-    <button class="nav-sub-item" onclick="setSecCat(this,'Encrypted & Modern Protocols')">🔐 Encrypted</button>
-    <button class="nav-sub-item" onclick="setSecCat(this,'Threat Detection & IDS/IPS')">🛡️ Threat Detection</button>
-    <button class="nav-sub-item" onclick="setSecCat(this,'Recon & Lateral Movement')">🕵️ Recon</button>
-    <button class="nav-sub-item" onclick="setSecCat(this,'Evasion & C2')">📡 Evasion & C2</button>
-    <button class="nav-sub-item" onclick="setSecCat(this,'UCaaS & Communications')">📞 UCaaS</button>
-    <button class="nav-sub-item" onclick="setSecCat(this,'Content Filtering')">🚧 Content Filtering</button>
+  <button class="nav-item" data-tab="security" onclick="showTab(this)"><span class="nav-ico">&#128737;</span>Security</button>
+  <button class="nav-item" id="nav-tests" data-tab="tests" onclick="toggleTestsNav(this)"><span class="nav-ico">⚗</span><span style="flex:1">Tests</span><span class="nav-arr" id="tests-arr" onclick="collapseTestsSub(event)" title="Collapse/expand">&#9656;</span></button>
+  <div class="nav-sub" id="tests-sub">
+    <button class="nav-sub-item active" onclick="setTestsCat(this,'all')">All Tests</button>
+    <button class="nav-sub-item" onclick="setTestsCat(this,'Connectivity & Network')">🌐 Connectivity</button>
+    <button class="nav-sub-item" onclick="setTestsCat(this,'Web & HTTP')">🌍 Web & HTTP</button>
+    <button class="nav-sub-item" onclick="setTestsCat(this,'Encrypted & Modern Protocols')">🔐 Encrypted</button>
+    <button class="nav-sub-item" onclick="setTestsCat(this,'Threat Detection & IDS/IPS')">🛡️ Threat Detection</button>
+    <button class="nav-sub-item" onclick="setTestsCat(this,'Recon & Lateral Movement')">🕵️ Recon</button>
+    <button class="nav-sub-item" onclick="setTestsCat(this,'Evasion & C2')">📡 Evasion & C2</button>
+    <button class="nav-sub-item" onclick="setTestsCat(this,'UCaaS & Communications')">📞 UCaaS</button>
+    <button class="nav-sub-item" onclick="setTestsCat(this,'Content Filtering')">🚧 Content Filtering</button>
   </div>
-  <button class="nav-item" data-tab="tests" onclick="showTab(this)"><span class="nav-ico">⚗</span>Tests</button>
   <button class="nav-item" data-tab="output" onclick="showTab(this)"><span class="nav-ico">⬛</span>Live View</button>
   <div class="nav-lbl">System</div>
   <button class="nav-item" data-tab="health" onclick="showTab(this)"><span class="nav-ico">&#9889;</span>Health</button>
@@ -1910,37 +1910,26 @@ const _SC={
   'ucaas':'UCaaS & Communications','voip':'UCaaS & Communications',
   'pornography':'Content Filtering',
 };
-let _secCat='all';
-function _openSecSub(){
-  $('sec-sub').classList.add('open');
-  $('sec-arr').classList.add('open');
-}
-function _closeSecSub(){
-  $('sec-sub').classList.remove('open');
-  $('sec-arr').classList.remove('open');
-}
-function toggleSecNav(btn){
-  // always open submenu + navigate to security
-  _openSecSub();
+let _testsCat='all';
+function _openTestsSub(){$('tests-sub').classList.add('open');$('tests-arr').classList.add('open');}
+function _closeTestsSub(){$('tests-sub').classList.remove('open');$('tests-arr').classList.remove('open');}
+function toggleTestsNav(btn){
+  _openTestsSub();
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   btn.classList.add('active');
-  $('tab-security').classList.add('active');
-  $('pg-title').textContent='Security';
-  clearInterval(_secTimer);_secTimer=null;
-  updateSecurityTab();_secTimer=setInterval(updateSecurityTab,_secInterval);
-  _initDrag('sec-grid');
+  $('tab-tests').classList.add('active');
+  $('pg-title').textContent='Tests';
 }
-function collapseSecSub(e){
+function collapseTestsSub(e){
   e.stopPropagation();
-  const sub=$('sec-sub'),arr=$('sec-arr');
-  if(sub.classList.contains('open')){_closeSecSub();}else{_openSecSub();}
+  if($('tests-sub').classList.contains('open')){_closeTestsSub();}else{_openTestsSub();}
 }
-function setSecCat(el,cat){
-  _secCat=cat;
+function setTestsCat(el,cat){
+  _testsCat=cat;
   document.querySelectorAll('.nav-sub-item').forEach(b=>b.classList.remove('active'));
   el.classList.add('active');
-  updateSecurityTab();
+  if(_lastState)renderState(_lastState);
 }
 function showTab(btn){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
@@ -1948,7 +1937,7 @@ function showTab(btn){
   btn.classList.add('active');
   $('tab-'+btn.dataset.tab).classList.add('active');
   $('pg-title').textContent=PAGE_TITLES[btn.dataset.tab]||btn.dataset.tab;
-  if(btn.dataset.tab!=='security')_closeSecSub();
+  if(btn.dataset.tab!=='tests')_closeTestsSub();
   if(btn.dataset.tab==='output')connectLog();
   clearInterval(_healthTimer);_healthTimer=null;
   clearInterval(_netInfoTimer);_netInfoTimer=null;
@@ -1956,7 +1945,7 @@ function showTab(btn){
   if(btn.dataset.tab==='health'){pollHealth();pollNetInfo();_healthTimer=setInterval(()=>{pollHealth();},2500);_netInfoTimer=setInterval(pollNetInfo,15000);_initDrag('health-grid');}
   if(btn.dataset.tab==='security'){updateSecurityTab();_secTimer=setInterval(updateSecurityTab,_secInterval);_initDrag('sec-grid');}
 }
-function navTo(tab){if(tab==='security'){const btn=$('nav-security');if(btn)toggleSecNav(btn);return;}const btn=document.querySelector('.nav-item[data-tab="'+tab+'"]');if(btn)showTab(btn);}
+function navTo(tab){if(tab==='tests'){const btn=$('nav-tests');if(btn)toggleTestsNav(btn);return;}const btn=document.querySelector('.nav-item[data-tab="'+tab+'"]');if(btn)showTab(btn);}
 function drawDonut(ok,fail){
   const c=$('donut'),ctx=c.getContext('2d'),W=c.width,H2=c.height,cx=W/2,cy=H2/2,r=66,ri=46;
   const tot=ok+fail;ctx.clearRect(0,0,W,H2);
@@ -2073,7 +2062,8 @@ function apply(s){
                'Recon & Lateral Movement':'🕵️','Evasion & C2':'📡',
                'UCaaS & Communications':'📞','Content Filtering':'🚧'};
     const cm={};
-    suites.forEach(su=>{const c=_SC[su.name]||'Other';(cm[c]=cm[c]||[]).push(su);});
+    const filtSuites=_testsCat==='all'?suites:suites.filter(su=>(_SC[su.name]||'')===_testsCat);
+    filtSuites.forEach(su=>{const c=_SC[su.name]||'Other';(cm[c]=cm[c]||[]).push(su);});
     Object.values(cm).forEach(a=>a.sort((a,b)=>a.name.localeCompare(b.name)));
     const co=_CO.concat(Object.keys(cm).filter(c=>!_CO.includes(c)).sort());
     const mkCard=su=>{
@@ -2086,7 +2076,8 @@ function apply(s){
         ${ta?`<div class="tcbar"><div class="tcbf" style="width:${tp}%;background:${bc}"></div></div>`:''}
       </div>`;
     };
-    tg.innerHTML=co.filter(c=>cm[c]).map((c,i)=>
+    if(!filtSuites.length){tg.innerHTML='<div class="empty">No suites in this category</div>';}
+    else tg.innerHTML=co.filter(c=>cm[c]).map((c,i)=>
       `<div class="tcat-hdr"${i===0?'':''} >${_CI[c]||'📋'} ${H(c)}</div>`+cm[c].map(mkCard).join('')
     ).join('');
   }
@@ -2511,17 +2502,13 @@ function drawSecTrend(hist){
 }
 function updateSecurityTab(){
   if(!_lastState)return;
-  // apply category filter
-  const allTests=_lastState.tests||{};
-  const tests=_secCat==='all'?allTests:Object.fromEntries(Object.entries(allTests).filter(([n])=>(_SC[n]||'')===_secCat));
-  // aggregate totals from filtered tests
-  let rch=0,blk=0,drp=0,att=0;
-  Object.values(tests).forEach(t=>{rch+=(t.allowed||0);blk+=(t.blocked||0);drp+=(t.dropped||0);att+=(t.attempts||0);});
+  const tests=_lastState.tests||{};
+  const tot=_lastState.totals||{};
+  const blk=tot.blocked||0,drp=tot.dropped||0,rch=tot.allowed||0;
   const totalProbes=rch+blk+drp;
-  const other=Math.max(0,att-totalProbes);
+  const other=Math.max(0,(tot.attempts||0)-totalProbes);
   const pct=(n,d)=>d?((n/d)*100).toFixed(1)+'%':'—';
-  const catLbl=_secCat==='all'?'total probes':_secCat+' probes';
-  $('sec-total').textContent=N(totalProbes);$('sec-total-sub').textContent=totalProbes?catLbl:'No data yet';
+  $('sec-total').textContent=N(totalProbes);$('sec-total-sub').textContent=totalProbes?'total probes':'No data yet';
   $('sec-blocked').textContent=N(blk);$('sec-blocked-sub').textContent=totalProbes?pct(blk,totalProbes)+' of probes':'—';
   $('sec-dropped').textContent=N(drp);$('sec-dropped-sub').textContent=totalProbes?pct(drp,totalProbes)+' of probes':'—';
   $('sec-allowed').textContent=N(rch);$('sec-allowed-sub').textContent=totalProbes?pct(rch,totalProbes)+' of probes':'—';
