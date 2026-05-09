@@ -787,6 +787,77 @@ def api_traceroute():
     )
 
 
+@app.route("/api/tls-check")
+def api_tls_check():
+    host = request.args.get("host", "").strip()
+    if not _TARGET_RE.match(host):
+        return jsonify({"error": "Invalid host"}), 400
+    raw_port = request.args.get("port", "443")
+    if not raw_port.isdigit() or not (1 <= int(raw_port) <= 65535):
+        return jsonify({"error": "Invalid port"}), 400
+    port = int(raw_port)
+    try:
+        ctx = ssl.create_default_context()
+        with _socket.create_connection((host, port), timeout=8) as sock:
+            with ctx.wrap_socket(sock, server_hostname=host) as ssock:
+                cert = ssock.getpeercert()
+                cipher = ssock.cipher()
+                version = ssock.version()
+        subject  = dict(x[0] for x in cert.get("subject", []))
+        issuer   = dict(x[0] for x in cert.get("issuer", []))
+        sans     = [v for t, v in cert.get("subjectAltName", []) if t == "DNS"]
+        not_before = cert.get("notBefore", "")
+        not_after  = cert.get("notAfter", "")
+        return jsonify({
+            "host": host, "port": port,
+            "tls_version": version,
+            "cipher": cipher[0] if cipher else "",
+            "cn": subject.get("commonName", ""),
+            "issuer_cn": issuer.get("commonName", ""),
+            "issuer_org": issuer.get("organizationName", ""),
+            "not_before": not_before, "not_after": not_after,
+            "sans": sans[:20],
+        })
+    except ssl.SSLCertVerificationError as e:
+        return jsonify({"error": f"Certificate verification failed: {e.reason}"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 200
+
+
+@app.route("/api/dns-lookup")
+def api_dns_lookup():
+    host = request.args.get("host", "").strip()
+    if not _TARGET_RE.match(host):
+        return jsonify({"error": "Invalid host"}), 400
+    resolvers_raw = request.args.get("resolvers", "8.8.8.8,1.1.1.1,9.9.9.9")
+    # Validate each resolver IP
+    _ip_re = __import__('re').compile(r'^(\d{1,3}\.){3}\d{1,3}$')
+    resolvers = [r.strip() for r in resolvers_raw.split(",") if _ip_re.match(r.strip())][:5]
+    if not resolvers:
+        resolvers = ["8.8.8.8", "1.1.1.1"]
+    results = []
+    for resolver in resolvers:
+        try:
+            proc = subprocess.run(
+                ["dig", "+short", "+time=3", f"@{resolver}", host, "A"],
+                capture_output=True, text=True, timeout=5,
+            )
+            addrs = [l.strip() for l in proc.stdout.splitlines() if l.strip()]
+            results.append({"resolver": resolver, "answers": addrs, "error": None})
+        except FileNotFoundError:
+            # Fall back to Python socket if dig unavailable
+            try:
+                infos = _socket.getaddrinfo(host, None, _socket.AF_INET)
+                addrs = list({i[4][0] for i in infos})
+                results.append({"resolver": "system", "answers": addrs, "error": None})
+            except Exception as e2:
+                results.append({"resolver": resolver, "answers": [], "error": str(e2)})
+            break
+        except Exception as e:
+            results.append({"resolver": resolver, "answers": [], "error": str(e)})
+    return jsonify({"host": host, "results": results})
+
+
 @app.route("/events")
 def sse_state():
     def _gen():
@@ -1473,6 +1544,24 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
           <button id="tr-stop" class="diag-btn cancel" onclick="stopTrace()" style="display:none">Stop</button>
         </div>
         <div id="tr-results"><div class="tr-status">Enter a hostname or IP address and click Trace.</div></div>
+      </div>
+      <div class="diag-tool">
+        <div class="diag-tool-hdr">&#128274; TLS / Certificate Inspector</div>
+        <div class="diag-input-row">
+          <input id="tls-host" class="diag-input" type="text" placeholder="hostname (e.g. example.com)" spellcheck="false" autocomplete="off" onkeydown="if(event.key==='Enter')runTlsCheck()">
+          <input id="tls-port" class="diag-input" type="text" value="443" style="flex:0 0 64px" title="Port">
+          <button id="tls-btn" class="diag-btn" onclick="runTlsCheck()">Check</button>
+        </div>
+        <div id="tls-results"><div class="tr-status">Enter a hostname and click Check.</div></div>
+      </div>
+      <div class="diag-tool">
+        <div class="diag-tool-hdr">&#128270; DNS Lookup (multi-resolver)</div>
+        <div class="diag-input-row">
+          <input id="dns-host" class="diag-input" type="text" placeholder="hostname (e.g. example.com)" spellcheck="false" autocomplete="off" onkeydown="if(event.key==='Enter')runDnsLookup()">
+          <input id="dns-resolvers" class="diag-input" type="text" value="8.8.8.8,1.1.1.1,9.9.9.9" style="flex:0 0 220px" title="Comma-separated resolver IPs">
+          <button id="dns-btn" class="diag-btn" onclick="runDnsLookup()">Lookup</button>
+        </div>
+        <div id="dns-results"><div class="tr-status">Enter a hostname and click Lookup.</div></div>
       </div>
     </div>
     <!-- About -->
@@ -2797,6 +2886,54 @@ function stopTrace(){
 function trProtoChange(){
   const p=$('tr-proto').value;
   $('tr-port').style.display=p==='tcp'?'':' none';
+}
+// ── TLS Inspector ─────────────────────────────────────────────────────────
+function runTlsCheck(){
+  const host=($('tls-host').value||'').trim(),port=($('tls-port').value||'443').trim();
+  if(!host){$('tls-results').innerHTML='<div class="tr-status" style="color:var(--red)">Enter a hostname.</div>';return;}
+  $('tls-btn').disabled=true;
+  $('tls-results').innerHTML='<div class="tr-status">Connecting&#8230;</div>';
+  fetch('/api/tls-check?host='+encodeURIComponent(host)+'&port='+encodeURIComponent(port))
+    .then(r=>r.json()).then(d=>{
+      $('tls-btn').disabled=false;
+      if(d.error){$('tls-results').innerHTML=`<div class="tr-status" style="color:var(--red)">${H(d.error)}</div>`;return;}
+      const now=new Date(),exp=new Date(d.not_after);
+      const daysLeft=Math.round((exp-now)/86400000);
+      const expC=daysLeft<14?'var(--red)':daysLeft<30?'var(--amber)':'var(--green)';
+      $('tls-results').innerHTML=`
+        <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:8px">
+          <tr><td style="color:var(--muted);padding:4px 0;width:140px">TLS Version</td><td style="color:var(--green);font-weight:600">${H(d.tls_version)}</td></tr>
+          <tr><td style="color:var(--muted);padding:4px 0">Cipher</td><td style="font-family:'SF Mono',Consolas,monospace;font-size:12px">${H(d.cipher)}</td></tr>
+          <tr><td style="color:var(--muted);padding:4px 0">Common Name</td><td>${H(d.cn)}</td></tr>
+          <tr><td style="color:var(--muted);padding:4px 0">Issuer</td><td>${H(d.issuer_cn)}${d.issuer_org?' ('+H(d.issuer_org)+')':''}</td></tr>
+          <tr><td style="color:var(--muted);padding:4px 0">Valid From</td><td style="font-family:'SF Mono',Consolas,monospace;font-size:12px">${H(d.not_before)}</td></tr>
+          <tr><td style="color:var(--muted);padding:4px 0">Expires</td><td><span style="font-family:'SF Mono',Consolas,monospace;font-size:12px">${H(d.not_after)}</span> <span style="color:${expC};font-size:12px;font-weight:600">(${daysLeft}d)</span></td></tr>
+          ${d.sans.length?`<tr><td style="color:var(--muted);padding:4px 0;vertical-align:top">SANs</td><td style="font-family:'SF Mono',Consolas,monospace;font-size:11px;line-height:1.8">${d.sans.map(s=>H(s)).join('<br>')}</td></tr>`:''}
+        </table>`;
+    }).catch(e=>{$('tls-btn').disabled=false;$('tls-results').innerHTML=`<div class="tr-status" style="color:var(--red)">${H(e.message)}</div>`;});
+}
+// ── DNS Lookup ────────────────────────────────────────────────────────────
+function runDnsLookup(){
+  const host=($('dns-host').value||'').trim();
+  if(!host){$('dns-results').innerHTML='<div class="tr-status" style="color:var(--red)">Enter a hostname.</div>';return;}
+  const resolvers=($('dns-resolvers').value||'8.8.8.8,1.1.1.1,9.9.9.9').trim();
+  $('dns-btn').disabled=true;
+  $('dns-results').innerHTML='<div class="tr-status">Looking up&#8230;</div>';
+  fetch('/api/dns-lookup?host='+encodeURIComponent(host)+'&resolvers='+encodeURIComponent(resolvers))
+    .then(r=>r.json()).then(d=>{
+      $('dns-btn').disabled=false;
+      if(d.error){$('dns-results').innerHTML=`<div class="tr-status" style="color:var(--red)">${H(d.error)}</div>`;return;}
+      const rows=d.results.map(r=>{
+        const answers=r.error?`<span style="color:var(--red)">${H(r.error)}</span>`:
+          (r.answers.length?r.answers.map(a=>`<span style="font-family:'SF Mono',Consolas,monospace;color:var(--green)">${H(a)}</span>`).join('  '):
+          '<span style="color:var(--dim)">NXDOMAIN</span>');
+        const match=d.results.length>1&&r.answers.length&&d.results[0].answers.length?
+          (JSON.stringify(r.answers.sort())===JSON.stringify(d.results[0].answers.sort())?
+          '<span style="color:var(--green);font-size:11px"> ✓</span>':'<span style="color:var(--red);font-size:11px"> ✗ mismatch</span>'):'';
+        return`<tr><td style="padding:5px 12px 5px 0;color:var(--muted);font-family:'SF Mono',Consolas,monospace;font-size:12px;white-space:nowrap">${H(r.resolver)}</td><td style="padding:5px 0;font-size:13px">${answers}${match}</td></tr>`;
+      }).join('');
+      $('dns-results').innerHTML=`<table style="width:100%;border-collapse:collapse;margin-top:8px">${rows}</table>`;
+    }).catch(e=>{$('dns-btn').disabled=false;$('dns-results').innerHTML=`<div class="tr-status" style="color:var(--red)">${H(e.message)}</div>`;});
 }
 // ── Security export ───────────────────────────────────────────────────────
 function exportSec(fmt){
