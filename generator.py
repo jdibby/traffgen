@@ -543,8 +543,7 @@ def _web_flush() -> None:
     """Atomically write _WEB_STATE (minus private keys) to the state file."""
     tmp = _WEB_STATE_FILE + ".tmp"
     try:
-        with _WEB_STATE_LOCK:
-            snapshot = {k: v for k, v in _WEB_STATE.items() if not k.startswith("_")}
+        snapshot = {k: v for k, v in _WEB_STATE.items() if not k.startswith("_")}
         with open(tmp, "w") as f:
             json.dump(snapshot, f, separators=(",", ":"))
         os.replace(tmp, _WEB_STATE_FILE)
@@ -620,7 +619,7 @@ def _web_record(name: str, ok: bool, dur_ms: int,
                 _WEB_STATE["history"] = _WEB_STATE["history"][-120:]
             _WEB_STATE["_history_last_t"] = now
 
-        _web_flush()
+    _web_flush()
 
 
 def _web_log(msg: str, level: str = "info", test: str = "") -> None:
