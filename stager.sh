@@ -543,12 +543,12 @@ if [ "$_UNAME" = "Darwin" ]; then
         warn "could not detect host LAN IP"
     fi
 else
-    HOST_LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+    HOST_LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}') || HOST_LAN_IP=""
     if [ -n "$HOST_LAN_IP" ]; then
         _PREFIX=24  # safe default
         if command -v ip >/dev/null 2>&1; then
             _P=$(ip -o -f inet addr 2>/dev/null \
-                 | awk -v h="$HOST_LAN_IP" 'index($4, h"/")>0 {split($4,a,"/"); print a[2]; exit}')
+                 | awk -v h="$HOST_LAN_IP" 'index($4, h"/")>0 {split($4,a,"/"); print a[2]; exit}') || _P=""
             [ -n "$_P" ] && _PREFIX="$_P"
         fi
         HOST_LAN_CIDR="${HOST_LAN_IP}/${_PREFIX}"
