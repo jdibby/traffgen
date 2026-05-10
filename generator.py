@@ -19,3 +19,45 @@ Usage (stand-alone):
 Usage (Docker default):
     # See CMD in Dockerfile — runs suite=all, size=S, loop
 """
+
+# ── Standard library ──────────────────────────────────────────────────────────────────────────────
+import os
+import re
+import sys
+import ssl
+import json
+import time
+import base64
+import signal
+import socket
+import random
+import threading
+import argparse
+import subprocess
+import traceback
+import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from urllib.parse import urljoin
+
+# ── Third-party ─────────────────────────────────────────────────────────────────────────────────
+import requests
+import urllib3
+from bs4 import BeautifulSoup
+
+# Rich terminal UI
+from rich.console import Console
+from rich.panel import Panel
+from rich.progress import (
+    Progress, SpinnerColumn, BarColumn, TextColumn,
+    TimeElapsedColumn, TimeRemainingColumn, MofNCompleteColumn,
+)
+from rich.table import Table
+from rich import box
+
+# ── Local config ──────────────────────────────────────────────────────────────────────────────
+from endpoints import *           # noqa: F401,F403  (large data file)
+
+# ── Globals ───────────────────────────────────────────────────────────────────────────────────
+VERSION = "3.4.0"
+
+PLACEHOLDER_FULL_FILE_CONTENT_SEE_BELOW = True
