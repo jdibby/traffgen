@@ -10,11 +10,12 @@ uploads to known LLM API endpoints), Metasploit checks, web crawling,
 malware/phishing domain probing, ad-tracker HEAD requests, speed-tests,
 and more.
 
-Designed for use in controlled lab environments to validate firewalls,
-IDS/IPS, SASE, DLP, CASB, and web-filtering policies.
+Designed to run inside a Docker container as a continuous traffic source
+for testing firewalls, IDS/IPS rules, and security analytics pipelines.
 
-Usage:
-    python3 generator.py [--suite SUITE] [--size SIZE] [--loop]
+Usage (stand-alone):
+    python3 generator.py --suite=all --size=M --loop
 
-Run  python3 generator.py --help  for full usage.
+Usage (Docker default):
+    # See CMD in Dockerfile — runs suite=all, size=S, loop
 """
