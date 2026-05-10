@@ -1,6 +1,6 @@
 #!/bin/bash
 # Healthy if generator.py wrote a heartbeat within the last 60 seconds.
-# The heartbeat thread in generator.py writes /tmp/traffgen.health every 15s.
+# The heartbeat thread in generator.py writes /tmp/traffgen.health every 2s.
 # This is more reliable than pgrep, which may not be available in slim images.
 HEALTH_FILE=/tmp/traffgen.health
 
