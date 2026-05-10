@@ -544,8 +544,8 @@ _dl_sase_cert() {
 
 # Public shared root CAs — common to all customers of each vendor
 _dl_sase_cert "Cato Networks"  \
-    "https://cc2.catonetworks.com/public/certificates/CatoNetworksTrustedRootCA.pem" \
-    "cato-networks" "pem"
+    "https://clientdownload.catonetworks.com/public/certificates/CatoNetworksTrustedRootCA.cer" \
+    "cato-networks" "der"
 _dl_sase_cert "Cisco Umbrella" \
     "https://www.cisco.com/security/pki/certs/ciscoumbrellaroot.cer" \
     "cisco-umbrella" "der"
