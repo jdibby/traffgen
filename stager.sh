@@ -516,6 +516,45 @@ docker builder prune -af 2>/dev/null || true
 step "Pulling latest traffgen image"
 docker pull jdibby/traffgen:latest
 
+step "Downloading SASE/TLS-inspection CA certificates"
+_SASE_DIR=$(mktemp -d /tmp/traffgen-sase-certs.XXXXXX)
+
+_dl_sase_cert() {
+    local label="$1" url="$2" dest="$3" fmt="${4:-pem}"
+    local tmp="${_SASE_DIR}/${dest}.tmp"
+    if ! curl -fsSL --max-time 15 -o "$tmp" "$url" 2>/dev/null; then
+        rm -f "$tmp"
+        return 0
+    fi
+    if [ "$fmt" = "der" ]; then
+        if command -v openssl >/dev/null 2>&1 && \
+           openssl x509 -inform DER -in "$tmp" -out "${_SASE_DIR}/${dest}.crt" 2>/dev/null; then
+            ok "  ${label}"
+        fi
+        rm -f "$tmp"
+    else
+        if grep -q "BEGIN CERTIFICATE" "$tmp" 2>/dev/null; then
+            mv "$tmp" "${_SASE_DIR}/${dest}.crt"
+            ok "  ${label}"
+        else
+            rm -f "$tmp"
+        fi
+    fi
+}
+
+# Public shared root CAs — common to all customers of each vendor
+_dl_sase_cert "Cato Networks"  \
+    "https://cc2.catonetworks.com/public/certificates/CatoNetworksTrustedRootCA.pem" \
+    "cato-networks" "pem"
+_dl_sase_cert "Cisco Umbrella" \
+    "https://www.cisco.com/security/pki/certs/ciscoumbrellaroot.cer" \
+    "cisco-umbrella" "der"
+_dl_sase_cert "Menlo Security" \
+    "https://deploy.menloadmin.com/instructions/cert/MenloSecurityCustomerRootCA.crt" \
+    "menlo-security" "pem"
+
+note "Zscaler, Netskope, Fortinet, Palo Alto, Check Point and other per-tenant vendors: the container auto-detects and installs the inspection CA at startup"
+
 step "Starting traffgen container"
 
 # Capture the host's LAN IP and subnet prefix before the container starts.
@@ -576,6 +615,11 @@ fi
 if [ -n "${HOST_LAN_CIDR:-}" ]; then
     _DOCKER_ARGS+=(-e "HOST_LAN_CIDR=${HOST_LAN_CIDR}")
 fi
+# Mount any successfully downloaded SASE CA certs into the container trust store
+for _sase_crt in "${_SASE_DIR}"/*.crt; do
+    [ -f "$_sase_crt" ] || continue
+    _DOCKER_ARGS+=(-v "${_sase_crt}:/usr/local/share/ca-certificates/$(basename "$_sase_crt"):ro")
+done
 _DOCKER_ARGS+=(--name traffgen jdibby/traffgen:latest)
 _DOCKER_ARGS+=(--suite="${_CFG_SUITE}" --size="${_CFG_SIZE}" --max-wait-secs="${_CFG_WAIT}")
 [ -n "${_CFG_LOOP:-}" ] && _DOCKER_ARGS+=("${_CFG_LOOP}")
