@@ -31,9 +31,9 @@ jobs:
         run: |
           ver=$(python3 -c "
           import re, sys
-          m = re.search(r'VERSION\s*=\s*[\"\']([\d.]+)[\"\']]', open('generator.py').read())
+          m = re.search(r'VERSION\s*=\s*[\"\'](\ d[\ d.]+)[\"\']', open('generator.py').read())
           if not m:
-              m = re.search(r'[\"\']([\d]+\.\d+\.\d+)[\"\']]', open('generator.py').read())
+              m = re.search(r'[\"\'](\ d+\.\ d+\.\ d+)[\"\']', open('generator.py').read())
           if m:
               print(m.group(1))
           else:
