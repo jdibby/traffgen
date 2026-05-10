@@ -2,7 +2,7 @@
 set -e
 
 cat <<'DISCLAIMER'
-┌─────────────────────────────────────────────────────────────────────────┐
+┌─────────────────────────────────────────────────────────────────────────┌
 │                             ! DISCLAIMER !                              │
 │                                                                         │
 │  This tool is intended for AUTHORIZED SECURITY TESTING AND RESEARCH     │
@@ -24,7 +24,7 @@ DISCLAIMER
 # CA certificate.  Install that CA here and all outbound connections through
 # the proxy will verify cleanly.
 #
-# ── How to inject the CA ──────────────────────────────────────────────────────
+# ── How to inject the CA ───────────────────────────────────────────────────────────────────
 #
 #   Option 1 — bind-mount a PEM/CRT file:
 #     docker run \
@@ -49,7 +49,7 @@ DISCLAIMER
 CERT_DIR=/usr/local/share/ca-certificates
 UPDATED=0
 
-# ── Option 1: .crt files bind-mounted into the system cert directory ──────────
+# ── Option 1: .crt files bind-mounted into the system cert directory ────────────
 if ls "$CERT_DIR"/*.crt 1>/dev/null 2>&1; then
     echo "[entrypoint] Installing custom CA certificate(s) from ${CERT_DIR}/ ..."
     update-ca-certificates 2>&1 | grep -v "^$" || true
@@ -171,7 +171,7 @@ auto_trust_proxy_ca() {
         wait "$pid" 2>/dev/null || true
     done
 
-    # ── Tally results ──────────────────────────────────────────────────────────
+    # ── Tally results ────────────────────────────────────────────────────────────
     local passed=() failed=() unreachable=()
     for probe in "${PROBES[@]}"; do
         local host="${probe%:*}"
@@ -202,7 +202,7 @@ auto_trust_proxy_ca() {
         echo "[entrypoint]   Intercepted           : ${failed[*]}"
     fi
 
-    # ── Fingerprint-vote across all failed hosts' chains ──────────────────────
+    # ── Fingerprint-vote across all failed hosts' chains ────────────────────
     # Use a temp file as an associative store (bash 3 compat fallback):
     # <TMP_DIR>/vote_<fingerprint> contains the vote count.
     # <TMP_DIR>/cacert_<fingerprint>.pem holds the cert.
@@ -236,9 +236,9 @@ auto_trust_proxy_ca() {
         done
     done
 
-    # ── Find the most-voted CA fingerprint ─────────────────────────────────────
+    # ── Find the most-voted CA fingerprint ───────────────────────────────────────
     local best_fp="" best_votes=0
-    for vote_file in "${TMP_DIR}"/vote_*.tmp "${TMP_DIR}"/vote_*; do
+    for vote_file in "${TMP_DIR}"/vote_*; do
         [ -f "$vote_file" ] || continue
         local fp votes
         fp=$(basename "$vote_file" | sed 's/^vote_//')
