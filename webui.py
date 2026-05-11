@@ -2303,6 +2303,16 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
       <div style="max-width:900px">
 
         <div class="a-section">
+          <div class="a-h">v3.9.1 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
+          <table class="st-table" style="margin-top:10px">
+            <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td><strong>iperf3 suite restored</strong> — re-added <code>iperf3</code> to the suite map as a simplified UDP-only 1 Mbps test; t-shirt size controls server count (XS=1 S=2 M=3 L=4 XL=5 public servers); suite count 52 → 53</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Diagnostics</td><td><strong>iperf3 diagnostics rework</strong> — bandwidth test tool now tests all 5 public servers every run with user-configurable bandwidth (default 10 M) and duration; per-server section headers, live interval table, and receiver summary card with loss % and jitter</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Security</td><td><strong>Wider login card</strong> — sign-in card widened 380 → 460 px so the authorized-use disclaimer is easier to read; disclaimer font size increased and line-height loosened</td></tr>
+          </table>
+        </div>
+
+        <div class="a-section">
           <div class="a-h">v3.9.0 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
           <table class="st-table" style="margin-top:10px">
             <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
