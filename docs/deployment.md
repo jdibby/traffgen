@@ -58,6 +58,14 @@ docker run --pull=always --detach --restart unless-stopped \
 
 Open `https://<host-ip>:7777` — accept the self-signed certificate warning on first visit.
 
+On the **first start**, login credentials (`traffadmin` + a generated password) are printed once to the container logs. Retrieve them with:
+
+```bash
+docker logs traffgen
+```
+
+You will be prompted to set a permanent password on first login. See [Web Dashboard — Authentication](web-dashboard.md#authentication) for full details.
+
 ### Host networking — full LAN access (Linux only)
 
 `--network=host` shares the host's network namespace, giving the `lateral-movement` suite access to your physical LAN for realistic host discovery scans. The dashboard is available at port 7777 without an explicit mapping.
