@@ -2285,7 +2285,7 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
 <div class="toast" id="toast"></div>
 <script>
 const $=id=>document.getElementById(id);
-const H=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const H=s=>String(s).replace(/&/g,'&amp;').replace(/\x3c/g,'&lt;').replace(/\x3e/g,'&gt;');
 const N=n=>Number(n).toLocaleString();
 function _canvasText(){return document.documentElement.classList.contains('light')?'#1f2328':'#e2e8f0';}
 function _canvasMuted(){return document.documentElement.classList.contains('light')?'#636e7b':'#64748b';}
@@ -2294,12 +2294,12 @@ const Tc=ts=>new Date(ts*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-d
 const Ts=ts=>new Date(ts*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:false});
 const Dur=ms=>ms<1000?ms+'ms':(ms/1000).toFixed(1)+'s';
 const RC=p=>p>=90?'var(--green)':p>=70?'var(--amber)':'var(--red)';
-// ── Column sort ──────────────────────────────────────────────────────────────
+// -- Column sort --------------------------------------------------------------
 const _tblSort={};
 function _parseSortVal(txt){
-  const s=(txt||'').trim().split('\n')[0].trim();
+  const s=(txt||'').trim().split(/\n/)[0].trim();
   let m;
-  if(s==='—'||s==='')return Infinity;
+  if(s==='\u2014'||s==='')return Infinity;
   if((m=s.match(/^(?:(\d+)d\s+)?(\d+)h\s+(\d+)m$/)))return(parseInt(m[1]||0)*86400+parseInt(m[2])*3600+parseInt(m[3])*60);
   if((m=s.match(/^(\d+(?:\.\d+)?)s$/)))return parseFloat(m[1])*1000;
   if((m=s.match(/^(\d+(?:\.\d+)?)ms$/)))return parseFloat(m[1]);
@@ -2919,7 +2919,7 @@ setInterval(()=>{
 },2000);
 function toggleAS(){_autoScroll=!_autoScroll;$('btn-as').innerHTML='Auto-scroll '+(_autoScroll?'&#10003;':'&#10007;');if(_autoScroll)_scrollToBot();}
 
-// ── Draggable overview widgets ─────────────────────────────────────────────────
+// -- Draggable overview widgets -------------------------------------------------
 function _initDrag(gridId){
   const grid=$(gridId);if(!grid)return;
   let dragged=null;
@@ -3060,7 +3060,7 @@ function runFromModal(){
   _ctrl(body).then(r=>r.json()).then(d=>{if(d.ok){toast('Running '+_modalSuite+' — generator restarting…',true);closeModal();navTo('output');}else toast('Error: '+d.error,false);})
     .catch(()=>toast('Request failed',false));
 }
-// ── Health / perf functions ────────────────────────────────────────────────────
+// -- Health / perf functions ----------------------------------------------------
 function fmtIO(v){const m=v*8/1000;if(m<0.01)return'<0.01 Mbps';if(m<10)return m.toFixed(2)+' Mbps';return m.toFixed(1)+' Mbps';}
 function gaugeColor(p){return p>85?'var(--red)':p>65?'var(--amber)':'var(--green)';}
 function gaugeHex(p){return p>85?'#f85149':p>65?'#f59e0b':'#22c55e';}
@@ -3249,7 +3249,7 @@ function setNetInterval(ms){
 // Kick off overview network widget immediately and keep it live at 1s default
 pollHealth();
 _netTimer=setInterval(pollHealth,_netInterval);
-// ── Network info widget ───────────────────────────────────────────────────────
+// -- Network info widget -------------------------------------------------------
 function applyNetInfo(d){
   if(!d)return;
   if($('h-pub-ip'))$('h-pub-ip').textContent=d.public_ip||'—';
@@ -3277,7 +3277,7 @@ function pollNetInfo(){
 }
 pollNetInfo();
 setInterval(pollNetInfo,30000);
-// ── Security Summary ──────────────────────────────────────────────────────────
+// -- Security Summary ----------------------------------------------------------
 let _secTimer=null,_secInterval=1000,_secHist=[];
 const _catHist={};
 let _diskPeakHist=[];
@@ -3388,7 +3388,7 @@ function toggleTheme(){
 }
 // Restore saved theme preference
 try{if(localStorage.getItem('tg-theme')==='light'){document.documentElement.classList.add('light');$('btn-theme').innerHTML='&#9788;';}}catch(e){}
-// ── Traceroute visualizer ──────────────────────────────────────────────────
+// -- Traceroute visualizer --------------------------------------------------
 let _trSrc=null;
 function _trColor(ms){
   if(ms===null)return'var(--muted)';
@@ -3439,7 +3439,7 @@ function trProtoChange(){
   const p=$('tr-proto').value;
   $('tr-port').style.display=p==='tcp'?'':' none';
 }
-// ── TLS Inspector ─────────────────────────────────────────────────────────
+// -- TLS Inspector ---------------------------------------------------------
 function runTlsCheck(){
   const host=($('tls-host').value||'').trim(),port=($('tls-port').value||'443').trim();
   const tlsVer=($('tls-ver')&&$('tls-ver').value)||'auto';
@@ -3465,7 +3465,7 @@ function runTlsCheck(){
         </table>`;
     }).catch(e=>{$('tls-btn').disabled=false;$('tls-results').innerHTML=`<div class="tr-status" style="color:var(--red)">${H(e.message)}</div>`;});
 }
-// ── DNS Lookup ────────────────────────────────────────────────────────────
+// -- DNS Lookup ------------------------------------------------------------
 function runDnsLookup(){
   const host=($('dns-host').value||'').trim();
   if(!host){$('dns-results').innerHTML='<div class="tr-status" style="color:var(--red)">Enter a hostname.</div>';return;}
@@ -3489,7 +3489,7 @@ function runDnsLookup(){
       $('dns-results').innerHTML=warn+`<table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:4px"><thead><tr><th style="text-align:left;padding:0 8px 6px 0;color:var(--muted);font-size:12px">Resolver</th><th style="text-align:left;padding:0 8px 6px 0;color:var(--muted);font-size:12px">Answers (${H(d.rtype)})</th><th style="text-align:right;padding:0 0 6px 12px;color:var(--muted);font-size:12px">RTT</th></tr>${rows}</table>`;
     }).catch(e=>{$('dns-btn').disabled=false;$('dns-results').innerHTML=`<div class="tr-status" style="color:var(--red)">${H(e.message)}</div>`;});
 }
-// ── On-demand runner (#216) ───────────────────────────────────────────────
+// -- On-demand runner (#216) -----------------------------------------------
 let _odrSrc=null;
 function _odrAppendLine(body,raw){
   if(!raw.trim())return;
@@ -3539,7 +3539,7 @@ function stopOnDemand(){
   if($('odr-btn'))$('odr-btn').disabled=false;
   if($('odr-stop'))$('odr-stop').style.display='none';
 }
-// ── Run history ──────────────────────────────────────────────────────────
+// -- Run history ----------------------------------------------------------
 const _RUN_HIST_KEY='tg_run_history';
 let _lastIter=0,_lastIterSnap=null;
 function _loadRunHistory(){return JSON.parse(localStorage.getItem(_RUN_HIST_KEY)||'[]');}
@@ -3600,7 +3600,7 @@ function toggleRunDetail(id){
   el.style.display=el.style.display==='none'?'block':'none';
 }
 document.addEventListener('DOMContentLoaded',_renderRunHistory);
-// ── Keyboard shortcuts ───────────────────────────────────────────────────
+// -- Keyboard shortcuts ---------------------------------------------------
 (function(){
   const _TAB_KEYS={'1':'overview','2':'security','3':'tests','4':'output','5':'latency','6':'health','7':'about'};
   document.addEventListener('keydown',function(e){
@@ -3709,7 +3709,7 @@ function exportResults(fmt){
   }
   setInterval(_render,2000);
 })();
-// ── Latency tracking (#213 / #214) ────────────────────────────────────────
+// -- Latency tracking (#213 / #214) ----------------------------------------
 (function(){
   const MAX_SAMPLES=300;
   const _lat={};   // suiteName -> [ms, ...]
@@ -3816,7 +3816,7 @@ window.addEventListener('resize',()=>{
   if(_lastState){drawSpark(_lastState.history||[]);drawSecTrend(_secHist);}
   if(_lastHealth){drawDiskBars(_lastHealth.disk_read_kbps||0,_lastHealth.disk_write_kbps||0);drawNetSpark('net-spark',_netHist);drawNetSpark('h-net-spark',_hNetHist);}
 });
-// ── Canvas hover tooltips ──────────────────────────────────────────────────
+// -- Canvas hover tooltips --------------------------------------------------
 const _tt=document.createElement('div');_tt.className='tt';document.body.appendChild(_tt);
 function showTip(e,lines){
   _tt.innerHTML=lines.filter(Boolean).join('<br>');_tt.style.display='block';
@@ -3868,7 +3868,7 @@ try{localStorage.removeItem('tg-widget-order-ov-grid');}catch(e){}
 _initDrag('sec-grid');
 _initDrag('health-grid');
 
-// ── Disclaimer modal (shown once per browser session) ─────────────────────
+// -- Disclaimer modal (shown once per browser session) ---------------------
 (function(){
   if(sessionStorage.getItem('disclaimer_ack'))return;
   const overlay=document.createElement('div');

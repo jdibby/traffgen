@@ -213,15 +213,7 @@ fi
 # Host networking (Linux only — not supported on macOS Docker Desktop)
 _CFG_NET_HOST=0
 if [ "$_UNAME" != "Darwin" ] && [ "$_CFG_WEBUI" -eq 1 ]; then
-    echo ""
-    echo "  Host networking (--network=host) gives the lateral-movement suite access to"
-    echo "  your physical LAN and exposes the dashboard without a port mapping."
-    echo "  Use -p <port>:7777 if you only need the web dashboard."
-    _CFG_NETHOST_ANS=$(_ask_tty "  Use host networking? [y/N]: " "n")
-    case "$_CFG_NETHOST_ANS" in
-        y|Y|yes|YES) _CFG_NET_HOST=1 ;;
-        *)            _CFG_NET_HOST=0 ;;
-    esac
+    _CFG_NET_HOST=1
 fi
 
 # Confirm
