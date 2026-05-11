@@ -55,6 +55,27 @@ RUN apt-get update && apt-get upgrade -y --no-install-recommends && \
   && echo "$TZ" > /etc/timezone \
   && rm -rf /var/lib/apt/lists/*
 
+ARG CURL_IMPERSONATE_VER=0.6.1
+
+# curl-impersonate: drop-in curl that mimics Chrome TLS fingerprint so SASE/CASB
+# platforms classify the TLS inspector traffic as browser HTTPS rather than raw TLS.
+# Available for amd64 and arm64 only; arm/v7 skips silently and falls back to
+# the Python ssl path in webui.py.
+RUN set -e; \
+    ARCH=$(dpkg --print-architecture); \
+    case "$ARCH" in \
+      amd64) CI_ARCH=x86_64-linux-gnu ;; \
+      arm64) CI_ARCH=aarch64-linux-gnu ;; \
+      *) echo "curl-impersonate not available for $ARCH — skipping"; exit 0 ;; \
+    esac; \
+    mkdir -p /tmp/ci && \
+    curl -fsSL "https://github.com/lwthiker/curl-impersonate/releases/download/v${CURL_IMPERSONATE_VER}/curl-impersonate-v${CURL_IMPERSONATE_VER}.${CI_ARCH}.tar.gz" \
+      | tar xz -C /tmp/ci && \
+    install -m 755 /tmp/ci/curl-impersonate-chrome /usr/local/bin/curl-impersonate-chrome && \
+    find /tmp/ci -name 'libcurl-impersonate-chrome.so*' -exec install -m 644 {} /usr/local/lib/ \; && \
+    ldconfig && \
+    rm -rf /tmp/ci
+
 ARG NIKTO_VERSION=2.1.6
 
 # nikto is not in Debian repos — install from upstream (Perl script, no extra deps)
