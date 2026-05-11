@@ -1096,7 +1096,7 @@ def api_dns_lookup():
     return jsonify({"host": host, "results": results, "rtype": rtype, "mismatch": mismatch})
 
 
-# Public iperf3 servers (host, port) — tried in order, rotate on failure
+# Public iperf3 servers (host, port) — all are tested in order
 _IP3_SERVERS = [
     ("iperf.he.net",                5201),
     ("bouygues.iperf.fr",           5201),
@@ -1104,8 +1104,7 @@ _IP3_SERVERS = [
     ("iperf3.moji.fr",              5201),
     ("iperf.scottlinux.com",        5201),
 ]
-# T-shirt size → number of servers to try
-_IP3_SIZE_COUNT = {"XS": 1, "S": 2, "M": 3, "L": 4, "XL": 5}
+_IP3_BW_RE = __import__('re').compile(r'^\d+(\.\d+)?[KMG]?$')
 _IP3_INTERVAL_RE = __import__('re').compile(
     r'\[\s*\d+\]\s+([\d.]+)-([\d.]+)\s+sec\s+[\d.]+\s+\S+\s+'
     r'([\d.]+)\s+(\w+)bits/sec'
@@ -1123,24 +1122,23 @@ def api_iperf3():
             headers={"Cache-Control": "no-cache"},
         )
 
-    raw_size = request.args.get("size", "S").upper()
-    if raw_size not in _IP3_SIZE_COUNT:
-        return _sse_err("Invalid size — use XS, S, M, L, or XL")
-    count = _IP3_SIZE_COUNT[raw_size]
-
-    raw_duration = request.args.get("duration", "5")
-    if not raw_duration.isdigit() or not (1 <= int(raw_duration) <= 30):
-        return _sse_err("Invalid duration — must be 1–30 seconds")
+    raw_duration = request.args.get("duration", "10")
+    if not raw_duration.isdigit() or not (1 <= int(raw_duration) <= 60):
+        return _sse_err("Invalid duration — must be 1–60 seconds")
     safe_duration = str(int(raw_duration))
+
+    raw_bw = request.args.get("bandwidth", "10M").strip().upper()
+    if not _IP3_BW_RE.match(raw_bw):
+        return _sse_err("Invalid bandwidth — use e.g. 10M, 100K, 1G")
+    safe_bw = raw_bw  # regex-validated
 
     def _gen():
         import threading as _threading
-        servers = _IP3_SERVERS[:count]
         tested = 0
-        for idx, (host, port) in enumerate(servers):
-            yield f'data: {json.dumps({"type": "server", "host": host, "port": port, "index": idx, "total": len(servers)})}\n\n'
+        for idx, (host, port) in enumerate(_IP3_SERVERS):
+            yield f'data: {json.dumps({"type": "server", "host": host, "port": port, "index": idx, "total": len(_IP3_SERVERS)})}\n\n'
             cmd = ["iperf3", "-c", host, "-p", str(port),
-                   "-t", safe_duration, "-u", "-b", "1M", "--forceflush"]
+                   "-t", safe_duration, "-u", "-b", safe_bw, "--forceflush"]
             try:
                 proc = subprocess.Popen(
                     cmd,
@@ -1347,7 +1345,7 @@ def _login_page(error: str = "") -> str:
 <style>
 *{{box-sizing:border-box;margin:0;padding:0}}
 body{{background:#0d1117;color:#c9d1d9;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh}}
-.card{{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:36px 32px;width:380px}}
+.card{{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:36px 36px;width:460px;max-width:96vw}}
 .brand{{font-size:13px;color:#8b949e;text-align:center;margin-bottom:20px;letter-spacing:.02em}}
 h1{{font-size:18px;font-weight:600;margin-bottom:22px;color:#e6edf3}}
 label{{font-size:12px;color:#8b949e;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em}}
@@ -1358,8 +1356,8 @@ button:hover{{background:#2ea043}}
 .err{{color:#f85149;font-size:13px;margin-bottom:14px;padding:8px 10px;background:rgba(248,81,73,.1);border-radius:5px}}
 .disc{{margin-top:22px;padding:14px;background:rgba(210,153,34,.08);border:1px solid rgba(210,153,34,.35);border-radius:6px}}
 .disc-hdr{{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:#d97706;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}}
-.disc ul{{padding-left:16px;color:#8b949e;font-size:12px;line-height:1.65}}
-.disc li{{margin-bottom:4px}}
+.disc ul{{padding-left:16px;color:#8b949e;font-size:13px;line-height:1.7}}
+.disc li{{margin-bottom:5px}}
 .disc strong{{color:#c9d1d9}}
 </style></head>
 <body><div class="card">
@@ -2160,19 +2158,19 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div id="dns-results"><div class="tr-status">Enter a hostname and click Lookup.</div></div>
       </div>
       <div class="diag-tool">
-        <div class="diag-tool-hdr">&#128246; iperf3 Bandwidth Test <span style="font-size:11px;font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0">UDP · 1 Mbps · public servers</span></div>
+        <div class="diag-tool-hdr">&#128246; iperf3 Bandwidth Test <span style="font-size:11px;font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0">UDP · all public servers</span></div>
         <div class="diag-input-row">
-          <select id="ip3-size" class="diag-input" style="flex:0 0 auto;width:auto;padding-right:18px" title="Number of servers to test">
-            <option value="XS">XS — 1 server</option>
-            <option value="S" selected>S — 2 servers</option>
-            <option value="M">M — 3 servers</option>
-            <option value="L">L — 4 servers</option>
-            <option value="XL">XL — 5 servers</option>
-          </select>
-          <input id="ip3-duration" class="diag-input" type="number" value="5" min="1" max="30" style="flex:0 0 72px;min-width:60px" title="Duration per server (s)" placeholder="5s">
-          <span style="font-size:12px;color:var(--muted);white-space:nowrap;align-self:center">sec / server</span>
-          <button id="ip3-btn" class="diag-btn" onclick="runIperf3()">Run</button>
-          <button id="ip3-stop" class="diag-btn cancel" onclick="stopIperf3()" style="display:none">Stop</button>
+          <div style="display:flex;align-items:center;gap:4px">
+            <label style="font-size:12px;color:var(--muted);white-space:nowrap">Bandwidth</label>
+            <input id="ip3-bw" class="diag-input" type="text" value="10M" style="width:72px" title="UDP target bandwidth (e.g. 1M, 10M, 100M)" placeholder="10M" spellcheck="false">
+          </div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <label style="font-size:12px;color:var(--muted);white-space:nowrap">Duration</label>
+            <input id="ip3-duration" class="diag-input" type="number" value="10" min="1" max="60" style="width:64px" title="Duration per server (seconds)">
+            <span style="font-size:12px;color:var(--muted)">s</span>
+          </div>
+          <button id="ip3-btn" class="diag-btn" onclick="runIperf3()">&#9654; Run All Servers</button>
+          <button id="ip3-stop" class="diag-btn cancel" onclick="stopIperf3()" style="display:none">&#9209; Stop</button>
         </div>
         <div id="ip3-results" style="display:none">
           <div id="ip3-status" class="tr-status"></div>
@@ -2230,7 +2228,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div>
           <div class="a-title">traffgen</div>
           <div class="a-ver">v<span id="about-ver">&#8212;</span> &middot; Multi-Protocol Network Traffic Generator</div>
-          <div class="a-sub">Simulates realistic network traffic across 52 test suites &#8212; DNS, HTTP/S, BGP, SSH, VoIP/UCaaS, C2 beacons, DLP, IDS/WAF triggers, lateral movement, TLS inspection, Metasploit vuln scanners, encoded payload delivery, and more.<br>Purpose-built to stress-test firewalls, IDS/IPS, URL filters, DLP engines, CASB/SASE/SSE platforms, and SIEM pipelines.</div>
+          <div class="a-sub">Simulates realistic network traffic across 53 test suites &#8212; DNS, HTTP/S, BGP, SSH, VoIP/UCaaS, C2 beacons, DLP, IDS/WAF triggers, lateral movement, TLS inspection, Metasploit vuln scanners, encoded payload delivery, and more.<br>Purpose-built to stress-test firewalls, IDS/IPS, URL filters, DLP engines, CASB/SASE/SSE platforms, and SIEM pipelines.</div>
         </div>
       </div>
       <div class="a-section">
@@ -2274,7 +2272,7 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
           <tr><td>IDS / IPS / WAF</td><td style="color:var(--text)">ids-trigger &middot; waf-attack &middot; log4shell &middot; nmap &middot; msf-webapp &middot; msf-enterprise &middot; msf-appliance &middot; msf-cisa-kev &middot; msf-middleware &middot; msf-recon &middot; web-scanner</td></tr>
           <tr><td>VoIP / UCaaS</td><td style="color:var(--text)">voip &middot; ucaas</td></tr>
           <tr><td>SASE / SSE / CASB</td><td style="color:var(--text)">shadow-it &middot; tor-anonymizer &middot; tls-inspection &middot; lateral-movement</td></tr>
-          <tr><td>Security Tools</td><td style="color:var(--text)">snmp &middot; post-quantum &middot; ai-browse</td></tr>
+          <tr><td>Security Tools</td><td style="color:var(--text)">snmp &middot; post-quantum &middot; ai-browse &middot; iperf3</td></tr>
           <tr><td>all</td><td style="color:var(--text)">Shuffled rotation of every suite above</td></tr>
         </table>
       </div>
@@ -2303,6 +2301,16 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
     <!-- Changelog -->
     <div id="tab-changelog" class="panel">
       <div style="max-width:900px">
+
+        <div class="a-section">
+          <div class="a-h">v3.9.1 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
+          <table class="st-table" style="margin-top:10px">
+            <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td><strong>iperf3 suite restored</strong> — re-added <code>iperf3</code> to the suite map as a simplified UDP-only 1 Mbps test; t-shirt size controls server count (XS=1 S=2 M=3 L=4 XL=5 public servers); suite count 52 → 53</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Diagnostics</td><td><strong>iperf3 diagnostics rework</strong> — bandwidth test tool now tests all 5 public servers every run with user-configurable bandwidth (default 10 M) and duration; per-server section headers, live interval table, and receiver summary card with loss % and jitter</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Security</td><td><strong>Wider login card</strong> — sign-in card widened 380 → 460 px so the authorized-use disclaimer is easier to read; disclaimer font size increased and line-height loosened</td></tr>
+          </table>
+        </div>
 
         <div class="a-section">
           <div class="a-h">v3.9.0 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
@@ -3947,15 +3955,15 @@ function _renderIpResult(d){
     +'</div>';
 }
 function runIperf3(){
-  const size=$('ip3-size').value;
-  const dur=($('ip3-duration').value||'5').trim();
+  const bw=($('ip3-bw').value||'10M').trim().toUpperCase();
+  const dur=($('ip3-duration').value||'10').trim();
   stopIperf3();
   $('ip3-results').style.display='';
   $('ip3-table').innerHTML='';
   $('ip3-summary').innerHTML='';
   $('ip3-status').textContent='Starting…';
   $('ip3-btn').disabled=true;$('ip3-stop').style.display='';
-  const url='/api/iperf3?size='+encodeURIComponent(size)+'&duration='+encodeURIComponent(dur);
+  const url='/api/iperf3?bandwidth='+encodeURIComponent(bw)+'&duration='+encodeURIComponent(dur);
   _ipSrc=new EventSource(url);
   _ipSrc.onmessage=e=>{
     const d=JSON.parse(e.data);
