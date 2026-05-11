@@ -3103,7 +3103,7 @@ function setFilter(btn,lvl){
   });
 }
 function _fmtMsgUA(msg){
-  return msg.replace(/Mozilla\/5\.0[^"'\n]*/g,function(ua){
+  return msg.replace(/Mozilla\/5\.0[^"'\\n]*/g,function(ua){
     let os='';
     const am=ua.match(/Android (\d+(?:\.\d+)*)/);if(am)os='Android '+am[1];
     else{const im=ua.match(/iPhone OS (\d+[_\d]*)/);if(im)os='iOS '+im[1].replace(/_/g,'.');}
