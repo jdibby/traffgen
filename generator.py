@@ -2264,8 +2264,6 @@ def speedtest_fast() -> None:
 # ══════════════════════════════════════════════════════════════════════════════
 
 # Curated list of well-known public iperf3 servers (host, port).
-# Availability varies — the suite tries a random sample and falls back to
-# loopback if none respond.
 _IPERF3_SERVERS = [
     ("iperf.he.net",                5201),
     ("bouygues.iperf.fr",           5201),
@@ -2275,6 +2273,8 @@ _IPERF3_SERVERS = [
     ("speedtest.serverius.net",     5002),
     ("lon.speedtest.clouvider.net", 5201),
     ("nyc.speedtest.clouvider.net", 5201),
+    ("la.speedtest.clouvider.net",  5201),
+    ("ams.speedtest.clouvider.net", 5201),
 ]
 
 # Default test variants: (label, iperf3 flag string)

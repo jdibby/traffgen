@@ -1096,15 +1096,24 @@ def api_dns_lookup():
     return jsonify({"host": host, "results": results, "rtype": rtype, "mismatch": mismatch})
 
 
-# Public iperf3 servers (host, port) — all are tested in order
+# Public iperf3 servers — (host, port, label)
 _IP3_SERVERS = [
-    ("iperf.he.net",                5201),
-    ("bouygues.iperf.fr",           5201),
-    ("ping.online.net",             5201),
-    ("iperf3.moji.fr",              5201),
-    ("iperf.scottlinux.com",        5201),
+    ("iperf.he.net",                5201, "Hurricane Electric — San Jose, US"),
+    ("bouygues.iperf.fr",           5201, "Bouygues Telecom — Paris, FR"),
+    ("ping.online.net",             5201, "Online.net — Paris, FR"),
+    ("iperf3.moji.fr",              5201, "Moji — Bordeaux, FR"),
+    ("iperf.scottlinux.com",        5201, "Scott Linux — Denver, US"),
+    ("speedtest.serverius.net",     5002, "Serverius — Amsterdam, NL"),
+    ("lon.speedtest.clouvider.net", 5201, "Clouvider — London, UK"),
+    ("nyc.speedtest.clouvider.net", 5201, "Clouvider — New York, US"),
+    ("la.speedtest.clouvider.net",  5201, "Clouvider — Los Angeles, US"),
+    ("ams.speedtest.clouvider.net", 5201, "Clouvider — Amsterdam, NL"),
 ]
-_IP3_BW_RE = __import__('re').compile(r'^\d+(\.\d+)?[KMG]?$')
+_IP3_HOST_RE = __import__('re').compile(
+    r'^(?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}'
+    r'|(?:\d{1,3}\.){3}\d{1,3}$'
+)
+_IP3_BW_NUM_RE = __import__('re').compile(r'^\d+(\.\d+)?$')
 _IP3_INTERVAL_RE = __import__('re').compile(
     r'\[\s*\d+\]\s+([\d.]+)-([\d.]+)\s+sec\s+[\d.]+\s+\S+\s+'
     r'([\d.]+)\s+(\w+)bits/sec'
@@ -1127,16 +1136,33 @@ def api_iperf3():
         return _sse_err("Invalid duration — must be 1–60 seconds")
     safe_duration = str(int(raw_duration))
 
-    raw_bw = request.args.get("bandwidth", "10M").strip().upper()
-    if not _IP3_BW_RE.match(raw_bw):
-        return _sse_err("Invalid bandwidth — use e.g. 10M, 100K, 1G")
-    safe_bw = raw_bw  # regex-validated
+    raw_bw_num = request.args.get("bw_num", "10").strip()
+    if not _IP3_BW_NUM_RE.match(raw_bw_num):
+        return _sse_err("Invalid bandwidth — enter a positive number")
+    raw_bw_unit = request.args.get("bw_unit", "M").upper()
+    if raw_bw_unit not in ("K", "M", "G"):
+        return _sse_err("Invalid bandwidth unit — use K, M, or G")
+    safe_bw = raw_bw_num + raw_bw_unit  # e.g. "10M"
+
+    # server: "auto" | "host:port" | "host" (defaults to port 5201)
+    raw_server = request.args.get("server", "auto").strip()
+    if raw_server == "auto":
+        run_servers = [(h, p) for h, p, _ in _IP3_SERVERS]
+    else:
+        parts = raw_server.rsplit(":", 1)
+        s_host = parts[0].strip()
+        s_port = int(parts[1]) if len(parts) == 2 and parts[1].isdigit() else 5201
+        if not _IP3_HOST_RE.match(s_host):
+            return _sse_err("Invalid server — use a hostname or IP address")
+        if not (1 <= s_port <= 65535):
+            return _sse_err("Invalid port in server address")
+        run_servers = [(s_host, s_port)]
 
     def _gen():
         import threading as _threading
         tested = 0
-        for idx, (host, port) in enumerate(_IP3_SERVERS):
-            yield f'data: {json.dumps({"type": "server", "host": host, "port": port, "index": idx, "total": len(_IP3_SERVERS)})}\n\n'
+        for idx, (host, port) in enumerate(run_servers):
+            yield f'data: {json.dumps({"type": "server", "host": host, "port": port, "index": idx, "total": len(run_servers)})}\n\n'
             cmd = ["iperf3", "-c", host, "-p", str(port),
                    "-t", safe_duration, "-u", "-b", safe_bw, "--forceflush"]
             try:
@@ -1147,7 +1173,7 @@ def api_iperf3():
                 )
             except FileNotFoundError:
                 yield f'data: {json.dumps({"type": "error", "msg": "iperf3 not found on this system"})}\n\n'
-                yield f'data: {json.dumps({"type": "done", "code": -1})}\n\n'
+                yield f'data: {json.dumps({"type": "done", "tested": tested})}\n\n'
                 return
 
             timeout = int(safe_duration) + 10
@@ -1156,7 +1182,6 @@ def api_iperf3():
                 k.append(True); p.kill()
             timer = _threading.Timer(timeout, _killer)
             timer.start()
-            got_result = False
             try:
                 for line in proc.stdout:
                     line = line.rstrip()
@@ -1178,7 +1203,6 @@ def api_iperf3():
                         if is_summary:
                             role = "sender" if line.endswith("sender") else "receiver"
                             yield f'data: {json.dumps({"type": "result", "host": host, "role": role, "mbps": mbps, "unit": unit, "lost_pct": lost_pct, "jitter_ms": jitter_ms})}\n\n'
-                            got_result = True
                         else:
                             yield f'data: {json.dumps({"type": "interval", "sec_start": sec_start, "sec_end": sec_end, "mbps": mbps, "unit": unit, "jitter_ms": jitter_ms, "lost_pct": lost_pct})}\n\n'
                 proc.wait()
@@ -2158,18 +2182,41 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div id="dns-results"><div class="tr-status">Enter a hostname and click Lookup.</div></div>
       </div>
       <div class="diag-tool">
-        <div class="diag-tool-hdr">&#128246; iperf3 Bandwidth Test <span style="font-size:11px;font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0">UDP · all public servers</span></div>
-        <div class="diag-input-row">
+        <div class="diag-tool-hdr">&#128246; iperf3 Bandwidth Test <span style="font-size:11px;font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0">UDP</span></div>
+        <div class="diag-input-row" style="flex-wrap:wrap;gap:8px">
+          <div style="display:flex;align-items:center;gap:4px;flex:1;min-width:220px">
+            <label style="font-size:12px;color:var(--muted);white-space:nowrap">Server</label>
+            <select id="ip3-server" class="diag-input" style="flex:1;min-width:0" onchange="ip3ServerChange()">
+              <option value="auto">Auto — try all 10 servers</option>
+              <option value="iperf.he.net:5201">iperf.he.net — San Jose, US</option>
+              <option value="bouygues.iperf.fr:5201">bouygues.iperf.fr — Paris, FR</option>
+              <option value="ping.online.net:5201">ping.online.net — Paris, FR</option>
+              <option value="iperf3.moji.fr:5201">iperf3.moji.fr — Bordeaux, FR</option>
+              <option value="iperf.scottlinux.com:5201">iperf.scottlinux.com — Denver, US</option>
+              <option value="speedtest.serverius.net:5002">speedtest.serverius.net — Amsterdam, NL</option>
+              <option value="lon.speedtest.clouvider.net:5201">lon.speedtest.clouvider.net — London, UK</option>
+              <option value="nyc.speedtest.clouvider.net:5201">nyc.speedtest.clouvider.net — New York, US</option>
+              <option value="la.speedtest.clouvider.net:5201">la.speedtest.clouvider.net — Los Angeles, US</option>
+              <option value="ams.speedtest.clouvider.net:5201">ams.speedtest.clouvider.net — Amsterdam, NL</option>
+              <option value="custom">Custom…</option>
+            </select>
+            <input id="ip3-custom" class="diag-input" type="text" placeholder="host or host:port" spellcheck="false" autocomplete="off" style="flex:1;min-width:140px;display:none" onkeydown="if(event.key==='Enter')runIperf3()">
+          </div>
           <div style="display:flex;align-items:center;gap:4px">
             <label style="font-size:12px;color:var(--muted);white-space:nowrap">Bandwidth</label>
-            <input id="ip3-bw" class="diag-input" type="text" value="10M" style="width:72px" title="UDP target bandwidth (e.g. 1M, 10M, 100M)" placeholder="10M" spellcheck="false">
+            <input id="ip3-bw-num" class="diag-input" type="number" value="10" min="1" style="width:68px" title="Bandwidth target" placeholder="10" oninput="this.setCustomValidity(this.value>0?'':'Enter a number')">
+            <select id="ip3-bw-unit" class="diag-input" style="width:auto;padding-right:18px">
+              <option value="K">Kbps</option>
+              <option value="M" selected>Mbps</option>
+              <option value="G">Gbps</option>
+            </select>
           </div>
           <div style="display:flex;align-items:center;gap:4px">
             <label style="font-size:12px;color:var(--muted);white-space:nowrap">Duration</label>
-            <input id="ip3-duration" class="diag-input" type="number" value="10" min="1" max="60" style="width:64px" title="Duration per server (seconds)">
+            <input id="ip3-duration" class="diag-input" type="number" value="10" min="1" max="60" style="width:60px" title="Duration per server (seconds)">
             <span style="font-size:12px;color:var(--muted)">s</span>
           </div>
-          <button id="ip3-btn" class="diag-btn" onclick="runIperf3()">&#9654; Run All Servers</button>
+          <button id="ip3-btn" class="diag-btn" onclick="runIperf3()">&#9654; Run</button>
           <button id="ip3-stop" class="diag-btn cancel" onclick="stopIperf3()" style="display:none">&#9209; Stop</button>
         </div>
         <div id="ip3-results" style="display:none">
@@ -2180,14 +2227,36 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
       </div>
       <div class="diag-tool">
         <div class="diag-tool-hdr">&#9654; On-Demand Test Runner</div>
-        <div class="diag-input-row">
-          <select id="odr-suite" class="diag-input" style="flex:0 0 auto;width:auto;padding-right:20px" title="Test suite">
+        <div class="diag-input-row" style="flex-wrap:wrap;gap:8px">
+          <select id="odr-suite" class="diag-input" style="flex:0 0 auto;width:auto;padding-right:20px" title="Test suite" onchange="odrSuiteChange()">
             <option value="all" selected>all</option>
           </select>
           <select id="odr-size" class="diag-input" style="flex:0 0 auto;width:auto;padding-right:20px" title="Traffic size">
             <option value="XS">XS</option><option value="S" selected>S</option>
             <option value="M">M</option><option value="L">L</option><option value="XL">XL</option>
           </select>
+          <!-- iperf3-specific controls — hidden for other suites -->
+          <select id="odr-ip3-server" class="diag-input" style="flex:1;min-width:180px;display:none" onchange="odrIp3ServerChange()">
+            <option value="auto">Auto — try all 10 servers</option>
+            <option value="iperf.he.net:5201">iperf.he.net — San Jose, US</option>
+            <option value="bouygues.iperf.fr:5201">bouygues.iperf.fr — Paris, FR</option>
+            <option value="ping.online.net:5201">ping.online.net — Paris, FR</option>
+            <option value="iperf3.moji.fr:5201">iperf3.moji.fr — Bordeaux, FR</option>
+            <option value="iperf.scottlinux.com:5201">iperf.scottlinux.com — Denver, US</option>
+            <option value="speedtest.serverius.net:5002">speedtest.serverius.net — Amsterdam, NL</option>
+            <option value="lon.speedtest.clouvider.net:5201">lon.speedtest.clouvider.net — London, UK</option>
+            <option value="nyc.speedtest.clouvider.net:5201">nyc.speedtest.clouvider.net — New York, US</option>
+            <option value="la.speedtest.clouvider.net:5201">la.speedtest.clouvider.net — Los Angeles, US</option>
+            <option value="ams.speedtest.clouvider.net:5201">ams.speedtest.clouvider.net — Amsterdam, NL</option>
+            <option value="custom">Custom…</option>
+          </select>
+          <input id="odr-ip3-custom" class="diag-input" type="text" placeholder="host or host:port" spellcheck="false" style="flex:0 0 160px;display:none">
+          <div id="odr-ip3-bw" style="display:none;align-items:center;gap:4px">
+            <input id="odr-ip3-bw-num" class="diag-input" type="number" value="10" min="1" style="width:64px" placeholder="10">
+            <select id="odr-ip3-bw-unit" class="diag-input" style="width:auto;padding-right:18px">
+              <option value="K">Kbps</option><option value="M" selected>Mbps</option><option value="G">Gbps</option>
+            </select>
+          </div>
           <button id="odr-btn" class="diag-btn" onclick="runOnDemand()">&#9654; Run</button>
           <button id="odr-stop" class="diag-btn cancel" onclick="stopOnDemand()" style="display:none">&#9209; Stop</button>
         </div>
@@ -3954,8 +4023,21 @@ function _renderIpResult(d){
     +'<div class="ip-bar-wrap"><div class="ip-bar-fill" style="width:'+pct.toFixed(1)+'%;background:'+bCol+'"></div></div>'
     +'</div>';
 }
+function ip3ServerChange(){
+  const v=$('ip3-server').value;
+  const cust=$('ip3-custom');
+  if(v==='custom'){cust.style.display='';cust.focus();}
+  else cust.style.display='none';
+}
 function runIperf3(){
-  const bw=($('ip3-bw').value||'10M').trim().toUpperCase();
+  const svrSel=$('ip3-server').value;
+  const server=svrSel==='custom'?($('ip3-custom').value||'').trim():svrSel;
+  if(!server){$('ip3-status')&&($('ip3-status').textContent='Enter a server address.');return;}
+  const bwNum=($('ip3-bw-num').value||'10').trim();
+  const bwUnit=$('ip3-bw-unit').value;
+  if(!bwNum||isNaN(bwNum)||Number(bwNum)<=0){
+    $('ip3-bw-num').focus();return;
+  }
   const dur=($('ip3-duration').value||'10').trim();
   stopIperf3();
   $('ip3-results').style.display='';
@@ -3963,7 +4045,7 @@ function runIperf3(){
   $('ip3-summary').innerHTML='';
   $('ip3-status').textContent='Starting…';
   $('ip3-btn').disabled=true;$('ip3-stop').style.display='';
-  const url='/api/iperf3?bandwidth='+encodeURIComponent(bw)+'&duration='+encodeURIComponent(dur);
+  const url='/api/iperf3?server='+encodeURIComponent(server)+'&bw_num='+encodeURIComponent(bwNum)+'&bw_unit='+encodeURIComponent(bwUnit)+'&duration='+encodeURIComponent(dur);
   _ipSrc=new EventSource(url);
   _ipSrc.onmessage=e=>{
     const d=JSON.parse(e.data);
@@ -3997,6 +4079,19 @@ function stopIperf3(){
 }
 // -- On-demand runner (#216) -----------------------------------------------
 let _odrSrc=null;
+function odrSuiteChange(){
+  const v=$('odr-suite').value;
+  const isIp3=(v==='iperf3');
+  $('odr-size').style.display=isIp3?'none':'';
+  $('odr-ip3-server').style.display=isIp3?'':'none';
+  $('odr-ip3-bw').style.display=isIp3?'flex':'none';
+  if(!isIp3){$('odr-ip3-custom').style.display='none';}
+  else odrIp3ServerChange();
+}
+function odrIp3ServerChange(){
+  const v=$('odr-ip3-server').value;
+  $('odr-ip3-custom').style.display=v==='custom'?'':'none';
+}
 function _odrAppendLine(body,raw){
   if(!raw.trim())return;
   const div=document.createElement('div');
@@ -4022,8 +4117,35 @@ function _odrAppendLine(body,raw){
 }
 function runOnDemand(){
   const suite=($('odr-suite')?$('odr-suite').value:'dns').trim();
-  const size=$('odr-size')?$('odr-size').value:'S';
   stopOnDemand();
+  // iperf3 — proxy through the diagnostics SSE endpoint for live output
+  if(suite==='iperf3'){
+    const svrSel=$('odr-ip3-server').value;
+    const server=svrSel==='custom'?($('odr-ip3-custom').value||'').trim():svrSel;
+    if(!server){return;}
+    const bwNum=($('odr-ip3-bw-num').value||'10').trim();
+    const bwUnit=$('odr-ip3-bw-unit').value;
+    if(!bwNum||isNaN(bwNum)||Number(bwNum)<=0){$('odr-ip3-bw-num').focus();return;}
+    const out=$('odr-out'),body=$('odr-body'),st=$('odr-status');
+    if(out)out.style.display='';if(body)body.innerHTML='';
+    if(st)st.textContent='Running iperf3…';
+    if($('odr-btn'))$('odr-btn').disabled=true;
+    if($('odr-stop'))$('odr-stop').style.display='';
+    const url='/api/iperf3?server='+encodeURIComponent(server)+'&bw_num='+encodeURIComponent(bwNum)+'&bw_unit='+encodeURIComponent(bwUnit)+'&duration=10';
+    _odrSrc=new EventSource(url);
+    _odrSrc.onmessage=function(e){
+      const d=JSON.parse(e.data);
+      if(d.type==='server'){if(body)_odrAppendLine(body,'→ Testing '+d.host+':'+d.port+' ('+( d.index+1)+'/'+d.total+')');}
+      else if(d.type==='interval'){if(body)_odrAppendLine(body,'  '+d.sec_start.toFixed(0)+'-'+d.sec_end.toFixed(0)+'s  '+d.mbps.toFixed(2)+' '+d.unit+'bits/s'+(d.lost_pct!=null?'  loss='+d.lost_pct.toFixed(1)+'%':''));}
+      else if(d.type==='result'&&d.role==='receiver'){if(body)_odrAppendLine(body,'[ok] '+d.host+' → '+d.mbps.toFixed(2)+' '+d.unit+'bits/s'+(d.lost_pct!=null?' loss='+d.lost_pct.toFixed(1)+'%  jitter='+d.jitter_ms+'ms':''));}
+      else if(d.type==='skip'){if(body)_odrAppendLine(body,'[warn] Skipped '+d.host+': '+(d.msg||'failed'));}
+      else if(d.type==='error'){if(body)_odrAppendLine(body,'[error] '+d.msg);if(st)st.textContent='Error';stopOnDemand();}
+      else if(d.type==='done'){if(st)st.textContent='Finished — '+d.tested+' server'+(d.tested===1?'':'s')+' tested.';stopOnDemand();}
+    };
+    _odrSrc.onerror=function(){if(st)st.textContent='Connection lost';stopOnDemand();};
+    return;
+  }
+  const size=$('odr-size')?$('odr-size').value:'S';
   const out=$('odr-out'),body=$('odr-body'),st=$('odr-status');
   if(out)out.style.display='';
   if(body)body.innerHTML='';
