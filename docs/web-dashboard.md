@@ -38,7 +38,7 @@ If you deployed with `stager.sh`, the credentials are extracted from the contain
 
 ### First login
 
-After signing in with the generated password you are immediately redirected to a **Set your password** page. Enter a new password (minimum 12 characters) and confirm it. This is the only time in-app password change is available.
+After signing in with the generated password you are immediately redirected to a **Set your password** page. Enter a new password (minimum 8 characters) and confirm it. This is the only time in-app password change is available.
 
 ### Password reset
 
@@ -120,9 +120,12 @@ Card grid for every available suite:
 
 CLI-style live log mirroring terminal output:
 
-- Level icons and colours: ✔ OK (green), ✗ Error (red), ⚠ Warn (yellow), — Debug (dim)
+- **Level colours**: ✔ OK (green), ✗ Error (red), ⚠ Warn (amber), — Info/Debug (dim)
+- **Automatic level classification** — connection errors, timeouts, "no links found", and HTTP 4xx/5xx responses are automatically tagged `WARN` or `ERROR` rather than `INFO`, so failures stand out without manual filtering
+- **User-Agent condensing** — long `Mozilla/5.0 ...` UA strings in log lines are condensed to compact labels (e.g. `[Chrome/130/Android 14]`) to prevent wrapping
+- **Sub-result indentation** — follow-up detail lines prefixed with `↳` are indented proportionally, matching the visual nesting shown in the terminal
 - Section banners and rule separators matching terminal format
-- **Filter** by level (OK / Warn / Error / Debug)
+- **Filter** by level (OK / Warn / Error / Info)
 - **Auto-scroll** — follows new output; scroll up to review history without breaking auto-scroll
 - **Clear** — wipe the current log buffer
 - **Pop Out** — open the live log in a standalone browser window

@@ -10,6 +10,8 @@
 | `--max-wait-secs` | integer | `20` | Max random pause between iterations when looping |
 | `--nowait` | — | off | Disable all inter-test pauses (loop and single-run mode) |
 | `--crawl-start` | URL | `https://data.commoncrawl.org` | Seed URL for the `web-crawl` suite |
+| `--iperf3-flags` | string | *(built-in defaults)* | Custom iperf3 flags for the `iperf3` suite — replaces the five default test variants with a single run using these flags (e.g. `--iperf3-flags "-t 10 -P 8 -u -b 50M"`) |
+| `--lateral-networks` | CIDRs | *(auto-detect)* | Comma-separated CIDRs to target in the `lateral-movement` suite (e.g. `192.168.1.0/24,10.0.0.0/24`). Omit to scan all auto-detected networks. |
 | `--list` | — | — | Print all suites with descriptions and exit |
 | `--version` | — | — | Print version and exit |
 

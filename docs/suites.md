@@ -1,6 +1,6 @@
 # Test Suites
 
-Traffgen ships **52 test suites** covering every major protocol and security control category. Use `--suite=<name>` to run a specific suite, or `--suite=all` to run every suite in shuffled order.
+Traffgen ships **53 test suites** covering every major protocol and security control category. Use `--suite=<name>` to run a specific suite, or `--suite=all` to run every suite in shuffled order.
 
 ```bash
 docker run --pull=always -it jdibby/traffgen:latest --list
@@ -131,6 +131,7 @@ All requests use a fake `sk-DLPTEST-…` token — responses are HTTP 401/403. T
 | Suite | Description |
 |---|---|
 | 🚀 `speedtest` | Runs a `fast.com` speed test via the `fastcli` Python package. Rounds scale with `--size`. Establishes baseline bandwidth and confirms speed-test traffic appears in application-awareness logs. |
+| 📶 `iperf3` | TCP/UDP bandwidth tests against a random sample of public iperf3 servers, with automatic loopback fallback when none are reachable. Five default variants: TCP, UDP 10 Mbps, TCP reverse-mode, TCP 4-stream, and alternate port 5202. Validates egress port 5201/5202, bulk flow detection, QoS/rate-limiting, and bandwidth-anomaly rules. Pass `--iperf3-flags` to replace the defaults with a single custom run. |
 | 📊 `snmp` | Three-function suite covering all SNMP versions: **SNMPv1** (18 community strings), **SNMPv2c** (26 community strings), and **SNMPv3** (20 credential sets across noAuthNoPriv, authNoPriv MD5/SHA, and authPriv DES/AES). Tests SNMP inspection, community-string detection, and SNMPv3 weak-credential signatures. |
 
 ---
