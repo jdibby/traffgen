@@ -2284,7 +2284,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
       <div class="tcard" data-widget="lat-heatmap">
         <div class="thdr">Time-of-Day Latency <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px">average duration by suite and hour of day</span></div>
         <div id="lat-hm-empty" class="empty" style="padding:20px">No data yet — latency heatmap builds as tests run.</div>
-        <div id="lat-hm-wrap" style="overflow-x:auto;display:none">
+        <div id="lat-hm-wrap" style="overflow-x:auto;overflow-y:auto;max-height:400px;display:none">
           <canvas id="lat-heatmap"></canvas>
         </div>
       </div>
