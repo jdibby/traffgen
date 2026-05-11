@@ -702,8 +702,8 @@ def change_password():
     if request.method == "POST":
         new_pw  = request.form.get("password", "")
         confirm = request.form.get("confirm", "")
-        if len(new_pw) < 12:
-            error = "Password must be at least 12 characters."
+        if len(new_pw) < 8:
+            error = "Password must be at least 8 characters."
         elif new_pw != confirm:
             error = "Passwords do not match."
         else:
@@ -1257,10 +1257,10 @@ initial setup.<br><br>To reset credentials, <strong>remove and recreate the cont
         err = f'<p class="err">{error}</p>' if error else ""
         body = f"""{err}
 <form method="post" action="/change-password">
-<label for="p">New password <span style="color:#8b949e;font-weight:400;text-transform:none">(min 12 characters)</span></label>
-<input id="p" name="password" type="password" autocomplete="new-password" autofocus required minlength="12">
+<label for="p">New password <span style="color:#8b949e;font-weight:400;text-transform:none">(min 8 characters)</span></label>
+<input id="p" name="password" type="password" autocomplete="new-password" autofocus required minlength="8">
 <label for="c">Confirm password</label>
-<input id="c" name="confirm" type="password" autocomplete="new-password" required minlength="12">
+<input id="c" name="confirm" type="password" autocomplete="new-password" required minlength="8">
 <button type="submit">Set password</button>
 </form>"""
     return f"""<!DOCTYPE html>
@@ -2138,7 +2138,7 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
           <div class="a-h">v3.7.0 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
           <table class="st-table" style="margin-top:10px">
             <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Security</td><td><strong>Dashboard authentication</strong> — login wall with generated <code>traffadmin</code> credentials printed once to Docker logs on first start; forced password change on first login (min 12 chars); subsequent logins use the updated password; credentials reset by redeploying the container</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Security</td><td><strong>Dashboard authentication</strong> — login wall with generated <code>traffadmin</code> credentials printed once to Docker logs on first start; forced password change on first login (min 8 chars); subsequent logins use the updated password; credentials reset by redeploying the container</td></tr>
             <tr><td><span class="cl-feat">FEAT</span></td><td>Security</td><td><strong>PBKDF2-SHA256 password hashing</strong> — stored credentials use PBKDF2-HMAC-SHA256 with 260 000 iterations and a per-install random salt; password file is root-only (chmod 600)</td></tr>
             <tr><td><span class="cl-chg">CHG</span></td><td>Security</td><td>In-app password reset intentionally disabled after initial setup — redeploy the container to rotate credentials</td></tr>
           </table>
