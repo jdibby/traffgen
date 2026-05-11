@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-generator.py — Traffic Generator v3.8.0
+generator.py — Traffic Generator v3.9.0
 ========================================
 Simulates realistic network traffic across a wide range of protocols and
 behaviours: DNS, HTTP/HTTPS/HTTP3, FTP, SSH, NTP, BGP, ICMP, SNMP,
@@ -58,7 +58,7 @@ from rich import box
 from endpoints import *           # noqa: F401,F403  (large data file)
 
 # ── Globals ───────────────────────────────────────────────────────────────────
-VERSION = "3.8.0"
+VERSION = "3.9.0"
 
 
 class _DualWriter:
@@ -276,6 +276,7 @@ _SUITE_DESCRIPTIONS: list[tuple[str, str]] = [
     ("msf-payload-delivery","msfvenom encoded payloads delivered via HTTP to public test targets — tests NGFW/IDS obfuscated payload detection"),
     ("msf-recon",           "Metasploit auxiliary recon scanners (EternalBlue probe, SMB/RDP/MySQL/Redis/HTTP fingerprinting)"),
     ("msf-webapp",          "Metasploit checks: web app CVEs (Drupal, Joomla, WordPress, GitLab, PHP CGI, Magento, Webmin)"),
+    ("iperf3",           "TCP/UDP bandwidth tests: public iperf3 servers → loopback fallback; validates egress port 5201, bulk flow detection, QoS/rate-limiting"),
     ("speedtest",        "fast.com speed-test via fastcli"),
     ("nmap",             "Nmap port scan (1-1024) + CVE script scan"),
     ("ntp",              "NTP UDP probes to a pool of public time servers"),
@@ -2257,6 +2258,162 @@ def speedtest_fast() -> None:
         _stats.fail()
         ui_error(f"[speedtest_fast] {e}")
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# IPERF3 BANDWIDTH
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Curated list of well-known public iperf3 servers (host, port).
+# Availability varies — the suite tries a random sample and falls back to
+# loopback if none respond.
+_IPERF3_SERVERS = [
+    ("iperf.he.net",                5201),
+    ("bouygues.iperf.fr",           5201),
+    ("ping.online.net",             5201),
+    ("iperf3.moji.fr",              5201),
+    ("iperf.scottlinux.com",        5201),
+    ("speedtest.serverius.net",     5002),
+    ("lon.speedtest.clouvider.net", 5201),
+    ("nyc.speedtest.clouvider.net", 5201),
+]
+
+# Default test variants: (label, iperf3 flag string)
+_IPERF3_DEFAULT_TESTS = [
+    ("TCP bandwidth",   "-t 5"),
+    ("UDP 10 Mbps",     "-u -b 10M -t 5"),
+    ("TCP reverse",     "-R -t 5"),
+    ("TCP 4-stream",    "-P 4 -t 5"),
+    ("port 5202",       "-t 5 -p 5202"),
+]
+
+
+def _parse_iperf3_result(json_str: str, label: str) -> None:
+    """Log a human-readable one-liner from iperf3 -J JSON output."""
+    import json as _json
+    try:
+        d = _json.loads(json_str)
+        end = d.get("end", {})
+        if "sum_sent" in end:
+            mbps = end["sum_sent"].get("bits_per_second", 0) / 1e6
+            console.log(f"  ↳ [green]{label}[/]  {mbps:.1f} Mbps sent")
+        elif "sum" in end:
+            mbps = end["sum"].get("bits_per_second", 0) / 1e6
+            lost = end["sum"].get("lost_percent", 0)
+            console.log(f"  ↳ [green]{label}[/]  {mbps:.1f} Mbps  loss={lost:.1f}%")
+        else:
+            console.log(f"  ↳ [green]{label}: OK[/]")
+    except Exception:
+        console.log(f"  ↳ [green]{label}: OK[/]")
+
+
+def _iperf3_run_tests(host: str, port: int, tests: list) -> int:
+    """Run each test variant against host:port. Returns number of successful tests."""
+    ok_count = 0
+    for label, flags in tests:
+        # Use the server's default port unless the test specifies its own -p
+        p = port
+        pm = re.search(r'-p\s+(\d+)', flags)
+        if pm:
+            p = int(pm.group(1))
+            flags_str = flags
+        else:
+            flags_str = f"{flags} -p {p}"
+        cmd = f"iperf3 -c {host} {flags_str} -J"
+        try:
+            r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=25)
+            if r.returncode == 0:
+                _parse_iperf3_result(r.stdout, label)
+                _stats.ok(target=host)
+                ok_count += 1
+            else:
+                err = (r.stderr or r.stdout or "").strip().split('\n')[0][:80]
+                console.log(f"  ↳ [yellow]{label}: {err or 'server refused'}[/]")
+                if "refused" in err.lower() or "unable to connect" in err.lower():
+                    _stats.block(target=host)
+                else:
+                    _stats.drop(target=host)
+        except subprocess.TimeoutExpired:
+            console.log(f"  ↳ [yellow]{label}: timeout[/]")
+            _stats.drop(target=host)
+        except Exception as e:
+            console.log(f"  ↳ [yellow]{label}: {e.__class__.__name__}[/]")
+            _stats.fail(target=host)
+    return ok_count
+
+
+def _iperf3_loopback(tests: list) -> None:
+    """Fallback: start a local iperf3 server, run tests against 127.0.0.1, stop it."""
+    console.log("  [dim]Starting local iperf3 server on :5201 (loopback fallback)[/]")
+    srv = subprocess.Popen(
+        ["iperf3", "-s", "-p", "5201"],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+    time.sleep(0.5)
+    try:
+        for label, flags in tests:
+            # Skip alternate-port tests in loopback mode (server is on 5201 only)
+            if re.search(r'-p\s+(?!5201)\d+', flags):
+                continue
+            flags_no_port = re.sub(r'-p\s+\d+', '', flags).strip()
+            cmd = f"iperf3 -c 127.0.0.1 {flags_no_port} -p 5201 -J"
+            try:
+                r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=20)
+                if r.returncode == 0:
+                    _parse_iperf3_result(r.stdout, f"{label} [loopback]")
+                    _stats.ok()
+                else:
+                    console.log(f"  ↳ [yellow]{label} [loopback]: failed[/]")
+                    _stats.fail()
+            except subprocess.TimeoutExpired:
+                console.log(f"  ↳ [yellow]{label} [loopback]: timeout[/]")
+                _stats.drop()
+    finally:
+        srv.terminate()
+        try:
+            srv.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            srv.kill()
+    ui_ok("iperf3 loopback tests complete")
+
+
+def iperf3_bandwidth() -> None:
+    """
+    iperf3 bandwidth test suite — validates egress port 5201/5202, bulk TCP/UDP
+    flow detection, QoS/rate-limiting, and bandwidth-anomaly rules.
+
+    Phase 1 — public iperf3 servers: attempts TCP, UDP, reverse, multi-stream,
+    and alternate-port tests against a random sample of well-known public servers.
+
+    Phase 2 — loopback fallback: if every public server is unreachable, starts a
+    local iperf3 server inside the container and runs the same variants against
+    127.0.0.1 so the suite always produces measurable output.
+
+    Custom flags: pass --iperf3-flags to replace the default test variants with
+    a single test using exactly those flags (e.g. --iperf3-flags "-t 10 -P 8 -u").
+    """
+    custom = getattr(ARGS, "iperf3_flags", "").strip()
+    tests  = [("custom", custom)] if custom else list(_IPERF3_DEFAULT_TESTS)
+
+    n_servers = _size_to_limits(ARGS.size, 2, 3, 5, len(_IPERF3_SERVERS))
+    servers   = random.sample(_IPERF3_SERVERS, n_servers)
+
+    ui_banner(
+        "iperf3 Bandwidth",
+        f"size={ARGS.size} | {n_servers} server(s) | {len(tests)} test(s)"
+        + (" | custom flags" if custom else " | loopback fallback if unreachable"),
+    )
+
+    public_ok = False
+    for host, port in servers:
+        console.log(f"[cyan]→ {host}:{port}[/]")
+        if _iperf3_run_tests(host, port, tests) > 0:
+            public_ok = True
+
+    if not public_ok:
+        console.log("[yellow]All public servers unreachable — running loopback fallback[/]")
+        _iperf3_loopback(tests)
+    else:
+        ui_ok("iperf3 bandwidth tests complete")
 
 def _nmap_classify(stdout: str) -> tuple[int, int, int]:
     """Parse nmap grepable output and return (open, closed, filtered) port counts."""
@@ -4857,6 +5014,7 @@ _SUITE_MAP: dict[str, list] = {
     "msf-aux-scan":          [msf_aux_scan],
     "msf-payload-delivery":  [msf_payload_delivery],
     "msf-cred-spray":        [msf_cred_spray],
+    "iperf3":           [iperf3_bandwidth],
     "speedtest":        [speedtest_fast],
     "nmap":             [nmap_1024os, nmap_cve],
     "ntp":              [ntp_random],
@@ -5092,6 +5250,13 @@ def parse_cli() -> argparse.Namespace:
         "--crawl-start", default="https://data.commoncrawl.org",
         metavar="URL",
         help="Seed URL for the 'web-crawl' suite (default: https://data.commoncrawl.org)",
+    )
+    specific.add_argument(
+        "--iperf3-flags", default="", metavar="FLAGS",
+        help=(
+            "Custom iperf3 flags replacing the default test variants for the 'iperf3' suite\n"
+            "(e.g. --iperf3-flags \"-t 10 -P 8 -u -b 50M\"). Omit to use built-in defaults."
+        ),
     )
     specific.add_argument(
         "--lateral-networks", default="", metavar="CIDRS",

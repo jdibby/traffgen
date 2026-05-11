@@ -49,7 +49,7 @@ RUN apt-get update && apt-get upgrade -y --no-install-recommends && \
     apt-get install -y --no-install-recommends \
     tzdata ca-certificates curl git \
     iproute2 traceroute iputils-ping netcat-openbsd dnsutils openssh-client \
-    nmap snmp openssl procps \
+    nmap snmp openssl procps iperf3 \
     perl python3 python3-pip sqlite3 ruby bash \
   && ln -fs /usr/share/zoneinfo/$TZ /etc/localtime \
   && echo "$TZ" > /etc/timezone \

@@ -2159,6 +2159,15 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
       <div style="max-width:900px">
 
         <div class="a-section">
+          <div class="a-h">v3.9.0 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
+          <table class="st-table" style="margin-top:10px">
+            <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td><strong>iperf3 bandwidth suite</strong> — TCP, UDP 10 Mbps, reverse-mode, 4-stream, and alternate-port (5202) tests against public iperf3 servers with automatic loopback fallback; validates egress port 5201, bulk flow detection, and QoS/rate-limiting rules</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td><strong>Custom iperf3 flags</strong> — pass <code>--iperf3-flags</code> to replace the default test variants with a single run using any iperf3 options (e.g. <code>--iperf3-flags "-t 10 -P 8 -u -b 50M"</code>)</td></tr>
+          </table>
+        </div>
+
+        <div class="a-section">
           <div class="a-h">v3.8.0 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
           <table class="st-table" style="margin-top:10px">
             <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
