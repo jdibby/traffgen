@@ -4404,7 +4404,7 @@ def _detect_host_lans() -> "list[tuple[str, str]]":
                     if not default_gw and _gw != "0.0.0.0":
                         default_gw = _gw
                     continue
-                if _LOOPBACK.match(_dest) or _DOCKER_BRIDGE.match(_dest):
+                if _LOOPBACK.match(_dest):
                     continue
                 # Connected route (no RTF_GATEWAY, no explicit gw)
                 if not (_flags & 0x2) and _gw == "0.0.0.0":
@@ -4444,7 +4444,7 @@ def _detect_host_lans() -> "list[tuple[str, str]]":
                 _ip, _pfx_s, _iface = _m.group(1), _m.group(2), _m.group(3)
                 if _SKIP_IFACES.match(_iface):
                     continue
-                if _LOOPBACK.match(_ip) or _DOCKER_BRIDGE.match(_ip):
+                if _LOOPBACK.match(_ip):
                     continue
                 # Get the actual interface IP rather than the network address
                 try:
