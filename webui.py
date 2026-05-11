@@ -17,6 +17,7 @@ import secrets
 import socket as _socket
 import ssl
 import string
+import shutil
 import struct
 import subprocess
 import time
@@ -854,6 +855,8 @@ def api_networks():
 
 
 _TARGET_RE = __import__('re').compile(r'^[a-zA-Z0-9._\-:]{1,253}$')
+# curl-impersonate-chrome binary path; None when not installed (arm/v7, dev environments)
+_CURL_IMPERSONATE = shutil.which("curl-impersonate-chrome")
 
 def _parse_hop(line):
     """Parse one traceroute output line into a hop dict, or return None."""
@@ -943,6 +946,57 @@ def api_traceroute():
     )
 
 
+def _tls_parse_cert_pem(pem: str) -> tuple:
+    """Parse cert fields from a PEM string via openssl x509. Returns (cn, issuer_cn, issuer_org, not_before, not_after, sans)."""
+    import re as _re2
+    cn = issuer_cn = issuer_org = not_before = not_after = ""
+    sans: list[str] = []
+    if not pem:
+        return cn, issuer_cn, issuer_org, not_before, not_after, sans
+    r = subprocess.run(
+        ["openssl", "x509", "-noout", "-subject", "-issuer",
+         "-dates", "-ext", "subjectAltName"],
+        input=pem, capture_output=True, text=True, timeout=5,
+    )
+    for line in r.stdout.splitlines():
+        line = line.strip()
+        if line.startswith("subject="):
+            m = _re2.search(r"CN\s*=\s*([^,/\n]+)", line)
+            if m: cn = m.group(1).strip()
+        elif line.startswith("issuer="):
+            m = _re2.search(r"CN\s*=\s*([^,/\n]+)", line)
+            if m: issuer_cn = m.group(1).strip()
+            m = _re2.search(r"\bO\s*=\s*([^,/\n]+)", line)
+            if m: issuer_org = m.group(1).strip()
+        elif line.startswith("notBefore="):
+            not_before = line[len("notBefore="):]
+        elif line.startswith("notAfter="):
+            not_after = line[len("notAfter="):]
+        elif "DNS:" in line:
+            sans = [s.strip()[4:] for s in line.split(",")
+                    if s.strip().startswith("DNS:")][:20]
+    return cn, issuer_cn, issuer_org, not_before, not_after, sans
+
+
+def _tls_cert_via_openssl_sclient(host: str, port: int) -> str:
+    """Fetch the server's leaf certificate in PEM format via openssl s_client."""
+    r = subprocess.run(
+        ["openssl", "s_client", "-connect", f"{host}:{port}",
+         "-servername", host, "-no_ign_eof"],
+        input="Q\n", capture_output=True, text=True, timeout=10,
+    )
+    pem_lines: list[str] = []
+    in_cert = False
+    for line in r.stdout.splitlines():
+        if "-----BEGIN CERTIFICATE-----" in line:
+            in_cert = True
+        if in_cert:
+            pem_lines.append(line)
+        if "-----END CERTIFICATE-----" in line:
+            break
+    return "\n".join(pem_lines)
+
+
 @app.route("/api/tls-check")
 def api_tls_check():
     host = request.args.get("host", "").strip()
@@ -954,11 +1008,42 @@ def api_tls_check():
     port = int(raw_port)
     tls_ver_param = request.args.get("tls_version", "auto").strip().lower()
 
+    # --- curl-impersonate path (auto mode only) ---
+    # Uses Chrome's TLS fingerprint so SASE/CASB platforms (e.g. Cato) classify
+    # the flow as browser HTTPS and apply TLS inspection policy correctly.
+    # Specific TLS version pins fall back to the Python ssl path below since
+    # pinning overrides the browser fingerprint anyway.
+    if _CURL_IMPERSONATE and tls_ver_param == "auto":
+        try:
+            ci = subprocess.run(
+                [_CURL_IMPERSONATE, "-k", "-s", "-o", "/dev/null",
+                 "--connect-timeout", "8", "--max-time", "10",
+                 "-w", "%{ssl_version}\t%{ssl_cipher}",
+                 f"https://{host}:{port}/"],
+                capture_output=True, text=True, timeout=15,
+            )
+            if ci.returncode not in (0, 22, 35):  # 22=HTTP error, 35=SSL connect error
+                return jsonify({"error": f"Connection failed (curl exit {ci.returncode})"}), 200
+            parts = ci.stdout.strip().split("\t")
+            version   = parts[0] if parts else ""
+            cipher_nm = parts[1] if len(parts) > 1 else ""
+            pem = _tls_cert_via_openssl_sclient(host, port)
+            cn, issuer_cn, issuer_org, not_before, not_after, sans = _tls_parse_cert_pem(pem)
+            return jsonify({
+                "host": host, "port": port,
+                "tls_version": version, "cipher": cipher_nm,
+                "cn": cn, "issuer_cn": issuer_cn, "issuer_org": issuer_org,
+                "not_before": not_before, "not_after": not_after,
+                "sans": sans,
+            })
+        except Exception as e:
+            return jsonify({"error": f"TLS error ({type(e).__name__}): {e}"}), 200
+
+    # --- Python ssl fallback (specific TLS version pins, or no curl-impersonate) ---
     _TLS_MAP = {
         "tls1.3": ssl.TLSVersion.TLSv1_3,
         "tls1.2": ssl.TLSVersion.TLSv1_2,
     }
-    # TLS 1.0 and 1.1 may not be available on the server; attempt gracefully
     try:
         _TLS_MAP["tls1.1"] = ssl.TLSVersion.TLSv1_1  # type: ignore[attr-defined]
         _TLS_MAP["tls1.0"] = ssl.TLSVersion.TLSv1    # type: ignore[attr-defined]
@@ -978,10 +1063,8 @@ def api_tls_check():
         with _socket.create_connection((host, port), timeout=8) as sock:
             with ctx.wrap_socket(sock, server_hostname=host) as ssock:
                 der_cert = ssock.getpeercert(binary_form=True)
-                cipher  = ssock.cipher()
-                version = ssock.version()
-                # Send a minimal HTTP request so the traffic looks like HTTPS
-                # to classification engines (e.g. SASE/CASB) rather than raw TLS.
+                cipher   = ssock.cipher()
+                version  = ssock.version()
                 try:
                     ssock.sendall(
                         f"HEAD / HTTP/1.1\r\nHost: {host}\r\nUser-Agent: Mozilla/5.0\r\nConnection: close\r\n\r\n".encode()
@@ -990,35 +1073,8 @@ def api_tls_check():
                 except Exception:
                     pass
 
-        # getpeercert() returns {} under CERT_NONE; parse the raw DER via openssl
-        cn = issuer_cn = issuer_org = not_before = not_after = ""
-        sans: list[str] = []
-        if der_cert:
-            pem = ssl.DER_cert_to_PEM_cert(der_cert)
-            r = subprocess.run(
-                ["openssl", "x509", "-noout", "-subject", "-issuer",
-                 "-dates", "-ext", "subjectAltName"],
-                input=pem, capture_output=True, text=True, timeout=5,
-            )
-            import re as _re2
-            for line in r.stdout.splitlines():
-                line = line.strip()
-                if line.startswith("subject="):
-                    m = _re2.search(r"CN\s*=\s*([^,/\n]+)", line)
-                    if m: cn = m.group(1).strip()
-                elif line.startswith("issuer="):
-                    m = _re2.search(r"CN\s*=\s*([^,/\n]+)", line)
-                    if m: issuer_cn = m.group(1).strip()
-                    m = _re2.search(r"\bO\s*=\s*([^,/\n]+)", line)
-                    if m: issuer_org = m.group(1).strip()
-                elif line.startswith("notBefore="):
-                    not_before = line[len("notBefore="):]
-                elif line.startswith("notAfter="):
-                    not_after = line[len("notAfter="):]
-                elif "DNS:" in line:
-                    sans = [s.strip()[4:] for s in line.split(",")
-                            if s.strip().startswith("DNS:")][:20]
-
+        pem = ssl.DER_cert_to_PEM_cert(der_cert) if der_cert else ""
+        cn, issuer_cn, issuer_org, not_before, not_after, sans = _tls_parse_cert_pem(pem)
         return jsonify({
             "host": host, "port": port,
             "tls_version": version,
