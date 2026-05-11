@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-generator.py — Traffic Generator v3.9.0
+generator.py — Traffic Generator v3.9.1
 ========================================
 Simulates realistic network traffic across a wide range of protocols and
 behaviours: DNS, HTTP/HTTPS/HTTP3, FTP, SSH, NTP, BGP, ICMP, SNMP,
@@ -58,7 +58,7 @@ from rich import box
 from endpoints import *           # noqa: F401,F403  (large data file)
 
 # ── Globals ───────────────────────────────────────────────────────────────────
-VERSION = "3.9.0"
+VERSION = "3.9.1"
 
 
 class _DualWriter:
@@ -294,6 +294,7 @@ _SUITE_DESCRIPTIONS: list[tuple[str, str]] = [
     ("waf-attack",       "SQLi/XSS/LFI/SSRF/CMDi/XXE/SSTI payloads in query params and POST bodies → WAF inline"),
     ("data-exfil-http",  "POST synthetic PII/credentials to paste sites → DLP + CASB outbound inspection"),
     ("web-scanner",      "Nikto web vulnerability scan"),
+    ("iperf3",           "UDP 1 Mbps bandwidth test against public iperf3 servers (XS=1 S=2 M=3 L=4 XL=all 5) — validates egress port 5201 and bulk UDP flow detection"),
     ("all",              "Run every suite above in random order"),
 ]
 
@@ -2377,42 +2378,24 @@ def _iperf3_loopback(tests: list) -> None:
 
 def iperf3_bandwidth() -> None:
     """
-    iperf3 bandwidth test suite — validates egress port 5201/5202, bulk TCP/UDP
-    flow detection, QoS/rate-limiting, and bandwidth-anomaly rules.
-
-    Phase 1 — public iperf3 servers: attempts TCP, UDP, reverse, multi-stream,
-    and alternate-port tests against a random sample of well-known public servers.
-
-    Phase 2 — loopback fallback: if every public server is unreachable, starts a
-    local iperf3 server inside the container and runs the same variants against
-    127.0.0.1 so the suite always produces measurable output.
-
-    Custom flags: pass --iperf3-flags to replace the default test variants with
-    a single test using exactly those flags (e.g. --iperf3-flags "-t 10 -P 8 -u").
+    iperf3 bandwidth suite — sends a 1 Mbps UDP stream to public iperf3 servers.
+    XS=1 server, S=2, M=3, L=4, XL=all 5. Tests egress port 5201, UDP bulk flow
+    detection, and bandwidth-anomaly rules.
     """
-    custom = getattr(ARGS, "iperf3_flags", "").strip()
-    tests  = [("custom", custom)] if custom else list(_IPERF3_DEFAULT_TESTS)
-
-    n_servers = _size_to_limits(ARGS.size, 2, 3, 5, len(_IPERF3_SERVERS))
-    servers   = random.sample(_IPERF3_SERVERS, n_servers)
+    n_servers = _size_to_limits(ARGS.size, 2, 3, 4, len(_IPERF3_SERVERS), xs=1)
+    servers   = _IPERF3_SERVERS[:n_servers]
+    tests     = [("UDP 1M", "-u -b 1M -t 10")]
 
     ui_banner(
         "iperf3 Bandwidth",
-        f"size={ARGS.size} | {n_servers} server(s) | {len(tests)} test(s)"
-        + (" | custom flags" if custom else " | loopback fallback if unreachable"),
+        f"size={ARGS.size} | {n_servers} server(s) | UDP 1 Mbps",
     )
 
-    public_ok = False
     for host, port in servers:
         console.log(f"[cyan]→ {host}:{port}[/]")
-        if _iperf3_run_tests(host, port, tests) > 0:
-            public_ok = True
+        _iperf3_run_tests(host, port, tests)
 
-    if not public_ok:
-        console.log("[yellow]All public servers unreachable — running loopback fallback[/]")
-        _iperf3_loopback(tests)
-    else:
-        ui_ok("iperf3 bandwidth tests complete")
+    ui_ok("iperf3 bandwidth tests complete")
 
 def _nmap_classify(stdout: str) -> tuple[int, int, int]:
     """Parse nmap grepable output and return (open, closed, filtered) port counts."""
@@ -5031,6 +5014,7 @@ _SUITE_MAP: dict[str, list] = {
     "waf-attack":       [waf_attack],
     "data-exfil-http":  [data_exfil_http],
     "web-scanner":      [web_scanner],
+    "iperf3":           [iperf3_bandwidth],
 }
 
 
