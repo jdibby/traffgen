@@ -1819,6 +1819,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
   <button class="nav-item" data-tab="output" onclick="showTab(this)"><span class="nav-ico">⬛</span>Live View</button>
   <button class="nav-item" data-tab="latency" onclick="showTab(this)"><span class="nav-ico">&#128202;</span>Latency</button>
   <button class="nav-item" data-tab="diagnostics" onclick="showTab(this)"><span class="nav-ico">&#128300;</span>Diagnostics</button>
+  <button class="nav-item" data-tab="iperf3" onclick="showTab(this)"><span class="nav-ico">&#128246;</span>iperf3</button>
   <div class="nav-lbl">System</div>
   <button class="nav-item" data-tab="health" onclick="showTab(this)"><span class="nav-ico">&#9889;</span>Health</button>
   <div class="nav-lbl">Info</div>
@@ -2182,50 +2183,6 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div id="dns-results"><div class="tr-status">Enter a hostname and click Lookup.</div></div>
       </div>
       <div class="diag-tool">
-        <div class="diag-tool-hdr">&#128246; iperf3 Bandwidth Test <span style="font-size:11px;font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0">UDP</span></div>
-        <div class="diag-input-row" style="flex-wrap:wrap;gap:8px">
-          <div style="display:flex;align-items:center;gap:4px;flex:1;min-width:220px">
-            <label style="font-size:12px;color:var(--muted);white-space:nowrap">Server</label>
-            <select id="ip3-server" class="diag-input" style="flex:1;min-width:0" onchange="ip3ServerChange()">
-              <option value="auto">Auto — try all 10 servers</option>
-              <option value="iperf.he.net:5201">iperf.he.net — San Jose, US</option>
-              <option value="bouygues.iperf.fr:5201">bouygues.iperf.fr — Paris, FR</option>
-              <option value="ping.online.net:5201">ping.online.net — Paris, FR</option>
-              <option value="iperf3.moji.fr:5201">iperf3.moji.fr — Bordeaux, FR</option>
-              <option value="iperf.scottlinux.com:5201">iperf.scottlinux.com — Denver, US</option>
-              <option value="speedtest.serverius.net:5002">speedtest.serverius.net — Amsterdam, NL</option>
-              <option value="lon.speedtest.clouvider.net:5201">lon.speedtest.clouvider.net — London, UK</option>
-              <option value="nyc.speedtest.clouvider.net:5201">nyc.speedtest.clouvider.net — New York, US</option>
-              <option value="la.speedtest.clouvider.net:5201">la.speedtest.clouvider.net — Los Angeles, US</option>
-              <option value="ams.speedtest.clouvider.net:5201">ams.speedtest.clouvider.net — Amsterdam, NL</option>
-              <option value="custom">Custom…</option>
-            </select>
-            <input id="ip3-custom" class="diag-input" type="text" placeholder="host or host:port" spellcheck="false" autocomplete="off" style="flex:1;min-width:140px;display:none" onkeydown="if(event.key==='Enter')runIperf3()">
-          </div>
-          <div style="display:flex;align-items:center;gap:4px">
-            <label style="font-size:12px;color:var(--muted);white-space:nowrap">Bandwidth</label>
-            <input id="ip3-bw-num" class="diag-input" type="number" value="10" min="1" style="width:68px" title="Bandwidth target" placeholder="10" oninput="this.setCustomValidity(this.value>0?'':'Enter a number')">
-            <select id="ip3-bw-unit" class="diag-input" style="width:auto;padding-right:18px">
-              <option value="K">Kbps</option>
-              <option value="M" selected>Mbps</option>
-              <option value="G">Gbps</option>
-            </select>
-          </div>
-          <div style="display:flex;align-items:center;gap:4px">
-            <label style="font-size:12px;color:var(--muted);white-space:nowrap">Duration</label>
-            <input id="ip3-duration" class="diag-input" type="number" value="10" min="1" max="60" style="width:60px" title="Duration per server (seconds)">
-            <span style="font-size:12px;color:var(--muted)">s</span>
-          </div>
-          <button id="ip3-btn" class="diag-btn" onclick="runIperf3()">&#9654; Run</button>
-          <button id="ip3-stop" class="diag-btn cancel" onclick="stopIperf3()" style="display:none">&#9209; Stop</button>
-        </div>
-        <div id="ip3-results" style="display:none">
-          <div id="ip3-status" class="tr-status"></div>
-          <div id="ip3-table"></div>
-          <div id="ip3-summary"></div>
-        </div>
-      </div>
-      <div class="diag-tool">
         <div class="diag-tool-hdr">&#9654; On-Demand Test Runner</div>
         <div class="diag-input-row" style="flex-wrap:wrap;gap:8px">
           <select id="odr-suite" class="diag-input" style="flex:0 0 auto;width:auto;padding-right:20px" title="Test suite" onchange="odrSuiteChange()">
@@ -2266,6 +2223,63 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
             <button onclick="$('odr-body').innerHTML=''" style="background:none;border:none;color:var(--dim);font-size:12px;cursor:pointer">Clear</button>
           </div>
           <div id="odr-body" class="obody" style="max-height:420px;border:1px solid var(--border);border-radius:6px;flex:none;overflow-y:auto"></div>
+        </div>
+      </div>
+    </div>
+    <!-- iperf3 -->
+    <div id="tab-iperf3" class="panel">
+      <div style="max-width:900px">
+        <div class="tcard">
+          <div class="thdr">&#128246; iperf3 Bandwidth Test <span style="font-size:11px;font-weight:400;color:var(--dim);text-transform:none;letter-spacing:0">UDP · public servers</span></div>
+          <!-- Controls -->
+          <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;padding:4px 0 16px">
+            <div style="display:flex;flex-direction:column;gap:5px;flex:1;min-width:220px">
+              <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Server</label>
+              <select id="ip3-server" class="diag-input" style="width:100%" onchange="ip3ServerChange()">
+                <option value="auto">Auto — try all 10 servers</option>
+                <option value="iperf.he.net:5201">iperf.he.net — San Jose, US</option>
+                <option value="bouygues.iperf.fr:5201">bouygues.iperf.fr — Paris, FR</option>
+                <option value="ping.online.net:5201">ping.online.net — Paris, FR</option>
+                <option value="iperf3.moji.fr:5201">iperf3.moji.fr — Bordeaux, FR</option>
+                <option value="iperf.scottlinux.com:5201">iperf.scottlinux.com — Denver, US</option>
+                <option value="speedtest.serverius.net:5002">speedtest.serverius.net — Amsterdam, NL</option>
+                <option value="lon.speedtest.clouvider.net:5201">lon.speedtest.clouvider.net — London, UK</option>
+                <option value="nyc.speedtest.clouvider.net:5201">nyc.speedtest.clouvider.net — New York, US</option>
+                <option value="la.speedtest.clouvider.net:5201">la.speedtest.clouvider.net — Los Angeles, US</option>
+                <option value="ams.speedtest.clouvider.net:5201">ams.speedtest.clouvider.net — Amsterdam, NL</option>
+                <option value="custom">Custom…</option>
+              </select>
+              <input id="ip3-custom" class="diag-input" type="text" placeholder="hostname or IP  (e.g. 192.168.1.1:5201)" spellcheck="false" autocomplete="off" style="display:none;width:100%" onkeydown="if(event.key==='Enter')runIperf3()">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:5px">
+              <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Bandwidth</label>
+              <div style="display:flex;gap:4px">
+                <input id="ip3-bw-num" class="diag-input" type="number" value="10" min="1" style="width:72px" title="Target bandwidth" oninput="this.setCustomValidity(this.value>0?'':'Enter a number')">
+                <select id="ip3-bw-unit" class="diag-input" style="width:auto;padding-right:18px">
+                  <option value="K">Kbps</option>
+                  <option value="M" selected>Mbps</option>
+                  <option value="G">Gbps</option>
+                </select>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:5px">
+              <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Duration / server</label>
+              <div style="display:flex;align-items:center;gap:5px">
+                <input id="ip3-duration" class="diag-input" type="number" value="10" min="1" max="60" style="width:68px" title="Seconds per server">
+                <span style="font-size:13px;color:var(--muted)">s</span>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;align-self:flex-end;padding-bottom:1px">
+              <button id="ip3-btn" class="diag-btn" style="padding:8px 20px;font-size:14px" onclick="runIperf3()">&#9654; Run</button>
+              <button id="ip3-stop" class="diag-btn cancel" style="padding:8px 16px;font-size:14px;display:none" onclick="stopIperf3()">&#9209; Stop</button>
+            </div>
+          </div>
+          <!-- Status + results -->
+          <div id="ip3-results" style="display:none">
+            <div id="ip3-status" class="tr-status" style="margin-bottom:8px"></div>
+            <div id="ip3-table"></div>
+            <div id="ip3-summary" style="margin-top:8px"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -2905,7 +2919,7 @@ let _healthTimer=null,_netInfoTimer=null,_lastHealth=null,_netHist=[],_hNetHist=
 let _cpuHist=[],_memHist=[];
 function uptime(t){const s=Math.floor(Date.now()/1000-t);return[Math.floor(s/3600),Math.floor((s%3600)/60),s%60].map(v=>String(v).padStart(2,'0')).join(':');}
 function elapsed(t){if(!t)return'';const s=Math.floor(Date.now()/1000-t);if(s<60)return s+'s elapsed';if(s<3600)return Math.floor(s/60)+'m '+(s%60)+'s elapsed';return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m elapsed';}
-const PAGE_TITLES={overview:'Overview',security:'Security',tests:'Tests',output:'Live View',latency:'Latency',diagnostics:'Diagnostics',health:'Health',about:'About',changelog:'Changelog'};
+const PAGE_TITLES={overview:'Overview',security:'Security',tests:'Tests',output:'Live View',latency:'Latency',diagnostics:'Diagnostics',iperf3:'iperf3',health:'Health',about:'About',changelog:'Changelog'};
 const SUITE_ICONS={
   'ad-tracker':'🎯','ai-browse':'🤖','bgp':'🌐','bulk-transfer':'💾',
   'blocklist-probe':'🚫','c2-beacon':'📡','llm-dlp':'🧠','web-crawl':'🕷️','dlp':'🔒',
