@@ -1245,7 +1245,7 @@ def _login_page(error: str = "") -> str:
 <style>
 *{{box-sizing:border-box;margin:0;padding:0}}
 body{{background:#0d1117;color:#c9d1d9;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh}}
-.card{{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:36px 32px;width:340px}}
+.card{{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:36px 32px;width:380px}}
 .brand{{font-size:13px;color:#8b949e;text-align:center;margin-bottom:20px;letter-spacing:.02em}}
 h1{{font-size:18px;font-weight:600;margin-bottom:22px;color:#e6edf3}}
 label{{font-size:12px;color:#8b949e;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em}}
@@ -1254,6 +1254,11 @@ input:focus{{border-color:#58a6ff}}
 button{{width:100%;background:#238636;border:none;border-radius:6px;color:#fff;font-size:14px;font-weight:600;padding:10px;cursor:pointer;transition:background .15s}}
 button:hover{{background:#2ea043}}
 .err{{color:#f85149;font-size:13px;margin-bottom:14px;padding:8px 10px;background:rgba(248,81,73,.1);border-radius:5px}}
+.disc{{margin-top:22px;padding:14px;background:rgba(210,153,34,.08);border:1px solid rgba(210,153,34,.35);border-radius:6px}}
+.disc-hdr{{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:#d97706;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}}
+.disc ul{{padding-left:16px;color:#8b949e;font-size:12px;line-height:1.65}}
+.disc li{{margin-bottom:4px}}
+.disc strong{{color:#c9d1d9}}
 </style></head>
 <body><div class="card">
 <div class="brand">🚦 traffgen dashboard</div>
@@ -1266,6 +1271,15 @@ button:hover{{background:#2ea043}}
 <input id="p" name="password" type="password" autocomplete="current-password" required>
 <button type="submit">Sign in</button>
 </form>
+<div class="disc">
+  <div class="disc-hdr"><span>⚠</span> Disclaimer</div>
+  <ul>
+    <li>This tool is intended for <strong>authorized security testing and research in controlled lab environments only</strong>.</li>
+    <li>You are solely responsible for obtaining explicit written permission before testing any systems or networks.</li>
+    <li>The author(s) accept <strong>no liability</strong> for misuse, unauthorized access, damage, data loss, or legal consequences arising from use of this tool.</li>
+    <li>Signing in constitutes acceptance of these terms.</li>
+  </ul>
+</div>
 </div></body></html>"""
 
 
