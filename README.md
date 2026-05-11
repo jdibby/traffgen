@@ -6,7 +6,7 @@
 [![Multi-arch](https://img.shields.io/badge/arch-amd64%20%7C%20arm64%20%7C%20arm%2Fv7-blue?logo=linux)](https://hub.docker.com/r/jdibby/traffgen)
 [![Version](https://img.shields.io/badge/version-3.9.0-green)](https://github.com/jdibby/traffgen/blob/main/generator.py)
 
-Trafgen simulates realistic network traffic across **53 test suites** — DNS, HTTP/S, FTP, SSH, BGP, ICMP, NTP, SNMP, DoH, DoT, VoIP/UCaaS, C2 beacons, DNS exfiltration, AI/LLM DLP, lateral movement, TLS inspection checks, WAF attacks, and more.
+Trafgen simulates realistic network traffic across **52 test suites** — DNS, HTTP/S, FTP, SSH, BGP, ICMP, NTP, SNMP, DoH, DoT, VoIP/UCaaS, C2 beacons, DNS exfiltration, AI/LLM DLP, lateral movement, TLS inspection checks, WAF attacks, and more.
 
 Purpose-built to validate **firewalls**, **IDS/IPS**, **URL filters**, **DLP engines**, **CASB platforms**, and **SIEM pipelines**.
 
@@ -58,7 +58,7 @@ curl -sk https://raw.githubusercontent.com/jdibby/traffgen/refs/heads/main/stage
 
 | Doc | What's in it |
 |---|---|
-| [Test Suites](docs/suites.md) | All 53 suites — what each tests, how to interpret results, outcome classification |
+| [Test Suites](docs/suites.md) | All 52 suites — what each tests, how to interpret results, outcome classification |
 | [Deployment Guide](docs/deployment.md) | Docker commands, stager.sh, network modes, TLS proxy setup, architecture, building |
 | [Configuration](docs/configuration.md) | CLI flags, `--size`, traffic pacing, custom endpoints |
 | [Web Dashboard](docs/web-dashboard.md) | Dashboard tabs, controls, draggable widgets, chart hover, multi-user mode |

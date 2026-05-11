@@ -1096,6 +1096,108 @@ def api_dns_lookup():
     return jsonify({"host": host, "results": results, "rtype": rtype, "mismatch": mismatch})
 
 
+# Public iperf3 servers (host, port) — tried in order, rotate on failure
+_IP3_SERVERS = [
+    ("iperf.he.net",                5201),
+    ("bouygues.iperf.fr",           5201),
+    ("ping.online.net",             5201),
+    ("iperf3.moji.fr",              5201),
+    ("iperf.scottlinux.com",        5201),
+]
+# T-shirt size → number of servers to try
+_IP3_SIZE_COUNT = {"XS": 1, "S": 2, "M": 3, "L": 4, "XL": 5}
+_IP3_INTERVAL_RE = __import__('re').compile(
+    r'\[\s*\d+\]\s+([\d.]+)-([\d.]+)\s+sec\s+[\d.]+\s+\S+\s+'
+    r'([\d.]+)\s+(\w+)bits/sec'
+    r'(?:\s+([\d.]+)\s+ms\s+(\d+)/\d+\s+\(([\d.]+)%\))?'
+    r'(?:\s+(\d+))?'
+)
+
+
+@app.route("/api/iperf3")
+def api_iperf3():
+    def _sse_err(msg: str) -> "Response":
+        return Response(
+            f'data: {json.dumps({"type": "error", "msg": msg})}\n\ndone: true\n\n',
+            mimetype="text/event-stream",
+            headers={"Cache-Control": "no-cache"},
+        )
+
+    raw_size = request.args.get("size", "S").upper()
+    if raw_size not in _IP3_SIZE_COUNT:
+        return _sse_err("Invalid size — use XS, S, M, L, or XL")
+    count = _IP3_SIZE_COUNT[raw_size]
+
+    raw_duration = request.args.get("duration", "5")
+    if not raw_duration.isdigit() or not (1 <= int(raw_duration) <= 30):
+        return _sse_err("Invalid duration — must be 1–30 seconds")
+    safe_duration = str(int(raw_duration))
+
+    def _gen():
+        import threading as _threading
+        servers = _IP3_SERVERS[:count]
+        tested = 0
+        for idx, (host, port) in enumerate(servers):
+            yield f'data: {json.dumps({"type": "server", "host": host, "port": port, "index": idx, "total": len(servers)})}\n\n'
+            cmd = ["iperf3", "-c", host, "-p", str(port),
+                   "-t", safe_duration, "-u", "-b", "1M", "--forceflush"]
+            try:
+                proc = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                    text=True, errors="replace",
+                )
+            except FileNotFoundError:
+                yield f'data: {json.dumps({"type": "error", "msg": "iperf3 not found on this system"})}\n\n'
+                yield f'data: {json.dumps({"type": "done", "code": -1})}\n\n'
+                return
+
+            timeout = int(safe_duration) + 10
+            _killed = []
+            def _killer(p=proc, k=_killed):
+                k.append(True); p.kill()
+            timer = _threading.Timer(timeout, _killer)
+            timer.start()
+            got_result = False
+            try:
+                for line in proc.stdout:
+                    line = line.rstrip()
+                    if not line:
+                        continue
+                    if "error" in line.lower() or "unable to connect" in line.lower() or "connection refused" in line.lower():
+                        yield f'data: {json.dumps({"type": "skip", "host": host, "msg": line})}\n\n'
+                        proc.kill()
+                        break
+                    is_summary = line.endswith(("sender", "receiver"))
+                    m = _IP3_INTERVAL_RE.search(line)
+                    if m:
+                        sec_start = float(m.group(1))
+                        sec_end   = float(m.group(2))
+                        mbps      = float(m.group(3))
+                        unit      = m.group(4)
+                        jitter_ms = float(m.group(5)) if m.group(5) else None
+                        lost_pct  = float(m.group(7)) if m.group(7) else None
+                        if is_summary:
+                            role = "sender" if line.endswith("sender") else "receiver"
+                            yield f'data: {json.dumps({"type": "result", "host": host, "role": role, "mbps": mbps, "unit": unit, "lost_pct": lost_pct, "jitter_ms": jitter_ms})}\n\n'
+                            got_result = True
+                        else:
+                            yield f'data: {json.dumps({"type": "interval", "sec_start": sec_start, "sec_end": sec_end, "mbps": mbps, "unit": unit, "jitter_ms": jitter_ms, "lost_pct": lost_pct})}\n\n'
+                proc.wait()
+            finally:
+                timer.cancel()
+            if _killed:
+                yield f'data: {json.dumps({"type": "skip", "host": host, "msg": "Connection timed out"})}\n\n'
+            tested += 1
+        yield f'data: {json.dumps({"type": "done", "tested": tested})}\n\n'
+
+    return Response(
+        _gen(),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 @app.route("/api/run-test")
 def api_run_test():
     """On-demand test runner (#216): stream generator output as SSE."""
@@ -1245,7 +1347,7 @@ def _login_page(error: str = "") -> str:
 <style>
 *{{box-sizing:border-box;margin:0;padding:0}}
 body{{background:#0d1117;color:#c9d1d9;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh}}
-.card{{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:36px 32px;width:340px}}
+.card{{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:36px 32px;width:380px}}
 .brand{{font-size:13px;color:#8b949e;text-align:center;margin-bottom:20px;letter-spacing:.02em}}
 h1{{font-size:18px;font-weight:600;margin-bottom:22px;color:#e6edf3}}
 label{{font-size:12px;color:#8b949e;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em}}
@@ -1254,6 +1356,11 @@ input:focus{{border-color:#58a6ff}}
 button{{width:100%;background:#238636;border:none;border-radius:6px;color:#fff;font-size:14px;font-weight:600;padding:10px;cursor:pointer;transition:background .15s}}
 button:hover{{background:#2ea043}}
 .err{{color:#f85149;font-size:13px;margin-bottom:14px;padding:8px 10px;background:rgba(248,81,73,.1);border-radius:5px}}
+.disc{{margin-top:22px;padding:14px;background:rgba(210,153,34,.08);border:1px solid rgba(210,153,34,.35);border-radius:6px}}
+.disc-hdr{{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:#d97706;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}}
+.disc ul{{padding-left:16px;color:#8b949e;font-size:12px;line-height:1.65}}
+.disc li{{margin-bottom:4px}}
+.disc strong{{color:#c9d1d9}}
 </style></head>
 <body><div class="card">
 <div class="brand">🚦 traffgen dashboard</div>
@@ -1266,6 +1373,15 @@ button:hover{{background:#2ea043}}
 <input id="p" name="password" type="password" autocomplete="current-password" required>
 <button type="submit">Sign in</button>
 </form>
+<div class="disc">
+  <div class="disc-hdr"><span>⚠</span> Disclaimer</div>
+  <ul>
+    <li>This tool is intended for <strong>authorized security testing and research in controlled lab environments only</strong>.</li>
+    <li>You are solely responsible for obtaining explicit written permission before testing any systems or networks.</li>
+    <li>The author(s) accept <strong>no liability</strong> for misuse, unauthorized access, damage, data loss, or legal consequences arising from use of this tool.</li>
+    <li>Signing in constitutes acceptance of these terms.</li>
+  </ul>
+</div>
 </div></body></html>"""
 
 
@@ -1390,6 +1506,15 @@ select.diag-input{appearance:none;-webkit-appearance:none;background-color:var(-
 .tr-bar-fill{height:100%;border-radius:3px;transition:width .4s ease}
 .tr-status{padding:10px 6px;color:var(--muted);font-style:italic;font-size:13px}
 .tr-error{padding:10px 6px;color:var(--red,#ef4444);font-size:13px}
+.tr-warn{padding:6px 6px;color:var(--amber,#f59e0b);font-size:12px;font-style:italic}
+
+.ip-tbl{margin-bottom:4px}
+.ip-row{display:grid;grid-template-columns:90px 90px 1fr 120px;gap:0;padding:3px 0;border-bottom:1px solid var(--border);font-size:13px;font-family:'SF Mono',Consolas,monospace}
+.ip-hdr{color:var(--muted);font-size:11px;font-weight:600;letter-spacing:.04em;border-bottom:1px solid var(--border2)}
+.ip-mbps{font-weight:700}
+.ip-summary{margin-top:12px;padding:14px;background:var(--surf2);border-radius:8px;border:1px solid var(--border2)}
+.ip-bar-wrap{height:6px;background:var(--border);border-radius:3px;margin-top:6px;overflow:hidden}
+.ip-bar-fill{height:100%;border-radius:3px;transition:width .3s}
 
 .nav-ico{width:18px;text-align:center;font-size:19px;opacity:.75}
 .sb-foot{margin-top:auto;padding:12px 16px;border-top:1px solid var(--border)}
@@ -2033,6 +2158,27 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
           <button id="dns-btn" class="diag-btn" onclick="runDnsLookup()">Lookup</button>
         </div>
         <div id="dns-results"><div class="tr-status">Enter a hostname and click Lookup.</div></div>
+      </div>
+      <div class="diag-tool">
+        <div class="diag-tool-hdr">&#128246; iperf3 Bandwidth Test <span style="font-size:11px;font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0">UDP · 1 Mbps · public servers</span></div>
+        <div class="diag-input-row">
+          <select id="ip3-size" class="diag-input" style="flex:0 0 auto;width:auto;padding-right:18px" title="Number of servers to test">
+            <option value="XS">XS — 1 server</option>
+            <option value="S" selected>S — 2 servers</option>
+            <option value="M">M — 3 servers</option>
+            <option value="L">L — 4 servers</option>
+            <option value="XL">XL — 5 servers</option>
+          </select>
+          <input id="ip3-duration" class="diag-input" type="number" value="5" min="1" max="30" style="flex:0 0 72px;min-width:60px" title="Duration per server (s)" placeholder="5s">
+          <span style="font-size:12px;color:var(--muted);white-space:nowrap;align-self:center">sec / server</span>
+          <button id="ip3-btn" class="diag-btn" onclick="runIperf3()">Run</button>
+          <button id="ip3-stop" class="diag-btn cancel" onclick="stopIperf3()" style="display:none">Stop</button>
+        </div>
+        <div id="ip3-results" style="display:none">
+          <div id="ip3-status" class="tr-status"></div>
+          <div id="ip3-table"></div>
+          <div id="ip3-summary"></div>
+        </div>
       </div>
       <div class="diag-tool">
         <div class="diag-tool-hdr">&#9654; On-Demand Test Runner</div>
@@ -3752,6 +3898,94 @@ function runDnsLookup(){
       const warn=mismatch?`<div style="padding:6px 10px;margin-bottom:8px;background:rgba(245,158,11,.1);border:1px solid var(--amber);border-radius:6px;font-size:13px;color:var(--amber)">&#9888; Mismatch — resolvers returned different answers</div>`:'';
       $('dns-results').innerHTML=warn+`<table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:4px"><thead><tr><th style="text-align:left;padding:0 8px 6px 0;color:var(--muted);font-size:12px">Resolver</th><th style="text-align:left;padding:0 8px 6px 0;color:var(--muted);font-size:12px">Answers (${H(d.rtype)})</th><th style="text-align:right;padding:0 0 6px 12px;color:var(--muted);font-size:12px">RTT</th></tr>${rows}</table>`;
     }).catch(e=>{$('dns-btn').disabled=false;$('dns-results').innerHTML=`<div class="tr-status" style="color:var(--red)">${H(e.message)}</div>`;});
+}
+// -- iperf3 Bandwidth Test -------------------------------------------------
+let _ipSrc=null,_ipCurTable=null;
+function _ip3SvrHdr(host,idx,total){
+  const wrap=document.createElement('div');
+  wrap.style.cssText='margin-top:12px;margin-bottom:4px;display:flex;align-items:center;gap:8px';
+  wrap.innerHTML=`<span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Server ${idx+1}/${total}</span>`
+    +`<span style="font-size:13px;color:var(--text);font-weight:600">${H(host)}</span>`;
+  $('ip3-table').appendChild(wrap);
+  // fresh interval table for this server
+  const tbl=document.createElement('div');
+  tbl.className='ip-tbl';
+  const hdr=document.createElement('div');hdr.className='ip-row ip-hdr';
+  hdr.innerHTML='<span>Interval</span><span>Transfer</span><span>Bitrate</span><span>Loss / Jitter</span>';
+  tbl.appendChild(hdr);
+  $('ip3-table').appendChild(tbl);
+  _ipCurTable=tbl;
+}
+function _renderIpInterval(d){
+  const tbl=_ipCurTable;if(!tbl)return;
+  const mbps=d.mbps,unit=d.unit;
+  const bitsLabel=mbps.toFixed(1)+' '+unit+'bits/s';
+  const bCol=mbps>=5?'var(--green)':mbps>=1?'var(--amber)':'var(--red)';
+  const dur=d.sec_end-d.sec_start;
+  const xferMB=(mbps*dur/8).toFixed(3)+' MB';
+  const lossJitter=d.lost_pct!=null
+    ?d.lost_pct.toFixed(1)+'%  '+d.jitter_ms+'ms':'—';
+  const row=document.createElement('div');row.className='ip-row';
+  row.innerHTML=`<span>${d.sec_start.toFixed(0)}-${d.sec_end.toFixed(0)}s</span><span>${H(xferMB)}</span><span class="ip-mbps" style="color:${bCol}">${H(bitsLabel)}</span><span>${H(lossJitter)}</span>`;
+  tbl.appendChild(row);
+  tbl.scrollTop=tbl.scrollHeight;
+}
+function _renderIpResult(d){
+  const el=$('ip3-summary');if(!el)return;
+  if(d.role!=='receiver')return;  // only show receiver summary for UDP
+  const mbps=d.mbps;
+  const bCol=mbps>=5?'var(--green)':mbps>=1?'var(--amber)':'var(--red)';
+  const pct=Math.min(100,mbps/10*100);  // scale to 10 Mbps max for 1M UDP test
+  const extra=d.lost_pct!=null
+    ?`<span style="color:var(--muted);font-size:12px;margin-left:8px">Loss ${d.lost_pct.toFixed(1)}%  Jitter ${d.jitter_ms!=null?d.jitter_ms+'ms':'—'}</span>`:'';
+  el.innerHTML+='<div class="ip-summary">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between">'
+    +`<span style="font-weight:600;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.05em">${H(d.host)}</span>`
+    +`<span class="ip-mbps" style="color:${bCol};font-size:18px">${mbps.toFixed(2)} ${H(d.unit)}bits/s</span>${extra}`
+    +'</div>'
+    +'<div class="ip-bar-wrap"><div class="ip-bar-fill" style="width:'+pct.toFixed(1)+'%;background:'+bCol+'"></div></div>'
+    +'</div>';
+}
+function runIperf3(){
+  const size=$('ip3-size').value;
+  const dur=($('ip3-duration').value||'5').trim();
+  stopIperf3();
+  $('ip3-results').style.display='';
+  $('ip3-table').innerHTML='';
+  $('ip3-summary').innerHTML='';
+  $('ip3-status').textContent='Starting…';
+  $('ip3-btn').disabled=true;$('ip3-stop').style.display='';
+  const url='/api/iperf3?size='+encodeURIComponent(size)+'&duration='+encodeURIComponent(dur);
+  _ipSrc=new EventSource(url);
+  _ipSrc.onmessage=e=>{
+    const d=JSON.parse(e.data);
+    if(d.type==='server'){
+      _ip3SvrHdr(d.host,d.index,d.total);
+      $('ip3-status').textContent='Testing '+d.host+' ('+( d.index+1)+'/'+d.total+')…';
+    }else if(d.type==='interval'){
+      _renderIpInterval(d);
+    }else if(d.type==='result'){
+      _renderIpResult(d);
+    }else if(d.type==='skip'){
+      const msg=document.createElement('div');msg.className='tr-warn';
+      msg.textContent='Skipped '+d.host+': '+(d.msg||'failed');
+      $('ip3-table').appendChild(msg);
+    }else if(d.type==='error'){
+      const err=document.createElement('div');err.className='tr-error';err.textContent=d.msg;
+      $('ip3-table').appendChild(err);
+      _ipSrc.close();_ipSrc=null;$('ip3-btn').disabled=false;$('ip3-stop').style.display='none';
+      $('ip3-status').textContent='Error.';
+    }else if(d.type==='done'){
+      $('ip3-status').textContent='Complete — '+d.tested+' server'+(d.tested===1?'':'s')+' tested.';
+      _ipSrc.close();_ipSrc=null;$('ip3-btn').disabled=false;$('ip3-stop').style.display='none';
+    }
+  };
+  _ipSrc.onerror=()=>{stopIperf3();$('ip3-status').textContent='Connection lost.';};
+}
+function stopIperf3(){
+  if(_ipSrc){_ipSrc.close();_ipSrc=null;}
+  if($('ip3-btn'))$('ip3-btn').disabled=false;
+  if($('ip3-stop'))$('ip3-stop').style.display='none';
 }
 // -- On-demand runner (#216) -----------------------------------------------
 let _odrSrc=null;
