@@ -1175,13 +1175,15 @@ def api_iperf3():
                 k.append(True); p.kill()
             timer = _threading.Timer(timeout, _killer)
             timer.start()
+            _skipped = []
             try:
                 for line in proc.stdout:
                     line = line.rstrip()
                     if not line:
                         continue
-                    if "error" in line.lower() or "unable to connect" in line.lower() or "connection refused" in line.lower():
-                        yield f'data: {json.dumps({"type": "skip", "host": host, "msg": line})}\n\n'
+                    if "error" in line.lower() or "unable to connect" in line.lower() or "connection refused" in line.lower() or "server is busy" in line.lower():
+                        yield f'data: {json.dumps({"type": "skip", "host": host, "msg": line.strip()})}\n\n'
+                        _skipped.append(True)
                         proc.kill()
                         break
                     # bidir summary lines end with "sender", "receiver",
@@ -1210,6 +1212,8 @@ def api_iperf3():
                 timer.cancel()
             if _killed:
                 yield f'data: {json.dumps({"type": "skip", "host": host, "msg": "Connection timed out"})}\n\n'
+            elif not _skipped and proc.returncode != 0:
+                yield f'data: {json.dumps({"type": "skip", "host": host, "msg": f"Failed (exit {proc.returncode})"})}\n\n'
             tested += 1
         yield f'data: {json.dumps({"type": "done", "tested": tested})}\n\n'
 
@@ -2369,11 +2373,21 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
       <div style="max-width:900px">
 
         <div class="a-section">
+          <div class="a-h">v3.9.2 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
+          <table class="st-table" style="margin-top:10px">
+            <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>iperf3</td><td><strong>Silent failure now shown</strong> — servers that fail without printing an error (silent non-zero exit) now emit an amber "Failed (exit N)" warning in the iperf3 tab and On-Demand runner instead of disappearing silently</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>iperf3</td><td><strong>Busy-server detection</strong> — added "server is busy" to the pattern list so iperf3's "try again later" message is caught and shown as a skip warning immediately</td></tr>
+          </table>
+        </div>
+
+        <div class="a-section">
           <div class="a-h">v3.9.1 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
           <table class="st-table" style="margin-top:10px">
             <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td><strong>iperf3 suite restored</strong> — re-added <code>iperf3</code> to the suite map as a simplified UDP-only 1 Mbps test; t-shirt size controls server count (XS=1 S=2 M=3 L=4 XL=5 public servers); suite count 52 → 53</td></tr>
-            <tr><td><span class="cl-feat">FEAT</span></td><td>Diagnostics</td><td><strong>iperf3 diagnostics rework</strong> — bandwidth test tool now tests all 5 public servers every run with user-configurable bandwidth (default 10 M) and duration; per-server section headers, live interval table, and receiver summary card with loss % and jitter</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>iperf3</td><td><strong>TCP bidirectional mode</strong> — iperf3 suite and web UI now run <code>--bidir</code> TCP tests measuring upload and download simultaneously; bandwidth cap removed (not applicable to TCP)</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>iperf3</td><td><strong>Dedicated iperf3 tab</strong> — first-class bandwidth testing page (📶) added under Monitor in the sidebar; server picker (Auto / 10 public servers / Custom), duration control, live ↑/↓ interval rows, and side-by-side Upload/Download summary cards</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>iperf3</td><td><strong>10 public servers, fast skip</strong> — pool expanded from 5 to 10 geographically diverse servers (Hurricane Electric, Bouygues, Online.net, Moji, Scott Linux, Serverius, 4× Clouvider); <code>--connect-timeout 5000</code> skips unreachable servers in ~5 s; t-shirt size controls count: XS=1 … XL=all 10</td></tr>
             <tr><td><span class="cl-feat">FEAT</span></td><td>Security</td><td><strong>Wider login card</strong> — sign-in card widened 380 → 460 px so the authorized-use disclaimer is easier to read; disclaimer font size increased and line-height loosened</td></tr>
           </table>
         </div>
