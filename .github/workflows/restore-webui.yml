@@ -1,10 +1,15 @@
 name: Restore webui.py
 
 on:
+  push:
+    branches:
+      - feature/host-network-default
+    paths:
+      - .github/workflows/restore-webui.yml
   workflow_dispatch:
     inputs:
       base_commit:
-        description: 'Base commit SHA with correct pre-patch webui.py'
+        description: 'Base commit SHA with pre-patch webui.py'
         required: false
         default: '42ce002'
 
@@ -86,13 +91,23 @@ jobs:
           echo "Expected MD5: $EXPECTED_MD5"
           echo "Actual MD5:   $ACTUAL_MD5"
           if [ "$ACTUAL_MD5" != "$EXPECTED_MD5" ]; then
-            echo "ERROR: MD5 mismatch - patch did not apply correctly"
+            echo "ERROR: MD5 mismatch"
             exit 1
           fi
           git config user.name "jdibby"
           git config user.email "48450541+jdibby@users.noreply.github.com"
           git add webui.py
-          git diff --cached --stat
-          git commit -m "fix: eliminate browser JS parse failures - replace non-ASCII in script"
-          git push
-          echo "SUCCESS: webui.py restored with correct content"
+          if git diff --cached --quiet; then
+            echo "webui.py already correct, nothing to commit"
+          else
+            git diff --cached --stat
+            git commit -m "fix: eliminate browser JS parse failures - replace non-ASCII in script
+
+Four defensive fixes to prevent browser-specific SyntaxError:
+- H(): use \\x3c/\\x3e instead of bare </> in regexes
+- _parseSortVal: split(/\\n/) regex
+- _parseSortVal: \\u2014 explicit Unicode escape for em-dash
+- All 13 JS section-header comments: replace U+2500 with ASCII hyphens"
+            git push
+            echo "SUCCESS: webui.py committed with correct content"
+          fi
