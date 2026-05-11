@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-generator.py — Traffic Generator v3.4.0
+generator.py — Traffic Generator v3.5.0
 ========================================
 Simulates realistic network traffic across a wide range of protocols and
 behaviours: DNS, HTTP/HTTPS/HTTP3, FTP, SSH, NTP, BGP, ICMP, SNMP,
@@ -58,7 +58,7 @@ from rich import box
 from endpoints import *           # noqa: F401,F403  (large data file)
 
 # ── Globals ───────────────────────────────────────────────────────────────────
-VERSION = "3.4.0"
+VERSION = "3.5.0"
 
 
 class _DualWriter:
@@ -341,57 +341,71 @@ class SuiteStats:
         self.blocked    = 0   # security control intercept
         self.dropped    = 0   # silent drop / timeout / DNS sinkhole
         self.codes: dict[str, int] = {}
+        self.probes: list[dict] = []  # per-probe details for drill-down
         self.start_time = time.time()
 
-    def record(self, code, exit_code: int = 0) -> None:
+    def record(self, code, exit_code: int = 0, target: str = "") -> None:
         """Record an HTTP status code (and optional curl exit code).
         '---' / '000' / '' counts as a drop/error."""
         with self._lock:
             self.attempts += 1
             c = str(code).strip()
             if exit_code in _BLOCK_EXITS:
+                outcome = "blocked"
                 self.blocked += 1
                 bucket = f"exit{exit_code}"
                 self.codes[bucket] = self.codes.get(bucket, 0) + 1
             elif exit_code in _DROP_EXITS:
+                outcome = "dropped"
                 self.dropped += 1
                 self.errors  += 1   # keep errors count for backwards compat
             elif not c or c in ("---", "000", "0"):
+                outcome = "dropped"
                 self.dropped += 1
                 self.errors  += 1
             elif c in _BLOCK_HTTP:
+                outcome = "blocked"
                 self.blocked += 1
                 self.responses += 1
                 bucket = (c[0] + "xx") if c[:1].isdigit() else c[:3]
                 self.codes[bucket] = self.codes.get(bucket, 0) + 1
             else:
+                outcome = "allowed"
                 self.allowed   += 1
                 self.responses += 1
                 bucket = (c[0] + "xx") if c[:1].isdigit() else c[:3]
                 self.codes[bucket] = self.codes.get(bucket, 0) + 1
+            if target and len(self.probes) < _PROBE_DETAIL_MAX:
+                self.probes.append({"t": target, "o": outcome, "c": c})
 
-    def ok(self) -> None:
+    def ok(self, target: str = "") -> None:
         """Record a successful non-HTTP probe (ping, dig, SSH reached, etc.)."""
         with self._lock:
             self.attempts  += 1
             self.responses += 1
             self.allowed   += 1
+            if target and len(self.probes) < _PROBE_DETAIL_MAX:
+                self.probes.append({"t": target, "o": "allowed", "c": ""})
 
-    def fail(self) -> None:
+    def fail(self, target: str = "") -> None:
         """Record a failed probe (exception, timeout, unreachable)."""
         with self._lock:
             self.attempts += 1
             self.errors   += 1
+            if target and len(self.probes) < _PROBE_DETAIL_MAX:
+                self.probes.append({"t": target, "o": "dropped", "c": ""})
 
-    def block(self, exit_code: int = 7) -> None:
+    def block(self, exit_code: int = 7, target: str = "") -> None:
         """Record an explicit non-HTTP block (RST, proxy refusal detected externally)."""
         with self._lock:
             self.attempts += 1
             self.blocked  += 1
             bucket = f"exit{exit_code}"
             self.codes[bucket] = self.codes.get(bucket, 0) + 1
+            if target and len(self.probes) < _PROBE_DETAIL_MAX:
+                self.probes.append({"t": target, "o": "blocked", "c": bucket})
 
-    def drop(self, exit_code: int = 28) -> None:
+    def drop(self, exit_code: int = 28, target: str = "") -> None:
         """Record a silent drop (timeout, no route, DNS sinkhole)."""
         with self._lock:
             self.attempts += 1
@@ -399,6 +413,8 @@ class SuiteStats:
             self.errors   += 1
             bucket = f"exit{exit_code}"
             self.codes[bucket] = self.codes.get(bucket, 0) + 1
+            if target and len(self.probes) < _PROBE_DETAIL_MAX:
+                self.probes.append({"t": target, "o": "dropped", "c": bucket})
 
     def merge(self, other: "SuiteStats") -> None:
         """Accumulate counters from another SuiteStats instance into this one."""
@@ -464,6 +480,7 @@ class SuiteStats:
         ))
 
 
+_PROBE_DETAIL_MAX = 200        # max per-probe entries kept per suite run
 _stats       = SuiteStats()   # per-function stats, reset before each function
 _suite_stats = SuiteStats()   # aggregate across all functions in a suite run
 
@@ -553,14 +570,15 @@ def _web_flush() -> None:
 
 def _web_record(name: str, ok: bool, dur_ms: int,
                 responses: int = 0, codes: "dict | None" = None,
-                blocked: int = 0, dropped: int = 0, allowed: int = 0) -> None:
+                blocked: int = 0, dropped: int = 0, allowed: int = 0,
+                probe_detail: "list | None" = None) -> None:
     """Record one completed test run into the web state and flush to disk."""
     with _WEB_STATE_LOCK:
         t = _WEB_STATE["tests"].setdefault(name, {
             "attempts": 0, "ok": 0, "fail": 0, "responses": 0,
             "last_run_at": 0, "last_ok": True,
             "last_dur_ms": 0, "avg_dur_ms": 0, "codes": {},
-            "blocked": 0, "dropped": 0, "allowed": 0,
+            "blocked": 0, "dropped": 0, "allowed": 0, "probes": [],
         })
         t["attempts"]   += 1
         t["responses"]  += responses
@@ -585,6 +603,11 @@ def _web_record(name: str, ok: bool, dur_ms: int,
         # Accumulate HTTP response-code buckets
         for code, cnt in (codes or {}).items():
             t["codes"][code] = t["codes"].get(code, 0) + cnt
+
+        # Per-probe drill-down: keep last _PROBE_DETAIL_MAX entries across runs
+        if probe_detail:
+            combined = t.get("probes", []) + probe_detail
+            t["probes"] = combined[-_PROBE_DETAIL_MAX:]
 
         # Clear running indicators
         _WEB_STATE["test_started_at"] = 0.0
@@ -881,7 +904,8 @@ def _run_guarded(func) -> None:
     dur_ms = int((time.time() - t0) * 1000)
     run_ok = not exc_box and not t.is_alive()
     _web_record(suite_name, run_ok, dur_ms, _stats.responses, dict(_stats.codes),
-                blocked=_stats.blocked, dropped=_stats.dropped, allowed=_stats.allowed)
+                blocked=_stats.blocked, dropped=_stats.dropped, allowed=_stats.allowed,
+                probe_detail=list(_stats.probes))
     _web_log(
         f"{suite_name}: {_stats.attempts} attempts, "
         f"{_stats.responses} ok, {_stats.errors} fail — {dur_ms}ms",
@@ -921,10 +945,10 @@ def _run_head_batch(urls: list[str], label: str,
                 status, exit_code = _curl_head(url, ua, connect_timeout, max_time, extra_flags)
                 style  = _status_style(status)
                 console.log(f"[{idx}/{len(urls)}] {url}  [{style}]HTTP {status}[/]")
-                _stats.record(status, exit_code)
+                _stats.record(status, exit_code, target=url)
             except Exception as e:
                 console.log(f"[yellow][{idx}/{len(urls)}] {url}  {e.__class__.__name__}[/]")
-                _stats.fail()
+                _stats.fail(target=url)
             finally:
                 prog.update(task, advance=1)
 

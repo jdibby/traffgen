@@ -1221,12 +1221,17 @@ td.nm{font-family:inherit;font-weight:500;font-size:16px}
 .bf{height:100%;border-radius:2px;transition:width .4s}
 .xrow{display:none}
 .xrow.open{display:table-row}
+.sec-probe-row{background:var(--surf2)}
+.sec-probe-cell{padding:4px 14px 4px 32px;font-family:'SF Mono',Consolas,monospace;font-size:13px;border-bottom:1px solid var(--border);word-break:break-all}
 .xcell{padding:7px 12px 9px 26px;background:var(--surf2);font-size:15px;font-family:'SF Mono',Consolas,monospace;border-bottom:1px solid var(--border)}
 .xinner{display:flex;flex-wrap:wrap;gap:14px}
 .xi{display:flex;flex-direction:column;gap:2px}
 .xl{font-size:14px;letter-spacing:.6px;text-transform:uppercase;color:var(--dim)}
 .ctags{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px}
 .ctag{padding:1px 6px;border-radius:4px;font-size:14px;background:var(--surf);border:1px solid var(--border2);color:var(--muted)}
+table[data-sort-tbody] thead th{cursor:pointer;user-select:none;white-space:nowrap}
+table[data-sort-tbody] thead th:hover{color:var(--text)}
+.sort-ind{font-size:10px;margin-left:3px;color:var(--muted);vertical-align:middle}
 .chev{font-size:14px;color:var(--muted);transition:transform .15s;display:inline-block}
 .chev.open{transform:rotate(90deg)}
 .ecard{background:var(--surf);border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.25)}
@@ -1526,7 +1531,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
                 <button onclick="exportResults('json')" title="Download results as JSON" style="padding:3px 11px;background:var(--surf2);border:1px solid var(--border2);border-radius:6px;color:var(--text);cursor:pointer;font-size:12px;font-weight:400;letter-spacing:0;text-transform:none">&#11123; JSON</button>
               </div>
             </div>
-            <table><thead><tr><th></th><th>Test</th><th class="r">Attempts</th><th class="r">OK</th><th class="r">Fail</th><th class="r">Rate</th><th class="r">Avg</th><th class="r">Last Run</th></tr></thead>
+            <table data-sort-tbody="tbl-body"><thead><tr><th></th><th>Test</th><th class="r">Attempts</th><th class="r">OK</th><th class="r">Fail</th><th class="r">Rate</th><th class="r">Avg</th><th class="r">Last Run</th></tr></thead>
             <tbody id="tbl-body"><tr><td colspan="8" class="empty">Waiting for data&#8230;</td></tr></tbody></table>
           </div>
           <div class="ecard" data-widget="live-events">
@@ -1588,7 +1593,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
       </div>
       <div class="tcard" data-widget="sec-breakdown">
         <div class="thdr">Per-Suite Security Breakdown <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px">sorted by blocked</span></div>
-        <table><thead><tr><th>Suite</th><th class="r">Probes</th><th class="r" style="color:#22c55e">Allowed</th><th class="r" style="color:var(--amber)">Blocked</th><th class="r" style="color:#818cf8">Dropped</th><th class="r">Block%</th><th class="r">Drop%</th></tr></thead>
+        <table data-sort-tbody="sec-tbl"><thead><tr><th>Suite</th><th class="r">Probes</th><th class="r" style="color:#22c55e">Allowed</th><th class="r" style="color:var(--amber)">Blocked</th><th class="r" style="color:#818cf8">Dropped</th><th class="r">Block%</th><th class="r">Drop%</th></tr></thead>
         <tbody id="sec-tbl"><tr><td colspan="7" class="empty">Waiting for data&#8230;</td></tr></tbody></table>
       </div>
       <div class="tcard" data-widget="sec-signals">
@@ -1638,7 +1643,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
             <span>Public IP: <span id="h-pub-ip" style="color:var(--green);font-family:'SF Mono',Consolas,monospace;font-size:17px;font-weight:600">&#8212;</span></span>
           </span>
         </div>
-        <table><thead><tr><th>Interface</th><th>IPv4 Address</th><th>MAC Address</th><th class="r">Speed</th><th class="r">MTU</th><th class="r">Link</th></tr></thead>
+        <table data-sort-tbody="netinfo-body"><thead><tr><th>Interface</th><th>IPv4 Address</th><th>MAC Address</th><th class="r">Speed</th><th class="r">MTU</th><th class="r">Link</th></tr></thead>
         <tbody id="netinfo-body"><tr><td colspan="6" class="empty">Loading&#8230;</td></tr></tbody></table>
       </div>
       <div class="h-row" data-widget="h-io-row">
@@ -1730,12 +1735,12 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
       </div>
       <div class="tcard" data-widget="h-top-proc">
         <div class="thdr">Top Processes <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px">sorted by CPU</span></div>
-        <table><thead><tr><th class="r">PID</th><th>Name</th><th class="r">CPU%</th><th class="r">Mem%</th><th class="r">RSS</th></tr></thead>
+        <table data-sort-tbody="proc-body"><thead><tr><th class="r">PID</th><th>Name</th><th class="r">CPU%</th><th class="r">Mem%</th><th class="r">RSS</th></tr></thead>
         <tbody id="proc-body"><tr><td colspan="5" class="empty">Loading&#8230;</td></tr></tbody></table>
       </div>
       <div class="tcard" data-widget="h-child-procs">
         <div class="thdr">Child Processes <span id="child-cnt" style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px"></span></div>
-        <table><thead><tr><th class="r">PID</th><th>Command</th><th class="r">State</th><th class="r">CPU%</th><th class="r">RSS</th><th class="r">Runtime</th></tr></thead>
+        <table data-sort-tbody="child-body"><thead><tr><th class="r">PID</th><th>Command</th><th class="r">State</th><th class="r">CPU%</th><th class="r">RSS</th><th class="r">Runtime</th></tr></thead>
         <tbody id="child-body"><tr><td colspan="6" class="empty">No child processes</td></tr></tbody></table>
       </div>
       </div><!-- /#health-grid -->
@@ -1815,7 +1820,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
       </div>
       <div class="tcard" data-widget="lat-table" style="flex-shrink:0">
         <div class="thdr">Suite Latency <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px">P50 · P95 · P99 from observed avg_dur_ms samples</span></div>
-        <table><thead><tr><th>Suite</th><th class="r">Samples</th><th class="r">Min</th><th class="r">P50</th><th class="r">P95</th><th class="r">P99</th><th class="r">Max</th></tr></thead>
+        <table data-sort-tbody="lat-tbody"><thead><tr><th>Suite</th><th class="r">Samples</th><th class="r">Min</th><th class="r">P50</th><th class="r">P95</th><th class="r">P99</th><th class="r">Max</th></tr></thead>
         <tbody id="lat-tbody"><tr><td colspan="7" class="empty">Waiting for data&#8230; Run at least one test to begin tracking.</td></tr></tbody></table>
       </div>
     </div>
@@ -2262,6 +2267,63 @@ const Tc=ts=>new Date(ts*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-d
 const Ts=ts=>new Date(ts*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:false});
 const Dur=ms=>ms<1000?ms+'ms':(ms/1000).toFixed(1)+'s';
 const RC=p=>p>=90?'var(--green)':p>=70?'var(--amber)':'var(--red)';
+// ── Column sort ──────────────────────────────────────────────────────────────
+const _tblSort={};
+function _parseSortVal(txt){
+  const s=(txt||'').trim().split('\n')[0].trim();
+  let m;
+  if(s==='—'||s==='')return Infinity;
+  if((m=s.match(/^(?:(\d+)d\s+)?(\d+)h\s+(\d+)m$/)))return(parseInt(m[1]||0)*86400+parseInt(m[2])*3600+parseInt(m[3])*60);
+  if((m=s.match(/^(\d+(?:\.\d+)?)s$/)))return parseFloat(m[1])*1000;
+  if((m=s.match(/^(\d+(?:\.\d+)?)ms$/)))return parseFloat(m[1]);
+  if((m=s.match(/^([\d.]+)%$/)))return parseFloat(m[1]);
+  const n=parseFloat(s.replace(/,/g,''));
+  return isNaN(n)?s.toLowerCase():n;
+}
+function _sortTableBody(id){
+  const st=_tblSort[id];if(!st||st.col<0)return;
+  const tbody=$(id);if(!tbody)return;
+  const all=Array.from(tbody.rows),pairs=[];
+  for(let i=0;i<all.length;i++){
+    if(!all[i].classList.contains('mrow'))continue;
+    const row=all[i];
+    const xr=i+1<all.length&&all[i+1].classList.contains('xrow')?all[i+1]:null;
+    if(xr)i++;
+    pairs.push([row,xr]);
+  }
+  if(pairs.length<2)return;
+  pairs.sort((a,b)=>{
+    const ac=a[0].cells[st.col],bc=b[0].cells[st.col];
+    if(!ac||!bc)return 0;
+    const av=_parseSortVal(ac.textContent),bv=_parseSortVal(bc.textContent);
+    const cmp=typeof av==='number'&&typeof bv==='number'?av-bv:av<bv?-1:av>bv?1:0;
+    return cmp*st.dir;
+  });
+  pairs.forEach(([r,xr])=>{tbody.appendChild(r);if(xr)tbody.appendChild(xr);});
+}
+function _updateSortIndicators(id){
+  const tbody=$(id);if(!tbody)return;
+  const thead=tbody.closest('table').querySelector('thead');if(!thead)return;
+  const st=_tblSort[id]||{col:-1};
+  Array.from(thead.querySelectorAll('th')).forEach((th,i)=>{
+    let ind=th.querySelector('.sort-ind');
+    if(i===st.col){
+      if(!ind){ind=document.createElement('span');ind.className='sort-ind';th.appendChild(ind);}
+      ind.textContent=st.dir>0?'▲':'▼';
+    }else if(ind)ind.remove();
+  });
+}
+document.addEventListener('click',e=>{
+  const th=e.target.closest('th');if(!th)return;
+  const table=th.closest('table[data-sort-tbody]');if(!table)return;
+  const id=table.dataset.sortTbody;
+  const ths=Array.from(th.closest('tr').querySelectorAll('th'));
+  const col=ths.indexOf(th);
+  const cur=_tblSort[id]||{col:-1,dir:1};
+  _tblSort[id]={col,dir:cur.col===col?cur.dir*-1:-1};
+  _updateSortIndicators(id);
+  _sortTableBody(id);
+});
 let _start=null,_uptimer=null,_elTimer=null,_pauseTimer=null,_autoScroll=true,_scrollLock=false;
 let _waitBannerTimer=null,_waitBannerUntil=0;
 function _showWaitBanner(until){
@@ -2287,7 +2349,7 @@ function _hideWaitBanner(){
 }
 (()=>{const ob=$('obody');if(!ob)return;ob.addEventListener('scroll',()=>{if(_scrollLock)return;const gap=ob.scrollHeight-ob.scrollTop-ob.clientHeight;const atBot=gap<120;if(atBot&&!_autoScroll){_autoScroll=true;const b=$('btn-as');if(b)b.innerHTML='Auto-scroll &#10003;';}else if(!atBot&&_autoScroll){_autoScroll=false;const b=$('btn-as');if(b)b.innerHTML='Auto-scroll &#10007;';}},{passive:true});})();
 let _lastState=null,_logEs=null,_logFilter='all';
-let _xRows=new Set(),_xEvs=new Set(),_modalSuite=null,_isPaused=false,_lastTest=null;
+let _xRows=new Set(),_xEvs=new Set(),_xSecRows=new Set(),_modalSuite=null,_isPaused=false,_lastTest=null;
 let _SD={};  // suite name → description, populated on first state arrival
 let _isAdmin=true,_authRequired=false,_adminToken='',_sessionMode=false,_hasController=false;
 let _sessionId=(()=>{try{let s=sessionStorage.getItem('tg-sid');if(!s){s=crypto.randomUUID();sessionStorage.setItem('tg-sid',s);}return s;}catch(e){return '';}})();
@@ -2631,6 +2693,7 @@ function apply(s){
       <div class="xi"><div class="xl">Dropped</div>${N(t.dropped||0)}</div>
     </div></td></tr>`;
   }).join('');
+  _sortTableBody('tbl-body');
   const evs=(s.events||[]).slice().reverse().slice(0,30),eb=$('ev-body');
   $('ev-cnt').textContent=evs.length?' \xb7 '+evs.length+' events':'';
   eb.innerHTML=!evs.length?'<div class="empty">Waiting…</div>':evs.map((e,i)=>{
@@ -2734,6 +2797,7 @@ function apply(s){
 }
 function toggleRow(n){if(_xRows.has(n))_xRows.delete(n);else _xRows.add(n);if(_lastState)apply(_lastState);}
 function toggleEv(i){if(_xEvs.has(i))_xEvs.delete(i);else _xEvs.add(i);if(_lastState)apply(_lastState);}
+function toggleSecRow(n){if(_xSecRows.has(n))_xSecRows.delete(n);else _xSecRows.add(n);updateSecurityTab();}
 function connect(){
   const url='/events'+(_sessionId?'?sid='+encodeURIComponent(_sessionId):'');
   const es=new EventSource(url);
@@ -3112,6 +3176,7 @@ function applyHealth(d){
       const memC=p.mem_pct>30?'var(--amber)':'var(--muted)';
       return`<tr class="mrow"><td class="r" style="color:var(--muted)">${p.pid}</td><td class="nm">${H(p.name)}</td><td class="r"><span style="color:${cpuC}">${p.cpu_pct.toFixed(1)}%</span></td><td class="r"><span style="color:${memC}">${p.mem_pct.toFixed(1)}%</span></td><td class="r" style="color:var(--muted)">${p.mem_mb.toFixed(0)} MB</td></tr>`;
     }).join('');
+  if(tb)_sortTableBody('proc-body');
   // Child processes (#223)
   const children=d.child_procs||[];
   if($('child-cnt'))$('child-cnt').textContent=children.length?children.length+' process'+(children.length!==1?'es':''):'none';
@@ -3128,6 +3193,7 @@ function applyHealth(d){
         `<td class="r" style="color:var(--muted)">${p.rss_mb.toFixed(0)} MB</td>`+
         `<td class="r" style="color:var(--muted)">${fmtUptime(p.runtime_s)}</td></tr>`;
     }).join('');
+  if(cb)_sortTableBody('child-body');
   // Per-core CPU (#220)
   const cores=d.core_pcts||[];
   if($('core-cnt'))$('core-cnt').textContent=cores.length?'('+cores.length+' core'+(cores.length!==1?'s':'')+')'  :'';
@@ -3171,6 +3237,7 @@ function applyNetInfo(d){
     const macStr=i.mac||'<span style="color:var(--muted)">—</span>';
     return`<tr class="mrow"><td class="nm">${H(i.name)}</td><td style="font-family:'SF Mono',Consolas,monospace;font-size:14px">${ipStr}</td><td style="font-family:'SF Mono',Consolas,monospace;font-size:14px">${macStr}</td><td class="r" style="color:var(--muted)">${H(i.speed||'—')}</td><td class="r" style="color:var(--muted)">${i.mtu||'—'}</td><td class="r"><span style="color:${linkC}">${H(i.link||'—')}</span></td></tr>`;
   }).join('');
+  _sortTableBody('netinfo-body');
 }
 function pollNetInfo(){
   fetch('/api/netinfo')
@@ -3240,7 +3307,7 @@ function updateSecurityTab(){
   }
   drawSecTrend(_secHist);
   // per-suite table — sort by blocked desc
-  const rows=Object.entries(tests).map(([n,t])=>({n,ta:t.attempts||0,rch:t.allowed||0,blk:t.blocked||0,drp:t.dropped||0,tot:(t.allowed||0)+(t.blocked||0)+(t.dropped||0)}));
+  const rows=Object.entries(tests).map(([n,t])=>({n,t,ta:t.attempts||0,rch:t.allowed||0,blk:t.blocked||0,drp:t.dropped||0,tot:(t.allowed||0)+(t.blocked||0)+(t.dropped||0),probes:t.probes||[]}));
   rows.sort((a,b)=>b.blk-a.blk||(b.drp-a.drp));
   const tb=$('sec-tbl');
   if(!rows.length){tb.innerHTML='<tr><td colspan="7" class="empty">Waiting…</td></tr>';}
@@ -3248,8 +3315,19 @@ function updateSecurityTab(){
     const bp=r.tot?r.blk/r.tot*100:0,dp=r.tot?r.drp/r.tot*100:0;
     const bpC=bp>50?'var(--red)':bp>10?'var(--amber)':'var(--muted)';
     const dpC=dp>50?'var(--red)':dp>10?'#818cf8':'var(--muted)';
-    return`<tr class="mrow"><td class="nm" title="${_SD[r.n]||''}" style="cursor:default"><span class="s-ico">${suiteIco(r.n)}</span>${H(r.n)}</td><td class="r">${N(r.tot)}</td><td class="r" style="color:#22c55e">${N(r.rch)}</td><td class="r" style="color:var(--amber)">${N(r.blk)}</td><td class="r" style="color:#818cf8">${N(r.drp)}</td><td class="r"><span style="color:${bpC}">${r.tot?bp.toFixed(1)+'%':'—'}</span></td><td class="r"><span style="color:${dpC}">${r.tot?dp.toFixed(1)+'%':'—'}</span></td></tr>`;
+    const hasProbes=r.probes.length>0,exp=_xSecRows.has(r.n);
+    const chevron=hasProbes?`<span class="chev${exp?' open':''}" style="margin-right:4px">&#8250;</span>`:'';
+    const mainRow=`<tr class="mrow"${hasProbes?` onclick="toggleSecRow('${r.n}')"`:' style="cursor:default"'}><td class="nm" title="${_SD[r.n]||''}">${chevron}<span class="s-ico">${suiteIco(r.n)}</span>${H(r.n)}</td><td class="r">${N(r.tot)}</td><td class="r" style="color:#22c55e">${N(r.rch)}</td><td class="r" style="color:var(--amber)">${N(r.blk)}</td><td class="r" style="color:#818cf8">${N(r.drp)}</td><td class="r"><span style="color:${bpC}">${r.tot?bp.toFixed(1)+'%':'—'}</span></td><td class="r"><span style="color:${dpC}">${r.tot?dp.toFixed(1)+'%':'—'}</span></td></tr>`;
+    if(!hasProbes)return mainRow;
+    const probeRows=r.probes.map(p=>{
+      const oC=p.o==='allowed'?'#22c55e':p.o==='blocked'?'var(--amber)':'#818cf8';
+      const codeStr=p.c?` <span style="color:var(--muted);font-size:13px">(${H(p.c)})</span>`:'';
+      return`<tr class="sec-probe-row"><td colspan="7" class="sec-probe-cell"><span style="color:${oC};font-weight:600;min-width:60px;display:inline-block">${H(p.o)}</span> <span style="color:var(--text)">${H(p.t)}</span>${codeStr}</td></tr>`;
+    }).join('');
+    const detailRow=`<tr class="xrow${exp?' open':''}"><td colspan="7" class="xcell" style="padding:0"><table style="width:100%;border-collapse:collapse">${probeRows}</table></td></tr>`;
+    return mainRow+detailRow;
   }).join('');
+  _sortTableBody('sec-tbl');
   // block signal breakdown — aggregate codes across filtered tests
   const codeTotals={};
   Object.values(tests).forEach(t=>{Object.entries(t.codes||{}).forEach(([k,v])=>{codeTotals[k]=(codeTotals[k]||0)+v;});});
@@ -3649,6 +3727,7 @@ function exportResults(fmt){
         +'<td class="r" style="color:'+c+'">'+_fmtMs(p99)+'</td>'
         +'<td class="r" style="color:var(--dim)">'+_fmtMs(mx)+'</td></tr>';
     }).join('');
+    _sortTableBody('lat-tbody');
   }
   function _renderHeatmap(){
     const suites=Object.keys(_hmData);
