@@ -130,6 +130,48 @@ CLI-style live log mirroring terminal output:
 - **Clear** — wipe the current log buffer
 - **Pop Out** — open the live log in a standalone browser window
 
+### Latency
+
+Per-suite round-trip time tracking:
+
+- **Heatmap** — colour grid showing latency buckets (< 50 ms, 50–200 ms, 200–500 ms, > 500 ms) per suite over time; builds as tests run
+- **Per-suite table** — min / avg / max / p95 latency, sample count, and colour-coded row for each suite that has run
+
+### Diagnostics
+
+Interactive network tools for ad-hoc investigation:
+
+- **Traceroute** — enter any hostname or IP; choose TCP (with configurable destination port), UDP, or ICMP protocol; live hop-by-hop output with RTT
+- **TLS / Certificate Inspector** — enter hostname and port; shows subject CN, SANs, issuer, validity dates, serial, key size, and negotiated cipher suite; supports pinning the handshake to TLS 1.0 / 1.1 / 1.2 / 1.3 or Auto
+- **DNS Lookup (multi-resolver)** — query A, AAAA, MX, TXT, CNAME, NS, or ANY records against up to three custom resolvers simultaneously; optional DoH mode; results show answers and RTT per resolver
+- **On-Demand Test Runner** — select any suite and t-shirt size and stream its output live; when `iperf3` is selected, a server picker (Auto / individual server / Custom host:port) replaces the size dropdown
+
+### iperf3
+
+Dedicated bandwidth measurement page (📶 in the sidebar, directly below Diagnostics):
+
+- **Server picker** — choose Auto (tries all 10 public servers in sequence), a specific geographic server, or type a custom `host:port`
+- **Duration** — configurable seconds per server (1–60 s, default 10 s)
+- **Live interval table** — per-second throughput rows with ↑ Upload / ↓ Download direction prefix; colour-coded green (≥ 50 Mbps), amber (≥ 5 Mbps), or red (< 5 Mbps)
+- **Summary cards** — Upload and Download results displayed side-by-side after each server test completes
+- **Fast failure** — unreachable or busy servers are skipped in ~5 seconds (TCP connect timeout) with an amber warning message; a generic failure notice is shown even when iperf3 exits without printing an error (e.g. silent non-zero exit)
+- Protocol: TCP bidirectional (`--bidir`) — measures upload and download simultaneously in a single run
+
+**Public servers** (10 geographically diverse nodes):
+
+| Server | Location |
+|---|---|
+| iperf.he.net:5201 | Hurricane Electric — San Jose, US |
+| bouygues.iperf.fr:5201 | Bouygues Telecom — Paris, FR |
+| ping.online.net:5201 | Online.net — Paris, FR |
+| iperf3.moji.fr:5201 | Moji — Bordeaux, FR |
+| iperf.scottlinux.com:5201 | Scott Linux — Denver, US |
+| speedtest.serverius.net:5002 | Serverius — Amsterdam, NL |
+| lon.speedtest.clouvider.net:5201 | Clouvider — London, UK |
+| nyc.speedtest.clouvider.net:5201 | Clouvider — New York, US |
+| la.speedtest.clouvider.net:5201 | Clouvider — Los Angeles, US |
+| ams.speedtest.clouvider.net:5201 | Clouvider — Amsterdam, NL |
+
 ### Health
 
 System resource monitoring:
