@@ -10,6 +10,46 @@ The dashboard uses a self-signed TLS certificate generated at startup. Your brow
 
 ---
 
+## Authentication
+
+The dashboard requires a login on every visit.
+
+### Initial credentials
+
+On the **first container start**, traffgen generates a random password and prints it **once** to the container logs:
+
+```
+docker logs traffgen
+```
+
+Look for the credentials block:
+
+```
+==========================================================
+  traffgen dashboard — initial credentials
+  Username : traffadmin
+  Password : <generated>
+  You will be prompted to set a new password on first login.
+  To reset credentials, remove and recreate the container.
+==========================================================
+```
+
+If you deployed with `stager.sh`, the credentials are extracted from the container logs and displayed directly in the terminal at the end of installation — no need to run `docker logs` separately.
+
+### First login
+
+After signing in with the generated password you are immediately redirected to a **Set your password** page. Enter a new password (minimum 12 characters) and confirm it. This is the only time in-app password change is available.
+
+### Password reset
+
+There is no in-app reset. If you forget your password:
+
+1. Remove the container: `docker rm -f traffgen`
+2. Re-run your original `docker run` or `stager.sh` command
+3. A new password is generated and printed to the logs on the next first start
+
+---
+
 ## Enabling the Dashboard
 
 Add `-p 7777:7777` to your `docker run` command, or use `--network=host` (Linux only) to also enable `lateral-movement` LAN scanning:
@@ -152,6 +192,8 @@ The first browser tab to connect gets full control. Additional tabs are **read-o
 
 ## Security Design
 
-The dashboard is **read-only by default** — no authentication is required because it exposes no sensitive data and accepts no dangerous input. The control endpoint (`POST /api/control`) validates all fields strictly against an allowlist before writing anything. All responses include security headers (`CSP`, `X-Frame-Options`, `HSTS`, etc.).
+The dashboard requires authentication for every page and API call. Sessions are tied to the server process — restarting the container invalidates all active sessions. All responses include security headers (`CSP`, `X-Frame-Options`, `HSTS`, etc.).
+
+Passwords are stored as PBKDF2-HMAC-SHA256 hashes (260 000 iterations, per-install random salt) in `/tmp/traffgen_auth.json` inside the container. The file is `chmod 600` and is lost when the container is removed, which is the intended credential-reset mechanism.
 
 > If you do not want the dashboard exposed, omit the `-p 7777:7777` flag. The dashboard still runs inside the container but is not reachable from outside.

@@ -646,6 +646,21 @@ fi
 
 ok "Container started"
 
+# ── Fetch initial dashboard credentials from container logs ────────────────────
+_CREDS_PW=""
+if [ "$_CFG_WEBUI" -eq 1 ]; then
+    _creds_waited=0
+    while [ "$_creds_waited" -lt 15 ]; do
+        _CREDS_PW=$(docker logs traffgen 2>/dev/null \
+            | grep "^  Password :" \
+            | awk -F': ' '{print $2}' \
+            | head -1 || true)
+        [ -n "$_CREDS_PW" ] && break
+        sleep 1
+        _creds_waited=$((_creds_waited + 1))
+    done
+fi
+
 # ── Done ──────────────────────────────────────────────────────────────────────
 echo ""
 echo "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
@@ -668,6 +683,19 @@ if [ "$_CFG_WEBUI" -eq 1 ]; then
     echo ""
     echo "  ${BOLD}Web dashboard : ${GREEN}https://${HOST_IP}:${_CFG_PORT}${RESET}"
     echo "  (Accept the self-signed certificate warning in your browser)"
+    if [ -n "$_CREDS_PW" ]; then
+        echo ""
+        echo "  ${BOLD}┌─────────────────────────────────────────────┐${RESET}"
+        echo "  ${BOLD}│   Dashboard credentials — save these now    │${RESET}"
+        echo "  ${BOLD}├─────────────────────────────────────────────┤${RESET}"
+        echo "  ${BOLD}│  Username : traffadmin                      │${RESET}"
+        printf "  ${BOLD}│  Password : ${GREEN}%-30s${RESET}${BOLD} │${RESET}\n" "$_CREDS_PW"
+        echo "  ${BOLD}├─────────────────────────────────────────────┤${RESET}"
+        echo "  ${BOLD}│  You will be prompted to change this        │${RESET}"
+        echo "  ${BOLD}│  password on first login.                   │${RESET}"
+        echo "  ${BOLD}│  To reset: remove and recreate container.   │${RESET}"
+        echo "  ${BOLD}└─────────────────────────────────────────────┘${RESET}"
+    fi
 else
     echo ""
     echo "  Running headless — no web dashboard."

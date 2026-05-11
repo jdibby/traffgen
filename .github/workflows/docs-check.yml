@@ -6,11 +6,13 @@ on:
     paths:
       - generator.py
       - README.md
+      - webui.py
       - docs/**
   pull_request:
     paths:
       - generator.py
       - README.md
+      - webui.py
       - docs/**
 
 jobs:
@@ -94,3 +96,20 @@ jobs:
             echo "::warning file=docs/web-dashboard.md::docs/web-dashboard.md is missing the /api/control endpoint documentation"
           fi
           echo "docs/web-dashboard.md present and complete"
+
+      - name: Check webui.py changelog contains current version
+        if: steps.version.outputs.version != 'NOT_FOUND'
+        run: |
+          VER="${{ steps.version.outputs.version }}"
+          # Extract only the changelog section to avoid false matches elsewhere in webui.py
+          CHANGELOG=$(python3 -c "
+          import re, sys
+          src = open('webui.py').read()
+          m = re.search(r'id=[\"\\x27]tab-changelog[\"\\x27].*', src, re.DOTALL)
+          print(m.group(0) if m else '')
+          ")
+          if ! echo "$CHANGELOG" | grep -qF "v$VER"; then
+            echo "::error file=webui.py::webui.py changelog is missing an entry for v$VER. Add a changelog entry to the tab-changelog section before bumping the version in generator.py."
+            exit 1
+          fi
+          echo "webui.py changelog contains v$VER"
