@@ -2297,7 +2297,7 @@ const RC=p=>p>=90?'var(--green)':p>=70?'var(--amber)':'var(--red)';
 // -- Column sort --------------------------------------------------------------
 const _tblSort={};
 function _parseSortVal(txt){
-  const s=(txt||'').trim().split(/\n/)[0].trim();
+  const s=(txt||'').trim().split(/\\n/)[0].trim();
   let m;
   if(s==='\u2014'||s==='')return Infinity;
   if((m=s.match(/^(?:(\d+)d\s+)?(\d+)h\s+(\d+)m$/)))return(parseInt(m[1]||0)*86400+parseInt(m[2])*3600+parseInt(m[3])*60);
