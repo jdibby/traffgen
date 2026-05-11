@@ -1136,14 +1136,6 @@ def api_iperf3():
         return _sse_err("Invalid duration — must be 1–60 seconds")
     safe_duration = str(int(raw_duration))
 
-    raw_bw_num = request.args.get("bw_num", "10").strip()
-    if not _IP3_BW_NUM_RE.match(raw_bw_num):
-        return _sse_err("Invalid bandwidth — enter a positive number")
-    raw_bw_unit = request.args.get("bw_unit", "M").upper()
-    if raw_bw_unit not in ("K", "M", "G"):
-        return _sse_err("Invalid bandwidth unit — use K, M, or G")
-    safe_bw = raw_bw_num + raw_bw_unit  # e.g. "10M"
-
     # server: "auto" | "host:port" | "host" (defaults to port 5201)
     raw_server = request.args.get("server", "auto").strip()
     if raw_server == "auto":
@@ -1164,7 +1156,8 @@ def api_iperf3():
         for idx, (host, port) in enumerate(run_servers):
             yield f'data: {json.dumps({"type": "server", "host": host, "port": port, "index": idx, "total": len(run_servers)})}\n\n'
             cmd = ["iperf3", "-c", host, "-p", str(port),
-                   "-t", safe_duration, "-u", "-b", safe_bw, "--forceflush"]
+                   "-t", safe_duration, "--bidir", "--connect-timeout", "5000",
+                   "--forceflush"]
             try:
                 proc = subprocess.Popen(
                     cmd,
@@ -1176,7 +1169,7 @@ def api_iperf3():
                 yield f'data: {json.dumps({"type": "done", "tested": tested})}\n\n'
                 return
 
-            timeout = int(safe_duration) + 10
+            timeout = int(safe_duration) + 7  # connect-timeout is 5s; add 2s buffer
             _killed = []
             def _killer(p=proc, k=_killed):
                 k.append(True); p.kill()
@@ -1191,7 +1184,11 @@ def api_iperf3():
                         yield f'data: {json.dumps({"type": "skip", "host": host, "msg": line})}\n\n'
                         proc.kill()
                         break
-                    is_summary = line.endswith(("sender", "receiver"))
+                    # bidir summary lines end with "sender", "receiver",
+                    # "sender (reverse)", or "receiver (reverse)"
+                    _SUM_TAGS = ("sender", "receiver", "sender (reverse)", "receiver (reverse)")
+                    is_summary = any(line.endswith(t) for t in _SUM_TAGS)
+                    is_reverse = "(reverse)" in line
                     m = _IP3_INTERVAL_RE.search(line)
                     if m:
                         sec_start = float(m.group(1))
@@ -1201,10 +1198,13 @@ def api_iperf3():
                         jitter_ms = float(m.group(5)) if m.group(5) else None
                         lost_pct  = float(m.group(7)) if m.group(7) else None
                         if is_summary:
-                            role = "sender" if line.endswith("sender") else "receiver"
-                            yield f'data: {json.dumps({"type": "result", "host": host, "role": role, "mbps": mbps, "unit": unit, "lost_pct": lost_pct, "jitter_ms": jitter_ms})}\n\n'
+                            is_send = "sender" in line
+                            direction = "reverse" if is_reverse else "forward"
+                            role = "sender" if is_send else "receiver"
+                            yield f'data: {json.dumps({"type": "result", "host": host, "role": role, "direction": direction, "mbps": mbps, "unit": unit, "lost_pct": lost_pct, "jitter_ms": jitter_ms})}\n\n'
                         else:
-                            yield f'data: {json.dumps({"type": "interval", "sec_start": sec_start, "sec_end": sec_end, "mbps": mbps, "unit": unit, "jitter_ms": jitter_ms, "lost_pct": lost_pct})}\n\n'
+                            direction = "reverse" if is_reverse else "forward"
+                            yield f'data: {json.dumps({"type": "interval", "sec_start": sec_start, "sec_end": sec_end, "mbps": mbps, "unit": unit, "direction": direction, "jitter_ms": jitter_ms, "lost_pct": lost_pct})}\n\n'
                 proc.wait()
             finally:
                 timer.cancel()
@@ -2208,12 +2208,6 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
             <option value="custom">Custom…</option>
           </select>
           <input id="odr-ip3-custom" class="diag-input" type="text" placeholder="host or host:port" spellcheck="false" style="flex:0 0 160px;display:none">
-          <div id="odr-ip3-bw" style="display:none;align-items:center;gap:4px">
-            <input id="odr-ip3-bw-num" class="diag-input" type="number" value="10" min="1" style="width:64px" placeholder="10">
-            <select id="odr-ip3-bw-unit" class="diag-input" style="width:auto;padding-right:18px">
-              <option value="K">Kbps</option><option value="M" selected>Mbps</option><option value="G">Gbps</option>
-            </select>
-          </div>
           <button id="odr-btn" class="diag-btn" onclick="runOnDemand()">&#9654; Run</button>
           <button id="odr-stop" class="diag-btn cancel" onclick="stopOnDemand()" style="display:none">&#9209; Stop</button>
         </div>
@@ -2230,7 +2224,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
     <div id="tab-iperf3" class="panel">
       <div style="max-width:900px">
         <div class="tcard">
-          <div class="thdr">&#128246; iperf3 Bandwidth Test <span style="font-size:11px;font-weight:400;color:var(--dim);text-transform:none;letter-spacing:0">UDP · public servers</span></div>
+          <div class="thdr">&#128246; iperf3 Bandwidth Test <span style="font-size:11px;font-weight:400;color:var(--dim);text-transform:none;letter-spacing:0">TCP · Bidirectional · public servers</span></div>
           <!-- Controls -->
           <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;padding:4px 0 16px">
             <div style="display:flex;flex-direction:column;gap:5px;flex:1;min-width:220px">
@@ -2250,17 +2244,6 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
                 <option value="custom">Custom…</option>
               </select>
               <input id="ip3-custom" class="diag-input" type="text" placeholder="hostname or IP  (e.g. 192.168.1.1:5201)" spellcheck="false" autocomplete="off" style="display:none;width:100%" onkeydown="if(event.key==='Enter')runIperf3()">
-            </div>
-            <div style="display:flex;flex-direction:column;gap:5px">
-              <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Bandwidth</label>
-              <div style="display:flex;gap:4px">
-                <input id="ip3-bw-num" class="diag-input" type="number" value="10" min="1" style="width:72px" title="Target bandwidth" oninput="this.setCustomValidity(this.value>0?'':'Enter a number')">
-                <select id="ip3-bw-unit" class="diag-input" style="width:auto;padding-right:18px">
-                  <option value="K">Kbps</option>
-                  <option value="M" selected>Mbps</option>
-                  <option value="G">Gbps</option>
-                </select>
-              </div>
             </div>
             <div style="display:flex;flex-direction:column;gap:5px">
               <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Duration / server</label>
@@ -4002,7 +3985,7 @@ function _ip3SvrHdr(host,idx,total){
   const tbl=document.createElement('div');
   tbl.className='ip-tbl';
   const hdr=document.createElement('div');hdr.className='ip-row ip-hdr';
-  hdr.innerHTML='<span>Interval</span><span>Transfer</span><span>Bitrate</span><span>Loss / Jitter</span>';
+  hdr.innerHTML='<span>Dir  Interval</span><span>Transfer</span><span>Bitrate</span><span>&nbsp;</span>';
   tbl.appendChild(hdr);
   $('ip3-table').appendChild(tbl);
   _ipCurTable=tbl;
@@ -4011,30 +3994,44 @@ function _renderIpInterval(d){
   const tbl=_ipCurTable;if(!tbl)return;
   const mbps=d.mbps,unit=d.unit;
   const bitsLabel=mbps.toFixed(1)+' '+unit+'bits/s';
-  const bCol=mbps>=5?'var(--green)':mbps>=1?'var(--amber)':'var(--red)';
+  const bCol=mbps>=50?'var(--green)':mbps>=5?'var(--amber)':'var(--red)';
   const dur=d.sec_end-d.sec_start;
-  const xferMB=(mbps*dur/8).toFixed(3)+' MB';
-  const lossJitter=d.lost_pct!=null
-    ?d.lost_pct.toFixed(1)+'%  '+d.jitter_ms+'ms':'—';
+  const xferMB=(mbps*dur/8).toFixed(2)+' MB';
+  const dir=d.direction==='reverse'?'↓':'↑';
   const row=document.createElement('div');row.className='ip-row';
-  row.innerHTML=`<span>${d.sec_start.toFixed(0)}-${d.sec_end.toFixed(0)}s</span><span>${H(xferMB)}</span><span class="ip-mbps" style="color:${bCol}">${H(bitsLabel)}</span><span>${H(lossJitter)}</span>`;
+  row.innerHTML=`<span>${dir} ${d.sec_start.toFixed(0)}-${d.sec_end.toFixed(0)}s</span><span>${H(xferMB)}</span><span class="ip-mbps" style="color:${bCol}">${H(bitsLabel)}</span><span>—</span>`;
   tbl.appendChild(row);
   tbl.scrollTop=tbl.scrollHeight;
 }
+// Accumulate per-host bidir results; render summary card when we have both directions
+let _ip3Results={};
 function _renderIpResult(d){
   const el=$('ip3-summary');if(!el)return;
-  if(d.role!=='receiver')return;  // only show receiver summary for UDP
-  const mbps=d.mbps;
-  const bCol=mbps>=5?'var(--green)':mbps>=1?'var(--amber)':'var(--red)';
-  const pct=Math.min(100,mbps/10*100);  // scale to 10 Mbps max for 1M UDP test
-  const extra=d.lost_pct!=null
-    ?`<span style="color:var(--muted);font-size:12px;margin-left:8px">Loss ${d.lost_pct.toFixed(1)}%  Jitter ${d.jitter_ms!=null?d.jitter_ms+'ms':'—'}</span>`:'';
+  // Only use the sender line for each direction — that's the true throughput
+  if(d.role!=='sender')return;
+  const key=d.host;
+  if(!_ip3Results[key])_ip3Results[key]={};
+  _ip3Results[key][d.direction]=d;
+  const r=_ip3Results[key];
+  // Render once we have both forward and reverse, or immediately for single-server
+  if(!r.forward||!r.reverse)return;
+  const up=r.forward,dn=r.reverse;
+  const bColUp=up.mbps>=50?'var(--green)':up.mbps>=5?'var(--amber)':'var(--red)';
+  const bColDn=dn.mbps>=50?'var(--green)':dn.mbps>=5?'var(--amber)':'var(--red)';
+  const pctUp=Math.min(100,up.mbps/1000*100);
+  const pctDn=Math.min(100,dn.mbps/1000*100);
   el.innerHTML+='<div class="ip-summary">'
-    +'<div style="display:flex;align-items:center;justify-content:space-between">'
-    +`<span style="font-weight:600;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.05em">${H(d.host)}</span>`
-    +`<span class="ip-mbps" style="color:${bCol};font-size:18px">${mbps.toFixed(2)} ${H(d.unit)}bits/s</span>${extra}`
+    +'<div style="font-weight:600;color:var(--text);font-size:13px;margin-bottom:10px">'+H(d.host)+'</div>'
+    +'<div style="display:flex;gap:16px;flex-wrap:wrap">'
+    +'<div style="flex:1;min-width:140px">'
+    +`<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px"><span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">↑ Upload</span><span class="ip-mbps" style="color:${bColUp};font-size:17px">${up.mbps.toFixed(1)} ${H(up.unit)}bits/s</span></div>`
+    +`<div class="ip-bar-wrap"><div class="ip-bar-fill" style="width:${pctUp.toFixed(1)}%;background:${bColUp}"></div></div>`
     +'</div>'
-    +'<div class="ip-bar-wrap"><div class="ip-bar-fill" style="width:'+pct.toFixed(1)+'%;background:'+bCol+'"></div></div>'
+    +'<div style="flex:1;min-width:140px">'
+    +`<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px"><span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">↓ Download</span><span class="ip-mbps" style="color:${bColDn};font-size:17px">${dn.mbps.toFixed(1)} ${H(dn.unit)}bits/s</span></div>`
+    +`<div class="ip-bar-wrap"><div class="ip-bar-fill" style="width:${pctDn.toFixed(1)}%;background:${bColDn}"></div></div>`
+    +'</div>'
+    +'</div>'
     +'</div>';
 }
 function ip3ServerChange(){
@@ -4047,19 +4044,15 @@ function runIperf3(){
   const svrSel=$('ip3-server').value;
   const server=svrSel==='custom'?($('ip3-custom').value||'').trim():svrSel;
   if(!server){$('ip3-status')&&($('ip3-status').textContent='Enter a server address.');return;}
-  const bwNum=($('ip3-bw-num').value||'10').trim();
-  const bwUnit=$('ip3-bw-unit').value;
-  if(!bwNum||isNaN(bwNum)||Number(bwNum)<=0){
-    $('ip3-bw-num').focus();return;
-  }
   const dur=($('ip3-duration').value||'10').trim();
   stopIperf3();
+  _ip3Results={};
   $('ip3-results').style.display='';
   $('ip3-table').innerHTML='';
   $('ip3-summary').innerHTML='';
   $('ip3-status').textContent='Starting…';
   $('ip3-btn').disabled=true;$('ip3-stop').style.display='';
-  const url='/api/iperf3?server='+encodeURIComponent(server)+'&bw_num='+encodeURIComponent(bwNum)+'&bw_unit='+encodeURIComponent(bwUnit)+'&duration='+encodeURIComponent(dur);
+  const url='/api/iperf3?server='+encodeURIComponent(server)+'&duration='+encodeURIComponent(dur);
   _ipSrc=new EventSource(url);
   _ipSrc.onmessage=e=>{
     const d=JSON.parse(e.data);
@@ -4098,7 +4091,6 @@ function odrSuiteChange(){
   const isIp3=(v==='iperf3');
   $('odr-size').style.display=isIp3?'none':'';
   $('odr-ip3-server').style.display=isIp3?'':'none';
-  $('odr-ip3-bw').style.display=isIp3?'flex':'none';
   if(!isIp3){$('odr-ip3-custom').style.display='none';}
   else odrIp3ServerChange();
 }
@@ -4137,21 +4129,18 @@ function runOnDemand(){
     const svrSel=$('odr-ip3-server').value;
     const server=svrSel==='custom'?($('odr-ip3-custom').value||'').trim():svrSel;
     if(!server){return;}
-    const bwNum=($('odr-ip3-bw-num').value||'10').trim();
-    const bwUnit=$('odr-ip3-bw-unit').value;
-    if(!bwNum||isNaN(bwNum)||Number(bwNum)<=0){$('odr-ip3-bw-num').focus();return;}
     const out=$('odr-out'),body=$('odr-body'),st=$('odr-status');
     if(out)out.style.display='';if(body)body.innerHTML='';
     if(st)st.textContent='Running iperf3…';
     if($('odr-btn'))$('odr-btn').disabled=true;
     if($('odr-stop'))$('odr-stop').style.display='';
-    const url='/api/iperf3?server='+encodeURIComponent(server)+'&bw_num='+encodeURIComponent(bwNum)+'&bw_unit='+encodeURIComponent(bwUnit)+'&duration=10';
+    const url='/api/iperf3?server='+encodeURIComponent(server)+'&duration=10';
     _odrSrc=new EventSource(url);
     _odrSrc.onmessage=function(e){
       const d=JSON.parse(e.data);
       if(d.type==='server'){if(body)_odrAppendLine(body,'→ Testing '+d.host+':'+d.port+' ('+( d.index+1)+'/'+d.total+')');}
-      else if(d.type==='interval'){if(body)_odrAppendLine(body,'  '+d.sec_start.toFixed(0)+'-'+d.sec_end.toFixed(0)+'s  '+d.mbps.toFixed(2)+' '+d.unit+'bits/s'+(d.lost_pct!=null?'  loss='+d.lost_pct.toFixed(1)+'%':''));}
-      else if(d.type==='result'&&d.role==='receiver'){if(body)_odrAppendLine(body,'[ok] '+d.host+' → '+d.mbps.toFixed(2)+' '+d.unit+'bits/s'+(d.lost_pct!=null?' loss='+d.lost_pct.toFixed(1)+'%  jitter='+d.jitter_ms+'ms':''));}
+      else if(d.type==='interval'){const dir=d.direction==='reverse'?'↓':'↑';if(body)_odrAppendLine(body,'  '+dir+' '+d.sec_start.toFixed(0)+'-'+d.sec_end.toFixed(0)+'s  '+d.mbps.toFixed(1)+' '+d.unit+'bits/s');}
+      else if(d.type==='result'&&d.role==='sender'){const dir=d.direction==='reverse'?'↓ Download':'↑ Upload';if(body)_odrAppendLine(body,'[ok] '+d.host+' '+dir+' → '+d.mbps.toFixed(1)+' '+d.unit+'bits/s');}
       else if(d.type==='skip'){if(body)_odrAppendLine(body,'[warn] Skipped '+d.host+': '+(d.msg||'failed'));}
       else if(d.type==='error'){if(body)_odrAppendLine(body,'[error] '+d.msg);if(st)st.textContent='Error';stopOnDemand();}
       else if(d.type==='done'){if(st)st.textContent='Finished — '+d.tested+' server'+(d.tested===1?'':'s')+' tested.';stopOnDemand();}
