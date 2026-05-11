@@ -1939,6 +1939,19 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
       <div style="max-width:900px">
 
         <div class="a-section">
+          <div class="a-h">v3.6.0 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
+          <table class="st-table" style="margin-top:10px">
+            <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Diagnostics</td><td><strong>TLS version selector</strong> — TLS probe in Diagnostics now lets you pin the handshake to TLS 1.0, 1.1, 1.2, or 1.3 (Auto uses system default); useful for validating cipher-suite enforcement on firewalls and load-balancers</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Generator</td><td><strong>Full browser header simulation</strong> — 1 000 real-world User-Agent strings (Chrome, Firefox, Safari, Edge, mobile; 2021–2026 era) with matching <code>Accept</code>, <code>Accept-Language</code>, and <code>Sec-CH-UA</code> headers for high-fidelity HTTP traffic generation</td></tr>
+            <tr><td><span class="cl-chg">CHG</span></td><td>Deployment</td><td><strong>Host-network default on Linux</strong> — stager.sh automatically enables <code>--network host</code> on Linux hosts (no interactive prompt); improves out-of-the-box routing fidelity for firewall testing</td></tr>
+            <tr><td><span class="cl-chg">CHG</span></td><td>Deployment</td><td><strong>Stager scoping</strong> — cleanup in stager.sh is now scoped to <code>jdibby/traffgen</code> containers and images only, preventing accidental removal of unrelated Docker resources</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Dashboard</td><td>Dark-mode nav sub-item colour corrected (was inheriting a near-invisible tint)</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Dashboard</td><td><strong>JS regex parse error</strong> — escaped <code>\\n</code> in <code>_parseSortVal</code> so Python does not expand it to a literal newline before the browser receives the script, eliminating "Invalid regular expression: missing /" at startup</td></tr>
+          </table>
+        </div>
+
+        <div class="a-section">
           <div class="a-h">v3.5.0 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
           <table class="st-table" style="margin-top:10px">
             <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
