@@ -8,11 +8,15 @@ Generates a self-signed TLS certificate on first start (stored in /tmp/).
 """
 
 import fcntl
+import functools
+import hashlib
 import json
 import logging
 import os
+import secrets
 import socket as _socket
 import ssl
+import string
 import struct
 import subprocess
 import time
@@ -20,7 +24,7 @@ import threading
 
 logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
-from flask import Flask, Response, jsonify, request  # noqa: E402
+from flask import Flask, Response, jsonify, redirect, request, session, url_for  # noqa: E402
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 _STATE_FILE  = "/tmp/traffgen_state.json"
@@ -30,6 +34,7 @@ _PAUSE_FILE  = "/tmp/traffgen_pause"
 _STOP_FILE   = "/tmp/traffgen_stop"
 _CERT        = "/tmp/webui.crt"
 _KEY         = "/tmp/webui.key"
+_AUTH_FILE   = "/tmp/traffgen_auth.json"
 PORT         = 7777
 MAX_SSE      = 30
 _VALID_SIZES = {"XS", "S", "M", "L", "XL"}
@@ -37,6 +42,7 @@ ADMIN_TOKEN  = os.environ.get("TRAFFGEN_ADMIN_TOKEN", "")
 
 # ── Flask ──────────────────────────────────────────────────────────────────────
 app = Flask(__name__)
+app.secret_key = os.urandom(32)   # new key each process start; sessions invalidate on restart
 
 _sse_count = 0
 _sse_lock  = threading.Lock()
@@ -555,6 +561,24 @@ def _add_sec(resp):
     return resp
 
 
+_AUTH_OPEN = {"/login", "/logout"}
+
+
+@app.before_request
+def _require_login():
+    if request.path in _AUTH_OPEN:
+        return None
+    if not session.get("logged_in"):
+        if request.path.startswith("/api/") or request.path in ("/events", "/log"):
+            return jsonify({"error": "Unauthorized"}), 401
+        return redirect(url_for("login"))
+    if session.get("must_change") and request.path != "/change-password":
+        if request.path.startswith("/api/") or request.path in ("/events", "/log"):
+            return jsonify({"error": "Password change required"}), 403
+        return redirect(url_for("change_password"))
+    return None
+
+
 # ── Helpers ────────────────────────────────────────────────────────────────────
 def _read_state() -> dict:
     try:
@@ -637,6 +661,61 @@ def index():
 @app.route("/log-view")
 def log_view():
     return Response(_LOG_HTML, mimetype="text/html")
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if session.get("logged_in"):
+        return redirect(url_for("index"))
+    error = ""
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        auth = _load_auth()
+        if (username == _AUTH_USERNAME and auth
+                and _verify_pw(password, auth["salt"], auth["hash"])):
+            session.clear()
+            session["logged_in"] = True
+            session["must_change"] = auth.get("must_change", False)
+            if session["must_change"]:
+                return redirect(url_for("change_password"))
+            return redirect(url_for("index"))
+        error = "Invalid username or password."
+    return Response(_login_page(error), mimetype="text/html")
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
+@app.route("/change-password", methods=["GET", "POST"])
+def change_password():
+    if not session.get("logged_in"):
+        return redirect(url_for("login"))
+    # Only permitted on first login (must_change flag).  After that, show the
+    # "redeploy to reset" notice — no in-app password reset.
+    if not session.get("must_change"):
+        return Response(_change_pw_page(locked=True), mimetype="text/html")
+    error = ""
+    if request.method == "POST":
+        new_pw  = request.form.get("password", "")
+        confirm = request.form.get("confirm", "")
+        if len(new_pw) < 12:
+            error = "Password must be at least 12 characters."
+        elif new_pw != confirm:
+            error = "Passwords do not match."
+        else:
+            auth = _load_auth()
+            salt = os.urandom(32)
+            auth.update({"salt": salt.hex(), "hash": _hash_pw(new_pw, salt), "must_change": False})
+            with open(_AUTH_FILE, "w") as f:
+                json.dump(auth, f)
+            os.chmod(_AUTH_FILE, 0o600)
+            session["must_change"] = False
+            return redirect(url_for("index"))
+    return Response(_change_pw_page(error), mimetype="text/html")
 
 
 @app.route("/api/state")
@@ -1091,6 +1170,123 @@ def sse_log():
             time.sleep(1)
 
     return _sse_wrap(_gen)
+
+
+# ── Authentication ─────────────────────────────────────────────────────────────
+_AUTH_USERNAME = "traffadmin"
+_PW_ALPHABET   = string.ascii_letters + string.digits
+
+
+def _hash_pw(password: str, salt: bytes) -> str:
+    return hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 260_000).hex()
+
+
+def _verify_pw(password: str, salt_hex: str, stored_hash: str) -> bool:
+    return secrets.compare_digest(
+        _hash_pw(password, bytes.fromhex(salt_hex)), stored_hash
+    )
+
+
+def _load_auth() -> dict:
+    try:
+        with open(_AUTH_FILE) as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _ensure_auth() -> None:
+    if os.path.exists(_AUTH_FILE):
+        return
+    pw   = "".join(secrets.choice(_PW_ALPHABET) for _ in range(16))
+    salt = os.urandom(32)
+    with open(_AUTH_FILE, "w") as f:
+        json.dump({"salt": salt.hex(), "hash": _hash_pw(pw, salt), "must_change": True}, f)
+    os.chmod(_AUTH_FILE, 0o600)
+    sep = "=" * 58
+    print(sep, flush=True)
+    print("  traffgen dashboard — initial credentials", flush=True)
+    print(f"  Username : {_AUTH_USERNAME}", flush=True)
+    print(f"  Password : {pw}", flush=True)
+    print("  You will be prompted to set a new password on first login.", flush=True)
+    print("  To reset credentials, remove and recreate the container.", flush=True)
+    print(sep, flush=True)
+
+
+def _login_page(error: str = "") -> str:
+    err = f'<p class="err">{error}</p>' if error else ""
+    return f"""<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>traffgen — Sign in</title>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{background:#0d1117;color:#c9d1d9;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh}}
+.card{{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:36px 32px;width:340px}}
+.brand{{font-size:13px;color:#8b949e;text-align:center;margin-bottom:20px;letter-spacing:.02em}}
+h1{{font-size:18px;font-weight:600;margin-bottom:22px;color:#e6edf3}}
+label{{font-size:12px;color:#8b949e;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em}}
+input{{width:100%;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e6edf3;font-size:14px;padding:9px 11px;margin-bottom:16px;outline:none;transition:border-color .15s}}
+input:focus{{border-color:#58a6ff}}
+button{{width:100%;background:#238636;border:none;border-radius:6px;color:#fff;font-size:14px;font-weight:600;padding:10px;cursor:pointer;transition:background .15s}}
+button:hover{{background:#2ea043}}
+.err{{color:#f85149;font-size:13px;margin-bottom:14px;padding:8px 10px;background:rgba(248,81,73,.1);border-radius:5px}}
+</style></head>
+<body><div class="card">
+<div class="brand">🚦 traffgen dashboard</div>
+<h1>Sign in</h1>
+{err}
+<form method="post" action="/login">
+<label for="u">Username</label>
+<input id="u" name="username" type="text" autocomplete="username" autofocus required>
+<label for="p">Password</label>
+<input id="p" name="password" type="password" autocomplete="current-password" required>
+<button type="submit">Sign in</button>
+</form>
+</div></body></html>"""
+
+
+def _change_pw_page(error: str = "", locked: bool = False) -> str:
+    if locked:
+        body = """<p style="color:#8b949e;font-size:14px;line-height:1.6">
+Your password has already been set. Traffgen does not support in-app password resets after
+initial setup.<br><br>To reset credentials, <strong>remove and recreate the container</strong>
+— a new password will be printed to the Docker logs on first start.</p>
+<a href="/" style="display:inline-block;margin-top:20px;color:#58a6ff;font-size:13px;text-decoration:none">&#8592; Back to dashboard</a>"""
+    else:
+        err = f'<p class="err">{error}</p>' if error else ""
+        body = f"""{err}
+<form method="post" action="/change-password">
+<label for="p">New password <span style="color:#8b949e;font-weight:400;text-transform:none">(min 12 characters)</span></label>
+<input id="p" name="password" type="password" autocomplete="new-password" autofocus required minlength="12">
+<label for="c">Confirm password</label>
+<input id="c" name="confirm" type="password" autocomplete="new-password" required minlength="12">
+<button type="submit">Set password</button>
+</form>"""
+    return f"""<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>traffgen — Change password</title>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{background:#0d1117;color:#c9d1d9;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh}}
+.card{{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:36px 32px;width:360px}}
+.brand{{font-size:13px;color:#8b949e;text-align:center;margin-bottom:20px;letter-spacing:.02em}}
+h1{{font-size:18px;font-weight:600;margin-bottom:8px;color:#e6edf3}}
+.sub{{font-size:13px;color:#8b949e;margin-bottom:22px}}
+label{{font-size:12px;color:#8b949e;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em}}
+input{{width:100%;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e6edf3;font-size:14px;padding:9px 11px;margin-bottom:16px;outline:none;transition:border-color .15s}}
+input:focus{{border-color:#58a6ff}}
+button{{width:100%;background:#238636;border:none;border-radius:6px;color:#fff;font-size:14px;font-weight:600;padding:10px;cursor:pointer;transition:background .15s}}
+button:hover{{background:#2ea043}}
+.err{{color:#f85149;font-size:13px;margin-bottom:14px;padding:8px 10px;background:rgba(248,81,73,.1);border-radius:5px}}
+</style></head>
+<body><div class="card">
+<div class="brand">🚦 traffgen dashboard</div>
+<h1>{'Reset credentials' if locked else 'Set your password'}</h1>
+{'<p class="sub">Choose a strong password to protect the dashboard.</p>' if not locked else ''}
+{body}
+</div></body></html>"""
 
 
 # ── TLS certificate ────────────────────────────────────────────────────────────
@@ -1937,6 +2133,16 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
     <!-- Changelog -->
     <div id="tab-changelog" class="panel">
       <div style="max-width:900px">
+
+        <div class="a-section">
+          <div class="a-h">v3.7.0 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
+          <table class="st-table" style="margin-top:10px">
+            <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Security</td><td><strong>Dashboard authentication</strong> — login wall with generated <code>traffadmin</code> credentials printed once to Docker logs on first start; forced password change on first login (min 12 chars); subsequent logins use the updated password; credentials reset by redeploying the container</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Security</td><td><strong>PBKDF2-SHA256 password hashing</strong> — stored credentials use PBKDF2-HMAC-SHA256 with 260 000 iterations and a per-install random salt; password file is root-only (chmod 600)</td></tr>
+            <tr><td><span class="cl-chg">CHG</span></td><td>Security</td><td>In-app password reset intentionally disabled after initial setup — redeploy the container to rotate credentials</td></tr>
+          </table>
+        </div>
 
         <div class="a-section">
           <div class="a-h">v3.6.0 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
@@ -3981,6 +4187,7 @@ es.onmessage=ev=>{
 if __name__ == "__main__":
     threading.Thread(target=_sample_health,   daemon=True, name="health-sampler").start()
     threading.Thread(target=_sample_net_info, daemon=True, name="net-info-sampler").start()
+    _ensure_auth()
     ctx = _ensure_cert()
     print(f"[webui] Dashboard: https://0.0.0.0:{PORT}", flush=True)
     app.run(
