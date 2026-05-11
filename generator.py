@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-generator.py — Traffic Generator v3.9.1
+generator.py — Traffic Generator v3.9.2
 ========================================
 Simulates realistic network traffic across a wide range of protocols and
 behaviours: DNS, HTTP/HTTPS/HTTP3, FTP, SSH, NTP, BGP, ICMP, SNMP,
@@ -258,7 +258,7 @@ _SUITE_DESCRIPTIONS: list[tuple[str, str]] = [
     ("dot",              "DNS over TLS: TCP/853 TLS handshake via openssl s_client"),
     ("ftp",              "FTP download via curl with rate limiting"),
     ("http",             "HTTP HEAD + file downloads (ZIP, tar.gz)"),
-    ("http3",            "HTTP/3 QUIC HEAD requests via curl --http3"),
+    ("http3",            "HTTP/3 QUIC HEAD requests via aioquic (native Python QUIC stack)"),
     ("https",            "HTTPS HEAD requests + iterative crawl"),
     ("icmp",             "Ping + traceroute to a set of remote hosts"),
     ("ids-sigs",         "16 Snort/Suricata signatures: scanner UAs + web-attack URL probes → testmyids.com"),
