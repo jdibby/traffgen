@@ -294,7 +294,7 @@ _SUITE_DESCRIPTIONS: list[tuple[str, str]] = [
     ("waf-attack",       "SQLi/XSS/LFI/SSRF/CMDi/XXE/SSTI payloads in query params and POST bodies → WAF inline"),
     ("data-exfil-http",  "POST synthetic PII/credentials to paste sites → DLP + CASB outbound inspection"),
     ("web-scanner",      "Nikto web vulnerability scan"),
-    ("iperf3",           "UDP 1 Mbps bandwidth test against public iperf3 servers (XS=1 S=2 M=3 L=4 XL=all 5) — validates egress port 5201 and bulk UDP flow detection"),
+    ("iperf3",           "TCP bidirectional bandwidth test against public iperf3 servers (XS=1 S=2 M=3 L=4 XL=all 10) — measures upload + download simultaneously; validates egress TCP port 5201"),
     ("all",              "Run every suite above in random order"),
 ]
 
@@ -2293,13 +2293,15 @@ def _parse_iperf3_result(json_str: str, label: str) -> None:
     try:
         d = _json.loads(json_str)
         end = d.get("end", {})
-        if "sum_sent" in end:
+        # bidir: end contains both streams; pick the two sender sums
+        streams = end.get("streams", [])
+        if streams and len(streams) >= 2:
+            up   = streams[0].get("sender", {}).get("bits_per_second", 0) / 1e6
+            down = streams[1].get("sender", {}).get("bits_per_second", 0) / 1e6
+            console.log(f"  ↳ [green]{label}[/]  ↑{up:.1f} Mbps  ↓{down:.1f} Mbps")
+        elif "sum_sent" in end:
             mbps = end["sum_sent"].get("bits_per_second", 0) / 1e6
-            console.log(f"  ↳ [green]{label}[/]  {mbps:.1f} Mbps sent")
-        elif "sum" in end:
-            mbps = end["sum"].get("bits_per_second", 0) / 1e6
-            lost = end["sum"].get("lost_percent", 0)
-            console.log(f"  ↳ [green]{label}[/]  {mbps:.1f} Mbps  loss={lost:.1f}%")
+            console.log(f"  ↳ [green]{label}[/]  {mbps:.1f} Mbps")
         else:
             console.log(f"  ↳ [green]{label}: OK[/]")
     except Exception:
@@ -2318,9 +2320,9 @@ def _iperf3_run_tests(host: str, port: int, tests: list) -> int:
             flags_str = flags
         else:
             flags_str = f"{flags} -p {p}"
-        cmd = f"iperf3 -c {host} {flags_str} -J"
+        cmd = f"iperf3 -c {host} {flags_str} --connect-timeout 5000 -J"
         try:
-            r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=25)
+            r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=20)
             if r.returncode == 0:
                 _parse_iperf3_result(r.stdout, label)
                 _stats.ok(target=host)
@@ -2378,17 +2380,17 @@ def _iperf3_loopback(tests: list) -> None:
 
 def iperf3_bandwidth() -> None:
     """
-    iperf3 bandwidth suite — sends a 1 Mbps UDP stream to public iperf3 servers.
-    XS=1 server, S=2, M=3, L=4, XL=all 5. Tests egress port 5201, UDP bulk flow
-    detection, and bandwidth-anomaly rules.
+    iperf3 bandwidth suite — TCP bidirectional test against public iperf3 servers.
+    XS=1 server, S=2, M=3, L=4, XL=all 10. Tests egress TCP port 5201 and measures
+    both upload and download throughput simultaneously.
     """
     n_servers = _size_to_limits(ARGS.size, 2, 3, 4, len(_IPERF3_SERVERS), xs=1)
     servers   = _IPERF3_SERVERS[:n_servers]
-    tests     = [("UDP 1M", "-u -b 1M -t 10")]
+    tests     = [("TCP bidir", "--bidir -t 10")]
 
     ui_banner(
         "iperf3 Bandwidth",
-        f"size={ARGS.size} | {n_servers} server(s) | UDP 1 Mbps",
+        f"size={ARGS.size} | {n_servers} server(s) | TCP bidirectional",
     )
 
     for host, port in servers:
