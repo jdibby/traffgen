@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-generator.py — Traffic Generator v3.5.0
+generator.py — Traffic Generator v3.6.0
 ========================================
 Simulates realistic network traffic across a wide range of protocols and
 behaviours: DNS, HTTP/HTTPS/HTTP3, FTP, SSH, NTP, BGP, ICMP, SNMP,
@@ -58,7 +58,7 @@ from rich import box
 from endpoints import *           # noqa: F401,F403  (large data file)
 
 # ── Globals ───────────────────────────────────────────────────────────────────
-VERSION = "3.5.0"
+VERSION = "3.6.0"
 
 
 class _DualWriter:
@@ -505,7 +505,9 @@ def _load_ads_pool() -> list:
             return _ads_pool
         try:
             console.log(f"[cyan]ads:[/] fetching Hagezi pro blocklist…")
-            resp = requests.get(_ADS_BLOCKLIST_URL, timeout=(5, 30), verify=True)
+            _bl_ua = random.choice(user_agents)
+            resp = requests.get(_ADS_BLOCKLIST_URL, timeout=(5, 30), verify=True,
+                                headers=_browser_headers_dict(_bl_ua))
             resp.raise_for_status()
             domains: list = []
             for line in resp.text.splitlines():
@@ -743,6 +745,110 @@ def _size_to_limits(size: str, s, m, l, xl, *, xs=None):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# BROWSER HEADER SIMULATION
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _browser_headers_dict(ua: str) -> dict:
+    """Return a dict of HTTP headers that match the given user-agent string.
+
+    Headers are chosen to match what the identified browser actually sends,
+    so traffic is indistinguishable from a real user browsing the web.
+    Chrome/Edge get Sec-CH-UA client-hints; Firefox gets a distinct Accept;
+    Safari/mobile browsers get appropriate platform headers.
+    """
+    import re as _re
+    ua_lower = ua.lower()
+
+    # Detect browser family
+    is_chrome = "chrome/" in ua_lower and "edg/" not in ua_lower and "opr/" not in ua_lower and "samsungbrowser/" not in ua_lower
+    is_edge   = "edg/" in ua_lower or "edga/" in ua_lower or "edgios/" in ua_lower
+    is_firefox = "firefox/" in ua_lower or "fxios/" in ua_lower
+    is_safari_native = "safari/" in ua_lower and "chrome/" not in ua_lower and "crios/" not in ua_lower
+    is_mobile = "mobile" in ua_lower or "android" in ua_lower or "iphone" in ua_lower or "ipad" in ua_lower
+    is_opera  = "opr/" in ua_lower
+    is_samsung = "samsungbrowser/" in ua_lower
+
+    # Common baseline
+    headers: dict = {
+        "User-Agent": ua,
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+    }
+
+    if is_firefox:
+        headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
+        headers["Accept-Language"] = "en-US,en;q=0.5"
+        headers["Upgrade-Insecure-Requests"] = "1"
+        headers["Sec-Fetch-Dest"] = "document"
+        headers["Sec-Fetch-Mode"] = "navigate"
+        headers["Sec-Fetch-Site"] = "none"
+        headers["Sec-Fetch-User"] = "?1"
+        headers["TE"] = "trailers"
+    elif is_edge or is_chrome or is_opera or is_samsung:
+        headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"
+        headers["Upgrade-Insecure-Requests"] = "1"
+        headers["Sec-Fetch-Dest"] = "document"
+        headers["Sec-Fetch-Mode"] = "navigate"
+        headers["Sec-Fetch-Site"] = "none"
+        headers["Sec-Fetch-User"] = "?1"
+
+        # Extract major version number for Sec-CH-UA
+        m = _re.search(r'(?:chrome|crios)/(\d+)', ua_lower)
+        if m:
+            ver = m.group(1)
+            if is_edge:
+                m2 = _re.search(r'edg[a-z]?/(\d+)', ua_lower)
+                ev = m2.group(1) if m2 else ver
+                headers["Sec-CH-UA"] = f'"Microsoft Edge";v="{ev}", "Chromium";v="{ver}", "Not_A Brand";v="24"'
+                headers["Sec-CH-UA-Mobile"] = "?1" if is_mobile else "?0"
+                headers["Sec-CH-UA-Platform"] = '"Android"' if "android" in ua_lower else ('"iOS"' if "iphone" in ua_lower or "ipad" in ua_lower else '"Windows"')
+            elif is_samsung:
+                headers["Sec-CH-UA"] = f'"Samsung Internet";v="{ver}", "Chromium";v="{ver}", "Not_A Brand";v="24"'
+                headers["Sec-CH-UA-Mobile"] = "?1"
+                headers["Sec-CH-UA-Platform"] = '"Android"'
+            else:
+                headers["Sec-CH-UA"] = f'"Google Chrome";v="{ver}", "Chromium";v="{ver}", "Not_A Brand";v="24"'
+                if is_mobile:
+                    headers["Sec-CH-UA-Mobile"] = "?1"
+                    if "android" in ua_lower:
+                        headers["Sec-CH-UA-Platform"] = '"Android"'
+                    else:
+                        headers["Sec-CH-UA-Platform"] = '"iOS"'
+                else:
+                    headers["Sec-CH-UA-Mobile"] = "?0"
+                    if "macintosh" in ua_lower:
+                        headers["Sec-CH-UA-Platform"] = '"macOS"'
+                    elif "x11" in ua_lower:
+                        headers["Sec-CH-UA-Platform"] = '"Linux"'
+                    else:
+                        headers["Sec-CH-UA-Platform"] = '"Windows"'
+    elif is_safari_native:
+        headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        headers["Upgrade-Insecure-Requests"] = "1"
+    else:
+        # Generic fallback
+        headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        headers["Upgrade-Insecure-Requests"] = "1"
+
+    return headers
+
+
+def _browser_headers(ua: str) -> str:
+    """Return curl -H flags as a single string matching the given user-agent."""
+    d = _browser_headers_dict(ua)
+    # User-Agent is passed via -A separately, skip it here
+    parts = []
+    for k, v in d.items():
+        if k == "User-Agent":
+            continue
+        # Escape single quotes inside value
+        v_esc = v.replace("'", "'\\''")
+        parts.append(f"-H '{k}: {v_esc}'")
+    return " ".join(parts)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # SUBPROCESS HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -757,12 +863,13 @@ def _curl_head(url: str, user_agent: str,
     browser-side tool.  The response body is discarded; only the status code
     is returned for logging.
     """
+    bh = _browser_headers(user_agent) if user_agent else ""
     cmd = (
         f"curl -k -s --show-error "
         f"--connect-timeout {connect_timeout} "
         f"-I -o /dev/null -w '%{{http_code}}' --max-time {max_time} "
         f"{extra_flags} "
-        f"-A '{user_agent}' {url}"
+        f"-A '{user_agent}' {bh} {url}"
     )
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True,
                             timeout=max_time + 5)
@@ -781,10 +888,11 @@ def _curl_download(url: str, rate_limit: str = "3M",
     """
     rate_flag = f"--limit-rate {rate_limit}" if rate_limit else ""
     ua_flag   = f"-A '{user_agent}'"          if user_agent  else ""
+    bh        = _browser_headers(user_agent)  if user_agent  else ""
     cmd = (
         f"curl {rate_flag} -k --show-error "
         f"--connect-timeout {connect_timeout} "
-        f"-L -o /dev/null -w '%{{response_code}} %{{content_type}}' {ua_flag} {url}"
+        f"-L -o /dev/null -w '%{{response_code}} %{{content_type}}' {ua_flag} {bh} {url}"
     )
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True,
                             timeout=timeout)
@@ -1106,7 +1214,7 @@ def bigfile() -> None:
         try:
             with requests.get(
                 url, stream=True, verify=False, timeout=(3, 3),
-                headers={"User-Agent": ua},
+                headers=_browser_headers_dict(ua),
             ) as resp:
                 if resp.status_code in (403, 429, 451):
                     ui_warn(f"HTTP {resp.status_code} from provider — skipping")
@@ -2292,7 +2400,9 @@ def urlresponse_random() -> None:
             task = prog.add_task("resp", total=n)
             for i, url in enumerate(https_endpoints[:n], 1):
                 try:
-                    r = requests.get(url, timeout=3, verify=False)
+                    _rt_ua = random.choice(user_agents)
+                    r = requests.get(url, timeout=3, verify=False,
+                                     headers=_browser_headers_dict(_rt_ua))
                     t = r.elapsed.total_seconds()
                     console.log(f"({i}/{n}) {url}  {t:.3f}s")
                     _stats.record(str(r.status_code))
@@ -2402,7 +2512,7 @@ def s3_sim() -> None:
         try:
             resp = requests.get(
                 url, verify=False, timeout=(3, 3),
-                headers={"User-Agent": ua},
+                headers=_browser_headers_dict(ua),
                 allow_redirects=True,
             )
             sc = str(resp.status_code)
@@ -3321,7 +3431,9 @@ def _download_domain_list(url: str, local_path: str) -> bool:
     """
     console.log(f"Downloading {url} → {local_path}")
     try:
-        with requests.get(url, stream=True, verify=False, timeout=10) as resp:
+        _dl_ua = random.choice(user_agents)
+        with requests.get(url, stream=True, verify=False, timeout=10,
+                          headers=_browser_headers_dict(_dl_ua)) as resp:
             resp.raise_for_status()
             with open(local_path, "wb") as fh:
                 for chunk in resp.iter_content(chunk_size=8192):
@@ -3356,7 +3468,9 @@ def _probe_domain_list(local_path: str, n: int = 10) -> None:
         for i, domain in enumerate(sample, 1):
             url = f"https://{domain}"
             try:
-                r = requests.get(url, timeout=3, verify=False, allow_redirects=True)
+                _probe_ua = random.choice(user_agents)
+                r = requests.get(url, timeout=3, verify=False, allow_redirects=True,
+                                 headers=_browser_headers_dict(_probe_ua))
                 console.log(f"({i}/{len(sample)}) {url}  →  {r.status_code}")
                 _stats.record(str(r.status_code))
             except requests.exceptions.ConnectionError as e:
@@ -3470,7 +3584,7 @@ def scrape_single_link(url: str) -> str | None:
             url,
             timeout=2,
             allow_redirects=True,
-            headers={"User-Agent": ua},
+            headers=_browser_headers_dict(ua),
             verify=False,
         )
         resp.raise_for_status()
@@ -4056,10 +4170,12 @@ def data_exfil_http() -> None:
         ua = random.choice(user_agents)
         console.log(f"  ({i}/{n}) POST {url}  payload={label}")
         try:
+            _exfil_hdrs = _browser_headers_dict(ua)
+            _exfil_hdrs["Content-Type"] = "application/x-www-form-urlencoded"
             resp = requests.post(
                 url,
                 data={"content": body, "format": "text", "expiry": "10m"},
-                headers={"User-Agent": ua, "Content-Type": "application/x-www-form-urlencoded"},
+                headers=_exfil_hdrs,
                 timeout=6,
                 verify=False,
                 allow_redirects=False,
@@ -4155,7 +4271,7 @@ def waf_attack() -> None:
                 status = result.stdout.strip()
                 _stats.record(status)
             else:
-                headers = {"User-Agent": ua}
+                headers = _browser_headers_dict(ua)
                 if isinstance(body, str):
                     headers["Content-Type"] = "application/xml"
                     resp = requests.post(url, data=body, headers=headers,

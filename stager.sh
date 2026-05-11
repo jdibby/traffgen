@@ -36,14 +36,13 @@ cat <<'BANNER'
     2. brew upgrade      - upgrade all Homebrew packages
     3. Install Docker    - Docker Desktop via: brew install --cask docker
     4. Launch Docker     - open Docker Desktop and wait for daemon
-    5. Remove containers - stop and remove ALL existing Docker containers
-    6. Prune images      - delete ALL Docker images, volumes, build cache
+    5. Remove containers - stop and remove existing traffgen containers only
+    6. Remove images     - remove jdibby/traffgen images and build cache
     7. Pull image        - jdibby/traffgen:latest from Docker Hub
     8. Start container   - port 7777, restart unless-stopped
 
-  NOTE: Steps 5 & 6 will permanently DELETE all existing containers and
-  images on this host. Run on a dedicated machine, or review the script
-  at https://github.com/jdibby/traffgen/blob/main/stager.sh before use.
+  NOTE: Steps 5 & 6 only touch jdibby/traffgen containers and images —
+  other containers and images on this host are left untouched.
 
   NOTE: macOS does not support --network=host. The lateral-movement suite
   will be limited to the Docker bridge network, not your physical LAN.
@@ -72,14 +71,14 @@ cat <<'BANNER'
     4. Install Docker CE - docker-ce, docker-ce-cli, containerd.io,
                            docker-buildx-plugin, docker-compose-plugin
     5. Enable Docker     - systemctl enable --now docker
-    6. Remove containers - stop and remove ALL existing Docker containers
-    7. Prune images      - delete ALL Docker images, volumes, build cache
+    6. Remove containers - stop and remove existing traffgen containers only
+    7. Prune images      - remove jdibby/traffgen images and build cache
     8. Pull image        - jdibby/traffgen:latest from Docker Hub
     9. Start container   - port 7777, restart unless-stopped
 
-  NOTE: Steps 6 & 7 will permanently DELETE all existing containers and
-  images on this host. Run on a dedicated machine, or review the script
-  at https://github.com/jdibby/traffgen/blob/main/stager.sh before use.
+  NOTE: Steps 6 & 7 only touch jdibby/traffgen containers and images —
+  other containers and images on this host are left untouched. Review the
+  script at https://github.com/jdibby/traffgen/blob/main/stager.sh before use.
 
 --------------------------------------------------------------------------------
 
@@ -504,13 +503,18 @@ else
 fi
 
 # ── Full cleanup and fresh start ──────────────────────────────────────────────
-step "Stopping and removing all containers"
-docker stop $(docker ps -aq) 2>/dev/null || true
-docker rm   $(docker ps -aq) 2>/dev/null || true
+step "Stopping and removing traffgen containers"
+while IFS= read -r _cid; do
+    [ -n "$_cid" ] || continue
+    docker stop "$_cid" 2>/dev/null || true
+    docker rm   "$_cid" 2>/dev/null || true
+done < <({ docker ps -aq --filter "ancestor=jdibby/traffgen"; \
+           docker ps -aq --filter "name=traffgen"; } 2>/dev/null | sort -u)
 
-step "Pruning images, volumes, and build cache"
-docker image prune -af   2>/dev/null || true
-docker volume prune -f   2>/dev/null || true
+step "Removing traffgen images and build cache"
+docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null \
+    | grep -E '^jdibby/traffgen:' \
+    | xargs -r docker rmi -f 2>/dev/null || true
 docker builder prune -af 2>/dev/null || true
 
 step "Pulling latest traffgen image"

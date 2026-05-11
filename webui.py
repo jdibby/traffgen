@@ -873,9 +873,29 @@ def api_tls_check():
     if not raw_port.isdigit() or not (1 <= int(raw_port) <= 65535):
         return jsonify({"error": "Invalid port"}), 400
     port = int(raw_port)
+    tls_ver_param = request.args.get("tls_version", "auto").strip().lower()
+
+    _TLS_MAP = {
+        "tls1.3": ssl.TLSVersion.TLSv1_3,
+        "tls1.2": ssl.TLSVersion.TLSv1_2,
+    }
+    # TLS 1.0 and 1.1 may not be available on the server; attempt gracefully
+    try:
+        _TLS_MAP["tls1.1"] = ssl.TLSVersion.TLSv1_1  # type: ignore[attr-defined]
+        _TLS_MAP["tls1.0"] = ssl.TLSVersion.TLSv1    # type: ignore[attr-defined]
+    except AttributeError:
+        pass
+
     try:
         ctx = ssl.create_default_context()
-        ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        if tls_ver_param in _TLS_MAP:
+            tls_obj = _TLS_MAP[tls_ver_param]
+            ctx.minimum_version = tls_obj
+            ctx.maximum_version = tls_obj
+        else:
+            ctx.minimum_version = ssl.TLSVersion.TLSv1_2
         with _socket.create_connection((host, port), timeout=8) as sock:
             with ctx.wrap_socket(sock, server_hostname=host) as ssock:
                 cert = ssock.getpeercert()
@@ -896,8 +916,8 @@ def api_tls_check():
             "not_before": not_before, "not_after": not_after,
             "sans": sans[:20],
         })
-    except ssl.SSLCertVerificationError as e:
-        return jsonify({"error": f"Certificate verification failed: {e.reason}"}), 200
+    except ssl.SSLError as e:
+        return jsonify({"error": f"TLS handshake failed: {e.reason or str(e)}"}), 200
     except (ConnectionRefusedError, TimeoutError, OSError):
         return jsonify({"error": "Connection failed — check host and port"}), 200
     except Exception as e:
@@ -1126,7 +1146,7 @@ body{display:flex;background:var(--bg);color:var(--text);font-family:-apple-syst
 .nav-arr.open{transform:rotate(90deg)}
 .nav-sub{max-height:0;overflow:hidden;transition:max-height .28s ease}
 .nav-sub.open{max-height:500px}
-.nav-sub-item{display:flex;align-items:center;gap:8px;padding:5px 16px 5px 36px;color:var(--dim);cursor:pointer;border:none;background:none;width:100%;text-align:left;font-size:14px;border-left:3px solid transparent;transition:all .12s}
+.nav-sub-item{display:flex;align-items:center;gap:8px;padding:5px 16px 5px 36px;color:var(--muted);cursor:pointer;border:none;background:none;width:100%;text-align:left;font-size:14px;border-left:3px solid transparent;transition:all .12s}
 .nav-sub-item:hover{color:var(--text);background:rgba(255,255,255,.04)}
 .nav-sub-item.active{color:var(--green);border-left-color:var(--green);background:var(--gdim)}
 .diag-tool{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:14px}
@@ -1767,6 +1787,13 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         <div class="diag-input-row">
           <input id="tls-host" class="diag-input" type="text" placeholder="hostname (e.g. example.com)" spellcheck="false" autocomplete="off" onkeydown="if(event.key==='Enter')runTlsCheck()">
           <input id="tls-port" class="diag-input" type="text" value="443" style="flex:0 0 64px" title="Port">
+          <select id="tls-ver" class="diag-input" style="flex:0 0 auto;width:auto;padding-right:20px" title="TLS version">
+            <option value="auto" selected>Auto</option>
+            <option value="tls1.3">TLS 1.3</option>
+            <option value="tls1.2">TLS 1.2</option>
+            <option value="tls1.1">TLS 1.1</option>
+            <option value="tls1.0">TLS 1.0</option>
+          </select>
           <button id="tls-btn" class="diag-btn" onclick="runTlsCheck()">Check</button>
         </div>
         <div id="tls-results"><div class="tr-status">Enter a hostname and click Check.</div></div>
@@ -3415,10 +3442,11 @@ function trProtoChange(){
 // ── TLS Inspector ─────────────────────────────────────────────────────────
 function runTlsCheck(){
   const host=($('tls-host').value||'').trim(),port=($('tls-port').value||'443').trim();
+  const tlsVer=($('tls-ver')&&$('tls-ver').value)||'auto';
   if(!host){$('tls-results').innerHTML='<div class="tr-status" style="color:var(--red)">Enter a hostname.</div>';return;}
   $('tls-btn').disabled=true;
   $('tls-results').innerHTML='<div class="tr-status">Connecting&#8230;</div>';
-  fetch('/api/tls-check?host='+encodeURIComponent(host)+'&port='+encodeURIComponent(port))
+  fetch('/api/tls-check?host='+encodeURIComponent(host)+'&port='+encodeURIComponent(port)+'&tls_version='+encodeURIComponent(tlsVer))
     .then(r=>r.json()).then(d=>{
       $('tls-btn').disabled=false;
       if(d.error){$('tls-results').innerHTML=`<div class="tr-status" style="color:var(--red)">${H(d.error)}</div>`;return;}
