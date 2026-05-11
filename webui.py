@@ -1942,8 +1942,8 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
         </div>
       </div>
       <div class="ov-section" id="ov-sec-analytics">
-        <div class="ov-sec-hdr" onclick="toggleOvSec(this)"><span>Analytics</span><span class="ov-sec-arr">&#9656;</span></div>
-        <div class="ov-sec-body collapsed">
+        <div class="ov-sec-hdr" onclick="toggleOvSec(this)"><span>Analytics</span><span class="ov-sec-arr open">&#9656;</span></div>
+        <div class="ov-sec-body">
           <div class="tcard" data-widget="cat-sparklines">
             <div class="thdr">Category Success Rate Trends</div>
             <div id="cat-spark-body" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;padding:4px 0"><div class="empty">Waiting for data&#8230;</div></div>
