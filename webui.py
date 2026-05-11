@@ -977,23 +977,46 @@ def api_tls_check():
             ctx.minimum_version = ssl.TLSVersion.TLSv1_2
         with _socket.create_connection((host, port), timeout=8) as sock:
             with ctx.wrap_socket(sock, server_hostname=host) as ssock:
-                cert = ssock.getpeercert()
-                cipher = ssock.cipher()
+                der_cert = ssock.getpeercert(binary_form=True)
+                cipher  = ssock.cipher()
                 version = ssock.version()
-        subject  = dict(x[0] for x in cert.get("subject", []))
-        issuer   = dict(x[0] for x in cert.get("issuer", []))
-        sans     = [v for t, v in cert.get("subjectAltName", []) if t == "DNS"]
-        not_before = cert.get("notBefore", "")
-        not_after  = cert.get("notAfter", "")
+
+        # getpeercert() returns {} under CERT_NONE; parse the raw DER via openssl
+        cn = issuer_cn = issuer_org = not_before = not_after = ""
+        sans: list[str] = []
+        if der_cert:
+            pem = ssl.DER_cert_to_PEM_cert(der_cert)
+            r = subprocess.run(
+                ["openssl", "x509", "-noout", "-subject", "-issuer",
+                 "-dates", "-ext", "subjectAltName"],
+                input=pem, capture_output=True, text=True, timeout=5,
+            )
+            import re as _re2
+            for line in r.stdout.splitlines():
+                line = line.strip()
+                if line.startswith("subject="):
+                    m = _re2.search(r"CN\s*=\s*([^,/\n]+)", line)
+                    if m: cn = m.group(1).strip()
+                elif line.startswith("issuer="):
+                    m = _re2.search(r"CN\s*=\s*([^,/\n]+)", line)
+                    if m: issuer_cn = m.group(1).strip()
+                    m = _re2.search(r"\bO\s*=\s*([^,/\n]+)", line)
+                    if m: issuer_org = m.group(1).strip()
+                elif line.startswith("notBefore="):
+                    not_before = line[len("notBefore="):]
+                elif line.startswith("notAfter="):
+                    not_after = line[len("notAfter="):]
+                elif "DNS:" in line:
+                    sans = [s.strip()[4:] for s in line.split(",")
+                            if s.strip().startswith("DNS:")][:20]
+
         return jsonify({
             "host": host, "port": port,
             "tls_version": version,
             "cipher": cipher[0] if cipher else "",
-            "cn": subject.get("commonName", ""),
-            "issuer_cn": issuer.get("commonName", ""),
-            "issuer_org": issuer.get("organizationName", ""),
+            "cn": cn, "issuer_cn": issuer_cn, "issuer_org": issuer_org,
             "not_before": not_before, "not_after": not_after,
-            "sans": sans[:20],
+            "sans": sans,
         })
     except ssl.SSLError as e:
         return jsonify({"error": f"TLS handshake failed: {e.reason or str(e)}"}), 200
@@ -1350,6 +1373,7 @@ body{display:flex;background:var(--bg);color:var(--text);font-family:-apple-syst
 .diag-input-row{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
 .diag-input{flex:1;min-width:180px;background:var(--input-bg,rgba(255,255,255,.06));border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:14px;font-family:'SF Mono',Consolas,monospace;outline:none}
 .diag-input:focus{border-color:var(--green);box-shadow:0 0 0 2px rgba(34,197,94,.15)}
+select.diag-input{appearance:none;-webkit-appearance:none;background-color:var(--surf2);color:var(--text);color-scheme:dark}
 .diag-btn{padding:8px 18px;background:var(--green);color:#0a0f1a;font-weight:700;font-size:14px;border:none;border-radius:8px;cursor:pointer;white-space:nowrap;transition:opacity .12s}
 .diag-btn:hover{opacity:.85}
 .diag-btn:disabled{opacity:.4;cursor:default}
