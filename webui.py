@@ -22,8 +22,8 @@ logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
 from flask import Flask, Response, jsonify, request  # noqa: E402
 
-# ── Constants ──────────────────────────────────────────────────────────────────────────────
-STATE_FILE  = "/tmp/traffgen_state.json"
+# -- Constants ------------------------------------------------------------------
+_STATE_FILE  = "/tmp/traffgen_state.json"
 _LOG_FILE    = "/tmp/traffgen_log.jsonl"
 _CMD_FILE    = "/tmp/traffgen_cmd.json"
 _PAUSE_FILE  = "/tmp/traffgen_pause"
@@ -34,7 +34,3 @@ PORT         = 7777
 MAX_SSE      = 30
 _VALID_SIZES = {"XS", "S", "M", "L", "XL"}
 ADMIN_TOKEN  = os.environ.get("TRAFFGEN_ADMIN_TOKEN", "")
-
-app = Flask(__name__)
-
-print("webui.py stub loaded - full content restore required")
