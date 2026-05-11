@@ -4,7 +4,7 @@
 
 [![Docker Hub](https://img.shields.io/docker/pulls/jdibby/traffgen?logo=docker&label=Docker%20Hub)](https://hub.docker.com/r/jdibby/traffgen)
 [![Multi-arch](https://img.shields.io/badge/arch-amd64%20%7C%20arm64%20%7C%20arm%2Fv7-blue?logo=linux)](https://hub.docker.com/r/jdibby/traffgen)
-[![Version](https://img.shields.io/badge/version-3.7.0-green)](https://github.com/jdibby/traffgen/blob/main/generator.py)
+[![Version](https://img.shields.io/badge/version-3.8.0-green)](https://github.com/jdibby/traffgen/blob/main/generator.py)
 
 Trafgen simulates realistic network traffic across **52 test suites** — DNS, HTTP/S, FTP, SSH, BGP, ICMP, NTP, SNMP, DoH, DoT, VoIP/UCaaS, C2 beacons, DNS exfiltration, AI/LLM DLP, lateral movement, TLS inspection checks, WAF attacks, and more.
 
