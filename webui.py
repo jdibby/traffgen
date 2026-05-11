@@ -2159,6 +2159,16 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
       <div style="max-width:900px">
 
         <div class="a-section">
+          <div class="a-h">v3.8.0 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
+          <table class="st-table" style="margin-top:10px">
+            <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Live View</td><td><strong>UA label wrapping</strong> — log lines containing User-Agent strings are now condensed to compact labels (e.g. <code>[Chrome/130/Android 14]</code>) in both the generator and the web UI, preventing long UAs from splitting across multiple log entries</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Live View</td><td><strong>Log level classification</strong> — connection errors, timeouts, "no links found", HTTP 4xx/5xx responses, and other failure signals are now classified as <code>WARN</code> or <code>ERROR</code> instead of <code>INFO</code></td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Live View</td><td><strong>Sub-result indentation</strong> — log lines prefixed with <code>↳</code> (sub-results / follow-up detail lines) now render with proportional left padding in the web Live View, matching the visual nesting shown in the terminal</td></tr>
+          </table>
+        </div>
+
+        <div class="a-section">
           <div class="a-h">v3.7.0 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
           <table class="st-table" style="margin-top:10px">
             <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
@@ -3093,7 +3103,7 @@ function setFilter(btn,lvl){
   });
 }
 function _fmtMsgUA(msg){
-  return msg.replace(/Mozilla\/5\.0[^\s"']*(?:\([^)]*\)[^\s"']*)*/g,function(ua){
+  return msg.replace(/Mozilla\/5\.0[^"'\n]*/g,function(ua){
     let os='';
     const am=ua.match(/Android (\d+(?:\.\d+)*)/);if(am)os='Android '+am[1];
     else{const im=ua.match(/iPhone OS (\d+[_\d]*)/);if(im)os='iOS '+im[1].replace(/_/g,'.');}
@@ -3139,6 +3149,8 @@ function appendLog(d){
     div.innerHTML=`<span class="llt">${ts}</span><span class="llm">${H(msg)}</span>`;
   } else {
     div.className='ll '+lvl;
+    const _im=msg.match(/^( +)↳/);
+    if(_im)div.style.paddingLeft=(14+Math.min(_im[1].length,8)*8)+'px';
     const icon=lvl==='ok'?'✔ ':lvl==='error'?'✗ ':lvl==='warn'?'⚠ ':'';
     div.innerHTML=`<span class="llt">${ts}</span><span class="llv">${H(lvl.toUpperCase().slice(0,5).padEnd(5))}</span><span class="llm">${icon?`<span style="opacity:.7">${icon}</span>`:''}${H(_fmtMsgUA(msg))}</span>`;
   }
@@ -3752,6 +3764,8 @@ function _odrAppendLine(body,raw){
   else if(/\[warn\]|⚠|\bwarn(ing)?\b/i.test(raw))lvl='warn';
   const icon=lvl==='ok'?'✔ ':lvl==='error'?'✗ ':lvl==='warn'?'⚠ ':'';
   div.className='ll '+lvl;
+  const _im2=raw.match(/^( +)↳/);
+  if(_im2)div.style.paddingLeft=(14+Math.min(_im2[1].length,8)*8)+'px';
   div.innerHTML='<span class="llt">'+ts+'</span><span class="llv">'+H(lvl.toUpperCase().slice(0,5).padEnd(5))+'</span><span class="llm">'+(icon?'<span style="opacity:.7">'+icon+'</span>':'')+H(_fmtMsgUA(raw))+'</span>';
   body.appendChild(div);body.scrollTop=body.scrollHeight;
 }

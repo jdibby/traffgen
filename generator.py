@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-generator.py — Traffic Generator v3.7.0
+generator.py — Traffic Generator v3.8.0
 ========================================
 Simulates realistic network traffic across a wide range of protocols and
 behaviours: DNS, HTTP/HTTPS/HTTP3, FTP, SSH, NTP, BGP, ICMP, SNMP,
@@ -58,7 +58,7 @@ from rich import box
 from endpoints import *           # noqa: F401,F403  (large data file)
 
 # ── Globals ───────────────────────────────────────────────────────────────────
-VERSION = "3.7.0"
+VERSION = "3.8.0"
 
 
 class _DualWriter:
@@ -121,6 +121,21 @@ class _DualWriter:
             lvl = 'warn'
         elif re.match(r'^[─━]{4,}', line):
             lvl = 'rule'
+        elif re.search(
+            r'(?i)\b(connection\s*error|connection\s*refused|connection\s*reset'
+            r'|no\s+links?\s+found|timed?\s*out|timeout|ssl\s*error'
+            r'|unreachable|skipping|skipped|blocked|dropped'
+            r'|HTTP\s+[45]\d{2}|→\s+[45]\d{2}'
+            r'|^\s*[45]\d{2}\b)',
+            line,
+        ):
+            lvl = 'warn'
+        elif re.search(
+            r'(?i)\b(exception|traceback|error\s*:|failed|failure'
+            r'|crash|abort|fatal|critical)\b',
+            line,
+        ):
+            lvl = 'error'
         else:
             lvl = 'info'
         _web_log(line, level=lvl)
@@ -747,6 +762,40 @@ def _size_to_limits(size: str, s, m, l, xl, *, xs=None):
 # ══════════════════════════════════════════════════════════════════════════════
 # BROWSER HEADER SIMULATION
 # ══════════════════════════════════════════════════════════════════════════════
+
+def _short_ua(ua: str) -> str:
+    """Return a compact [Browser/OS] label from a User-Agent string."""
+    ul = ua.lower()
+    os = ""
+    am = re.search(r'android (\d+)', ul)
+    if am:
+        os = f"Android {am.group(1)}"
+    elif re.search(r'iphone os (\d+)', ul):
+        m = re.search(r'iphone os (\d+)', ul)
+        os = f"iOS {m.group(1)}"
+    elif re.search(r'windows nt', ul):
+        os = "Windows"
+    elif "macintosh" in ul:
+        os = "macOS"
+    elif "linux" in ul:
+        os = "Linux"
+    br = ""
+    if "edg/" in ul or "edga/" in ul:
+        m = re.search(r'edg[a/](\d+)', ul)
+        br = f"Edge/{m.group(1)}" if m else "Edge"
+    elif "chrome/" in ul and "chromium" not in ul:
+        m = re.search(r'chrome/(\d+)', ul)
+        br = f"Chrome/{m.group(1)}" if m else "Chrome"
+    elif "firefox/" in ul:
+        m = re.search(r'firefox/(\d+)', ul)
+        br = f"Firefox/{m.group(1)}" if m else "Firefox"
+    elif "safari/" in ul:
+        m = re.search(r'version/(\d+)', ul)
+        br = f"Safari/{m.group(1)}" if m else "Safari"
+    else:
+        br = "Browser"
+    return f"[{br}/{os}]" if os else f"[{br}]"
+
 
 def _browser_headers_dict(ua: str) -> dict:
     """Return a dict of HTTP headers that match the given user-agent string.
@@ -2968,7 +3017,7 @@ def c2_beacon() -> None:
                 jitter  = random.uniform(1, 5)
                 console.log(
                     f"C2 ({i}/{beacons}) POST → {target}  "
-                    f"jitter={jitter:.1f}s  ua={ua[:40]}"
+                    f"jitter={jitter:.1f}s  ua={_short_ua(ua)}"
                 )
                 try:
                     resp = requests.post(
@@ -3577,7 +3626,7 @@ def scrape_single_link(url: str) -> str | None:
     """
     time.sleep(random.uniform(0.2, 2))
     ua = random.choice(user_agents)
-    console.log(f"→ {url}  [dim]{ua[:60]}[/]")
+    console.log(f"→ {url}  [dim]{_short_ua(ua)}[/]")
 
     try:
         resp = requests.get(
