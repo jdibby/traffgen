@@ -980,6 +980,15 @@ def api_tls_check():
                 der_cert = ssock.getpeercert(binary_form=True)
                 cipher  = ssock.cipher()
                 version = ssock.version()
+                # Send a minimal HTTP request so the traffic looks like HTTPS
+                # to classification engines (e.g. SASE/CASB) rather than raw TLS.
+                try:
+                    ssock.sendall(
+                        f"HEAD / HTTP/1.1\r\nHost: {host}\r\nUser-Agent: Mozilla/5.0\r\nConnection: close\r\n\r\n".encode()
+                    )
+                    ssock.recv(4096)
+                except Exception:
+                    pass
 
         # getpeercert() returns {} under CERT_NONE; parse the raw DER via openssl
         cn = issuer_cn = issuer_org = not_before = not_after = ""
