@@ -4346,11 +4346,16 @@ def _detect_host_lans() -> "list[tuple[str, str]]":
     def _hex_to_ip(h: str) -> str:
         return _socket.inet_ntoa(_struct.pack("<I", int(h, 16)))
 
-    def _normalise(ip: str, prefix: int) -> "tuple[str, str] | None":
+    def _normalise(ip: str, prefix: int, iface_checked: bool = False) -> "tuple[str, str] | None":
         """Return (ip, canonical_cidr), capping large subnets at /24."""
         if not _IP_RE.match(ip):
             return None
-        if _LOOPBACK.match(ip) or _DOCKER_BRIDGE.match(ip):
+        if _LOOPBACK.match(ip):
+            return None
+        # Skip Docker bridge IPs only when we have no interface name to rely on.
+        # When the interface was already filtered by _SKIP_IFACES (strategies 1+2),
+        # trust the name — 172.22.x.x on a real NIC is not a Docker bridge.
+        if not iface_checked and _DOCKER_BRIDGE.match(ip):
             return None
         try:
             if prefix == 32:
@@ -4365,8 +4370,8 @@ def _detect_host_lans() -> "list[tuple[str, str]]":
         except Exception:
             return None
 
-    def _add(ip: str, prefix: int) -> None:
-        entry = _normalise(ip, prefix)
+    def _add(ip: str, prefix: int, iface_checked: bool = False) -> None:
+        entry = _normalise(ip, prefix, iface_checked)
         if entry and entry[1] not in seen_nets:
             seen_nets.add(entry[1])
             results.append(entry)
@@ -4417,11 +4422,11 @@ def _detect_host_lans() -> "list[tuple[str, str]]":
                         ).stdout
                         _m = _re.search(r"inet (\d+\.\d+\.\d+\.\d+)/(\d+)", _ip_out)
                         if _m:
-                            _add(_m.group(1), int(_m.group(2)))
+                            _add(_m.group(1), int(_m.group(2)), iface_checked=True)
                             continue
                     except Exception:
                         pass
-                    _add(_dest, _pfx)
+                    _add(_dest, _pfx, iface_checked=True)
         if default_gw and not results:
             _add(default_gw, 24)
     except Exception:
@@ -4449,11 +4454,11 @@ def _detect_host_lans() -> "list[tuple[str, str]]":
                     ).stdout
                     _im = _re.search(r"inet (\d+\.\d+\.\d+\.\d+)/(\d+)", _ip_out)
                     if _im:
-                        _add(_im.group(1), int(_im.group(2)))
+                        _add(_im.group(1), int(_im.group(2)), iface_checked=True)
                         continue
                 except Exception:
                     pass
-                _add(_ip, int(_pfx_s))
+                _add(_ip, int(_pfx_s), iface_checked=True)
         except Exception:
             pass
 
