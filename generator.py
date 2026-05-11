@@ -276,7 +276,6 @@ _SUITE_DESCRIPTIONS: list[tuple[str, str]] = [
     ("msf-payload-delivery","msfvenom encoded payloads delivered via HTTP to public test targets — tests NGFW/IDS obfuscated payload detection"),
     ("msf-recon",           "Metasploit auxiliary recon scanners (EternalBlue probe, SMB/RDP/MySQL/Redis/HTTP fingerprinting)"),
     ("msf-webapp",          "Metasploit checks: web app CVEs (Drupal, Joomla, WordPress, GitLab, PHP CGI, Magento, Webmin)"),
-    ("iperf3",           "TCP/UDP bandwidth tests: public iperf3 servers → loopback fallback; validates egress port 5201, bulk flow detection, QoS/rate-limiting"),
     ("speedtest",        "fast.com speed-test via fastcli"),
     ("nmap",             "Nmap port scan (1-1024) + CVE script scan"),
     ("ntp",              "NTP UDP probes to a pool of public time servers"),
@@ -5014,7 +5013,6 @@ _SUITE_MAP: dict[str, list] = {
     "msf-aux-scan":          [msf_aux_scan],
     "msf-payload-delivery":  [msf_payload_delivery],
     "msf-cred-spray":        [msf_cred_spray],
-    "iperf3":           [iperf3_bandwidth],
     "speedtest":        [speedtest_fast],
     "nmap":             [nmap_1024os, nmap_cve],
     "ntp":              [ntp_random],
@@ -5250,13 +5248,6 @@ def parse_cli() -> argparse.Namespace:
         "--crawl-start", default="https://data.commoncrawl.org",
         metavar="URL",
         help="Seed URL for the 'web-crawl' suite (default: https://data.commoncrawl.org)",
-    )
-    specific.add_argument(
-        "--iperf3-flags", default="", metavar="FLAGS",
-        help=(
-            "Custom iperf3 flags replacing the default test variants for the 'iperf3' suite\n"
-            "(e.g. --iperf3-flags \"-t 10 -P 8 -u -b 50M\"). Omit to use built-in defaults."
-        ),
     )
     specific.add_argument(
         "--lateral-networks", default="", metavar="CIDRS",

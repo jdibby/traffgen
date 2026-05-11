@@ -1096,6 +1096,154 @@ def api_dns_lookup():
     return jsonify({"host": host, "results": results, "rtype": rtype, "mismatch": mismatch})
 
 
+# Allowlist for iperf3 modes — maps UI name to iperf3 flags
+_IP3_MODE_FLAGS: "dict[str, list[str]]" = {
+    "tcp":      [],
+    "udp":      ["-u"],
+    "reverse":  ["-R"],
+    "parallel": ["-P", "4"],
+}
+_IP3_BW_RE = __import__('re').compile(r'^\d+[KMG]?$')
+_IP3_INTERVAL_RE = __import__('re').compile(
+    r'\[\s*\d+\]\s+([\d.]+)-([\d.]+)\s+sec\s+[\d.]+\s+\S+\s+'
+    r'([\d.]+)\s+(\w+)bits/sec'
+    r'(?:\s+([\d.]+)\s+ms\s+(\d+)/\d+\s+\(([\d.]+)%\))?'
+    r'(?:\s+(\d+))?'
+)
+
+
+@app.route("/api/iperf3")
+def api_iperf3():
+    def _sse_err(msg: str) -> "Response":
+        return Response(
+            f'data: {json.dumps({"type": "error", "msg": msg})}\n\ndone: true\n\n',
+            mimetype="text/event-stream",
+            headers={"Cache-Control": "no-cache"},
+        )
+
+    # ── Validate all inputs eagerly ───────────────────────────────────────────
+    raw_host = request.args.get("host", "").strip()
+    loopback_mode = (not raw_host) or raw_host in ("loopback", "127.0.0.1")
+    if loopback_mode:
+        safe_host = "127.0.0.1"
+    else:
+        if not _TARGET_RE.match(raw_host):
+            return _sse_err("Invalid host — use a hostname or IP address")
+        safe_host = raw_host  # regex-validated
+
+    raw_port = request.args.get("port", "5201")
+    if not raw_port.isdigit() or not (1 <= int(raw_port) <= 65535):
+        return _sse_err("Invalid port")
+    safe_port = str(int(raw_port))  # re-serialised int
+
+    raw_mode = request.args.get("mode", "tcp").lower()
+    if raw_mode not in _IP3_MODE_FLAGS:
+        return _sse_err("Invalid mode — use tcp, udp, reverse, or parallel")
+    safe_mode_flags: list = _IP3_MODE_FLAGS[raw_mode]  # allowlist lookup
+
+    raw_duration = request.args.get("duration", "5")
+    if not raw_duration.isdigit() or not (1 <= int(raw_duration) <= 30):
+        return _sse_err("Invalid duration — must be 1–30 seconds")
+    safe_duration = str(int(raw_duration))  # re-serialised int
+
+    raw_bw = request.args.get("bandwidth", "10M").strip()
+    if not _IP3_BW_RE.match(raw_bw):
+        return _sse_err("Invalid bandwidth — use e.g. 10M, 100K, 1G")
+    safe_bw = raw_bw  # regex-validated
+
+    raw_streams = request.args.get("streams", "4")
+    if not raw_streams.isdigit() or not (1 <= int(raw_streams) <= 8):
+        return _sse_err("Invalid streams — must be 1–8")
+    safe_streams = str(int(raw_streams))  # re-serialised int
+
+    def _gen():
+        import re as _re3
+        server_proc = None
+        try:
+            if loopback_mode:
+                # Start a local iperf3 server on the chosen port
+                try:
+                    server_proc = subprocess.Popen(
+                        ["iperf3", "-s", "-p", safe_port, "--forceflush"],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    )
+                    import time as _time
+                    _time.sleep(0.5)  # give the server a moment to bind
+                except FileNotFoundError:
+                    yield f'data: {json.dumps({"type": "error", "msg": "iperf3 not found on this system"})}\n\n'
+                    return
+
+            cmd = ["iperf3", "-c", safe_host, "-p", safe_port,
+                   "-t", safe_duration, "--forceflush"]
+            cmd += safe_mode_flags
+            # For parallel mode, override the -P flag with the user-specified
+            # streams count instead of the default 4 from the allowlist
+            if raw_mode == "parallel":
+                # Remove the default "-P","4" appended by the allowlist
+                cmd = [a for a in cmd if a not in ("-P", "4")]
+                cmd += ["-P", safe_streams]
+            if raw_mode == "udp":
+                cmd += ["-b", safe_bw]
+
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, errors="replace",
+            )
+            timeout = int(safe_duration) + 10
+            import threading as _threading
+            _killed = []
+            def _killer():
+                _killed.append(True)
+                proc.kill()
+            timer = _threading.Timer(timeout, _killer)
+            timer.start()
+            try:
+                for line in proc.stdout:
+                    line = line.rstrip()
+                    if not line:
+                        continue
+                    if "Connecting to host" in line:
+                        yield f'data: {json.dumps({"type": "connecting", "host": safe_host, "port": int(safe_port)})}\n\n'
+                        continue
+                    is_summary = line.rstrip().endswith(("sender", "receiver"))
+                    m = _IP3_INTERVAL_RE.search(line)
+                    if m:
+                        sec_start = float(m.group(1))
+                        sec_end   = float(m.group(2))
+                        mbps      = float(m.group(3))
+                        unit      = m.group(4)  # "M", "K", "G", etc.
+                        jitter_ms = float(m.group(5)) if m.group(5) else None
+                        lost_pct  = float(m.group(7)) if m.group(7) else None
+                        retransmits = int(m.group(8)) if m.group(8) else None
+                        if is_summary:
+                            role = "sender" if line.endswith("sender") else "receiver"
+                            yield f'data: {json.dumps({"type": "result", "role": role, "mbps": mbps, "unit": unit, "retransmits": retransmits, "lost_pct": lost_pct, "jitter_ms": jitter_ms})}\n\n'
+                        else:
+                            yield f'data: {json.dumps({"type": "interval", "sec_start": sec_start, "sec_end": sec_end, "mbps": mbps, "unit": unit, "retransmits": retransmits, "lost_pct": lost_pct, "jitter_ms": jitter_ms})}\n\n'
+                proc.wait()
+                timer.cancel()
+            finally:
+                timer.cancel()
+            code = proc.returncode
+            if _killed:
+                yield f'data: {json.dumps({"type": "error", "msg": "iperf3 timed out"})}\n\n'
+            yield f'data: {json.dumps({"type": "done", "code": code})}\n\n'
+        except FileNotFoundError:
+            yield f'data: {json.dumps({"type": "error", "msg": "iperf3 not found on this system"})}\n\n'
+        except Exception as exc:
+            yield f'data: {json.dumps({"type": "error", "msg": str(exc)})}\n\n'
+        finally:
+            if server_proc is not None:
+                server_proc.kill()
+
+    return Response(
+        _gen(),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 @app.route("/api/run-test")
 def api_run_test():
     """On-demand test runner (#216): stream generator output as SSE."""
@@ -1404,6 +1552,13 @@ select.diag-input{appearance:none;-webkit-appearance:none;background-color:var(-
 .tr-bar-fill{height:100%;border-radius:3px;transition:width .4s ease}
 .tr-status{padding:10px 6px;color:var(--muted);font-style:italic;font-size:13px}
 .tr-error{padding:10px 6px;color:var(--red,#ef4444);font-size:13px}
+
+.ip-row{display:grid;grid-template-columns:90px 90px 1fr 80px;gap:0;padding:3px 0;border-bottom:1px solid var(--border);font-size:13px;font-family:'SF Mono',Consolas,monospace}
+.ip-row:first-child{color:var(--muted);font-size:11px;font-weight:600;letter-spacing:.04em}
+.ip-mbps{font-weight:700}
+.ip-summary{margin-top:12px;padding:14px;background:var(--surf2);border-radius:8px;border:1px solid var(--border2)}
+.ip-bar-wrap{height:6px;background:var(--border);border-radius:3px;margin-top:6px;overflow:hidden}
+.ip-bar-fill{height:100%;border-radius:3px;transition:width .3s}
 
 .nav-ico{width:18px;text-align:center;font-size:19px;opacity:.75}
 .sb-foot{margin-top:auto;padding:12px 16px;border-top:1px solid var(--border)}
@@ -2047,6 +2202,40 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
           <button id="dns-btn" class="diag-btn" onclick="runDnsLookup()">Lookup</button>
         </div>
         <div id="dns-results"><div class="tr-status">Enter a hostname and click Lookup.</div></div>
+      </div>
+      <div class="diag-tool">
+        <div class="diag-tool-hdr">&#128246; iperf3 Bandwidth Test</div>
+        <div class="diag-input-row" style="flex-wrap:wrap;align-items:flex-end">
+          <div style="display:flex;gap:4px;flex:1;min-width:200px;align-items:center">
+            <input id="ip3-host" class="diag-input" type="text" placeholder="hostname or IP" spellcheck="false" autocomplete="off" style="flex:1;min-width:120px" onkeydown="if(event.key==='Enter')runIperf3()">
+            <select id="ip3-preset" class="diag-input" style="flex:0 0 auto;width:auto;padding-right:18px" title="Public test servers" onchange="(function(v){if(!v)return;if(v==='loopback'){$('ip3-host').value='';$('ip3-port').value='5201';}else{$('ip3-host').value=v.split(':')[0];$('ip3-port').value=v.split(':')[1]||'5201';}$('ip3-preset').value='';})(this.value)">
+              <option value="">Presets&#9660;</option>
+              <option value="loopback">Loopback (127.0.0.1)</option>
+              <option value="iperf.he.net:5201">iperf.he.net</option>
+              <option value="bouygues.iperf.fr:5201">bouygues.iperf.fr</option>
+              <option value="ping.online.net:5201">ping.online.net</option>
+              <option value="iperf3.moji.fr:5201">iperf3.moji.fr</option>
+              <option value="iperf.scottlinux.com:5201">iperf.scottlinux.com</option>
+            </select>
+          </div>
+          <input id="ip3-port" class="diag-input" type="number" value="5201" min="1" max="65535" style="flex:0 0 80px;min-width:70px" title="Port">
+          <select id="ip3-mode" class="diag-input" style="flex:0 0 auto;width:auto;padding-right:18px" title="Mode" onchange="ip3ModeChange()">
+            <option value="tcp">TCP</option>
+            <option value="udp">UDP</option>
+            <option value="reverse">Reverse (TCP)</option>
+            <option value="parallel">Parallel (4 streams)</option>
+          </select>
+          <input id="ip3-duration" class="diag-input" type="number" value="5" min="1" max="30" style="flex:0 0 64px;min-width:56px" title="Duration (s)" placeholder="5s">
+          <input id="ip3-bw" class="diag-input" type="text" value="10M" style="flex:0 0 72px;min-width:64px;display:none" title="UDP bandwidth (e.g. 10M, 100K, 1G)" placeholder="Bandwidth">
+          <input id="ip3-streams" class="diag-input" type="number" value="4" min="1" max="8" style="flex:0 0 64px;min-width:56px;display:none" title="Parallel streams (1–8)" placeholder="Streams">
+          <button id="ip3-btn" class="diag-btn" onclick="runIperf3()">Run</button>
+          <button id="ip3-stop" class="diag-btn cancel" onclick="stopIperf3()" style="display:none">Stop</button>
+        </div>
+        <div id="ip3-results" style="display:none">
+          <div id="ip3-status" class="tr-status"></div>
+          <div id="ip3-table"></div>
+          <div id="ip3-summary"></div>
+        </div>
       </div>
       <div class="diag-tool">
         <div class="diag-tool-hdr">&#9654; On-Demand Test Runner</div>
@@ -3766,6 +3955,88 @@ function runDnsLookup(){
       const warn=mismatch?`<div style="padding:6px 10px;margin-bottom:8px;background:rgba(245,158,11,.1);border:1px solid var(--amber);border-radius:6px;font-size:13px;color:var(--amber)">&#9888; Mismatch — resolvers returned different answers</div>`:'';
       $('dns-results').innerHTML=warn+`<table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:4px"><thead><tr><th style="text-align:left;padding:0 8px 6px 0;color:var(--muted);font-size:12px">Resolver</th><th style="text-align:left;padding:0 8px 6px 0;color:var(--muted);font-size:12px">Answers (${H(d.rtype)})</th><th style="text-align:right;padding:0 0 6px 12px;color:var(--muted);font-size:12px">RTT</th></tr>${rows}</table>`;
     }).catch(e=>{$('dns-btn').disabled=false;$('dns-results').innerHTML=`<div class="tr-status" style="color:var(--red)">${H(e.message)}</div>`;});
+}
+// -- iperf3 Bandwidth Test -------------------------------------------------
+let _ipSrc=null;
+function ip3ModeChange(){
+  const m=$('ip3-mode').value;
+  $('ip3-bw').style.display=m==='udp'?'':'none';
+  $('ip3-streams').style.display=m==='parallel'?'':'none';
+}
+function _renderIpInterval(d){
+  const tbl=$('ip3-table');
+  if(!tbl)return;
+  if(!tbl.firstChild){
+    const hdr=document.createElement('div');hdr.className='ip-row';
+    hdr.innerHTML='<span>Interval</span><span>Transfer</span><span>Bitrate</span><span>Retr / Loss</span>';
+    tbl.appendChild(hdr);
+  }
+  const mbps=d.mbps,unit=d.unit;
+  const bitsLabel=mbps.toFixed(1)+' '+unit+'bits/s';
+  const bCol=mbps>=100?'var(--green)':mbps>=10?'var(--amber)':'var(--red)';
+  // Estimate transfer: mbps * interval_duration / 8 MB
+  const dur=d.sec_end-d.sec_start;
+  const xferMB=(mbps*dur/8).toFixed(2)+' MB';
+  const retrLoss=d.lost_pct!=null?d.lost_pct.toFixed(1)+'% / '+d.jitter_ms+'ms':(d.retransmits!=null?d.retransmits:'—');
+  const row=document.createElement('div');row.className='ip-row';
+  row.innerHTML=`<span>${d.sec_start.toFixed(2)}-${d.sec_end.toFixed(2)}s</span><span>${H(xferMB)}</span><span class="ip-mbps" style="color:${bCol}">${H(bitsLabel)}</span><span>${H(String(retrLoss))}</span>`;
+  tbl.appendChild(row);
+  tbl.scrollTop=tbl.scrollHeight;
+}
+function _renderIpResult(d){
+  const el=$('ip3-summary');if(!el)return;
+  const mbps=d.mbps;
+  const bCol=mbps>=100?'var(--green)':mbps>=10?'var(--amber)':'var(--red)';
+  const pct=Math.min(100,mbps/1000*100);
+  const extra=d.lost_pct!=null?`<span style="color:var(--muted);font-size:12px;margin-left:8px">Loss ${d.lost_pct.toFixed(1)}%  Jitter ${d.jitter_ms}ms</span>`:(d.retransmits!=null?`<span style="color:var(--muted);font-size:12px;margin-left:8px">Retr ${d.retransmits}</span>`:'');
+  el.innerHTML+='<div class="ip-summary">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between">'
+    +`<span style="font-weight:600;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.05em">${H(d.role)}</span>`
+    +`<span class="ip-mbps" style="color:${bCol};font-size:18px">${mbps.toFixed(1)} ${H(d.unit)}bits/s</span>${extra}`
+    +'</div>'
+    +'<div class="ip-bar-wrap"><div class="ip-bar-fill" style="width:'+pct.toFixed(1)+'%;background:'+bCol+'"></div></div>'
+    +'</div>';
+}
+function runIperf3(){
+  const host=($('ip3-host').value||'').trim();
+  const port=($('ip3-port').value||'5201').trim();
+  const mode=$('ip3-mode').value;
+  const dur=($('ip3-duration').value||'5').trim();
+  const bw=($('ip3-bw').value||'10M').trim();
+  const streams=($('ip3-streams').value||'4').trim();
+  stopIperf3();
+  $('ip3-results').style.display='';
+  $('ip3-table').innerHTML='';
+  $('ip3-summary').innerHTML='';
+  $('ip3-status').textContent='Connecting…';
+  $('ip3-btn').disabled=true;$('ip3-stop').style.display='';
+  let url='/api/iperf3?mode='+encodeURIComponent(mode)+'&port='+encodeURIComponent(port)+'&duration='+encodeURIComponent(dur)+'&bandwidth='+encodeURIComponent(bw)+'&streams='+encodeURIComponent(streams);
+  if(host&&host!=='loopback')url+='&host='+encodeURIComponent(host);
+  _ipSrc=new EventSource(url);
+  _ipSrc.onmessage=e=>{
+    const d=JSON.parse(e.data);
+    if(d.type==='connecting'){
+      $('ip3-status').textContent='Connected to '+d.host+':'+d.port+' — running…';
+    }else if(d.type==='interval'){
+      _renderIpInterval(d);
+    }else if(d.type==='result'){
+      _renderIpResult(d);
+    }else if(d.type==='error'){
+      const err=document.createElement('div');err.className='tr-error';err.textContent=d.msg;
+      $('ip3-results').appendChild(err);
+      _ipSrc.close();_ipSrc=null;$('ip3-btn').disabled=false;$('ip3-stop').style.display='none';
+      $('ip3-status').textContent='Error.';
+    }else if(d.type==='done'){
+      $('ip3-status').textContent='Complete (exit '+d.code+').';
+      _ipSrc.close();_ipSrc=null;$('ip3-btn').disabled=false;$('ip3-stop').style.display='none';
+    }
+  };
+  _ipSrc.onerror=()=>{stopIperf3();$('ip3-status').textContent='Connection lost.';};
+}
+function stopIperf3(){
+  if(_ipSrc){_ipSrc.close();_ipSrc=null;}
+  if($('ip3-btn'))$('ip3-btn').disabled=false;
+  if($('ip3-stop'))$('ip3-stop').style.display='none';
 }
 // -- On-demand runner (#216) -----------------------------------------------
 let _odrSrc=null;
