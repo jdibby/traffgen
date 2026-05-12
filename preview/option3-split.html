@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Traffic Map — Option 3: Split Panel</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0a0c10;color:#e2e8f0;font-family:'Inter',system-ui,sans-serif;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+  header{display:flex;align-items:center;gap:12px;padding:10px 18px;background:#0d1117;border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0}
+  header h1{font-size:15px;font-weight:600}
+  .badge{background:rgba(0,255,136,.12);color:#00ff88;font-size:10px;font-weight:700;letter-spacing:1px;padding:2px 8px;border-radius:20px;text-transform:uppercase;border:1px solid rgba(0,255,136,.25);animation:badge-pulse 2s ease-in-out infinite}
+  @keyframes badge-pulse{0%,100%{opacity:1}50%{opacity:.6}}
+  .main{flex:1;display:flex;overflow:hidden}
+  #map{flex:1}
+  /* Right panel */
+  .right{width:300px;background:#0d1117;border-left:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+  .r-hdr{padding:14px 16px 10px;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0}
+  .r-hdr-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:#4a5568;margin-bottom:10px}
+  /* Stat row */
+  .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:2px}
+  .stat-box{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:6px;padding:8px 10px}
+  .stat-n{font-size:20px;font-weight:700;line-height:1.1}
+  .stat-n.g{color:#00ff88}
+  .stat-n.b{color:#63b3ed}
+  .stat-n.p{color:#b794f4}
+  .stat-n.o{color:#f6ad55}
+  .stat-l{font-size:10px;color:#4a5568;margin-top:1px}
+  /* Country breakdown */
+  .c-section{padding:10px 16px 6px;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0}
+  .c-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#4a5568;margin-bottom:8px}
+  .c-row{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12px}
+  .c-bar-wrap{flex:1;height:4px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden}
+  .c-bar{height:100%;border-radius:2px;background:#63b3ed;transition:width .5s}
+  .c-count{color:#4a5568;font-size:11px;min-width:18px;text-align:right}
+  .c-name{min-width:90px;color:#a0aec0}
+  /* Live feed */
+  .feed-section{flex:1;overflow-y:auto;min-height:0}
+  .feed-title{padding:10px 16px 6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#4a5568;position:sticky;top:0;background:#0d1117;border-bottom:1px solid rgba(255,255,255,.04)}
+  .feed-item{display:flex;gap:10px;padding:8px 16px;border-bottom:1px solid rgba(255,255,255,.04);align-items:flex-start;animation:slide-in .2s ease}
+  @keyframes slide-in{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:none}}
+  .f-dot{width:7px;height:7px;border-radius:50%;margin-top:4px;flex-shrink:0}
+  .f-body{flex:1;min-width:0}
+  .f-host{font-size:12px;font-weight:600;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .f-meta{display:flex;gap:6px;margin-top:2px;align-items:center}
+  .f-loc{font-size:10px;color:#4a5568}
+  .f-suite{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:1px 5px;border-radius:3px}
+  .f-time{font-size:10px;color:#2d3748;margin-left:auto}
+  /* Map tooltips */
+  .leaflet-tooltip{background:rgba(13,17,23,.95);border:1px solid rgba(255,255,255,.15);color:#e2e8f0;font-size:12px;border-radius:6px;padding:6px 10px;box-shadow:0 4px 16px rgba(0,0,0,.5)}
+  .leaflet-tooltip::before{display:none}
+</style>
+</head>
+<body>
+<header>
+  <span style="font-size:18px">🗺</span>
+  <h1>Traffic Map</h1>
+  <span class="badge">● Live</span>
+  <span style="margin-left:auto;font-size:11px;color:#4a5568">traffgen v3.9.3</span>
+</header>
+<div class="main">
+  <div id="map"></div>
+  <div class="right">
+    <div class="r-hdr">
+      <div class="r-hdr-title">Traffic Overview</div>
+      <div class="stat-grid">
+        <div class="stat-box"><div class="stat-n g" id="s-arcs">0</div><div class="stat-l">Active arcs</div></div>
+        <div class="stat-box"><div class="stat-n b" id="s-total">0</div><div class="stat-l">Total probes</div></div>
+        <div class="stat-box"><div class="stat-n p" id="s-ctry">0</div><div class="stat-l">Countries</div></div>
+        <div class="stat-box"><div class="stat-n o" id="s-ep">15</div><div class="stat-l">Endpoints</div></div>
+      </div>
+    </div>
+    <div class="c-section">
+      <div class="c-title">By Country</div>
+      <div id="ctry-list"></div>
+    </div>
+    <div class="feed-section">
+      <div class="feed-title">Live Hit Feed</div>
+      <div id="feed"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const map = L.map('map',{center:[39,-98],zoom:4,zoomControl:true,attributionControl:false});
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:14}).addTo(map);
+
+const SOURCE = [39.74,-104.98];
+const SUITE_COLOR={dns:'#63b3ed',https:'#b794f4',iperf3:'#f6ad55',nmap:'#fc8181','shadow-it':'#fbd38d','tor-anonymizer':'#9ae6b4',c2:'#fc8181',malware:'#fc8181'};
+
+const DESTS=[
+  {ll:[37.41,-122.08], host:'8.8.8.8', loc:'Mountain View, CA', country:'US', suite:'dns'},
+  {ll:[37.77,-122.42], host:'1.1.1.1', loc:'San Francisco, CA', country:'US', suite:'dns'},
+  {ll:[47.67,-122.12], host:'microsoft.com', loc:'Redmond, WA', country:'US', suite:'https'},
+  {ll:[40.71,-74.01],  host:'vimeo.com', loc:'New York, NY', country:'US', suite:'https'},
+  {ll:[37.53,-121.99], host:'scanme.nmap.org', loc:'Fremont, CA', country:'US', suite:'nmap'},
+  {ll:[47.38,8.54],    host:'9.9.9.9', loc:'Zurich, Switzerland', country:'CH', suite:'dns'},
+  {ll:[51.51,-0.13],   host:'lon.clouvider.net', loc:'London, UK', country:'GB', suite:'iperf3'},
+  {ll:[48.86,2.35],    host:'bouygues.iperf.fr', loc:'Paris, France', country:'FR', suite:'iperf3'},
+  {ll:[34.05,-118.24], host:'la.clouvider.net', loc:'Los Angeles, CA', country:'US', suite:'iperf3'},
+  {ll:[37.34,-121.89], host:'adobe.com', loc:'San Jose, CA', country:'US', suite:'https'},
+  {ll:[30.27,-97.74],  host:'tesla.com', loc:'Austin, TX', country:'US', suite:'https'},
+  {ll:[37.33,-122.03], host:'apple.com', loc:'Cupertino, CA', country:'US', suite:'https'},
+  {ll:[52.37,4.90],    host:'wetransfer.com', loc:'Amsterdam, NL', country:'NL', suite:'shadow-it'},
+  {ll:[46.20,6.14],    host:'protonvpn.com', loc:'Geneva, Switzerland', country:'CH', suite:'tor-anonymizer'},
+  {ll:[39.74,-104.98], host:'iperf.scottlinux.com', loc:'Denver, CO', country:'US', suite:'iperf3'},
+];
+
+// Source marker
+const srcIcon = L.divIcon({
+  html:`<div style="width:12px;height:12px;border-radius:50%;background:#00ff88;box-shadow:0 0 0 3px rgba(0,255,136,.25),0 0 10px rgba(0,255,136,.5)"></div>`,
+  className:'',iconSize:[12,12],iconAnchor:[6,6]
+});
+L.marker(SOURCE,{icon:srcIcon,interactive:false,zIndexOffset:1000}).addTo(map);
+
+// Dest markers
+DESTS.forEach(d=>{
+  const c=SUITE_COLOR[d.suite]||'#63b3ed';
+  L.circleMarker(d.ll,{radius:5,color:c,fillColor:c,fillOpacity:.4,weight:1.5,opacity:.7}).addTo(map)
+   .bindTooltip(`<strong style="color:${c}">${d.host}</strong><br><span style="color:#718096;font-size:11px">📍 ${d.loc}</span><br><span style="color:${c};font-size:10px;text-transform:uppercase">${d.suite}</span>`,{className:'',sticky:true,offset:[10,0]});
+});
+
+// Arc
+function buildArc(from,to,n=50){
+  const midLat=(from[0]+to[0])/2+Math.abs(to[1]-from[1])*.18;
+  const midLng=(from[1]+to[1])/2;
+  return Array.from({length:n+1},(_,i)=>{const t=i/n;return[(1-t)*(1-t)*from[0]+2*(1-t)*t*midLat+t*t*to[0],(1-t)*(1-t)*from[1]+2*(1-t)*t*midLng+t*t*to[1]];});
+}
+
+let activeArcs=0,totalProbes=0;
+const countryCounts={};
+
+function shootArc(dst){
+  const c=SUITE_COLOR[dst.suite]||'#63b3ed';
+  const pts=buildArc(SOURCE,dst.ll);
+  activeArcs++;totalProbes++;
+  countryCounts[dst.country]=(countryCounts[dst.country]||0)+1;
+  updateStats();
+  addFeed(dst,c);
+  updateCountries();
+
+  const trail=L.polyline([pts[0]],{color:c,weight:2,opacity:.5,interactive:false,smoothFactor:1}).addTo(map);
+  const dot=L.circleMarker(pts[0],{radius:4,color:c,fillColor:'#fff',fillOpacity:1,weight:2,interactive:false}).addTo(map);
+  let i=0;
+  const TRAIL=10;
+  const ticker=setInterval(()=>{
+    i++;
+    if(i>=pts.length){
+      clearInterval(ticker);
+      activeArcs=Math.max(0,activeArcs-1);updateStats();
+      // Pulse
+      const pulse=L.circleMarker(dst.ll,{radius:6,color:c,fillColor:c,fillOpacity:.5,weight:1,interactive:false}).addTo(map);
+      let r=6,op=.5;
+      const pt=setInterval(()=>{r+=2;op-=.06;if(op<=0){clearInterval(pt);map.removeLayer(pulse);}else pulse.setStyle({radius:r,fillOpacity:op,opacity:op});},35);
+      let tOp=.5;
+      const fade=setInterval(()=>{tOp-=.05;if(tOp<=0){clearInterval(fade);map.removeLayer(trail);map.removeLayer(dot);}else{trail.setStyle({opacity:tOp});dot.setStyle({fillOpacity:tOp*2,opacity:tOp*2});}},40);
+      return;
+    }
+    dot.setLatLng(pts[i]);
+    trail.setLatLngs(pts.slice(Math.max(0,i-TRAIL),i+1));
+  },35);
+}
+
+function updateStats(){
+  document.getElementById('s-arcs').textContent=activeArcs;
+  document.getElementById('s-total').textContent=totalProbes;
+  document.getElementById('s-ctry').textContent=Object.keys(countryCounts).length;
+}
+
+function updateCountries(){
+  const list=document.getElementById('ctry-list');
+  const max=Math.max(...Object.values(countryCounts));
+  const FLAGS={US:'🇺🇸',GB:'🇬🇧',FR:'🇫🇷',NL:'🇳🇱',CH:'🇨🇭',DE:'🇩🇪',JP:'🇯🇵',AU:'🇦🇺',CA:'🇨🇦',SE:'🇸🇪'};
+  const NAMES={US:'United States',GB:'United Kingdom',FR:'France',NL:'Netherlands',CH:'Switzerland',DE:'Germany',JP:'Japan',AU:'Australia',CA:'Canada',SE:'Sweden'};
+  const sorted=Object.entries(countryCounts).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  list.innerHTML=sorted.map(([c,n])=>`
+    <div class="c-row">
+      <span>${FLAGS[c]||'🌐'}</span>
+      <span class="c-name">${NAMES[c]||c}</span>
+      <div class="c-bar-wrap"><div class="c-bar" style="width:${Math.round(n/max*100)}%"></div></div>
+      <span class="c-count">${n}</span>
+    </div>`).join('');
+}
+
+const feed=document.getElementById('feed');
+function addFeed(dst,c){
+  const now=new Date().toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const el=document.createElement('div');
+  el.className='feed-item';
+  el.innerHTML=`<div class="f-dot" style="background:${c}"></div>
+    <div class="f-body">
+      <div class="f-host">${dst.host}</div>
+      <div class="f-meta">
+        <span class="f-loc">📍 ${dst.loc}</span>
+        <span class="f-suite" style="background:${c}22;color:${c};border:1px solid ${c}44">${dst.suite}</span>
+        <span class="f-time">${now}</span>
+      </div>
+    </div>`;
+  feed.insertBefore(el,feed.firstChild);
+  while(feed.children.length>20)feed.removeChild(feed.lastChild);
+}
+
+// Demo loop
+function demo(){
+  const dst=DESTS[Math.floor(Math.random()*DESTS.length)];
+  shootArc(dst);
+  if(Math.random()>.6)setTimeout(()=>shootArc(DESTS[Math.floor(Math.random()*DESTS.length)]),400);
+  setTimeout(demo,700+Math.random()*1800);
+}
+setTimeout(demo,600);
+</script>
+</body>
+</html>

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Traffic Map — Option 4: Neon</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#04060a;color:#e2e8f0;font-family:'Inter',system-ui,sans-serif;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+  header{display:flex;align-items:center;gap:12px;padding:10px 18px;background:rgba(4,6,10,.95);border-bottom:1px solid rgba(99,179,237,.1);flex-shrink:0;backdrop-filter:blur(4px)}
+  header h1{font-size:15px;font-weight:600;background:linear-gradient(90deg,#63b3ed,#00ff88);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .badge{background:rgba(0,255,136,.08);color:#00ff88;font-size:10px;font-weight:700;letter-spacing:1px;padding:2px 10px;border-radius:20px;text-transform:uppercase;border:1px solid rgba(0,255,136,.2);position:relative;overflow:hidden}
+  .badge::after{content:'';position:absolute;left:-100%;top:0;width:60%;height:100%;background:linear-gradient(90deg,transparent,rgba(0,255,136,.3),transparent);animation:sweep 2.5s ease-in-out infinite}
+  @keyframes sweep{to{left:200%}}
+  #map{flex:1;width:100%}
+  .leaflet-container{background:#04060a}
+  /* Floating stats strip */
+  .stats-strip{position:absolute;bottom:0;left:0;right:0;z-index:1000;background:linear-gradient(transparent,rgba(4,6,10,.95) 40%);padding:20px 24px 16px;pointer-events:none;display:flex;justify-content:center;gap:0}
+  .ss-inner{display:flex;gap:1px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:12px;overflow:hidden;backdrop-filter:blur(12px)}
+  .ss-stat{padding:10px 28px;text-align:center;border-right:1px solid rgba(255,255,255,.06)}
+  .ss-stat:last-child{border:none}
+  .ss-n{font-size:22px;font-weight:800;line-height:1;letter-spacing:-0.5px}
+  .ss-l{font-size:10px;color:#4a5568;text-transform:uppercase;letter-spacing:1px;margin-top:3px;font-weight:600}
+  /* Colour coded stats */
+  .n-g{color:#00ff88;text-shadow:0 0 20px rgba(0,255,136,.5)}
+  .n-b{color:#63b3ed;text-shadow:0 0 20px rgba(99,179,237,.5)}
+  .n-p{color:#d6bcfa;text-shadow:0 0 20px rgba(214,188,250,.4)}
+  .n-o{color:#f6ad55;text-shadow:0 0 20px rgba(246,173,85,.4)}
+  /* Tooltip */
+  .leaflet-tooltip{background:rgba(4,6,10,.95);border:1px solid rgba(99,179,237,.25);color:#e2e8f0;font-size:12px;border-radius:8px;padding:8px 12px;box-shadow:0 0 20px rgba(0,0,0,.8),0 0 0 1px rgba(99,179,237,.1) inset}
+  .leaflet-tooltip::before{display:none}
+  .tt-h{font-weight:700;color:#63b3ed;margin-bottom:3px}
+  .tt-l{color:#4a5568;font-size:11px}
+  .tt-s{font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin-top:4px;font-weight:700}
+  /* Suite legend */
+  .suite-legend{position:absolute;top:14px;right:14px;z-index:1000;background:rgba(4,6,10,.85);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px 14px;font-size:11px;backdrop-filter:blur(8px);pointer-events:none}
+  .sl-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#4a5568;margin-bottom:8px}
+  .sl-row{display:flex;align-items:center;gap:7px;padding:2px 0;color:#718096}
+  .sl-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+</style>
+</head>
+<body>
+<header>
+  <span style="font-size:18px;-webkit-text-fill-color:initial">🗺</span>
+  <h1>Traffic Map</h1>
+  <span class="badge">● Live</span>
+  <span style="margin-left:auto;font-size:11px;color:#2d3748">traffgen v3.9.3</span>
+</header>
+<div id="map" style="position:relative">
+  <!-- Stats strip overlaid on map -->
+  <div class="stats-strip">
+    <div class="ss-inner">
+      <div class="ss-stat"><div class="ss-n n-g" id="s-arcs">0</div><div class="ss-l">Active Arcs</div></div>
+      <div class="ss-stat"><div class="ss-n n-b" id="s-total">0</div><div class="ss-l">Total Probes</div></div>
+      <div class="ss-stat"><div class="ss-n n-p" id="s-ctry">0</div><div class="ss-l">Countries</div></div>
+      <div class="ss-stat"><div class="ss-n n-o" id="s-src">Denver, CO</div><div class="ss-l">Source</div></div>
+    </div>
+  </div>
+  <!-- Suite legend -->
+  <div class="suite-legend">
+    <div class="sl-title">Suite</div>
+    <div class="sl-row"><div class="sl-dot" style="background:#63b3ed"></div>DNS / DoH</div>
+    <div class="sl-row"><div class="sl-dot" style="background:#b794f4"></div>HTTPS / Web</div>
+    <div class="sl-row"><div class="sl-dot" style="background:#f6ad55"></div>iperf3</div>
+    <div class="sl-row"><div class="sl-dot" style="background:#fc8181"></div>Nmap / IDS</div>
+    <div class="sl-row"><div class="sl-dot" style="background:#9ae6b4"></div>Anonymizer</div>
+    <div class="sl-row"><div class="sl-dot" style="background:#fbd38d"></div>Shadow IT</div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const map = L.map('map',{center:[39,-98],zoom:4,zoomControl:false,attributionControl:false});
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:14}).addTo(map);
+// Labels on top
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:14,pane:'overlayPane'}).addTo(map);
+L.control.zoom({position:'topright'}).addTo(map);
+
+const SOURCE=[39.74,-104.98];
+const SUITE_COLOR={dns:'#63b3ed',https:'#b794f4',iperf3:'#f6ad55',nmap:'#fc8181','shadow-it':'#fbd38d','tor-anonymizer':'#9ae6b4',c2:'#fc8181'};
+
+const DESTS=[
+  {ll:[37.41,-122.08],host:'8.8.8.8',loc:'Mountain View, CA',country:'US',suite:'dns'},
+  {ll:[37.77,-122.42],host:'1.1.1.1',loc:'San Francisco, CA',country:'US',suite:'dns'},
+  {ll:[47.67,-122.12],host:'microsoft.com',loc:'Redmond, WA',country:'US',suite:'https'},
+  {ll:[40.71,-74.01], host:'vimeo.com',loc:'New York, NY',country:'US',suite:'https'},
+  {ll:[37.53,-121.99],host:'scanme.nmap.org',loc:'Fremont, CA',country:'US',suite:'nmap'},
+  {ll:[47.38,8.54],   host:'9.9.9.9',loc:'Zurich, Switzerland',country:'CH',suite:'dns'},
+  {ll:[51.51,-0.13],  host:'lon.clouvider.net',loc:'London, UK',country:'GB',suite:'iperf3'},
+  {ll:[48.86,2.35],   host:'bouygues.iperf.fr',loc:'Paris, France',country:'FR',suite:'iperf3'},
+  {ll:[34.05,-118.24],host:'la.clouvider.net',loc:'Los Angeles, CA',country:'US',suite:'iperf3'},
+  {ll:[37.34,-121.89],host:'adobe.com',loc:'San Jose, CA',country:'US',suite:'https'},
+  {ll:[30.27,-97.74], host:'tesla.com',loc:'Austin, TX',country:'US',suite:'https'},
+  {ll:[37.33,-122.03],host:'apple.com',loc:'Cupertino, CA',country:'US',suite:'https'},
+  {ll:[52.37,4.90],   host:'wetransfer.com',loc:'Amsterdam, NL',country:'NL',suite:'shadow-it'},
+  {ll:[46.20,6.14],   host:'protonvpn.com',loc:'Geneva, Switzerland',country:'CH',suite:'tor-anonymizer'},
+  {ll:[39.74,-104.98],host:'iperf.scottlinux.com',loc:'Denver, CO',country:'US',suite:'iperf3'},
+];
+
+// Source marker — animated neon ring
+const srcIcon=L.divIcon({
+  html:`<div style="position:relative;width:20px;height:20px">
+    <div style="position:absolute;inset:0;border-radius:50%;background:#00ff88;opacity:.9;box-shadow:0 0 6px #00ff88,0 0 20px rgba(0,255,136,.6)"></div>
+    <div style="position:absolute;inset:-6px;border-radius:50%;border:1.5px solid rgba(0,255,136,.5);animation:r1 2s ease-out infinite"></div>
+    <div style="position:absolute;inset:-14px;border-radius:50%;border:1px solid rgba(0,255,136,.25);animation:r1 2s ease-out .5s infinite"></div>
+  </div>
+  <style>@keyframes r1{0%{transform:scale(.8);opacity:.9}100%{transform:scale(1.8);opacity:0}}</style>`,
+  className:'',iconSize:[20,20],iconAnchor:[10,10],zIndexOffset:1000
+});
+L.marker(SOURCE,{icon:srcIcon,interactive:false}).addTo(map);
+
+// Dest markers
+DESTS.forEach(d=>{
+  const c=SUITE_COLOR[d.suite]||'#63b3ed';
+  L.circleMarker(d.ll,{radius:5,color:c,fillColor:c,fillOpacity:.3,weight:1.5,opacity:.6}).addTo(map)
+   .bindTooltip(`<div class="tt-h">${d.host}</div><div class="tt-l">📍 ${d.loc}</div><div class="tt-s" style="color:${c}">${d.suite}</div>`,{className:'',sticky:true,offset:[10,0]});
+});
+
+// Arc builder
+function buildArc(from,to,n=60){
+  const midLat=(from[0]+to[0])/2+Math.abs(to[1]-from[1])*.18;
+  const midLng=(from[1]+to[1])/2;
+  return Array.from({length:n+1},(_,i)=>{const t=i/n;return[(1-t)*(1-t)*from[0]+2*(1-t)*t*midLat+t*t*to[0],(1-t)*(1-t)*from[1]+2*(1-t)*t*midLng+t*t*to[1]];});
+}
+
+let activeArcs=0,totalProbes=0;
+const seen=new Set();
+
+function shootArc(dst){
+  const c=SUITE_COLOR[dst.suite]||'#63b3ed';
+  const pts=buildArc(SOURCE,dst.ll);
+  activeArcs++;totalProbes++;seen.add(dst.country);
+  document.getElementById('s-arcs').textContent=activeArcs;
+  document.getElementById('s-total').textContent=totalProbes;
+  document.getElementById('s-ctry').textContent=seen.size;
+
+  // Neon glow trail (two polylines: thick glow + thin core)
+  const glow=L.polyline([pts[0]],{color:c,weight:6,opacity:.15,interactive:false,smoothFactor:1}).addTo(map);
+  const core=L.polyline([pts[0]],{color:c,weight:1.5,opacity:.7,interactive:false,smoothFactor:1}).addTo(map);
+
+  // Traveling dot — neon white
+  const dot=L.circleMarker(pts[0],{radius:5,color:'#fff',fillColor:c,fillOpacity:1,weight:2,interactive:false}).addTo(map);
+
+  let i=0;
+  const TRAIL=14;
+  const ticker=setInterval(()=>{
+    i++;
+    if(i>=pts.length){
+      clearInterval(ticker);
+      activeArcs=Math.max(0,activeArcs-1);
+      document.getElementById('s-arcs').textContent=activeArcs;
+      // Neon burst at destination
+      const burst=L.circleMarker(dst.ll,{radius:5,color:c,fillColor:c,fillOpacity:.9,weight:0,interactive:false}).addTo(map);
+      let r=5,op=.9;
+      const bT=setInterval(()=>{r+=3;op-=.07;if(op<=0){clearInterval(bT);map.removeLayer(burst);}else burst.setStyle({radius:r,fillOpacity:op,opacity:op});},30);
+      // Fade everything
+      let tOp=.7;
+      const fade=setInterval(()=>{tOp-=.04;if(tOp<=0){clearInterval(fade);[glow,core,dot].forEach(l=>map.removeLayer(l));}else{glow.setStyle({opacity:tOp*.2});core.setStyle({opacity:tOp});dot.setStyle({fillOpacity:tOp,opacity:tOp});}},40);
+      return;
+    }
+    dot.setLatLng(pts[i]);
+    const tail=pts.slice(Math.max(0,i-TRAIL),i+1);
+    glow.setLatLngs(tail);
+    core.setLatLngs(tail);
+  },35);
+}
+
+// Auto-expand bounds when non-US dest fires
+const US_BOUNDS=map.getBounds();
+let expanded=false;
+function maybeExpand(dst){
+  if(!expanded&&(dst.country!=='US')){
+    expanded=true;
+    map.flyTo([30,0],2,{duration:2});
+  }
+}
+
+// Demo loop
+function demo(){
+  const dst=DESTS[Math.floor(Math.random()*DESTS.length)];
+  maybeExpand(dst);
+  shootArc(dst);
+  if(Math.random()>.55)setTimeout(()=>{const d2=DESTS[Math.floor(Math.random()*DESTS.length)];maybeExpand(d2);shootArc(d2);},350);
+  setTimeout(demo,700+Math.random()*1600);
+}
+setTimeout(demo,800);
+</script>
+</body>
+</html>

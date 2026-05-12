@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Traffic Map — Option 2: 3D Globe</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#07090d;color:#e2e8f0;font-family:'Inter',system-ui,sans-serif;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+  header{display:flex;align-items:center;gap:12px;padding:10px 18px;background:#0d1117;border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0}
+  header h1{font-size:15px;font-weight:600}
+  .badge{background:rgba(99,179,237,.1);color:#63b3ed;font-size:10px;font-weight:700;letter-spacing:1px;padding:2px 8px;border-radius:20px;text-transform:uppercase;border:1px solid rgba(99,179,237,.25)}
+  .main{flex:1;display:flex;overflow:hidden}
+  #globe-wrap{flex:1;position:relative;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,#0d1a2a 0%,#07090d 70%)}
+  #globe-svg{display:block}
+  /* Stats panel */
+  .stats-panel{width:220px;background:#0d1117;border-left:1px solid rgba(255,255,255,.07);padding:20px 16px;display:flex;flex-direction:column;gap:16px;overflow-y:auto;flex-shrink:0}
+  .sp-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:#4a5568;margin-bottom:8px}
+  .sp-stat{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:10px 12px}
+  .sp-val{font-size:22px;font-weight:700;color:#63b3ed;line-height:1.1}
+  .sp-val.green{color:#00ff88}
+  .sp-lbl{font-size:11px;color:#4a5568;margin-top:2px}
+  .sp-feed{flex:1;min-height:0}
+  .feed-item{font-size:11px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);display:flex;gap:8px;align-items:flex-start;color:#718096}
+  .feed-item:last-child{border:none}
+  .feed-dot{width:6px;height:6px;border-radius:50%;background:#00ff88;margin-top:3px;flex-shrink:0}
+  .feed-host{color:#a0aec0;font-weight:500}
+  .feed-loc{color:#4a5568;font-size:10px}
+  /* Arc glow */
+  .arc-path{fill:none;stroke-linecap:round}
+  /* Tooltip */
+  #globe-tip{position:absolute;background:rgba(13,17,23,.95);border:1px solid rgba(255,255,255,.15);color:#e2e8f0;font-size:12px;border-radius:6px;padding:7px 11px;pointer-events:none;display:none;white-space:nowrap;z-index:10}
+  #globe-tip .th{font-weight:700;color:#63b3ed}
+</style>
+</head>
+<body>
+<header>
+  <span style="font-size:18px">🌐</span>
+  <h1>Traffic Map</h1>
+  <span class="badge">● Live</span>
+  <span style="margin-left:auto;font-size:11px;color:#4a5568">traffgen v3.9.3</span>
+</header>
+<div class="main">
+  <div id="globe-wrap">
+    <svg id="globe-svg"></svg>
+    <div id="globe-tip"></div>
+  </div>
+  <div class="stats-panel">
+    <div>
+      <div class="sp-title">Traffic Stats</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="sp-stat"><div class="sp-val green" id="s-arcs">0</div><div class="sp-lbl">Active arcs</div></div>
+        <div class="sp-stat"><div class="sp-val" id="s-total">0</div><div class="sp-lbl">Total probes</div></div>
+        <div class="sp-stat"><div class="sp-val" id="s-ctry">14</div><div class="sp-lbl">Countries</div></div>
+        <div class="sp-stat"><div class="sp-val" id="s-ep">15</div><div class="sp-lbl">Endpoints</div></div>
+      </div>
+    </div>
+    <div class="sp-feed" id="sp-feed-wrap">
+      <div class="sp-title">Recent Hits</div>
+      <div id="sp-feed"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/d3@7/dist/d3.min.js"></script>
+<script src="https://unpkg.com/topojson-client@3/dist/topojson-client.min.js"></script>
+<script>
+const SOURCE_COORD = [-104.98, 39.74]; // Denver CO [lon, lat]
+
+const DESTINATIONS = [
+  {coord:[-122.08,37.41], host:'8.8.8.8', loc:'Mountain View, CA', suite:'dns'},
+  {coord:[-122.42,37.77], host:'1.1.1.1', loc:'San Francisco, CA', suite:'dns'},
+  {coord:[-122.12,47.67], host:'microsoft.com', loc:'Redmond, WA', suite:'https'},
+  {coord:[-74.01,40.71],  host:'vimeo.com', loc:'New York, NY', suite:'https'},
+  {coord:[-121.99,37.53], host:'scanme.nmap.org', loc:'Fremont, CA', suite:'nmap'},
+  {coord:[8.54,47.38],    host:'9.9.9.9', loc:'Zurich, Switzerland', suite:'dns'},
+  {coord:[-0.13,51.51],   host:'lon.clouvider.net', loc:'London, UK', suite:'iperf3'},
+  {coord:[2.35,48.86],    host:'bouygues.iperf.fr', loc:'Paris, France', suite:'iperf3'},
+  {coord:[-118.24,34.05], host:'la.clouvider.net', loc:'Los Angeles, CA', suite:'iperf3'},
+  {coord:[-121.89,37.34], host:'adobe.com', loc:'San Jose, CA', suite:'https'},
+  {coord:[-97.74,30.27],  host:'tesla.com', loc:'Austin, TX', suite:'https'},
+  {coord:[-122.03,37.33], host:'apple.com', loc:'Cupertino, CA', suite:'https'},
+  {coord:[4.90,52.37],    host:'wetransfer.com', loc:'Amsterdam, NL', suite:'shadow-it'},
+  {coord:[6.14,46.20],    host:'protonvpn.com', loc:'Geneva, Switzerland', suite:'tor-anonymizer'},
+  {coord:[-104.98,39.74], host:'iperf.scottlinux.com', loc:'Denver, CO', suite:'iperf3'},
+];
+
+const SUITE_COLOR = {
+  dns:'#63b3ed', https:'#b794f4', iperf3:'#f6ad55',
+  nmap:'#fc8181', 'shadow-it':'#fbd38d', 'tor-anonymizer':'#9ae6b4',
+};
+
+const W = Math.min(window.innerWidth - 240, window.innerHeight - 60);
+const H = window.innerHeight - 60;
+const svg = d3.select('#globe-svg').attr('width',W).attr('height',H);
+const defs = svg.append('defs');
+
+// Glow filter
+const f = defs.append('filter').attr('id','glow');
+f.append('feGaussianBlur').attr('stdDeviation','2.5').attr('result','coloredBlur');
+const fM = f.append('feMerge');
+fM.append('feMergeNode').attr('in','coloredBlur');
+fM.append('feMergeNode').attr('in','SourceGraphic');
+
+const R = Math.min(W, H) * 0.42;
+const cx = W/2, cy = H/2;
+
+let rotation = [90, -25]; // Start centered on US
+const projection = d3.geoOrthographic()
+  .scale(R)
+  .translate([cx, cy])
+  .clipAngle(90)
+  .rotate(rotation);
+
+const pathGen = d3.geoPath(projection);
+
+// Globe background
+svg.append('circle').attr('cx',cx).attr('cy',cy).attr('r',R)
+   .attr('fill','#0a1628').attr('stroke','#1a2744').attr('stroke-width',1);
+
+// Graticule
+const grat = svg.append('path').datum(d3.geoGraticule()())
+  .attr('fill','none').attr('stroke','rgba(255,255,255,.05)').attr('stroke-width',.5);
+
+const landG = svg.append('g');
+const arcG = svg.append('g');
+const dotG = svg.append('g');
+
+// Load world geo
+fetch('https://unpkg.com/world-atlas@2/countries-110m.json')
+  .then(r=>r.json()).then(world=>{
+    const land = topojson.feature(world, world.objects.land);
+    const borders = topojson.mesh(world, world.objects.countries, (a,b)=>a!==b);
+
+    const landPath = landG.append('path').datum(land)
+      .attr('fill','#1a2744').attr('stroke','none');
+    const borderPath = landG.append('path').datum(borders)
+      .attr('fill','none').attr('stroke','#243554').attr('stroke-width',.5);
+
+    // Source dot
+    const srcDot = dotG.append('circle').attr('r',7)
+      .attr('fill','#00ff88').attr('stroke','rgba(0,255,136,.4)').attr('stroke-width',4)
+      .attr('filter','url(#glow)').style('cursor','default');
+
+    // Destination dots
+    const dstDots = DESTINATIONS.map(d => ({
+      d,
+      el: dotG.append('circle').attr('r',4)
+        .attr('fill', SUITE_COLOR[d.suite]||'#63b3ed')
+        .attr('fill-opacity',.5).attr('stroke','none')
+        .style('cursor','pointer')
+        .on('mouseover', function(ev) {
+          showTip(ev, `<div class="th">${d.host}</div><div style="color:#718096;font-size:11px">📍 ${d.loc}</div><div style="color:${SUITE_COLOR[d.suite]||'#63b3ed'};font-size:10px;margin-top:3px">${d.suite}</div>`);
+          d3.select(this).attr('fill-opacity',1).attr('r',6);
+        })
+        .on('mousemove', moveTip)
+        .on('mouseout', function() {
+          hideTip();
+          d3.select(this).attr('fill-opacity',.5).attr('r',4);
+        }),
+    }));
+
+    function reproject() {
+      projection.rotate(rotation);
+      grat.attr('d', pathGen(d3.geoGraticule()()));
+      landPath.attr('d', pathGen(land));
+      borderPath.attr('d', pathGen(borders));
+
+      // Reproject all dots
+      const srcP = projection(SOURCE_COORD);
+      if (srcP) { srcDot.attr('cx',srcP[0]).attr('cy',srcP[1]).attr('display',null); }
+      else { srcDot.attr('display','none'); }
+
+      dstDots.forEach(({d, el}) => {
+        const p = projection(d.coord);
+        if (p) { el.attr('cx',p[0]).attr('cy',p[1]).attr('display',null); }
+        else { el.attr('display','none'); }
+      });
+
+      // Reproject active arcs
+      arcG.selectAll('path.arc-path').each(function() {
+        const dd = d3.select(this).datum();
+        if (dd) d3.select(this).attr('d', pathGen(dd));
+      });
+      arcG.selectAll('circle.dot-travel').each(function() {
+        const dd = d3.select(this).datum();
+        if (dd && dd._pts && dd._i !== undefined) {
+          const p = projection(dd._pts[Math.min(dd._i, dd._pts.length-1)]);
+          if (p) d3.select(this).attr('cx',p[0]).attr('cy',p[1]).attr('display',null);
+          else d3.select(this).attr('display','none');
+        }
+      });
+    }
+    reproject();
+
+    // Slow auto-rotate
+    let autoRotate = true;
+    d3.timer(elapsed => {
+      if (autoRotate) {
+        rotation[0] += 0.05;
+        reproject();
+      }
+    });
+
+    // Drag to rotate
+    let dragStart;
+    svg.call(d3.drag()
+      .on('start', ev => { autoRotate=false; dragStart=[...rotation]; })
+      .on('drag', ev => {
+        rotation[0] = dragStart[0] + ev.dx * 0.3;
+        rotation[1] = Math.max(-70, Math.min(70, dragStart[1] - ev.dy * 0.3));
+        reproject();
+      })
+      .on('end', () => setTimeout(()=>autoRotate=true, 3000))
+    );
+
+    // ── Arc shooting ────────────────────────────────────────────────────────
+    let activeArcs=0, totalProbes=0;
+    function updateStats() {
+      document.getElementById('s-arcs').textContent=activeArcs;
+      document.getElementById('s-total').textContent=totalProbes;
+    }
+
+    function shootArc(dst) {
+      activeArcs++; totalProbes++; updateStats();
+      addFeedItem(dst);
+
+      const color = SUITE_COLOR[dst.suite] || '#63b3ed';
+      const geoArc = {type:'LineString', coordinates:[SOURCE_COORD, dst.coord]};
+
+      const arcPath = arcG.append('path').datum(geoArc)
+        .attr('class','arc-path')
+        .attr('stroke', color)
+        .attr('stroke-width', 1.5)
+        .attr('stroke-opacity', 0.6)
+        .attr('filter','url(#glow)')
+        .attr('d', pathGen(geoArc));
+
+      // Traveling dot along interpolated path
+      const interp = d3.geoInterpolate(SOURCE_COORD, dst.coord);
+      const N = 60;
+      let i = 0;
+
+      const tDot = arcG.append('circle').datum({_pts: null, _i:0})
+        .attr('class','dot-travel')
+        .attr('r',4)
+        .attr('fill','#fff')
+        .attr('stroke',color)
+        .attr('stroke-width',2)
+        .attr('filter','url(#glow)')
+        .attr('display','none');
+
+      const tick = d3.interval(() => {
+        i++;
+        const t = i/N;
+        const coord = interp(t);
+        const proj = projection(coord);
+
+        if (proj && d3.geoDistance(coord, projection.invert([cx,cy])) < Math.PI/2) {
+          tDot.datum({_pts:null,_i:i})
+            .attr('cx',proj[0]).attr('cy',proj[1])
+            .attr('display',null);
+        } else {
+          tDot.attr('display','none');
+        }
+
+        if (i >= N) {
+          tick.stop();
+          activeArcs = Math.max(0,activeArcs-1);
+          updateStats();
+          tDot.remove();
+          // Fade arc
+          let op=0.6;
+          const fade = d3.interval(()=>{
+            op -= 0.05;
+            if(op<=0){fade.stop();arcPath.remove();}
+            else arcPath.attr('stroke-opacity',op);
+          }, 50);
+        }
+      }, 40);
+    }
+
+    // ── Demo loop ────────────────────────────────────────────────────────────
+    function demo() {
+      const dst = DESTINATIONS[Math.floor(Math.random()*DESTINATIONS.length)];
+      shootArc(dst);
+      if (Math.random()>.65) {
+        setTimeout(()=>shootArc(DESTINATIONS[Math.floor(Math.random()*DESTINATIONS.length)]), 500);
+      }
+      setTimeout(demo, 1000 + Math.random()*2200);
+    }
+    setTimeout(demo, 800);
+  });
+
+// ── Tooltip ──────────────────────────────────────────────────────────────────
+const tip = document.getElementById('globe-tip');
+function showTip(ev, html) { tip.innerHTML=html; tip.style.display='block'; moveTip(ev); }
+function moveTip(ev) { tip.style.left=(ev.clientX+14)+'px'; tip.style.top=(ev.clientY-10)+'px'; }
+function hideTip() { tip.style.display='none'; }
+
+// ── Feed ─────────────────────────────────────────────────────────────────────
+const feed = document.getElementById('sp-feed');
+function addFeedItem(dst) {
+  const c = SUITE_COLOR[dst.suite]||'#63b3ed';
+  const el = document.createElement('div');
+  el.className='feed-item';
+  el.innerHTML=`<div class="feed-dot" style="background:${c}"></div><div><div class="feed-host">${dst.host}</div><div class="feed-loc">${dst.loc} · ${dst.suite}</div></div>`;
+  feed.insertBefore(el, feed.firstChild);
+  while(feed.children.length>12) feed.removeChild(feed.lastChild);
+}
+</script>
+</body>
+</html>
