@@ -1589,7 +1589,8 @@ select.diag-input{appearance:none;-webkit-appearance:none;background-color:var(-
 #tab-output.panel{padding:0;gap:0;overflow:hidden}
 #tab-trafficmap.panel{padding:0;gap:0;overflow:hidden}
 #tab-trafficmap.panel.active{flex-direction:row}
-#tmap{position:absolute;inset:0}
+#tmap-container{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;position:relative;background:#04060a}
+#tmap{flex:1;min-height:300px}
 .tmap-strip{position:absolute;bottom:0;left:0;right:0;z-index:1000;background:linear-gradient(transparent,rgba(4,6,10,.95) 40%);padding:20px 24px 16px;pointer-events:none;display:flex;justify-content:center}
 .tmap-strip-inner{display:flex;gap:1px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:12px;overflow:hidden;backdrop-filter:blur(12px)}
 .tmap-stat{padding:10px 24px;text-align:center;border-right:1px solid rgba(255,255,255,.06)}
@@ -2336,7 +2337,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
     </div>
     <!-- Traffic Map -->
     <div id="tab-trafficmap" class="panel">
-      <div id="tmap-container" style="flex:1;position:relative;min-width:0;background:#04060a">
+      <div id="tmap-container">
         <div id="tmap"></div>
         <div class="tmap-strip">
           <div class="tmap-strip-inner">
@@ -4996,26 +4997,29 @@ function initTrafficMap(){
     var srcIcon=L.divIcon({html:'<div style="position:relative;width:20px;height:20px"><div style="position:absolute;inset:0;border-radius:50%;background:#00ff88;opacity:.9;box-shadow:0 0 6px #00ff88,0 0 20px rgba(0,255,136,.6)"></div><div style="position:absolute;inset:-6px;border-radius:50%;border:1.5px solid rgba(0,255,136,.5);animation:tmapR1 2s ease-out infinite"></div><div style="position:absolute;inset:-14px;border-radius:50%;border:1px solid rgba(0,255,136,.25);animation:tmapR1 2s ease-out .5s infinite"></div></div><style>@keyframes tmapR1{0%{transform:scale(.8);opacity:.9}100%{transform:scale(1.8);opacity:0}}</style>',className:'',iconSize:[20,20],iconAnchor:[10,10],zIndexOffset:1000});
     _tmapSrcMarker=L.marker(_tmapSrc,{icon:srcIcon,interactive:false}).addTo(_tmap);
   }
+  // Load CSS immediately (no onload dependency — unreliable cross-browser for stylesheets)
+  if(!document.getElementById('leaflet-css')){
+    var lk=document.createElement('link');lk.id='leaflet-css';lk.rel='stylesheet';
+    lk.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(lk);
+  }
   function _doInit(){
+    if(!window.L){setTimeout(_doInit,50);return;}
     var mapEl=document.getElementById('tmap');
-    if(!mapEl||!mapEl.offsetHeight){setTimeout(_doInit,100);return;}
-    _tmap=L.map('tmap',{center:[39,-98],zoom:4,zoomControl:false,attributionControl:false});
+    if(!mapEl||(!mapEl.offsetHeight&&!mapEl.offsetWidth)){setTimeout(_doInit,100);return;}
+    _tmap=L.map(mapEl,{center:[39,-98],zoom:4,zoomControl:false,attributionControl:false});
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:14}).addTo(_tmap);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:14,pane:'overlayPane'}).addTo(_tmap);
     L.control.zoom({position:'topright'}).addTo(_tmap);
+    // Force tile refresh after layout settles
+    setTimeout(function(){if(_tmap)_tmap.invalidateSize();},300);
     _tmapPlaceSrc();
     _tmapConnectLog();
   }
-  function _loadJS(){
-    if(!window.L){
-      var sc=document.createElement('script');sc.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';sc.onload=_doInit;document.head.appendChild(sc);
-    }else{_doInit();}
-  }
-  if(!document.getElementById('leaflet-css')){
-    var lk=document.createElement('link');lk.id='leaflet-css';lk.rel='stylesheet';lk.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-    lk.onload=_loadJS;
-    document.head.appendChild(lk);
-  }else{_loadJS();}
+  if(!window.L){
+    var sc=document.createElement('script');sc.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    sc.onload=_doInit;document.head.appendChild(sc);
+  }else{_doInit();}
 }
 </script>
 </body></html>"""
