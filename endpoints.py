@@ -337,8 +337,11 @@ icmp_endpoints = [
     # United States — General (CDN / anycast)
     "8.8.8.8", "8.8.4.4",            # Google DNS
     "1.1.1.1", "1.0.0.1",            # Cloudflare
-    "9.9.9.9",                        # Quad9
+    "208.67.222.222", "208.67.220.220",  # OpenDNS
+    "9.9.9.9", "149.112.112.112",    # Quad9
     "4.2.2.2", "4.2.2.4",            # Level3
+    "64.6.64.6", "64.6.65.6",        # Verisign
+    "24.116.0.202",                   # Comcast/Level3 — US East
     # Canada
     "149.112.121.10",                 # CIRA
     # Brazil
