@@ -1656,13 +1656,12 @@ select.diag-input{appearance:none;-webkit-appearance:none;background-color:var(-
 .panel{display:none;flex-direction:column;gap:14px;padding:18px;flex:1;min-height:0;overflow-y:auto}
 .panel.active{display:flex}
 #tab-output.panel{padding:0;gap:0;overflow:hidden}
-#tab-trafficmap.panel{padding:0;gap:0;overflow:hidden}
+#tab-trafficmap.panel{padding:0;gap:0;overflow:hidden;flex-direction:column}
 #tab-trafficmap.panel.active{flex-direction:column}
-/* Override the generic .panel>* rule */
-#tab-trafficmap.panel>#tmap-container,#tab-trafficmap.panel>.tmap-bottom{max-width:none!important;width:auto!important;align-self:stretch!important}
+.tmap-main-row{display:flex;flex-direction:row;flex:1;min-height:0;overflow:hidden}
+.tmap-left-col{display:flex;flex-direction:column;flex:1;min-width:0}
 #tmap-container{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;position:relative;background:#04060a}
 #tmap{flex:1;min-height:200px}
-/* Hidden — replaced by .tmap-bottom */
 .tmap-strip{display:none}.tmap-legend{display:none}.tmap-right{display:none}
 .tmap-n{font-size:20px;font-weight:800;line-height:1;letter-spacing:-.5px;text-align:center}
 .tmap-l{font-size:10px;color:#4a5568;text-transform:uppercase;letter-spacing:1px;margin-top:3px;font-weight:600}
@@ -1674,18 +1673,18 @@ select.diag-input{appearance:none;-webkit-appearance:none;background-color:var(-
 .tmap-leg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .tmap-fs-btn{position:absolute;top:14px;left:14px;z-index:1000;background:rgba(4,6,10,.85);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:5px 10px;font-size:16px;color:#718096;cursor:pointer;backdrop-filter:blur(8px);transition:color .15s,border-color .15s;line-height:1}
 .tmap-fs-btn:hover{color:#e2e8f0;border-color:rgba(255,255,255,.2)}
-/* ── Bottom panel ── */
-.tmap-bottom{background:#080b10;border-top:1px solid rgba(255,255,255,.07);flex-shrink:0;display:flex;flex-direction:column}
-.tmap-bottom-bar{display:flex;align-items:stretch;border-bottom:1px solid rgba(255,255,255,.06)}
-.tmap-stat{padding:8px 20px;text-align:center;border-right:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0}
-.tmap-stat:last-of-type{border-right:none}
+/* ── Bottom bar: legend left + stats center ── */
+.tmap-bottom{background:#080b10;border-top:1px solid rgba(255,255,255,.07);flex-shrink:0;display:flex;flex-direction:row;align-items:stretch}
+.tmap-leg-section{padding:5px 12px;display:flex;flex-wrap:wrap;gap:3px 14px;align-items:center;flex-shrink:0;border-right:1px solid rgba(255,255,255,.06);max-width:260px}
+.tmap-leg-item{display:flex;align-items:center;gap:5px;font-size:10px;color:#718096;white-space:nowrap}
+.tmap-stats-section{flex:1;display:flex;align-items:stretch;justify-content:center}
+.tmap-stat{padding:6px 16px;text-align:center;border-right:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0}
+.tmap-stat:last-child{border-right:none}
 .tmap-src-city{font-size:13px;font-weight:700;line-height:1.1;color:#f6ad55;text-shadow:0 0 20px rgba(246,173,85,.4);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
 .tmap-src-isp{font-size:9px;color:#f6ad55;opacity:.45;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;margin-top:2px}
-.tmap-bottom-sep{width:1px;background:rgba(255,255,255,.08);margin:8px 0;flex-shrink:0}
-.tmap-leg-inline{display:flex;flex-wrap:wrap;gap:4px 20px;padding:0 16px;align-items:center;flex:1;min-width:0}
-.tmap-leg-item{display:flex;align-items:center;gap:6px;font-size:10.5px;color:#718096;white-space:nowrap}
-.tmap-bottom-detail{display:flex;height:108px;min-height:0;overflow:hidden}
-.tmap-c-section{width:280px;flex-shrink:0;padding:6px 10px;overflow-y:auto;border-right:1px solid rgba(255,255,255,.06);scrollbar-width:thin;scrollbar-color:#1a202c transparent}
+/* ── Right sidebar: By Country + Live Hit Feed ── */
+.tmap-right-col{width:220px;background:#080b10;border-left:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+.tmap-c-section{padding:6px 10px;overflow-y:auto;flex-shrink:0;max-height:45%;border-bottom:1px solid rgba(255,255,255,.06);scrollbar-width:thin;scrollbar-color:#1a202c transparent}
 .tmap-c-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#4a5568;margin-bottom:5px;position:sticky;top:0;background:#080b10;padding-top:2px}
 .tmap-c-row{display:flex;align-items:center;gap:6px;padding:2px 0;font-size:11px}
 .tmap-c-bar-wrap{flex:1;height:3px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden}
@@ -1899,22 +1898,22 @@ html.light{--bg:#f6f8fa;--sidebar:#eef1f5;--surf:#ffffff;--surf2:#f0f3f7;--borde
 html.light .obody{background:#f0f4f8}html.light .obody .llm{color:#24292f}html.light .obody .llt{color:#8c959f}
 html.light .obody .ll:hover{background:rgba(0,0,0,.04)}html.light .cmd-blk{background:#f0f4f8;color:#24292f}
 html.light #tmap-container{background:#e8ecf0}html.light .leaflet-container{background:#e8ecf0!important}
-html.light .tmap-bottom{background:#f0f3f7;border-top:1px solid #d0d7de}
-html.light .tmap-bottom-bar{border-bottom:1px solid #d0d7de}
-html.light .tmap-stat{border-right-color:#d0d7de}
-html.light .tmap-bottom-sep{background:#d0d7de}
-html.light .tmap-c-section{border-right-color:#d0d7de}
+html.light .tmap-bottom{background:#f0f3f7;border-top-color:#d0d7de}
+html.light .tmap-leg-section{border-right-color:#d0d7de}
+html.light .tmap-right-col{background:#f0f3f7;border-left-color:#d0d7de}
+html.light .tmap-c-section{border-bottom-color:#d0d7de}
 html.light .tmap-c-title{color:#636e7b;background:#f0f3f7}
 html.light .tmap-feed-title{color:#636e7b;background:#f0f3f7;border-bottom-color:#d0d7de}
+html.light .tmap-stats-section .tmap-stat{border-right-color:#d0d7de}
 html.light .tmap-l{color:#636e7b}
 html.light .tmap-leg-item{color:#4a5568}
 html.light .tmap-src-city{color:#b7791f;text-shadow:none}
 html.light .tmap-src-isp{color:#b7791f}
 html.light .tmap-nr{color:#c53030!important;text-shadow:none!important}
-html.light .tmap-ng{color:#276749!important}
-html.light .tmap-nb{color:#2b6cb0!important}
-html.light .tmap-np{color:#6b46c1!important}
-html.light .tmap-no{color:#b7791f!important}
+html.light .tmap-ng{color:#276749!important;text-shadow:none!important}
+html.light .tmap-nb{color:#2b6cb0!important;text-shadow:none!important}
+html.light .tmap-np{color:#6b46c1!important;text-shadow:none!important}
+html.light .tmap-no{color:#b7791f!important;text-shadow:none!important}
 .h-gauges{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .h-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media(max-width:860px){.h-gauges,.h-row{grid-template-columns:1fr}}
@@ -2426,41 +2425,47 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
     </div>
     <!-- Traffic Map -->
     <div id="tab-trafficmap" class="panel">
-      <div id="tmap-container">
-        <div id="tmap"></div>
-        <div id="tmap-status" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:2000;background:rgba(4,6,10,.85);flex-direction:column;gap:10px;pointer-events:none">
-          <div style="color:#00ff88;font-size:13px;font-family:monospace" id="tmap-status-msg">Loading map…</div>
-          <div style="width:120px;height:2px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden"><div id="tmap-status-bar" style="height:100%;width:0%;background:#00ff88;transition:width .4s"></div></div>
-        </div>
-        <button class="tmap-fs-btn" onclick="tmapFullscreen()" title="Toggle fullscreen">&#x26F6;</button>
-      </div>
-      <!-- Bottom panel: stats + legend + country list + live feed -->
-      <div class="tmap-bottom">
-        <div class="tmap-bottom-bar">
-          <div class="tmap-stat"><div class="tmap-n tmap-ng" id="tmap-s-arcs">0</div><div class="tmap-l">Active Arcs</div></div>
-          <div class="tmap-stat"><div class="tmap-n tmap-nb" id="tmap-s-total">0</div><div class="tmap-l">Total Probes</div></div>
-          <div class="tmap-stat"><div class="tmap-n tmap-nr" id="tmap-s-blocked">0</div><div class="tmap-l">Blocked</div></div>
-          <div class="tmap-stat"><div class="tmap-n tmap-np" id="tmap-s-ctry">0</div><div class="tmap-l">Countries</div></div>
-          <div class="tmap-stat"><div class="tmap-n tmap-no" id="tmap-s-ep">0</div><div class="tmap-l">Endpoints</div></div>
-          <div class="tmap-stat" style="min-width:120px">
-            <div class="tmap-src-city" id="tmap-s-src">—</div>
-            <div class="tmap-src-isp" id="tmap-s-isp"></div>
-            <div class="tmap-l">Source</div>
+      <div class="tmap-main-row">
+        <!-- Left: map + bottom bar -->
+        <div class="tmap-left-col">
+          <div id="tmap-container">
+            <div id="tmap"></div>
+            <div id="tmap-status" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:2000;background:rgba(4,6,10,.85);flex-direction:column;gap:10px;pointer-events:none">
+              <div style="color:#00ff88;font-size:13px;font-family:monospace" id="tmap-status-msg">Loading map…</div>
+              <div style="width:120px;height:2px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden"><div id="tmap-status-bar" style="height:100%;width:0%;background:#00ff88;transition:width .4s"></div></div>
+            </div>
+            <button class="tmap-fs-btn" onclick="tmapFullscreen()" title="Toggle fullscreen">&#x26F6;</button>
           </div>
-          <div class="tmap-bottom-sep"></div>
-          <div class="tmap-leg-inline">
-            <div class="tmap-leg-item"><div class="tmap-leg-dot" style="background:#63b3ed"></div>DNS / DoH / DoT</div>
-            <div class="tmap-leg-item"><div class="tmap-leg-dot" style="background:#b794f4"></div>HTTPS / Web</div>
-            <div class="tmap-leg-item"><div class="tmap-leg-dot" style="background:#f6ad55"></div>iperf3 / Bandwidth</div>
-            <div class="tmap-leg-item"><div class="tmap-leg-dot" style="background:#fc8181"></div>Nmap / IDS / IPS</div>
-            <div class="tmap-leg-item"><div class="tmap-leg-dot" style="background:#68d391"></div>AI / LLM</div>
-            <div class="tmap-leg-item"><div class="tmap-leg-dot" style="background:#9ae6b4"></div>Anonymizer / VPN</div>
-            <div class="tmap-leg-item"><div class="tmap-leg-dot" style="background:#f687b3"></div>C2 / Malware</div>
-            <div class="tmap-leg-item"><div class="tmap-leg-dot" style="background:#fbd38d"></div>Shadow IT</div>
-            <div class="tmap-leg-item"><div class="tmap-leg-dot" style="background:#fc8181;border:1.5px solid #fc8181;background:transparent;outline:1.5px solid #fc8181;outline-offset:1px"></div><span style="color:#fc8181">Blocked</span></div>
+          <!-- Bottom bar: legend left + stats center -->
+          <div class="tmap-bottom">
+            <div class="tmap-leg-section">
+              <div class="tmap-leg-item"><div class="tmap-leg-dot" style="background:#63b3ed"></div>DNS</div>
+              <div class="tmap-leg-item"><div class="tmap-leg-dot" style="background:#b794f4"></div>HTTP / Web</div>
+              <div class="tmap-leg-item"><div class="tmap-leg-dot" style="background:#f6ad55"></div>Bandwidth</div>
+              <div class="tmap-leg-item"><div class="tmap-leg-dot" style="background:#f97316"></div>Threat / Scan</div>
+              <div class="tmap-leg-item"><div class="tmap-leg-dot" style="background:#ed64a6"></div>Porn</div>
+              <div class="tmap-leg-item"><div class="tmap-leg-dot" style="background:#68d391"></div>AI / LLM</div>
+              <div class="tmap-leg-item"><div class="tmap-leg-dot" style="background:#9ae6b4"></div>Anon / VPN</div>
+              <div class="tmap-leg-item"><div class="tmap-leg-dot" style="background:#f687b3"></div>C2 / Malware</div>
+              <div class="tmap-leg-item"><div class="tmap-leg-dot" style="background:#fbd38d"></div>Shadow IT</div>
+              <div class="tmap-leg-item"><div class="tmap-leg-dot" style="outline:1.5px solid #fc8181;outline-offset:1px"></div><span style="color:#fc8181">Blocked</span></div>
+            </div>
+            <div class="tmap-stats-section">
+              <div class="tmap-stat"><div class="tmap-n tmap-ng" id="tmap-s-arcs">0</div><div class="tmap-l">Active Arcs</div></div>
+              <div class="tmap-stat"><div class="tmap-n tmap-nb" id="tmap-s-total">0</div><div class="tmap-l">Total Probes</div></div>
+              <div class="tmap-stat"><div class="tmap-n tmap-nr" id="tmap-s-blocked">0</div><div class="tmap-l">Blocked</div></div>
+              <div class="tmap-stat"><div class="tmap-n tmap-np" id="tmap-s-ctry">0</div><div class="tmap-l">Countries</div></div>
+              <div class="tmap-stat"><div class="tmap-n tmap-no" id="tmap-s-ep">0</div><div class="tmap-l">Endpoints</div></div>
+              <div class="tmap-stat">
+                <div class="tmap-src-city" id="tmap-s-src">—</div>
+                <div class="tmap-src-isp" id="tmap-s-isp"></div>
+                <div class="tmap-l">Source</div>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="tmap-bottom-detail">
+        <!-- Right sidebar: By Country + Live Hit Feed -->
+        <div class="tmap-right-col">
           <div class="tmap-c-section">
             <div class="tmap-c-title">By Country</div>
             <div id="tmap-ctry-list"></div>
@@ -4776,8 +4781,9 @@ function _tmapApplyTiles(){
 const _tmapCtry={};
 const _tmapFlags={US:'🇺🇸',GB:'🇬🇧',FR:'🇫🇷',NL:'🇳🇱',CH:'🇨🇭',DE:'🇩🇪',JP:'🇯🇵',AU:'🇦🇺',CA:'🇨🇦',SE:'🇸🇪',NZ:'🇳🇿',PA:'🇵🇦',CY:'🇨🇾',CN:'🇨🇳',SG:'🇸🇬',IE:'🇮🇪',HK:'🇭🇰',RO:'🇷🇴',VG:'🇻🇬',IL:'🇮🇱',NO:'🇳🇴',MY:'🇲🇾'};
 const _tmapCNames={US:'United States',GB:'United Kingdom',FR:'France',NL:'Netherlands',CH:'Switzerland',DE:'Germany',JP:'Japan',AU:'Australia',CA:'Canada',SE:'Sweden',NZ:'New Zealand',PA:'Panama',CY:'Cyprus',CN:'China',SG:'Singapore',IE:'Ireland',HK:'Hong Kong',RO:'Romania',VG:'British Virgin Is.',IL:'Israel',NO:'Norway',MY:'Malaysia'};
-const _tmapSuiteColor={'dns':'#63b3ed','doh':'#63b3ed','dot':'#63b3ed','http':'#b794f4','https':'#b794f4','ftp':'#b794f4','ssh':'#b794f4','tls-inspection':'#b794f4','http3':'#b794f4','web-crawl':'#b794f4','iperf3':'#f6ad55','speedtest':'#f6ad55','bulk-transfer':'#f6ad55','url-latency':'#f6ad55','s3':'#f6ad55','nmap':'#fc8181','web-scanner':'#fc8181','ids-sigs':'#fc8181','ips-ua':'#fc8181','cve-probe':'#fc8181','waf-attack':'#fc8181','log4shell':'#fc8181','msf-webapp':'#fc8181','msf-enterprise':'#fc8181','msf-appliance':'#fc8181','msf-cisa-kev':'#fc8181','msf-middleware':'#fc8181','msf-recon':'#fc8181','msf-aux-scan':'#fc8181','msf-payload-delivery':'#fc8181','msf-cred-spray':'#fc8181','blocklist-probe':'#fc8181','phishing-domains':'#fc8181','squatting':'#fc8181','pornography':'#fc8181','ai-browse':'#68d391','llm-dlp':'#68d391','post-quantum':'#68d391','tor-anonymizer':'#9ae6b4','c2-beacon':'#f687b3','c2-useragents':'#f687b3','malware-samples':'#f687b3','lateral-movement':'#f687b3','shadow-it':'#fbd38d','data-exfil-http':'#fbd38d','dlp':'#fbd38d','ad-tracker':'#fbd38d','dns-exfil':'#63b3ed','av-test':'#a0aec0','bgp':'#a0aec0','icmp':'#a0aec0','ntp':'#a0aec0','snmp':'#a0aec0','voip':'#68d391','ucaas':'#68d391'};
-const _tmapSuiteColorLight={'dns':'#2b6cb0','doh':'#2b6cb0','dot':'#2b6cb0','http':'#6b46c1','https':'#6b46c1','ftp':'#6b46c1','ssh':'#6b46c1','tls-inspection':'#6b46c1','http3':'#6b46c1','web-crawl':'#6b46c1','iperf3':'#c05621','speedtest':'#c05621','bulk-transfer':'#c05621','url-latency':'#c05621','s3':'#c05621','nmap':'#c53030','web-scanner':'#c53030','ids-sigs':'#c53030','ips-ua':'#c53030','cve-probe':'#c53030','waf-attack':'#c53030','log4shell':'#c53030','msf-webapp':'#c53030','msf-enterprise':'#c53030','msf-appliance':'#c53030','msf-cisa-kev':'#c53030','msf-middleware':'#c53030','msf-recon':'#c53030','msf-aux-scan':'#c53030','msf-payload-delivery':'#c53030','msf-cred-spray':'#c53030','blocklist-probe':'#c53030','phishing-domains':'#c53030','squatting':'#c53030','pornography':'#c53030','ai-browse':'#276749','llm-dlp':'#276749','post-quantum':'#276749','tor-anonymizer':'#276749','c2-beacon':'#97266d','c2-useragents':'#97266d','malware-samples':'#97266d','lateral-movement':'#97266d','shadow-it':'#b7791f','data-exfil-http':'#b7791f','dlp':'#b7791f','ad-tracker':'#b7791f','dns-exfil':'#2b6cb0','av-test':'#4a5568','bgp':'#4a5568','icmp':'#4a5568','ntp':'#4a5568','snmp':'#4a5568','voip':'#276749','ucaas':'#276749'};
+// #fc8181 reserved for blocked arcs only
+const _tmapSuiteColor={'dns':'#63b3ed','doh':'#63b3ed','dot':'#63b3ed','http':'#b794f4','https':'#b794f4','ftp':'#b794f4','ssh':'#b794f4','tls-inspection':'#b794f4','http3':'#b794f4','web-crawl':'#b794f4','iperf3':'#f6ad55','speedtest':'#f6ad55','bulk-transfer':'#f6ad55','url-latency':'#f6ad55','s3':'#f6ad55','nmap':'#f97316','web-scanner':'#f97316','ids-sigs':'#f97316','ips-ua':'#f97316','cve-probe':'#f97316','waf-attack':'#f97316','log4shell':'#f97316','msf-webapp':'#f97316','msf-enterprise':'#f97316','msf-appliance':'#f97316','msf-cisa-kev':'#f97316','msf-middleware':'#f97316','msf-recon':'#f97316','msf-aux-scan':'#f97316','msf-payload-delivery':'#f97316','msf-cred-spray':'#f97316','blocklist-probe':'#f97316','phishing-domains':'#f97316','squatting':'#f97316','pornography':'#ed64a6','ai-browse':'#68d391','llm-dlp':'#68d391','post-quantum':'#68d391','tor-anonymizer':'#9ae6b4','c2-beacon':'#f687b3','c2-useragents':'#f687b3','malware-samples':'#f687b3','lateral-movement':'#f687b3','shadow-it':'#fbd38d','data-exfil-http':'#fbd38d','dlp':'#fbd38d','ad-tracker':'#fbd38d','dns-exfil':'#63b3ed','av-test':'#a0aec0','bgp':'#a0aec0','icmp':'#a0aec0','ntp':'#a0aec0','snmp':'#a0aec0','voip':'#68d391','ucaas':'#68d391'};
+const _tmapSuiteColorLight={'dns':'#2b6cb0','doh':'#2b6cb0','dot':'#2b6cb0','http':'#6b46c1','https':'#6b46c1','ftp':'#6b46c1','ssh':'#6b46c1','tls-inspection':'#6b46c1','http3':'#6b46c1','web-crawl':'#6b46c1','iperf3':'#c05621','speedtest':'#c05621','bulk-transfer':'#c05621','url-latency':'#c05621','s3':'#c05621','nmap':'#c2410c','web-scanner':'#c2410c','ids-sigs':'#c2410c','ips-ua':'#c2410c','cve-probe':'#c2410c','waf-attack':'#c2410c','log4shell':'#c2410c','msf-webapp':'#c2410c','msf-enterprise':'#c2410c','msf-appliance':'#c2410c','msf-cisa-kev':'#c2410c','msf-middleware':'#c2410c','msf-recon':'#c2410c','msf-aux-scan':'#c2410c','msf-payload-delivery':'#c2410c','msf-cred-spray':'#c2410c','blocklist-probe':'#c2410c','phishing-domains':'#c2410c','squatting':'#c2410c','pornography':'#9d174d','ai-browse':'#276749','llm-dlp':'#276749','post-quantum':'#276749','tor-anonymizer':'#276749','c2-beacon':'#97266d','c2-useragents':'#97266d','malware-samples':'#97266d','lateral-movement':'#97266d','shadow-it':'#b7791f','data-exfil-http':'#b7791f','dlp':'#b7791f','ad-tracker':'#b7791f','dns-exfil':'#2b6cb0','av-test':'#4a5568','bgp':'#4a5568','icmp':'#4a5568','ntp':'#4a5568','snmp':'#4a5568','voip':'#276749','ucaas':'#276749'};
 function _tmapIsLight(){return document.documentElement.classList.contains('light');}
 function _tmapColor(suite){return(_tmapIsLight()?_tmapSuiteColorLight:_tmapSuiteColor)[suite]||(_tmapIsLight()?'#2b6cb0':'#63b3ed');}
 function _tmapBlockedColor(){return _tmapIsLight()?'#c53030':'#fc8181';}
@@ -5086,10 +5092,13 @@ function _tmapExtractHost(msg){
   // 2. Arrow notation: "→ host[:port]"
   m=msg.match(/→\s*([a-z0-9][a-z0-9._-]+\.[a-z]{2,})/i);
   if(m)return m[1].toLowerCase().split(':')[0];
-  // 3. Keyword followed (lazily) by the first hostname-looking token
-  m=msg.match(/\b(?:nmap|dig|ping|ntp|snmpwalk|snmp|traceroute|query|probe|target|connect|testing|test)\b.*?([a-z][a-z0-9._-]{2,}\.[a-z]{2,})/i);
+  // 3. hostname:port pattern (STUN, SIP, iperf3, Redis, etc.)
+  m=msg.match(/\b([a-z][a-z0-9._-]{3,}\.[a-z]{2,6}):\d{2,5}\b/i);
   if(m)return m[1].toLowerCase();
-  // 4. Bare IP address fallback
+  // 4. Keyword followed (lazily) by the first hostname-looking token
+  m=msg.match(/\b(?:nmap|dig|ping|ntp|stun|sip|snmpwalk|snmp|traceroute|neighbor|query|probe|target|connect|testing|test)\b.*?([a-z][a-z0-9._-]{2,}\.[a-z]{2,})/i);
+  if(m)return m[1].toLowerCase();
+  // 5. Bare IP address fallback
   m=msg.match(/\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b/);
   if(m)return m[1];
   return null;
@@ -5168,6 +5177,7 @@ function _tmapAddFeed(host,geo,c,suite,outcome){
 }
 const _tmapGeoPending={};
 let _tmapCurrentSuite='';
+let _tmapLastHost='';
 // Known targets for suites whose log lines rarely contain extractable hostnames
 const _tmapSuiteHosts={
   'icmp':['8.8.8.8','1.1.1.1','9.9.9.9','208.67.222.222','4.2.2.2','84.200.69.80','192.234.141.1','12.12.12.12',
@@ -5181,13 +5191,29 @@ const _tmapSuiteHosts={
          '77.88.8.8','84.200.69.80','194.168.4.100','194.109.6.66','91.239.100.100',
          '193.166.4.24','193.17.47.1','195.175.39.39','149.112.121.10',
          '202.12.27.33','168.126.63.1','223.5.5.5','168.95.1.1','202.166.205.61'],
-  'ips-ua':['testmyids.com','scanme.nmap.org'],
-  'cve-probe':['testmyids.com','scanme.nmap.org'],
+  'ips-ua':['testmyids.com','scanme.nmap.org','www.testmyids.com'],
+  'cve-probe':['testmyids.com','scanme.nmap.org','httpforever.com'],
   'ids-sigs':['testmyids.com','scanme.nmap.org','www.testmyids.com'],
-  'msf-cisa-kev':['scanme.nmap.org','testmyids.com'],
-  'log4shell':['scanme.nmap.org','testmyids.com'],
+  'msf-cisa-kev':['scanme.nmap.org','testmyids.com','hackazon.webscantest.com','testhtml5.vulnweb.com'],
+  'msf-webapp':['scanme.nmap.org','testmyids.com','hackazon.webscantest.com','testhtml5.vulnweb.com','zero.webappsecurity.com'],
+  'msf-enterprise':['scanme.nmap.org','testmyids.com','hackazon.webscantest.com','testhtml5.vulnweb.com'],
+  'msf-appliance':['scanme.nmap.org','testmyids.com','httpforever.com'],
+  'msf-middleware':['scanme.nmap.org','testmyids.com','hackazon.webscantest.com'],
+  'msf-recon':['scanme.nmap.org','testmyids.com','www.testmyids.com','httpforever.com'],
+  'msf-aux-scan':['scanme.nmap.org','testmyids.com','zero.webappsecurity.com','testhtml5.vulnweb.com'],
+  'msf-payload-delivery':['scanme.nmap.org','testmyids.com','hackazon.webscantest.com'],
+  'msf-cred-spray':['scanme.nmap.org','testmyids.com','zero.webappsecurity.com'],
+  'log4shell':['scanme.nmap.org','testmyids.com','www.testmyids.com'],
   'ntp':['time.google.com','0.us.pool.ntp.org','1.us.pool.ntp.org','time-a-g.nist.gov','time.nist.gov'],
   'snmp':['test.net-snmp.org','demo.snmplabs.com'],
+  'bgp':['bgp.he.net','route-server.he.net','route-server.ip-plus.net','route-server.gin.ntt.net'],
+  'bulk-transfer':['ipv4.download.thinkbroadband.com','speed.cloudflare.com','speedtest.tele2.net','proof.ovh.net'],
+  'speedtest':['api.fast.com','speed.cloudflare.com','www.speedtest.net'],
+  'web-scanner':['www.testmyids.com','scanme.nmap.org','hackazon.webscantest.com','zero.webappsecurity.com','testhtml5.vulnweb.com'],
+  'blocklist-probe':['malware-test.com','phishing-test.com','testmyids.com','urlhaus-api.abuse.ch','openphish.com'],
+  'phishing-domains':['phishtank.org','openphish.com','safe.dnsfilter.com','urlhaus-api.abuse.ch'],
+  'tls-inspection':['expired.badssl.com','wrong.host.badssl.com','self-signed.badssl.com','untrusted-root.badssl.com'],
+  'lateral-movement':['8.8.8.8','1.1.1.1','scanme.nmap.org','testmyids.com'],
 };
 function _tmapIsPrivateIP(h){return/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|0\.0\.0\.0|::1|fc|fd|fe80)/.test(h);}
 let _tmapGeoQueue=[],_tmapGeoRunning=0,_tmapGeoTimer=null;
@@ -5247,6 +5273,15 @@ function _tmapHandleLog(d){
   const suite=d.test||_tmapCurrentSuite||'dns';
   const outcome=_tmapOutcome(d.msg);
   let host=_tmapExtractHost(d.msg);
+  if(host){
+    _tmapLastHost=host;
+  } else if(outcome&&_tmapLastHost){
+    // Sub-result line (e.g. ↳ HTTP 403) — apply outcome to last seen host
+    const g=_tmapGeo[_tmapLastHost];
+    if(g)_tmapShootArcWithMarker(_tmapLastHost,g,suite,outcome);
+    else _tmapLiveGeo(_tmapLastHost,suite,outcome);
+    return;
+  }
   // Fallback: for suites whose logs lack extractable hosts, use suite's known targets
   if(!host&&_tmapSuiteHosts[suite]){
     const arr=_tmapSuiteHosts[suite];
