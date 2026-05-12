@@ -91,6 +91,8 @@ _health_cache: dict = {}
 _health_lock2 = threading.Lock()
 _net_info_cache: dict = {}
 _net_info_lock = threading.Lock()
+_geo_cache: dict = {}
+_geo_cache_lock = threading.Lock()
 
 
 def _sample_health() -> None:
@@ -548,7 +550,7 @@ _SEC_HEADERS = {
         "style-src 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; "
         "script-src 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; "
         "img-src 'self' data: https://*.basemaps.cartocdn.com; "
-        "connect-src 'self' https://cdn.jsdelivr.net https://unpkg.com https://ip-api.com https://ipapi.co"
+        "connect-src 'self' https://cdn.jsdelivr.net https://unpkg.com"
     ),
     "Strict-Transport-Security": "max-age=31536000",
     "Permissions-Policy":        "geolocation=(), microphone=(), camera=()",
@@ -742,6 +744,49 @@ def api_health():
 def api_netinfo():
     with _net_info_lock:
         return jsonify(dict(_net_info_cache))
+
+
+@app.route("/api/geo")
+def api_geo():
+    import ipaddress as _ipaddress
+    import urllib.request as _urlreq
+
+    host = request.args.get("host", "").strip()
+    if not host:
+        return jsonify({}), 400
+    with _geo_cache_lock:
+        if host in _geo_cache:
+            return jsonify(_geo_cache[host])
+    try:
+        ip = _socket.gethostbyname(host)
+    except Exception:
+        ip = host
+    try:
+        addr = _ipaddress.ip_address(ip)
+        if addr.is_private or addr.is_loopback:
+            return jsonify({}), 404
+    except Exception:
+        pass
+    try:
+        url = f"http://ip-api.com/json/{ip}?fields=lat,lon,city,regionCode,countryCode,status"
+        with _urlreq.urlopen(url, timeout=4) as resp:
+            data = json.loads(resp.read())
+        if data.get("status") == "success":
+            city = data.get("city", "")
+            if data.get("regionCode"):
+                city = city + ", " + data["regionCode"]
+            result = {
+                "lat": data["lat"],
+                "lon": data["lon"],
+                "city": city,
+                "country": data.get("countryCode", "US"),
+            }
+            with _geo_cache_lock:
+                _geo_cache[host] = result
+            return jsonify(result)
+    except Exception:
+        pass
+    return jsonify({}), 404
 
 
 def _is_admin() -> bool:
@@ -3144,11 +3189,12 @@ const _SDL={
     _tid=setTimeout(()=>tip.classList.add('show'),80);
   });
   document.addEventListener('mousemove',e=>{
-    if(tip.classList.contains('show'))rePos(e.clientX,e.clientY);
+    if(!tip.classList.contains('show'))return;
+    if(!e.target.closest('.tcard2')){clearTimeout(_tid);tip.classList.remove('show');return;}
+    rePos(e.clientX,e.clientY);
   });
   document.addEventListener('mouseout',e=>{
-    if(!e.target.closest('.tcard2'))return;
-    clearTimeout(_tid);tip.classList.remove('show');
+    if(!e.relatedTarget||!e.relatedTarget.closest('.tcard2')){clearTimeout(_tid);tip.classList.remove('show');}
   });
 })();
 const _SC={
@@ -4996,34 +5042,68 @@ function _tmapAddFeed(host,geo,c,suite){
   while(feed.children.length>40)feed.removeChild(feed.lastChild);
 }
 const _tmapGeoPending={};
+let _tmapCurrentSuite='';
+// Known targets for suites whose log lines rarely contain extractable hostnames
+const _tmapSuiteHosts={
+  'icmp':['8.8.8.8','1.1.1.1','9.9.9.9','208.67.222.222','4.2.2.2','64.6.64.6','84.200.69.80','149.112.112.112'],
+  'ips-ua':['testmyids.com','scanme.nmap.org'],
+  'cve-probe':['testmyids.com','scanme.nmap.org'],
+  'ids-sigs':['testmyids.com','scanme.nmap.org','www.testmyids.com'],
+  'msf-cisa-kev':['scanme.nmap.org','testmyids.com'],
+  'log4shell':['scanme.nmap.org','testmyids.com'],
+  'ntp':['time.google.com','0.us.pool.ntp.org','1.us.pool.ntp.org','time-a-g.nist.gov','time.nist.gov'],
+  'snmp':['test.net-snmp.org','demo.snmplabs.com'],
+};
 function _tmapIsPrivateIP(h){return/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|0\.0\.0\.0|::1|fc|fd|fe80)/.test(h);}
+let _tmapGeoQueue=[],_tmapGeoRunning=0,_tmapGeoTimer=null;
+const _TMAP_GEO_CONCUR=4,_TMAP_GEO_DELAY=50;
+function _tmapDrainGeoQueue(){
+  _tmapGeoTimer=null;
+  while(_tmapGeoRunning<_TMAP_GEO_CONCUR&&_tmapGeoQueue.length){
+    const {host,suite}=_tmapGeoQueue.shift();
+    _tmapGeoRunning++;
+    fetch('/api/geo?host='+encodeURIComponent(host))
+      .then(function(r){return r.ok?r.json():null;})
+      .then(function(j){
+        if(j&&j.lat!=null){
+          const geo={ll:[j.lat,j.lon],city:j.city||'',country:j.country||'US',hint:suite};
+          _tmapGeo[host]=geo;
+          _tmapShootArcWithMarker(host,geo,suite);
+        }
+      }).catch(function(){})
+      .finally(function(){
+        _tmapGeoRunning--;
+        if(_tmapGeoQueue.length&&!_tmapGeoTimer)_tmapGeoTimer=setTimeout(_tmapDrainGeoQueue,_TMAP_GEO_DELAY);
+      });
+  }
+}
 function _tmapLiveGeo(host,suite){
   if(_tmapIsPrivateIP(host))return;
   if(_tmapGeoPending[host])return;
   _tmapGeoPending[host]=1;
-  fetch('https://ipapi.co/'+host+'/json/')
-    .then(function(r){return r.json();})
-    .then(function(j){
-      if(!j||!j.latitude)return;
-      const geo={ll:[j.latitude,j.longitude],city:(j.city||'')+(j.region_code?', '+j.region_code:''),country:j.country_code||'US',hint:suite};
-      _tmapGeo[host]=geo;
-      _tmapShootArcWithMarker(host,geo,suite);
-    }).catch(function(){});
+  _tmapGeoQueue.push({host,suite});
+  if(!_tmapGeoTimer&&_tmapGeoRunning<_TMAP_GEO_CONCUR)_tmapDrainGeoQueue();
 }
 function _tmapShootArcWithMarker(host,geo,suite){
   if(!_tmapPlacedHosts.has(host)){
     _tmapPlacedHosts.add(host);
     const c=_tmapSuiteColor[geo.hint]||'#63b3ed';
     if(_tmap)L.circleMarker(geo.ll,{radius:4,color:c,fillColor:c,fillOpacity:.25,weight:1.5,opacity:.5}).addTo(_tmap)
-     .bindTooltip('<div style="font-weight:700;color:'+c+'">'+H(host)+'</div><div style="color:#4a5568;font-size:11px">📍 '+H(geo.city)+'</div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:'+c+';margin-top:3px">'+H(geo.hint)+'</div>',{className:'',sticky:true,offset:[10,0]});
+     .bindTooltip('<div style="font-weight:700;color:'+c+'">'+H(host)+'</div><div style="color:#4a5568;font-size:11px">📍 '+H(geo.city)+'</div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:'+c+';margin-top:3px">'+H(geo.hint)+'</div>',{className:'',sticky:false,direction:'right',offset:[6,0]});
   }
   _tmapShootArc(geo,suite,host);
 }
 function _tmapHandleLog(d){
   if(!d||!d.msg)return;
-  const host=_tmapExtractHost(d.msg);
+  if(d.test)_tmapCurrentSuite=d.test;
+  const suite=d.test||_tmapCurrentSuite||'dns';
+  let host=_tmapExtractHost(d.msg);
+  // Fallback: for suites whose logs lack extractable hosts, use suite's known targets
+  if(!host&&_tmapSuiteHosts[suite]){
+    const arr=_tmapSuiteHosts[suite];
+    host=arr[Math.floor(Math.random()*arr.length)];
+  }
   if(!host)return;
-  const suite=d.test||'dns';
   const geo=_tmapGeo[host];
   if(geo){
     _tmapShootArcWithMarker(host,geo,suite);
