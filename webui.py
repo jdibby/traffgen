@@ -7,6 +7,7 @@ Accepts validated control commands via POST /api/control.
 Generates a self-signed TLS certificate on first start (stored in /tmp/).
 """
 
+import collections
 import fcntl
 import functools
 import hashlib
@@ -93,6 +94,9 @@ _net_info_cache: dict = {}
 _net_info_lock = threading.Lock()
 _geo_cache: dict = {}
 _geo_cache_lock = threading.Lock()
+_geo_rate_window: collections.deque = collections.deque()  # timestamps of ip-api.com calls
+_geo_rate_lock = threading.Lock()
+_GEO_RATE_MAX = 40  # max ip-api.com calls per 60 s (free tier allows 45)
 
 
 def _sample_health() -> None:
@@ -757,20 +761,38 @@ def api_geo():
     with _geo_cache_lock:
         if host in _geo_cache:
             return jsonify(_geo_cache[host])
+    # Resolve hostname → IP
     try:
         ip = _socket.gethostbyname(host)
     except Exception:
         ip = host
+    # Reject private / loopback IPs immediately
     try:
         addr = _ipaddress.ip_address(ip)
         if addr.is_private or addr.is_loopback:
             return jsonify({}), 404
     except Exception:
         pass
+    # Enforce server-side rate limit before calling ip-api.com
+    now = time.time()
+    with _geo_rate_lock:
+        cutoff = now - 60.0
+        while _geo_rate_window and _geo_rate_window[0] < cutoff:
+            _geo_rate_window.popleft()
+        if len(_geo_rate_window) >= _GEO_RATE_MAX:
+            retry_after = max(1, int(61 - (now - _geo_rate_window[0])))
+            resp = jsonify({"error": "rate_limited"})
+            resp.headers["Retry-After"] = str(retry_after)
+            return resp, 429
+        _geo_rate_window.append(now)
     try:
         url = f"http://ip-api.com/json/{ip}?fields=lat,lon,city,regionCode,countryCode,status"
         with _urlreq.urlopen(url, timeout=4) as resp:
             data = json.loads(resp.read())
+        if data.get("status") == "fail" and "notAllowed" in str(data.get("message", "")):
+            resp = jsonify({"error": "rate_limited"})
+            resp.headers["Retry-After"] = "10"
+            return resp, 429
         if data.get("status") == "success":
             city = data.get("city", "")
             if data.get("regionCode"):
@@ -4957,6 +4979,63 @@ const _tmapGeo={
   '80.10.246.129':{ll:[48.86,2.35],city:'Paris',country:'FR',hint:'icmp'},
   '68.87.85.98':{ll:[39.95,-75.17],city:'Philadelphia, PA',country:'US',hint:'icmp'},
   '68.87.64.146':{ll:[39.95,-75.17],city:'Philadelphia, PA',country:'US',hint:'icmp'},
+  // Global DNS resolvers — 20+ countries
+  '77.88.8.8':{ll:[55.75,37.62],city:'Moscow',country:'RU',hint:'dns'},
+  '77.88.8.1':{ll:[55.75,37.62],city:'Moscow',country:'RU',hint:'dns'},
+  '84.200.69.80':{ll:[50.11,8.68],city:'Frankfurt',country:'DE',hint:'dns'},
+  '84.200.70.40':{ll:[50.11,8.68],city:'Frankfurt',country:'DE',hint:'dns'},
+  '80.67.169.40':{ll:[48.86,2.35],city:'Paris',country:'FR',hint:'dns'},
+  '194.168.4.100':{ll:[51.51,-0.13],city:'London',country:'GB',hint:'dns'},
+  '194.109.6.66':{ll:[52.37,4.89],city:'Amsterdam',country:'NL',hint:'dns'},
+  '194.132.32.32':{ll:[59.33,18.07],city:'Stockholm',country:'SE',hint:'dns'},
+  '91.239.100.100':{ll:[55.68,12.57],city:'Copenhagen',country:'DK',hint:'dns'},
+  '89.233.43.71':{ll:[55.68,12.57],city:'Copenhagen',country:'DK',hint:'dns'},
+  '195.159.0.100':{ll:[59.91,10.75],city:'Oslo',country:'NO',hint:'dns'},
+  '193.166.4.24':{ll:[60.17,24.94],city:'Espoo',country:'FI',hint:'dns'},
+  '193.17.47.1':{ll:[50.08,14.44],city:'Prague',country:'CZ',hint:'dns'},
+  '185.43.135.1':{ll:[50.08,14.44],city:'Prague',country:'CZ',hint:'dns'},
+  '130.59.31.248':{ll:[47.37,8.54],city:'Zurich',country:'CH',hint:'dns'},
+  '195.175.39.39':{ll:[39.92,32.86],city:'Ankara',country:'TR',hint:'dns'},
+  '195.238.2.21':{ll:[50.85,4.35],city:'Brussels',country:'BE',hint:'dns'},
+  '62.1.0.11':{ll:[37.98,23.73],city:'Athens',country:'GR',hint:'dns'},
+  '89.104.118.6':{ll:[44.43,26.10],city:'Bucharest',country:'RO',hint:'dns'},
+  '213.0.184.251':{ll:[40.42,-3.70],city:'Madrid',country:'ES',hint:'dns'},
+  '193.43.4.12':{ll:[41.90,12.50],city:'Rome',country:'IT',hint:'dns'},
+  '212.162.33.6':{ll:[52.23,21.01],city:'Warsaw',country:'PL',hint:'dns'},
+  '149.112.121.10':{ll:[45.42,-75.70],city:'Ottawa',country:'CA',hint:'dns'},
+  '149.112.122.10':{ll:[45.50,-73.57],city:'Montreal',country:'CA',hint:'dns'},
+  '200.221.11.101':{ll:[-23.55,-46.63],city:'São Paulo',country:'BR',hint:'dns'},
+  '202.12.27.33':{ll:[35.69,139.69],city:'Tokyo',country:'JP',hint:'dns'},
+  '168.126.63.1':{ll:[37.57,126.98],city:'Seoul',country:'KR',hint:'dns'},
+  '168.126.63.2':{ll:[37.57,126.98],city:'Seoul',country:'KR',hint:'dns'},
+  '223.5.5.5':{ll:[30.28,120.16],city:'Hangzhou',country:'CN',hint:'dns'},
+  '223.6.6.6':{ll:[30.28,120.16],city:'Hangzhou',country:'CN',hint:'dns'},
+  '119.29.29.29':{ll:[22.54,114.06],city:'Shenzhen',country:'CN',hint:'dns'},
+  '114.114.114.114':{ll:[32.06,118.77],city:'Nanjing',country:'CN',hint:'dns'},
+  '168.95.1.1':{ll:[25.05,121.53],city:'Taipei',country:'TW',hint:'dns'},
+  '168.95.192.1':{ll:[25.05,121.53],city:'Taipei',country:'TW',hint:'dns'},
+  '203.80.96.10':{ll:[22.32,114.17],city:'Hong Kong',country:'HK',hint:'dns'},
+  '202.166.205.61':{ll:[1.35,103.82],city:'Singapore',country:'SG',hint:'dns'},
+  '203.113.0.110':{ll:[13.75,100.52],city:'Bangkok',country:'TH',hint:'dns'},
+  '203.162.4.190':{ll:[10.82,106.63],city:'Ho Chi Minh City',country:'VN',hint:'dns'},
+  '202.155.0.10':{ll:[-6.21,106.85],city:'Jakarta',country:'ID',hint:'dns'},
+  '210.213.131.235':{ll:[14.59,120.98],city:'Manila',country:'PH',hint:'dns'},
+  '202.188.0.132':{ll:[3.15,101.69],city:'Kuala Lumpur',country:'MY',hint:'dns'},
+  '103.8.45.5':{ll:[19.08,72.88],city:'Mumbai',country:'IN',hint:'dns'},
+  '103.8.46.5':{ll:[19.08,72.88],city:'Mumbai',country:'IN',hint:'dns'},
+  '203.82.80.8':{ll:[33.72,73.04],city:'Islamabad',country:'PK',hint:'dns'},
+  '202.4.96.2':{ll:[23.72,90.41],city:'Dhaka',country:'BD',hint:'dns'},
+  '202.160.50.9':{ll:[-36.87,174.77],city:'Auckland',country:'NZ',hint:'dns'},
+  '212.199.244.162':{ll:[32.09,34.80],city:'Tel Aviv',country:'IL',hint:'dns'},
+  '213.42.20.20':{ll:[25.20,55.27],city:'Dubai',country:'AE',hint:'dns'},
+  '212.104.59.28':{ll:[24.69,46.72],city:'Riyadh',country:'SA',hint:'dns'},
+  '196.37.155.180':{ll:[-26.20,28.04],city:'Johannesburg',country:'ZA',hint:'dns'},
+  '196.207.40.30':{ll:[6.45,3.39],city:'Lagos',country:'NG',hint:'dns'},
+  '196.201.216.30':{ll:[-1.29,36.82],city:'Nairobi',country:'KE',hint:'dns'},
+  '196.202.250.10':{ll:[30.06,31.25],city:'Cairo',country:'EG',hint:'dns'},
+  '200.49.159.68':{ll:[-34.61,-58.37],city:'Buenos Aires',country:'AR',hint:'icmp'},
+  '200.33.89.90':{ll:[19.43,-99.13],city:'Mexico City',country:'MX',hint:'icmp'},
+  '200.1.123.46':{ll:[-33.45,-70.67],city:'Santiago',country:'CL',hint:'icmp'},
 };
 function tmapFullscreen(){
   const el=document.getElementById('tab-trafficmap');
@@ -4964,8 +5043,11 @@ function tmapFullscreen(){
   else if(el.requestFullscreen){el.requestFullscreen();}
 }
 function _tmapExtractHost(msg){
+  // 0. DNS dig line — extract the @server_ip (the actual connection target)
+  let m=msg.match(/\bdig\b[^@]*@(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/);
+  if(m)return m[1];
   // 1. Full URL — most reliable
-  let m=msg.match(/https?:\/\/([^/\s>"']+)/);
+  m=msg.match(/https?:\/\/([^/\s>"']+)/);
   if(m)return m[1].toLowerCase().replace(/^www2?\./,'');
   // 2. Arrow notation: "→ host[:port]"
   m=msg.match(/→\s*([a-z0-9][a-z0-9._-]+\.[a-z]{2,})/i);
@@ -5045,7 +5127,17 @@ const _tmapGeoPending={};
 let _tmapCurrentSuite='';
 // Known targets for suites whose log lines rarely contain extractable hostnames
 const _tmapSuiteHosts={
-  'icmp':['8.8.8.8','1.1.1.1','9.9.9.9','208.67.222.222','4.2.2.2','64.6.64.6','84.200.69.80','149.112.112.112'],
+  'icmp':['8.8.8.8','1.1.1.1','9.9.9.9','208.67.222.222','4.2.2.2','84.200.69.80',
+          '77.88.8.8','194.168.4.100','194.109.6.66','194.132.32.32','91.239.100.100',
+          '195.159.0.100','193.166.4.24','193.17.47.1','195.175.39.39','130.59.31.248',
+          '202.12.27.33','168.126.63.1','223.5.5.5','119.29.29.29','168.95.1.1',
+          '203.80.96.10','202.166.205.61','203.113.0.110','202.155.0.10','139.130.4.5',
+          '202.160.50.9','212.199.244.162','213.42.20.20','196.37.155.180','196.201.216.30',
+          '200.221.11.101','149.112.121.10','200.49.159.68','200.33.89.90'],
+  'dns':['8.8.8.8','1.1.1.1','208.67.222.222','9.9.9.9',
+         '77.88.8.8','84.200.69.80','194.168.4.100','194.109.6.66','91.239.100.100',
+         '193.166.4.24','193.17.47.1','195.175.39.39','149.112.121.10',
+         '202.12.27.33','168.126.63.1','223.5.5.5','168.95.1.1','202.166.205.61'],
   'ips-ua':['testmyids.com','scanme.nmap.org'],
   'cve-probe':['testmyids.com','scanme.nmap.org'],
   'ids-sigs':['testmyids.com','scanme.nmap.org','www.testmyids.com'],
@@ -5056,21 +5148,34 @@ const _tmapSuiteHosts={
 };
 function _tmapIsPrivateIP(h){return/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|0\.0\.0\.0|::1|fc|fd|fe80)/.test(h);}
 let _tmapGeoQueue=[],_tmapGeoRunning=0,_tmapGeoTimer=null;
-const _TMAP_GEO_CONCUR=4,_TMAP_GEO_DELAY=50;
+const _TMAP_GEO_CONCUR=2,_TMAP_GEO_DELAY=400;
 function _tmapDrainGeoQueue(){
   _tmapGeoTimer=null;
   while(_tmapGeoRunning<_TMAP_GEO_CONCUR&&_tmapGeoQueue.length){
     const {host,suite}=_tmapGeoQueue.shift();
     _tmapGeoRunning++;
     fetch('/api/geo?host='+encodeURIComponent(host))
-      .then(function(r){return r.ok?r.json():null;})
+      .then(function(r){
+        if(r.status===429){
+          // Rate limited — clear pending and re-queue so it will be retried
+          delete _tmapGeoPending[host];
+          _tmapGeoQueue.unshift({host,suite});
+          const ra=(parseInt(r.headers.get('Retry-After')||'5')+1)*1000;
+          if(!_tmapGeoTimer)_tmapGeoTimer=setTimeout(_tmapDrainGeoQueue,ra);
+          return null;
+        }
+        return r.ok?r.json():null;
+      })
       .then(function(j){
         if(j&&j.lat!=null){
           const geo={ll:[j.lat,j.lon],city:j.city||'',country:j.country||'US',hint:suite};
           _tmapGeo[host]=geo;
           _tmapShootArcWithMarker(host,geo,suite);
         }
-      }).catch(function(){})
+      }).catch(function(){
+        // Network error — allow retry
+        delete _tmapGeoPending[host];
+      })
       .finally(function(){
         _tmapGeoRunning--;
         if(_tmapGeoQueue.length&&!_tmapGeoTimer)_tmapGeoTimer=setTimeout(_tmapDrainGeoQueue,_TMAP_GEO_DELAY);
@@ -5119,18 +5224,24 @@ function _tmapConnectLog(){
 }
 function initTrafficMap(){
   if(_tmap){_tmap.invalidateSize();if(!_tmapEs)_tmapConnectLog();return;}
-  // Set a default source immediately so arcs can fire even before ip-api responds
+  // Set a default source immediately so arcs can fire before geo resolves
   _tmapSrc=[39,-98];
-  // Fetch real geo in background — non-blocking
-  fetch('https://ip-api.com/json?fields=lat,lon,city,regionName,countryCode')
-    .then(function(r){return r.json();}).then(function(j){
-      if(j&&j.lat){
+  // Resolve source location via server — retry until public_ip is available
+  function _fetchSrcGeo(attempt){
+    fetch('/api/netinfo').then(function(r){return r.ok?r.json():null;}).then(function(n){
+      var pub=n&&n.public_ip&&n.public_ip!=='resolving…'?n.public_ip:null;
+      if(!pub){if(attempt<8)setTimeout(function(){_fetchSrcGeo(attempt+1);},2000);return;}
+      return fetch('/api/geo?host='+encodeURIComponent(pub));
+    }).then(function(r){return r&&r.ok?r.json():null;}).then(function(j){
+      if(j&&j.lat!=null){
         _tmapSrc=[j.lat,j.lon];
-        var srcEl=$('tmap-s-src');if(srcEl)srcEl.textContent=(j.city||'')+(j.regionName?', '+j.regionName:'');
+        var srcEl=$('tmap-s-src');if(srcEl)srcEl.textContent=j.city||'';
         if(_tmap&&_tmapSrcMarker){_tmap.removeLayer(_tmapSrcMarker);_tmapSrcMarker=null;}
         if(_tmap)_tmapPlaceSrc();
-      }
-    }).catch(function(){});
+      } else if(attempt<8){setTimeout(function(){_fetchSrcGeo(attempt+1);},3000);}
+    }).catch(function(){if(attempt<8)setTimeout(function(){_fetchSrcGeo(attempt+1);},3000);});
+  }
+  _fetchSrcGeo(0);
   function _tmapPlaceSrc(){
     if(!_tmap||!_tmapSrc)return;
     var srcIcon=L.divIcon({html:'<div style="position:relative;width:20px;height:20px"><div style="position:absolute;inset:0;border-radius:50%;background:#00ff88;opacity:.9;box-shadow:0 0 6px #00ff88,0 0 20px rgba(0,255,136,.6)"></div><div style="position:absolute;inset:-6px;border-radius:50%;border:1.5px solid rgba(0,255,136,.5);animation:tmapR1 2s ease-out infinite"></div><div style="position:absolute;inset:-14px;border-radius:50%;border:1px solid rgba(0,255,136,.25);animation:tmapR1 2s ease-out .5s infinite"></div></div><style>@keyframes tmapR1{0%{transform:scale(.8);opacity:.9}100%{transform:scale(1.8);opacity:0}}</style>',className:'',iconSize:[20,20],iconAnchor:[10,10],zIndexOffset:1000});

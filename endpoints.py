@@ -76,15 +76,66 @@ Variable index (matches generator.py usage names 1-to-1):
 
 # ── DNS resolvers ──────────────────────────────────────────────────────────────
 dns_endpoints = [
-    "8.8.8.8",
-    "8.8.4.4",
-    "1.1.1.1",
-    "1.0.0.1",
-    "208.67.220.220",
-    "208.67.222.222",
-    "149.112.112.112",
+    # US
+    "8.8.8.8", "8.8.4.4",            # Google
+    "1.1.1.1", "1.0.0.1",            # Cloudflare
+    "208.67.222.222", "208.67.220.220",  # OpenDNS
+    "9.9.9.9", "149.112.112.112",    # Quad9
+    "64.6.64.6",                      # Verisign
+    # Canada
+    "149.112.121.10", "149.112.122.10",  # CIRA
+    # Europe
+    "77.88.8.8", "77.88.8.1",        # Yandex — Russia
+    "84.200.69.80", "84.200.70.40",  # DNS.Watch — Germany
+    "80.67.169.40",                   # FDN — France
+    "194.168.4.100",                  # BT — UK
+    "194.109.6.66",                   # SURFnet — Netherlands
+    "194.132.32.32",                  # Bahnhof — Sweden
+    "91.239.100.100", "89.233.43.71", # UncensoredDNS — Denmark
+    "195.159.0.100",                  # UiO — Norway
+    "193.166.4.24",                   # FUNET — Finland
+    "193.17.47.1", "185.43.135.1",   # CZ.NIC — Czech Republic
+    "130.59.31.248",                  # SWITCH — Switzerland
+    "195.175.39.39",                  # Türk Telekom — Turkey
+    "195.238.2.21",                   # Scarlet — Belgium
+    "62.1.0.11",                      # OTE — Greece
+    "89.104.118.6",                   # RCS&RDS — Romania
+    "213.0.184.251",                  # Orange — Spain
+    "193.43.4.12",                    # CNR — Italy
+    "212.162.33.6",                   # NASK — Poland
+    # Asia-Pacific
+    "202.12.27.33",                   # WIDE — Japan
+    "168.126.63.1", "168.126.63.2",  # KT — South Korea
+    "223.5.5.5", "223.6.6.6",        # Alibaba — China
+    "119.29.29.29", "114.114.114.114",  # Tencent/114DNS — China
+    "168.95.1.1", "168.95.192.1",    # Chunghwa — Taiwan
+    "203.80.96.10",                   # HKBN — Hong Kong
+    "202.166.205.61",                 # Singtel — Singapore
+    "103.8.45.5", "103.8.46.5",      # India
+    "203.113.0.110",                  # TOT — Thailand
+    "203.162.4.190",                  # VDC — Vietnam
+    "202.155.0.10",                   # Telkom — Indonesia
+    "210.213.131.235",                # PLDT — Philippines
+    "202.188.0.132",                  # TMnet — Malaysia
+    "203.82.80.8",                    # PTCL — Pakistan
+    "202.4.96.2",                     # Grameen — Bangladesh
+    # Middle East & Africa
+    "212.199.244.162",                # Bezeq — Israel
+    "213.42.20.20",                   # Emirates — UAE
+    "212.104.59.28",                  # Mobily — Saudi Arabia
+    "196.37.155.180",                 # IS — South Africa
+    "196.207.40.30",                  # MTN — Nigeria
+    "196.201.216.30",                 # Jamii — Kenya
+    "196.202.250.10",                 # Nour — Egypt
+    # South America
+    "200.221.11.101",                 # NIC.br — Brazil
+    "200.49.159.68",                  # Claro — Argentina
+    "200.33.89.90",                   # Telmex — Mexico
+    # Oceania
+    "139.130.4.5",                    # Internode — Australia
+    "202.160.50.9",                   # Orcon — New Zealand
+    # Internal/private (LAN reachability)
     "10.254.254.1",
-    "9.9.9.9",
     ]
 
 # ── DNS query targets (domain names) ──────────────────────────────────────────
@@ -125,39 +176,105 @@ dns_urls = [
 
 # ── ICMP / traceroute targets ──────────────────────────────────────────────────
 icmp_endpoints = [
-    "8.8.8.8",
-    "8.8.4.4",
-    "1.1.1.1",
-    "1.0.0.1",
-    "172.30.0.1",
-    "172.16.0.1",
-    "172.22.11.1",
-    "192.168.1.1",
-    "12.12.12.12",
-    "208.67.220.220",
-    "208.67.222.222",
-    "9.9.9.9",
-    "12.12.12.1",
-    "139.130.4.5",
-    "84.200.69.80",
-    "84.200.70.40",
-    "149.112.112.112",
-    "68.87.85.98",
-    "4.2.2.2",
-    "4.2.2.3",
-    "4.2.2.4",
-    "64.6.64.6",
-    "64.6.65.6",
-    "68.87.64.146",
-    "68.105.28.11",
-    "24.116.0.201",
-    "24.116.0.202",
-    "209.18.47.61",
-    "209.18.47.62",
-    "103.8.45.5",
-    "103.8.46.5",
-    "80.10.246.2",
-    "80.10.246.129",
+    # United States
+    "8.8.8.8", "8.8.4.4",            # Google DNS
+    "1.1.1.1", "1.0.0.1",            # Cloudflare
+    "208.67.222.222", "208.67.220.220",  # OpenDNS
+    "9.9.9.9", "149.112.112.112",    # Quad9
+    "4.2.2.2", "4.2.2.4",            # Level3
+    "64.6.64.6", "64.6.65.6",        # Verisign
+    # Canada
+    "149.112.121.10",                 # CIRA
+    # Brazil
+    "200.221.11.101",                 # NIC.br
+    # Argentina
+    "200.49.159.68",                  # Claro
+    # Mexico
+    "200.33.89.90",                   # Telmex
+    # Chile
+    "200.1.123.46",                   # ENTEL
+    # Russia
+    "77.88.8.8", "77.88.8.1",        # Yandex
+    # Germany
+    "84.200.69.80", "84.200.70.40",  # DNS.Watch
+    # France
+    "80.10.246.2", "80.10.246.129",  # Orange
+    # UK
+    "194.168.4.100",                  # BT
+    # Netherlands
+    "194.109.6.66",                   # SURFnet
+    # Sweden
+    "194.132.32.32",                  # Bahnhof
+    # Denmark
+    "91.239.100.100",                 # UncensoredDNS
+    # Norway
+    "195.159.0.100",                  # UiO
+    # Finland
+    "193.166.4.24",                   # FUNET
+    # Czech Republic
+    "193.17.47.1",                    # CZ.NIC
+    # Turkey
+    "195.175.39.39",                  # Türk Telekom
+    # Belgium
+    "195.238.2.21",                   # Scarlet
+    # Greece
+    "62.1.0.11",                      # OTE
+    # Romania
+    "89.104.118.6",                   # RCS&RDS
+    # Switzerland
+    "130.59.31.248",                  # SWITCH
+    # Italy
+    "193.43.4.12",                    # CNR
+    # Japan
+    "202.12.27.33",                   # WIDE Project
+    # South Korea
+    "168.126.63.1", "168.126.63.2",  # KT
+    # China
+    "223.5.5.5", "119.29.29.29", "114.114.114.114",
+    # Taiwan
+    "168.95.1.1",                     # Chunghwa
+    # Hong Kong
+    "203.80.96.10",                   # HKBN
+    # Singapore
+    "202.166.205.61",                 # Singtel
+    # Thailand
+    "203.113.0.110",                  # TOT
+    # Vietnam
+    "203.162.4.190",                  # VDC
+    # Indonesia
+    "202.155.0.10",                   # Telkom
+    # Philippines
+    "210.213.131.235",                # PLDT
+    # Malaysia
+    "202.188.0.132",                  # TMnet
+    # India
+    "103.8.45.5", "103.8.46.5",
+    # Pakistan
+    "203.82.80.8",                    # PTCL
+    # Bangladesh
+    "202.4.96.2",                     # Grameen
+    # Australia
+    "139.130.4.5",                    # Internode
+    # New Zealand
+    "202.160.50.9",                   # Orcon
+    # Israel
+    "212.199.244.162",                # Bezeq
+    # UAE
+    "213.42.20.20",                   # Emirates
+    # Saudi Arabia
+    "212.104.59.28",                  # Mobily
+    # South Africa
+    "196.37.155.180",                 # Internet Solutions
+    # Nigeria
+    "196.207.40.30",                  # MTN
+    # Kenya
+    "196.201.216.30",                 # Jamii Telecom
+    # Egypt
+    "196.202.250.10",                 # Nour
+    # Private LAN (test local reachability)
+    "172.30.0.1", "172.16.0.1", "172.22.11.1", "192.168.1.1",
+    # Legacy Comcast/Level3 (US East)
+    "68.87.85.98", "68.87.64.146", "24.116.0.201", "24.116.0.202",
     ]
 
 # ── NTP servers ───────────────────────────────────────────────────────────────
