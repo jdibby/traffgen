@@ -2382,6 +2382,15 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
       <div style="max-width:900px">
 
         <div class="a-section">
+          <div class="a-h">v3.9.3 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
+          <table class="st-table" style="margin-top:10px">
+            <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td><strong>ips-ua suite</strong> — ~260 malicious/suspicious HTTP User-Agent strings (C2 frameworks, RATs, infostealers, scanners, cryptominers) sent against safe IDS/IPS test hosts to validate User-Agent–based IPS signatures</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td><strong>cve-probe suite</strong> — 31 CVE-matched HTTP exploit probes (Log4Shell, Shellshock, Struts2, Spring4Shell, EternalBlue, ProxyLogon, Zerologon and more) targeting testmyids.com / scanme.nmap.org to validate IPS CVE signature detection</td></tr>
+          </table>
+        </div>
+
+        <div class="a-section">
           <div class="a-h">v3.9.2 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
           <table class="st-table" style="margin-top:10px">
             <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>

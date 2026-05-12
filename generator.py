@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-generator.py — Traffic Generator v3.9.2
+generator.py — Traffic Generator v3.9.3
 ========================================
 Simulates realistic network traffic across a wide range of protocols and
 behaviours: DNS, HTTP/HTTPS/HTTP3, FTP, SSH, NTP, BGP, ICMP, SNMP,
@@ -58,7 +58,7 @@ from rich import box
 from endpoints import *           # noqa: F401,F403  (large data file)
 
 # ── Globals ───────────────────────────────────────────────────────────────────
-VERSION = "3.9.2"
+VERSION = "3.9.3"
 
 
 class _DualWriter:
@@ -295,6 +295,8 @@ _SUITE_DESCRIPTIONS: list[tuple[str, str]] = [
     ("data-exfil-http",  "POST synthetic PII/credentials to paste sites → DLP + CASB outbound inspection"),
     ("web-scanner",      "Nikto web vulnerability scan"),
     ("iperf3",           "TCP bidirectional bandwidth test against public iperf3 servers (XS=1 S=2 M=3 L=4 XL=all 10) — measures upload + download simultaneously; validates egress TCP port 5201"),
+    ("ips-ua",           "~260 malicious HTTP User-Agent strings (C2 frameworks, RATs, scanners, infostealers, cryptominers) → IDS/IPS UA-based signature detection"),
+    ("cve-probe",        "CVE-matched HTTP exploit probes (Log4Shell, Shellshock, Struts2, Spring4Shell, EternalBlue, ProxyLogon, and 25+ more) → IPS CVE signature detection"),
     ("all",              "Run every suite above in random order"),
 ]
 
@@ -4958,6 +4960,135 @@ def ucaas_sim() -> None:
         ui_error(f"[ucaas_sim] {e}")
 
 
+def ips_ua() -> None:
+    """
+    Fire ~260 malicious/suspicious HTTP User-Agent strings against purpose-built
+    IDS/IPS test hosts (testmyids.com, scanme.nmap.org).
+
+    UA signatures sourced from:
+      • Emerging Threats open ruleset (emerging-user_agents.rules)
+      • mitchellkrogza/nginx-ultimate-bad-bot-blocker
+      • mthcht/awesome-lists suspicious UA CSV
+      • Public malware-analysis reports (Unit42, Talos, CrowdStrike, Sekoia)
+
+    Categories: C2 frameworks (Cobalt Strike, Metasploit, Empire, Sliver),
+    RATs/trojans, modern infostealers (BunnyLoader, LokiBot, LemonDuck,
+    Raccoon), vulnerability scanners (Nikto, sqlmap, Nessus, OpenVAS, Nuclei,
+    ZGrab), credential-attack tools (Rubeus, Evilginx, AADInternals), bad bots,
+    PowerShell/scripting indicators, cryptominer UAs, exploit-kit indicators,
+    headless browsers, and AiTM frameworks.
+
+    Each probe is an HTTP GET to one of the safe test targets with the
+    malicious UA injected; connections are refused or reset — payloads never
+    reach a real victim host.  Validates that IDS/IPS / SASE platforms fire
+    on User-Agent–based signatures (Snort/Suricata UA rules, ET category).
+    """
+    n = _size_to_limits(ARGS.size, 10, 30, 60, len(ips_ua_signatures), len(ips_ua_signatures))
+    sample = random.sample(ips_ua_signatures, k=min(n, len(ips_ua_signatures)))
+    target = random.choice(ips_ua_targets)
+    url = f"http://{target}"
+
+    ui_banner("IPS User-Agent Signatures",
+              f"{len(sample)}/{len(ips_ua_signatures)} UAs → {url}")
+    ok_count = 0
+    for ua in sample:
+        console.log(f"  UA: [dim]{ua[:80]}[/]")
+        try:
+            result = subprocess.run(
+                ["curl", "-k", "-s", "--show-error", "--connect-timeout", "4",
+                 "-I", "-o", "/dev/null", "-w", "%{http_code}", "--max-time", "6",
+                 "-A", ua, url],
+                capture_output=True, text=True, timeout=12,
+            )
+            status = result.stdout.strip()
+            _stats.record(status)
+            console.log(f"    ↳ [{_status_style(status)}]HTTP {status}[/]")
+            ok_count += 1
+        except Exception as e:
+            _stats.fail()
+            console.log(f"    ↳ [yellow]error: {e}[/]")
+        time.sleep(random.uniform(0.1, 0.4))
+    ui_ok(f"IPS UA check complete  ({ok_count}/{len(sample)} sent)")
+
+
+def cve_probe() -> None:
+    """
+    Send HTTP requests crafted to match IPS/IDS CVE signatures against
+    purpose-built security test hosts (testmyids.com, scanme.nmap.org).
+
+    Probe categories:
+      • Log4Shell / Log4j (CVE-2021-44228, CVE-2021-45046) — JNDI in headers
+      • Shellshock (CVE-2014-6271) — bash function in HTTP headers
+      • Struts2 RCE (CVE-2017-5638) — OGNL in Content-Type
+      • Spring4Shell (CVE-2022-22965) — classLoader parameter chain
+      • Confluence OGNL RCE (CVE-2022-26134) — encoded OGNL in URL path
+      • Apache ActiveMQ RCE (CVE-2023-46604) — Jolokia endpoint probe
+      • Apache path traversal (CVE-2021-41773/42013) — %2e encoding bypass
+      • Pulse Secure / F5 / Fortinet LFI (CVE-2019-11510/2020-5902/2018-13379)
+      • SharePoint RCE (CVE-2019-0604) — SOAP action probe
+      • F5 BIG-IP iControl REST auth bypass (CVE-2022-1388)
+      • Cisco IOS XE (CVE-2023-20198) — WebUI privilege escalation pattern
+      • XXE injection / SSTI payload probes
+      • Office Equation Editor / HTA / MSCOMCTL.OCX byte patterns
+        (CVE-2017-11882, CVE-2017-0199, CVE-2012-0158)
+      • EternalBlue/WannaCry SMB byte pattern (CVE-2017-0144)
+      • ProxyLogon SSRF cookie (CVE-2021-26855)
+      • Zerologon probe (CVE-2020-1472)
+      • Scanner UA probes (Nikto, sqlmap, Nessus, OpenVAS, Nuclei, ZGrab)
+      • Webshell access patterns (PHP webshell, China Chopper)
+
+    All probes target only testmyids.com or scanme.nmap.org — public hosts
+    that explicitly welcome IDS/IPS test traffic.  Connections are refused or
+    reset; exploit payloads never reach a real service.
+
+    Validates that network IPS / SASE inline inspection (Cato, Zscaler,
+    Palo Alto, Fortinet) fires on CVE-specific HTTP patterns.
+    """
+    n = _size_to_limits(ARGS.size, 5, 10, 20, len(cve_http_probes), len(cve_http_probes))
+    sample = random.sample(cve_http_probes, k=min(n, len(cve_http_probes)))
+
+    ui_banner("CVE HTTP Probe",
+              f"{len(sample)}/{len(cve_http_probes)} probes → {cve_probe_targets}")
+    ok_count = 0
+    for cve_id, label, method, path, extra_headers, body in sample:
+        target = random.choice(cve_probe_targets)
+        url = f"http://{target}{path}"
+        console.log(f"  [{cve_id}] {label[:50]}  → {target}")
+        try:
+            hdrs = {"User-Agent": f"traffgen-cve-probe/{cve_id}",
+                    "Accept": "*/*",
+                    "Connection": "close"}
+            hdrs.update(extra_headers)
+            if method == "GET":
+                result = subprocess.run(
+                    ["curl", "-k", "-s", "--show-error", "--connect-timeout", "4",
+                     "-o", "/dev/null", "-w", "%{http_code}", "--max-time", "6",
+                     url] +
+                    [item for k, v in extra_headers.items() for item in ("-H", f"{k}: {v}")],
+                    capture_output=True, text=True, timeout=12,
+                )
+                status = result.stdout.strip()
+                _stats.record(status)
+            else:
+                resp = requests.request(
+                    method, url,
+                    headers=hdrs,
+                    data=body,
+                    timeout=6,
+                    verify=False,
+                    allow_redirects=False,
+                )
+                status = str(resp.status_code)
+                _stats.record(status)
+            console.log(f"    ↳ [{_status_style(status)}]HTTP {status}[/]")
+            ok_count += 1
+        except Exception as e:
+            _stats.fail()
+            console.log(f"    ↳ [yellow]error: {e}[/]")
+        time.sleep(random.uniform(0.2, 0.5))
+    ui_ok(f"CVE probe complete  ({ok_count}/{len(sample)} sent)")
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # CLI & RUNNER
 # ══════════════════════════════════════════════════════════════════════════════
@@ -5017,6 +5148,8 @@ _SUITE_MAP: dict[str, list] = {
     "data-exfil-http":  [data_exfil_http],
     "web-scanner":      [web_scanner],
     "iperf3":           [iperf3_bandwidth],
+    "ips-ua":           [ips_ua],
+    "cve-probe":        [cve_probe],
 }
 
 
