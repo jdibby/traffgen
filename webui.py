@@ -545,9 +545,10 @@ _SEC_HEADERS = {
     "Cache-Control":             "no-store",
     "Content-Security-Policy": (
         "default-src 'none'; "
-        "style-src 'unsafe-inline'; "
-        "script-src 'unsafe-inline'; "
-        "connect-src 'self'"
+        "style-src 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; "
+        "script-src 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; "
+        "img-src 'self' data: https://*.basemaps.cartocdn.com; "
+        "connect-src 'self' https://ip-api.com"
     ),
     "Strict-Transport-Security": "max-age=31536000",
     "Permissions-Policy":        "geolocation=(), microphone=(), camera=()",
