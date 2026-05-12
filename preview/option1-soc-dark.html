@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Traffic Map — Option 1: SOC Dark</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0a0c10;color:#e2e8f0;font-family:'Inter',system-ui,sans-serif;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+  header{display:flex;align-items:center;gap:12px;padding:10px 18px;background:#0d1117;border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0}
+  header h1{font-size:15px;font-weight:600;color:#e2e8f0;letter-spacing:.3px}
+  .badge{background:rgba(0,255,136,.12);color:#00ff88;font-size:10px;font-weight:700;letter-spacing:1px;padding:2px 8px;border-radius:20px;text-transform:uppercase;border:1px solid rgba(0,255,136,.25)}
+  #map{flex:1;width:100%}
+  /* Leaflet dark tiles */
+  .leaflet-container{background:#0a0c10}
+  /* Stats legend */
+  .map-legend{position:absolute;bottom:32px;right:16px;z-index:1000;background:rgba(10,12,16,.9);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:12px 16px;font-size:12px;min-width:200px;backdrop-filter:blur(8px);pointer-events:none}
+  .map-legend h3{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:#4a5568;margin-bottom:10px}
+  .ml-row{display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+  .ml-row:last-child{border:none;padding-top:6px;margin-top:2px}
+  .ml-label{color:#718096;font-size:11px}
+  .ml-val{color:#e2e8f0;font-weight:600;font-size:12px}
+  .ml-val.green{color:#00ff88}
+  .ml-val.active{color:#63b3ed;animation:pulse-text 1.5s ease-in-out infinite}
+  @keyframes pulse-text{0%,100%{opacity:1}50%{opacity:.5}}
+  /* Source ping */
+  .src-ping{width:16px;height:16px;border-radius:50%;background:rgba(0,255,136,.3);position:relative;display:inline-flex;align-items:center;justify-content:center}
+  .src-ping::after{content:'';position:absolute;width:100%;height:100%;border-radius:50%;background:rgba(0,255,136,.4);animation:ripple 2s infinite}
+  @keyframes ripple{0%{transform:scale(1);opacity:.8}100%{transform:scale(2.5);opacity:0}}
+  /* Tooltip */
+  .leaflet-tooltip{background:rgba(13,17,23,.95);border:1px solid rgba(255,255,255,.15);color:#e2e8f0;font-size:12px;border-radius:6px;padding:6px 10px;box-shadow:0 4px 16px rgba(0,0,0,.5)}
+  .leaflet-tooltip::before{display:none}
+  .tt-host{font-weight:700;color:#63b3ed;margin-bottom:2px}
+  .tt-loc{color:#718096;font-size:11px}
+  .tt-suite{color:#00ff88;font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+</style>
+</head>
+<body>
+<header>
+  <span style="font-size:18px">🗺</span>
+  <h1>Traffic Map</h1>
+  <span class="badge">● Live</span>
+  <span style="margin-left:auto;font-size:11px;color:#4a5568">traffgen v3.9.3</span>
+</header>
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ── Map init ──────────────────────────────────────────────────────────────────
+const map = L.map('map', {
+  center: [39, -98],
+  zoom: 4,
+  zoomControl: true,
+  attributionControl: false,
+});
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  subdomains: 'abcd',
+  maxZoom: 14,
+}).addTo(map);
+
+// ── Demo geo data ─────────────────────────────────────────────────────────────
+const SOURCE = [39.74, -104.98]; // Denver, CO (demo)
+const DESTINATIONS = [
+  {ll:[37.41,-122.08], host:'8.8.8.8', label:'Google DNS', loc:'Mountain View, CA', suite:'dns'},
+  {ll:[37.77,-122.42], host:'1.1.1.1', label:'Cloudflare', loc:'San Francisco, CA', suite:'dns'},
+  {ll:[47.67,-122.12], host:'microsoft.com', label:'Microsoft', loc:'Redmond, WA', suite:'https'},
+  {ll:[40.71,-74.01],  host:'vimeo.com', label:'Vimeo', loc:'New York, NY', suite:'https'},
+  {ll:[37.53,-121.99], host:'scanme.nmap.org', label:'Nmap Test', loc:'Fremont, CA', suite:'nmap'},
+  {ll:[47.38,8.54],    host:'9.9.9.9', label:'Quad9 DNS', loc:'Zurich, Switzerland', suite:'dns'},
+  {ll:[51.51,-0.13],   host:'lon.speedtest.clouvider.net', label:'Clouvider', loc:'London, UK', suite:'iperf3'},
+  {ll:[48.86,2.35],    host:'bouygues.iperf.fr', label:'Bouygues', loc:'Paris, France', suite:'iperf3'},
+  {ll:[34.05,-118.24], host:'la.speedtest.clouvider.net', label:'Clouvider LA', loc:'Los Angeles, CA', suite:'iperf3'},
+  {ll:[37.34,-121.89], host:'adobe.com', label:'Adobe', loc:'San Jose, CA', suite:'https'},
+  {ll:[30.27,-97.74],  host:'tesla.com', label:'Tesla', loc:'Austin, TX', suite:'https'},
+  {ll:[37.33,-122.03], host:'apple.com', label:'Apple', loc:'Cupertino, CA', suite:'https'},
+  {ll:[52.37,4.90],    host:'wetransfer.com', label:'WeTransfer', loc:'Amsterdam, NL', suite:'shadow-it'},
+  {ll:[46.20,6.14],    host:'protonvpn.com', label:'ProtonVPN', loc:'Geneva, Switzerland', suite:'tor-anonymizer'},
+  {ll:[39.74,-104.98], host:'iperf.scottlinux.com', label:'Scott Linux', loc:'Denver, CO', suite:'iperf3'},
+];
+
+// ── Source marker ─────────────────────────────────────────────────────────────
+const srcIcon = L.divIcon({
+  html: `<div style="width:14px;height:14px;border-radius:50%;background:#00ff88;box-shadow:0 0 0 4px rgba(0,255,136,.25),0 0 12px rgba(0,255,136,.6);position:relative">
+    <div style="position:absolute;inset:-8px;border-radius:50%;border:1.5px solid rgba(0,255,136,.4);animation:ripple 2s infinite"></div>
+  </div>
+  <style>@keyframes ripple{0%{transform:scale(1);opacity:.8}100%{transform:scale(2);opacity:0}}</style>`,
+  className: '',
+  iconSize: [14, 14],
+  iconAnchor: [7, 7],
+});
+L.marker(SOURCE, {icon: srcIcon, interactive: false, zIndexOffset: 1000}).addTo(map);
+
+// ── Destination markers ───────────────────────────────────────────────────────
+const dotIcon = (active) => L.circleMarker;
+
+DESTINATIONS.forEach(d => {
+  const m = L.circleMarker(d.ll, {
+    radius: 4,
+    color: '#63b3ed',
+    fillColor: '#63b3ed',
+    fillOpacity: 0.35,
+    weight: 1,
+    opacity: 0.5,
+  }).addTo(map);
+  m.bindTooltip(
+    `<div class="tt-host">${d.host}</div><div class="tt-loc">📍 ${d.loc}</div><div class="tt-suite">${d.suite}</div>`,
+    {className: '', sticky: true, offset: [10, 0]}
+  );
+});
+
+// ── Arc builder (bezier curve) ────────────────────────────────────────────────
+function buildArc(from, to, n=60) {
+  const midLat = (from[0]+to[0])/2 + Math.abs(to[1]-from[1])*0.18;
+  const midLng = (from[1]+to[1])/2;
+  const pts = [];
+  for (let i=0;i<=n;i++) {
+    const t=i/n;
+    pts.push([ (1-t)*(1-t)*from[0]+2*(1-t)*t*midLat+t*t*to[0],
+               (1-t)*(1-t)*from[1]+2*(1-t)*t*midLng+t*t*to[1] ]);
+  }
+  return pts;
+}
+
+// ── Traveling dot animation ───────────────────────────────────────────────────
+let activeArcs = 0;
+
+function shootArc(dst) {
+  const pts = buildArc(SOURCE, dst.ll);
+  activeArcs++;
+  updateStats();
+
+  // Trailing polyline
+  const trail = L.polyline([pts[0]], {
+    color: '#00ff88',
+    weight: 1.5,
+    opacity: 0.5,
+    interactive: false,
+    smoothFactor: 1,
+  }).addTo(map);
+
+  // Moving dot
+  const dot = L.circleMarker(pts[0], {
+    radius: 4,
+    color: '#00ff88',
+    fillColor: '#ffffff',
+    fillOpacity: 1,
+    weight: 2,
+    interactive: false,
+  }).addTo(map);
+
+  let i = 0;
+  const TRAIL_LEN = 12;
+  const STEP_MS = 40;
+
+  const ticker = setInterval(() => {
+    i++;
+    if (i >= pts.length) {
+      clearInterval(ticker);
+      activeArcs = Math.max(0, activeArcs-1);
+      updateStats();
+      // Pulse destination
+      const pulse = L.circleMarker(dst.ll, {
+        radius: 8, color: '#00ff88', fillColor: '#00ff88',
+        fillOpacity: 0.4, weight: 1, interactive: false,
+      }).addTo(map);
+      let r=8, op=0.4;
+      const pTick = setInterval(() => {
+        r += 1.5; op -= 0.04;
+        if (op <= 0) { clearInterval(pTick); map.removeLayer(pulse); }
+        else pulse.setStyle({radius:r, fillOpacity:op, opacity:op});
+      }, 30);
+      // Fade trail
+      let tOp = 0.5;
+      const fade = setInterval(() => {
+        tOp -= 0.04;
+        if (tOp <= 0) { clearInterval(fade); map.removeLayer(trail); map.removeLayer(dot); }
+        else { trail.setStyle({opacity: tOp}); dot.setStyle({fillOpacity: tOp*2, opacity: tOp*2}); }
+      }, 40);
+      return;
+    }
+    dot.setLatLng(pts[i]);
+    trail.setLatLngs(pts.slice(Math.max(0, i-TRAIL_LEN), i+1));
+  }, STEP_MS);
+}
+
+// ── Stats legend ──────────────────────────────────────────────────────────────
+let countries = new Set(), totalSent = 0;
+DESTINATIONS.forEach(d => countries.add(d.loc.split(', ').pop()));
+
+const legend = L.control({position: 'bottomright'});
+legend.onAdd = () => {
+  const d = L.DomUtil.create('div', 'map-legend');
+  d.id = 'map-legend';
+  d.innerHTML = `
+    <h3>Traffic Stats</h3>
+    <div class="ml-row"><span class="ml-label">📡 Source</span><span class="ml-val green" id="ml-src">Denver, CO</span></div>
+    <div class="ml-row"><span class="ml-label">🌍 Countries</span><span class="ml-val" id="ml-ctry">${countries.size}</span></div>
+    <div class="ml-row"><span class="ml-label">📍 Endpoints</span><span class="ml-val" id="ml-ep">${DESTINATIONS.length}</span></div>
+    <div class="ml-row"><span class="ml-label">⚡ Active arcs</span><span class="ml-val active" id="ml-active">0</span></div>
+    <div class="ml-row"><span class="ml-label">📦 Total probes</span><span class="ml-val" id="ml-total">0</span></div>
+  `;
+  return d;
+};
+legend.addTo(map);
+
+function updateStats() {
+  const e = document.getElementById('ml-active');
+  const t = document.getElementById('ml-total');
+  if (e) e.textContent = activeArcs;
+  if (t) t.textContent = totalSent;
+}
+
+// ── Auto demo loop ────────────────────────────────────────────────────────────
+function demoLoop() {
+  const dst = DESTINATIONS[Math.floor(Math.random() * DESTINATIONS.length)];
+  totalSent++;
+  updateStats();
+  shootArc(dst);
+  // Occasionally shoot multiple arcs
+  if (Math.random() > 0.6) {
+    const dst2 = DESTINATIONS[Math.floor(Math.random() * DESTINATIONS.length)];
+    setTimeout(() => { totalSent++; updateStats(); shootArc(dst2); }, 400);
+  }
+  setTimeout(demoLoop, 800 + Math.random() * 2000);
+}
+setTimeout(demoLoop, 1000);
+</script>
+</body>
+</html>
