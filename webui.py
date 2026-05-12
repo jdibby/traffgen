@@ -4666,7 +4666,7 @@ _initDrag('health-grid');
 })();
 
 // ── Traffic Map ────────────────────────────────────────────────────────────────
-let _tmap=null,_tmapEs=null,_tmapExpanded=false,_tmapSrc=null,_tmapPlacedHosts=new Set();
+let _tmap=null,_tmapEs=null,_tmapExpanded=false,_tmapSrc=null,_tmapSrcMarker=null,_tmapPlacedHosts=new Set();
 let _tmapArcs=0,_tmapTotal=0,_tmapEps=new Set();
 const _tmapCtry={};
 const _tmapFlags={US:'🇺🇸',GB:'🇬🇧',FR:'🇫🇷',NL:'🇳🇱',CH:'🇨🇭',DE:'🇩🇪',JP:'🇯🇵',AU:'🇦🇺',CA:'🇨🇦',SE:'🇸🇪',NZ:'🇳🇿',PA:'🇵🇦',CY:'🇨🇾',CN:'🇨🇳',SG:'🇸🇬',IE:'🇮🇪',HK:'🇭🇰',RO:'🇷🇴',VG:'🇻🇬',IL:'🇮🇱',NO:'🇳🇴',MY:'🇲🇾'};
@@ -4902,9 +4902,9 @@ function _tmapBuildArc(from,to,n){
   return Array.from({length:n+1},function(_,i){var t=i/n;return[(1-t)*(1-t)*from[0]+2*(1-t)*t*midLat+t*t*to[0],(1-t)*(1-t)*from[1]+2*(1-t)*t*midLng+t*t*to[1]];});
 }
 function _tmapShootArc(geo,suite,host){
-  if(!_tmap||!_tmapSrc)return;
+  if(!_tmap)return;
   const c=_tmapSuiteColor[suite]||'#63b3ed';
-  const from=_tmapSrc,to=geo.ll;
+  const from=_tmapSrc||[39,-98],to=geo.ll;
   if(Math.abs(from[0]-to[0])<0.1&&Math.abs(from[1]-to[1])<0.1)return;
   _tmapArcs++;_tmapTotal++;_tmapEps.add(host);
   _tmapCtry[geo.country]=(_tmapCtry[geo.country]||0)+1;
@@ -4979,8 +4979,22 @@ function _tmapConnectLog(){
 }
 function initTrafficMap(){
   if(_tmap){_tmap.invalidateSize();if(!_tmapEs)_tmapConnectLog();return;}
-  if(!document.getElementById('leaflet-css')){
-    var lk=document.createElement('link');lk.id='leaflet-css';lk.rel='stylesheet';lk.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';document.head.appendChild(lk);
+  // Set a default source immediately so arcs can fire even before ip-api responds
+  _tmapSrc=[39,-98];
+  // Fetch real geo in background — non-blocking
+  fetch('https://ip-api.com/json?fields=lat,lon,city,regionName,countryCode')
+    .then(function(r){return r.json();}).then(function(j){
+      if(j&&j.lat){
+        _tmapSrc=[j.lat,j.lon];
+        var srcEl=$('tmap-s-src');if(srcEl)srcEl.textContent=(j.city||'')+(j.regionName?', '+j.regionName:'');
+        if(_tmap&&_tmapSrcMarker){_tmap.removeLayer(_tmapSrcMarker);_tmapSrcMarker=null;}
+        if(_tmap)_tmapPlaceSrc();
+      }
+    }).catch(function(){});
+  function _tmapPlaceSrc(){
+    if(!_tmap||!_tmapSrc)return;
+    var srcIcon=L.divIcon({html:'<div style="position:relative;width:20px;height:20px"><div style="position:absolute;inset:0;border-radius:50%;background:#00ff88;opacity:.9;box-shadow:0 0 6px #00ff88,0 0 20px rgba(0,255,136,.6)"></div><div style="position:absolute;inset:-6px;border-radius:50%;border:1.5px solid rgba(0,255,136,.5);animation:tmapR1 2s ease-out infinite"></div><div style="position:absolute;inset:-14px;border-radius:50%;border:1px solid rgba(0,255,136,.25);animation:tmapR1 2s ease-out .5s infinite"></div></div><style>@keyframes tmapR1{0%{transform:scale(.8);opacity:.9}100%{transform:scale(1.8);opacity:0}}</style>',className:'',iconSize:[20,20],iconAnchor:[10,10],zIndexOffset:1000});
+    _tmapSrcMarker=L.marker(_tmapSrc,{icon:srcIcon,interactive:false}).addTo(_tmap);
   }
   function _doInit(){
     var mapEl=document.getElementById('tmap');
@@ -4989,22 +5003,19 @@ function initTrafficMap(){
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:14}).addTo(_tmap);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:14,pane:'overlayPane'}).addTo(_tmap);
     L.control.zoom({position:'topright'}).addTo(_tmap);
-    fetch('https://ip-api.com/json?fields=lat,lon,city,regionName,countryCode')
-      .then(function(r){return r.json();}).then(function(j){
-        _tmapSrc=[j.lat||39,j.lon||-98];
-        var srcEl=$('tmap-s-src');if(srcEl)srcEl.textContent=(j.city||'')+(j.regionName?', '+j.regionName:'');
-        var srcIcon=L.divIcon({html:'<div style="position:relative;width:20px;height:20px"><div style="position:absolute;inset:0;border-radius:50%;background:#00ff88;opacity:.9;box-shadow:0 0 6px #00ff88,0 0 20px rgba(0,255,136,.6)"></div><div style="position:absolute;inset:-6px;border-radius:50%;border:1.5px solid rgba(0,255,136,.5);animation:tmapR1 2s ease-out infinite"></div><div style="position:absolute;inset:-14px;border-radius:50%;border:1px solid rgba(0,255,136,.25);animation:tmapR1 2s ease-out .5s infinite"></div></div><style>@keyframes tmapR1{0%{transform:scale(.8);opacity:.9}100%{transform:scale(1.8);opacity:0}}</style>',className:'',iconSize:[20,20],iconAnchor:[10,10],zIndexOffset:1000});
-        L.marker(_tmapSrc,{icon:srcIcon,interactive:false}).addTo(_tmap);
-        _tmapConnectLog();
-      }).catch(function(){
-        _tmapSrc=[39,-98];
-        var srcEl=$('tmap-s-src');if(srcEl)srcEl.textContent='Unknown';
-        _tmapConnectLog();
-      });
+    _tmapPlaceSrc();
+    _tmapConnectLog();
   }
-  if(!window.L){
-    var sc=document.createElement('script');sc.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';sc.onload=_doInit;document.head.appendChild(sc);
-  }else{_doInit();}
+  function _loadJS(){
+    if(!window.L){
+      var sc=document.createElement('script');sc.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';sc.onload=_doInit;document.head.appendChild(sc);
+    }else{_doInit();}
+  }
+  if(!document.getElementById('leaflet-css')){
+    var lk=document.createElement('link');lk.id='leaflet-css';lk.rel='stylesheet';lk.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    lk.onload=_loadJS;
+    document.head.appendChild(lk);
+  }else{_loadJS();}
 }
 </script>
 </body></html>"""
