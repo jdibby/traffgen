@@ -1351,7 +1351,7 @@ def sse_state():
         last_ka = time.time()
         while True:
             yield f"data: {json.dumps(_read_state(), separators=(',', ':'))}\n\n"
-            time.sleep(2)
+            time.sleep(1)
             # keepalive comment so proxies/browsers don't close idle connections
             if time.time() - last_ka > 15:
                 yield ": ka\n\n"
@@ -3394,8 +3394,10 @@ function apply(s){
   $('btn-stop').style.display=isStopped?'none':'inline-grid';
   const lp=$('pill-live');if(isStopped){lp.className='tp-pill tp-stopped';lp.innerHTML='&#9654; RESTART';lp.title='Click to restart tests';}else{lp.className='tp-pill tp-running';lp.innerHTML='<span class="pulse"></span>LIVE';lp.title='Click to stop all tests';}
   $('cfg-s-pill').textContent='suite:'+(s.suite||'—');$('cfg-z-pill').textContent='size:'+(s.size||'—');
+  const live=st==='running'&&s.live?s.live:null;
   const tot=s.totals||{},ok=tot.ok||0,fail=tot.fail||0,att=tot.attempts||0,p=att?ok/att*100:0,blk=tot.blocked||0,drp=tot.dropped||0;
-  $('v-total').textContent=N(att);$('s-total').textContent=N(ok)+' ok \xb7 '+N(fail)+' fail'+(blk?' \xb7 '+N(blk)+' blocked':'')+(drp?' \xb7 '+N(drp)+' dropped':'');
+  $('v-total').textContent=N(att);
+  {const livePart=live?' \xb7 ↻ '+N(live.attempts)+' req in progress':'';$('s-total').textContent=N(ok)+' ok \xb7 '+N(fail)+' fail'+(blk?' \xb7 '+N(blk)+' blocked':'')+(drp?' \xb7 '+N(drp)+' dropped':'')+livePart;}
   $('v-rate').textContent=att?p.toFixed(1)+'%':'—';$('v-rate').style.color=att?RC(p):'var(--muted)';$('s-rate').textContent=att?N(att)+' total requests':'No data yet';
   const cur=s.current_test||'',tsa=s.test_started_at||0;
   $('v-test').textContent=cur?cur:'—';
@@ -3414,9 +3416,10 @@ function apply(s){
     const bc=RC(tp),lr=t.last_run_at?Tc(t.last_run_at):'—',act=n===cur,exp=_xRows.has(n);
     const codes=t.codes||{};
     const ctags=Object.entries(codes).sort().map(([k,v])=>`<span class="ctag">${H(k)}: ${N(v)}</span>`).join('');
+    const liveTag=act&&live?`<span style="font-size:10px;color:var(--amber);font-weight:400;display:block;line-height:1.4">↻ ${N(live.attempts)} req · ${N(live.allowed)} ok${live.blocked?' · '+N(live.blocked)+' blk':''}</span>`:'';
     return`<tr class="mrow${act?' style="background:rgba(34,197,94,.04)"':''}" onclick="toggleRow('${n}')">
       <td><span class="chev${exp?' open':''}">&#8250;</span></td>
-      <td class="nm" title="${_SD[n]||''}" style="cursor:default"><span class="s-ico">${suiteIco(n)}</span>${act?'<span style="color:var(--green)">&#9654; </span>':''}${H(n)}</td>
+      <td class="nm" title="${_SD[n]||''}" style="cursor:default"><span class="s-ico">${suiteIco(n)}</span>${act?'<span style="color:var(--green)">&#9654; </span>':''}${H(n)}${liveTag}</td>
       <td class="r">${N(ta)}</td><td class="r" style="color:var(--green)">${N(tok)}</td>
       <td class="r" style="color:${tf?'var(--red)':'var(--muted)'}">${N(tf)}</td>
       <td class="r"><div class="rw"><span style="color:${bc}">${ta?tp.toFixed(1)+'%':'—'}</span><div class="bt"><div class="bf" style="width:${tp}%;background:${bc}"></div></div></div></td>
@@ -3470,10 +3473,12 @@ function apply(s){
     const mkCard=su=>{
       const td=tests[su.name]||{},ta=td.attempts||0,tok=td.ok||0,tf=td.fail||0,tp=ta?tok/ta*100:0;
       const bc=RC(tp),act=su.name===cur;
+      const liveRow=act&&live?`<div style="font-size:10px;color:var(--amber);margin-top:3px">↻ ${N(live.attempts)} req · ${N(live.allowed)} ok${live.blocked?' · '+N(live.blocked)+' blocked':''}</div>`:'';
       return`<div class="tcard2${act?' running':''}" data-suite="${H(su.name)}" data-desc="${H(su.description||'')}" onclick="openModal(this.dataset.suite,this.dataset.desc)">
         <div class="tcn" title="${H(su.description||'')}"><span class="s-ico">${suiteIco(su.name)}</span><span class="tcn-lbl">${H(su.name)}</span>${act?'<span class="badge">RUNNING</span>':''}</div>
         <div class="tcd">${H(su.description||'—')}</div>
         <div class="tcs"><span style="color:var(--muted)">${N(ta)} attempts</span><span style="color:var(--green)">${N(tok)} ok</span><span style="color:${tf?'var(--red)':'var(--muted)'}">${N(tf)} fail</span>${ta?'<span style="color:'+bc+'">'+tp.toFixed(1)+'%</span>':''}</div>
+        ${liveRow}
         ${ta?`<div class="tcbar"><div class="tcbf" style="width:${tp}%;background:${bc}"></div></div>`:''}
       </div>`;
     };
@@ -4027,7 +4032,8 @@ function updateSecurityTab(){
   if(!_lastState)return;
   const tests=_lastState.tests||{};
   const tot=_lastState.totals||{};
-  const blk=tot.blocked||0,drp=tot.dropped||0,rch=tot.allowed||0;
+  const _live=_lastState.status==='running'&&_lastState.live?_lastState.live:null;
+  const blk=(tot.blocked||0)+(_live?_live.blocked||0:0),drp=(tot.dropped||0)+(_live?_live.dropped||0:0),rch=(tot.allowed||0)+(_live?_live.allowed||0:0);
   const totalProbes=rch+blk+drp;
   const other=Math.max(0,(tot.attempts||0)-totalProbes);
   const pct=(n,d)=>d?((n/d)*100).toFixed(1)+'%':'—';
@@ -5111,7 +5117,7 @@ function _tmapBuildArc(from,to,n){
 }
 function _tmapOutcome(msg){
   if(!msg)return'';
-  if(/\b(403|407|451|511|block(?:ed|ing)?|refused|reject(?:ed)?|denied|RST|sinkhole|silently.?drop|not.?allowed|forbidden)\b/i.test(msg))return'blocked';
+  if(/\b(403|407|451|511|block(?:ed|ing)?|refused|reject(?:ed)?|denied|RST|reset(?:\s+by\s+peer)?|sinkhole|silently.?drop|not.?allowed|forbidden|filtered|intercepted|ECONNRESET|ECONNREFUSED)\b/i.test(msg))return'blocked';
   if(/\b(2\d\d|ok|success(?:ful)?|reachable|established|open|allowed)\b/i.test(msg))return'allowed';
   return'';
 }
@@ -5176,6 +5182,7 @@ function _tmapAddFeed(host,geo,c,suite,outcome){
 const _tmapGeoPending={};
 let _tmapCurrentSuite='';
 let _tmapLastHost='';
+let _tmapLastHostOutcome='';
 // Known targets for suites whose log lines rarely contain extractable hostnames
 const _tmapSuiteHosts={
   'icmp':['8.8.8.8','1.1.1.1','9.9.9.9','208.67.222.222','4.2.2.2','84.200.69.80','192.234.141.1','12.12.12.12',
@@ -5284,8 +5291,12 @@ function _tmapHandleLog(d){
   let host=_tmapExtractHost(d.msg);
   if(host){
     _tmapLastHost=host;
+    _tmapLastHostOutcome=outcome;
   } else if(outcome&&_tmapLastHost){
-    // Sub-result line (e.g. ↳ HTTP 403) — apply outcome to last seen host
+    // Sub-result line (e.g. ↳ HTTP 403) — apply outcome to last seen host.
+    // Skip if the host line already reported this outcome to avoid double-counting.
+    if(_tmapLastHostOutcome&&_tmapLastHostOutcome===outcome){_tmapLastHostOutcome='';return;}
+    _tmapLastHostOutcome='';
     const g=_tmapGeo[_tmapLastHost];
     if(g)_tmapShootArcWithMarker(_tmapLastHost,g,suite,outcome);
     else _tmapLiveGeo(_tmapLastHost,suite,outcome);
