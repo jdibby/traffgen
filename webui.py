@@ -548,7 +548,7 @@ _SEC_HEADERS = {
         "style-src 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; "
         "script-src 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; "
         "img-src 'self' data: https://*.basemaps.cartocdn.com; "
-        "connect-src 'self' https://cdn.jsdelivr.net https://unpkg.com https://ip-api.com"
+        "connect-src 'self' https://cdn.jsdelivr.net https://unpkg.com https://ip-api.com https://ipapi.co"
     ),
     "Strict-Transport-Security": "max-age=31536000",
     "Permissions-Policy":        "geolocation=(), microphone=(), camera=()",
@@ -4881,9 +4881,36 @@ const _tmapGeo={
   'route-views.routeviews.org':{ll:[44.05,-123.09],city:'Eugene, OR',country:'US',hint:'bgp'},
   'bgp.he.net':{ll:[37.53,-121.99],city:'Fremont, CA',country:'US',hint:'bgp'},
   'demo.snmplabs.com':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'snmp'},
+  'test.net-snmp.org':{ll:[39.04,-77.49],city:'Ashburn, VA',country:'US',hint:'snmp'},
+  'snmp.inetdaemon.com':{ll:[33.75,-84.39],city:'Atlanta, GA',country:'US',hint:'snmp'},
+  'routertest.net':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'snmp'},
   '0.us.pool.ntp.org':{ll:[38.96,-77.09],city:'US Pool',country:'US',hint:'ntp'},
   '1.us.pool.ntp.org':{ll:[38.96,-77.09],city:'US Pool',country:'US',hint:'ntp'},
+  '2.us.pool.ntp.org':{ll:[38.96,-77.09],city:'US Pool',country:'US',hint:'ntp'},
+  '3.us.pool.ntp.org':{ll:[38.96,-77.09],city:'US Pool',country:'US',hint:'ntp'},
   '1.ro.pool.ntp.org':{ll:[44.43,26.10],city:'Bucharest',country:'RO',hint:'ntp'},
+  'time-a-g.nist.gov':{ll:[39.14,-77.22],city:'Gaithersburg, MD',country:'US',hint:'ntp'},
+  'time-b-g.nist.gov':{ll:[39.14,-77.22],city:'Gaithersburg, MD',country:'US',hint:'ntp'},
+  'time-c-g.nist.gov':{ll:[39.14,-77.22],city:'Gaithersburg, MD',country:'US',hint:'ntp'},
+  'time-a-wwv.nist.gov':{ll:[40.68,-105.04],city:'Fort Collins, CO',country:'US',hint:'ntp'},
+  'time-b-wwv.nist.gov':{ll:[40.68,-105.04],city:'Fort Collins, CO',country:'US',hint:'ntp'},
+  'time-a-b.nist.gov':{ll:[40.01,-105.27],city:'Boulder, CO',country:'US',hint:'ntp'},
+  'time-b-b.nist.gov':{ll:[40.01,-105.27],city:'Boulder, CO',country:'US',hint:'ntp'},
+  'time.nist.gov':{ll:[40.01,-105.27],city:'Boulder, CO',country:'US',hint:'ntp'},
+  'utcnist.colorado.edu':{ll:[40.01,-105.27],city:'Boulder, CO',country:'US',hint:'ntp'},
+  'lon.speedtest.clouvider.net':{ll:[51.51,-0.13],city:'London',country:'GB',hint:'iperf3'},
+  'nyc.speedtest.clouvider.net':{ll:[40.71,-74.01],city:'New York, NY',country:'US',hint:'iperf3'},
+  'la.speedtest.clouvider.net':{ll:[34.05,-118.24],city:'Los Angeles, CA',country:'US',hint:'iperf3'},
+  'ams.speedtest.clouvider.net':{ll:[52.37,4.90],city:'Amsterdam',country:'NL',hint:'iperf3'},
+  'iperf.he.net':{ll:[37.53,-121.99],city:'Fremont, CA',country:'US',hint:'iperf3'},
+  '45.33.32.156':{ll:[37.53,-121.99],city:'Fremont, CA',country:'US',hint:'nmap'},
+  'www.testmyids.com':{ll:[37.53,-121.99],city:'Fremont, CA',country:'US',hint:'ids-sigs'},
+  '139.130.4.5':{ll:[-33.87,151.21],city:'Sydney',country:'AU',hint:'icmp'},
+  '12.12.12.12':{ll:[32.78,-96.80],city:'Dallas, TX',country:'US',hint:'icmp'},
+  '80.10.246.2':{ll:[48.86,2.35],city:'Paris',country:'FR',hint:'icmp'},
+  '80.10.246.129':{ll:[48.86,2.35],city:'Paris',country:'FR',hint:'icmp'},
+  '68.87.85.98':{ll:[39.95,-75.17],city:'Philadelphia, PA',country:'US',hint:'icmp'},
+  '68.87.64.146':{ll:[39.95,-75.17],city:'Philadelphia, PA',country:'US',hint:'icmp'},
 };
 function tmapFullscreen(){
   const el=document.getElementById('tab-trafficmap');
@@ -4891,14 +4918,18 @@ function tmapFullscreen(){
   else if(el.requestFullscreen){el.requestFullscreen();}
 }
 function _tmapExtractHost(msg){
+  // 1. Full URL — most reliable
   let m=msg.match(/https?:\/\/([^/\s>"']+)/);
   if(m)return m[1].toLowerCase().replace(/^www2?\./,'');
+  // 2. Arrow notation: "→ host[:port]"
+  m=msg.match(/→\s*([a-z0-9][a-z0-9._-]+\.[a-z]{2,})/i);
+  if(m)return m[1].toLowerCase().split(':')[0];
+  // 3. Keyword followed (lazily) by the first hostname-looking token
+  m=msg.match(/\b(?:nmap|dig|ping|ntp|snmpwalk|snmp|traceroute|query|probe|target|connect|testing|test)\b.*?([a-z][a-z0-9._-]{2,}\.[a-z]{2,})/i);
+  if(m)return m[1].toLowerCase();
+  // 4. Bare IP address fallback
   m=msg.match(/\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b/);
   if(m)return m[1];
-  m=msg.match(/→\s*([a-z0-9][a-z0-9._-]+\.[a-z]{2,})/i);
-  if(m)return m[1].toLowerCase();
-  m=msg.match(/(?:query|probe|target|ping|connect|testing|test)\s*[:=]?\s*([a-z0-9][a-z0-9._-]+\.[a-z]{2,})/i);
-  if(m)return m[1].toLowerCase();
   return null;
 }
 function _tmapBuildArc(from,to,n){
@@ -4964,20 +4995,41 @@ function _tmapAddFeed(host,geo,c,suite){
   feed.insertBefore(el,feed.firstChild);
   while(feed.children.length>40)feed.removeChild(feed.lastChild);
 }
+const _tmapGeoPending={};
+function _tmapIsPrivateIP(h){return/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|0\.0\.0\.0|::1|fc|fd|fe80)/.test(h);}
+function _tmapLiveGeo(host,suite){
+  if(_tmapIsPrivateIP(host))return;
+  if(_tmapGeoPending[host])return;
+  _tmapGeoPending[host]=1;
+  fetch('https://ipapi.co/'+host+'/json/')
+    .then(function(r){return r.json();})
+    .then(function(j){
+      if(!j||!j.latitude)return;
+      const geo={ll:[j.latitude,j.longitude],city:(j.city||'')+(j.region_code?', '+j.region_code:''),country:j.country_code||'US',hint:suite};
+      _tmapGeo[host]=geo;
+      _tmapShootArcWithMarker(host,geo,suite);
+    }).catch(function(){});
+}
+function _tmapShootArcWithMarker(host,geo,suite){
+  if(!_tmapPlacedHosts.has(host)){
+    _tmapPlacedHosts.add(host);
+    const c=_tmapSuiteColor[geo.hint]||'#63b3ed';
+    if(_tmap)L.circleMarker(geo.ll,{radius:4,color:c,fillColor:c,fillOpacity:.25,weight:1.5,opacity:.5}).addTo(_tmap)
+     .bindTooltip('<div style="font-weight:700;color:'+c+'">'+H(host)+'</div><div style="color:#4a5568;font-size:11px">📍 '+H(geo.city)+'</div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:'+c+';margin-top:3px">'+H(geo.hint)+'</div>',{className:'',sticky:true,offset:[10,0]});
+  }
+  _tmapShootArc(geo,suite,host);
+}
 function _tmapHandleLog(d){
   if(!d||!d.msg)return;
   const host=_tmapExtractHost(d.msg);
   if(!host)return;
+  const suite=d.test||'dns';
   const geo=_tmapGeo[host];
-  if(!geo)return;
-  const suite=d.test||geo.hint||'dns';
-  if(!_tmapPlacedHosts.has(host)){
-    _tmapPlacedHosts.add(host);
-    const c=_tmapSuiteColor[geo.hint]||'#63b3ed';
-    L.circleMarker(geo.ll,{radius:4,color:c,fillColor:c,fillOpacity:.25,weight:1.5,opacity:.5}).addTo(_tmap)
-     .bindTooltip('<div style="font-weight:700;color:'+c+'">'+H(host)+'</div><div style="color:#4a5568;font-size:11px">📍 '+H(geo.city)+'</div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:'+c+';margin-top:3px">'+H(geo.hint)+'</div>',{className:'',sticky:true,offset:[10,0]});
+  if(geo){
+    _tmapShootArcWithMarker(host,geo,suite);
+  }else{
+    _tmapLiveGeo(host,suite);
   }
-  _tmapShootArc(geo,suite,host);
 }
 function _tmapConnectLog(){
   if(_tmapEs)return;
