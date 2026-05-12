@@ -1673,12 +1673,11 @@ select.diag-input{appearance:none;-webkit-appearance:none;background-color:var(-
 .tmap-leg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .tmap-fs-btn{position:absolute;top:14px;left:14px;z-index:1000;background:rgba(4,6,10,.85);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:5px 10px;font-size:16px;color:#718096;cursor:pointer;backdrop-filter:blur(8px);transition:color .15s,border-color .15s;line-height:1}
 .tmap-fs-btn:hover{color:#e2e8f0;border-color:rgba(255,255,255,.2)}
-/* ── Bottom bar: legend left + stats center ── */
-.tmap-bottom{background:#080b10;border-top:1px solid rgba(255,255,255,.07);flex-shrink:0;display:flex;flex-direction:row;align-items:stretch}
-.tmap-leg-section{padding:5px 12px;display:flex;flex-wrap:wrap;gap:3px 14px;align-items:center;flex-shrink:0;border-right:1px solid rgba(255,255,255,.06);max-width:260px}
+/* ── Floating overlays on the map ── */
+.tmap-leg-float{position:absolute;bottom:20px;left:14px;z-index:1000;background:rgba(4,6,10,.82);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:6px 10px;display:flex;flex-wrap:wrap;gap:3px 12px;backdrop-filter:blur(8px);max-width:190px;pointer-events:none}
 .tmap-leg-item{display:flex;align-items:center;gap:5px;font-size:10px;color:#718096;white-space:nowrap}
-.tmap-stats-section{flex:1;display:flex;align-items:stretch;justify-content:center}
-.tmap-stat{padding:6px 16px;text-align:center;border-right:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0}
+.tmap-stats-float{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);z-index:1000;background:rgba(4,6,10,.82);border:1px solid rgba(255,255,255,.08);border-radius:8px;display:flex;flex-direction:row;backdrop-filter:blur(8px);pointer-events:none;white-space:nowrap}
+.tmap-stat{padding:6px 14px;text-align:center;border-right:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0}
 .tmap-stat:last-child{border-right:none}
 .tmap-src-city{font-size:13px;font-weight:700;line-height:1.1;color:#f6ad55;text-shadow:0 0 20px rgba(246,173,85,.4);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
 .tmap-src-isp{font-size:9px;color:#f6ad55;opacity:.45;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;margin-top:2px}
@@ -1898,13 +1897,13 @@ html.light{--bg:#f6f8fa;--sidebar:#eef1f5;--surf:#ffffff;--surf2:#f0f3f7;--borde
 html.light .obody{background:#f0f4f8}html.light .obody .llm{color:#24292f}html.light .obody .llt{color:#8c959f}
 html.light .obody .ll:hover{background:rgba(0,0,0,.04)}html.light .cmd-blk{background:#f0f4f8;color:#24292f}
 html.light #tmap-container{background:#e8ecf0}html.light .leaflet-container{background:#e8ecf0!important}
-html.light .tmap-bottom{background:#f0f3f7;border-top-color:#d0d7de}
-html.light .tmap-leg-section{border-right-color:#d0d7de}
+html.light .tmap-leg-float{background:rgba(240,243,247,.9);border-color:#d0d7de}
+html.light .tmap-stats-float{background:rgba(240,243,247,.9);border-color:#d0d7de}
+html.light .tmap-stat{border-right-color:#d0d7de}
 html.light .tmap-right-col{background:#f0f3f7;border-left-color:#d0d7de}
 html.light .tmap-c-section{border-bottom-color:#d0d7de}
 html.light .tmap-c-title{color:#636e7b;background:#f0f3f7}
 html.light .tmap-feed-title{color:#636e7b;background:#f0f3f7;border-bottom-color:#d0d7de}
-html.light .tmap-stats-section .tmap-stat{border-right-color:#d0d7de}
 html.light .tmap-l{color:#636e7b}
 html.light .tmap-leg-item{color:#4a5568}
 html.light .tmap-src-city{color:#b7791f;text-shadow:none}
@@ -2435,10 +2434,8 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
               <div style="width:120px;height:2px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden"><div id="tmap-status-bar" style="height:100%;width:0%;background:#00ff88;transition:width .4s"></div></div>
             </div>
             <button class="tmap-fs-btn" onclick="tmapFullscreen()" title="Toggle fullscreen">&#x26F6;</button>
-          </div>
-          <!-- Bottom bar: legend left + stats center -->
-          <div class="tmap-bottom">
-            <div class="tmap-leg-section">
+            <!-- Floating legend: bottom-left of map -->
+            <div class="tmap-leg-float">
               <div class="tmap-leg-item"><div class="tmap-leg-dot" style="background:#63b3ed"></div>DNS</div>
               <div class="tmap-leg-item"><div class="tmap-leg-dot" style="background:#b794f4"></div>HTTP / Web</div>
               <div class="tmap-leg-item"><div class="tmap-leg-dot" style="background:#f6ad55"></div>Bandwidth</div>
@@ -2450,7 +2447,8 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
               <div class="tmap-leg-item"><div class="tmap-leg-dot" style="background:#fbd38d"></div>Shadow IT</div>
               <div class="tmap-leg-item"><div class="tmap-leg-dot" style="outline:1.5px solid #fc8181;outline-offset:1px"></div><span style="color:#fc8181">Blocked</span></div>
             </div>
-            <div class="tmap-stats-section">
+            <!-- Floating stats: bottom-center of map -->
+            <div class="tmap-stats-float">
               <div class="tmap-stat"><div class="tmap-n tmap-ng" id="tmap-s-arcs">0</div><div class="tmap-l">Active Arcs</div></div>
               <div class="tmap-stat"><div class="tmap-n tmap-nb" id="tmap-s-total">0</div><div class="tmap-l">Total Probes</div></div>
               <div class="tmap-stat"><div class="tmap-n tmap-nr" id="tmap-s-blocked">0</div><div class="tmap-l">Blocked</div></div>
@@ -5218,6 +5216,7 @@ const _tmapSuiteHosts={
 function _tmapIsPrivateIP(h){return/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|0\.0\.0\.0|::1|fc|fd|fe80)/.test(h);}
 let _tmapGeoQueue=[],_tmapGeoRunning=0,_tmapGeoTimer=null;
 const _TMAP_GEO_CONCUR=2,_TMAP_GEO_DELAY=400;
+const _tmapGeoDeferred={};
 function _tmapDrainGeoQueue(){
   _tmapGeoTimer=null;
   while(_tmapGeoRunning<_TMAP_GEO_CONCUR&&_tmapGeoQueue.length){
@@ -5240,10 +5239,14 @@ function _tmapDrainGeoQueue(){
           const geo={ll:[j.lat,j.lon],city:j.city||'',country:j.country||'US',hint:suite};
           _tmapGeo[host]=geo;
           _tmapShootArcWithMarker(host,geo,suite,outcome);
+          // Fire any arcs that arrived while geo was in-flight (e.g. ↳ HTTP 403 sub-lines)
+          (_tmapGeoDeferred[host]||[]).forEach(function(d){_tmapShootArcWithMarker(host,geo,d.suite,d.outcome);});
+          delete _tmapGeoDeferred[host];
         }
       }).catch(function(){
         // Network error — allow retry
         delete _tmapGeoPending[host];
+        delete _tmapGeoDeferred[host];
       })
       .finally(function(){
         _tmapGeoRunning--;
@@ -5253,7 +5256,13 @@ function _tmapDrainGeoQueue(){
 }
 function _tmapLiveGeo(host,suite,outcome){
   if(_tmapIsPrivateIP(host))return;
-  if(_tmapGeoPending[host])return;
+  if(_tmapGeo[host]){_tmapShootArcWithMarker(host,_tmapGeo[host],suite,outcome);return;}
+  if(_tmapGeoPending[host]){
+    // Geo lookup already in flight — defer this arc until it resolves
+    if(!_tmapGeoDeferred[host])_tmapGeoDeferred[host]=[];
+    _tmapGeoDeferred[host].push({suite,outcome:outcome||''});
+    return;
+  }
   _tmapGeoPending[host]=1;
   _tmapGeoQueue.push({host,suite,outcome:outcome||''});
   if(!_tmapGeoTimer&&_tmapGeoRunning<_TMAP_GEO_CONCUR)_tmapDrainGeoQueue();
