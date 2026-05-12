@@ -137,6 +137,18 @@ Per-suite round-trip time tracking:
 - **Heatmap** — colour grid showing latency buckets (< 50 ms, 50–200 ms, 200–500 ms, > 500 ms) per suite over time; builds as tests run
 - **Per-suite table** — min / avg / max / p95 latency, sample count, and colour-coded row for each suite that has run
 
+### Traffic Map
+
+Live animated world map showing traffic destinations as arcs from your host to remote endpoints.
+
+- **Animated arcs** — each outbound connection fires a bezier arc from your source IP to the destination; a neon glow line with an animated travelling dot gives instant visual feedback of traffic intensity
+- **Colour-coded by suite** — every suite has a distinct arc colour so you can see at a glance which test is generating which traffic (DNS, ICMP, HTTP, C2 beacons, etc.)
+- **Destination markers** — circle markers are placed once per unique host; hover to see the hostname, city, and suite that first resolved it
+- **Traffic Overview panel** — collapsible right-side panel lists recent destination hosts with city and country, colour-coded by suite
+- **Geo resolution** — static lookup table covers ~230 common hostnames; unknown hosts are resolved via the built-in `/api/geo` server-side endpoint (no browser rate limits), which resolves the hostname to an IP and calls ip-api.com from the server with in-memory caching
+- **Suite coverage** — all 55 suites generate arcs; suites whose log lines carry no extractable hostname (icmp, ips-ua, cve-probe, ntp, snmp) use a curated fallback list of known target hosts for visual representation
+- **Source location** — your public IP is resolved once at startup to place the arc origin correctly on the map; falls back to a US-central default if resolution fails
+
 ### Diagnostics
 
 Interactive network tools for ad-hoc investigation:
