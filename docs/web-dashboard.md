@@ -142,13 +142,14 @@ Per-suite round-trip time tracking:
 Live animated world map showing traffic destinations as arcs from your host to remote endpoints.
 
 - **Animated arcs** — each outbound connection fires a bezier arc from your source IP to the destination; a neon glow line with an animated travelling dot gives instant visual feedback of traffic intensity
-- **Colour-coded by suite** — every suite has a distinct arc colour so you can see at a glance which test is generating which traffic (DNS, ICMP, HTTP, C2 beacons, etc.)
-- **Allowed vs Blocked** — arcs fire in green/blue (allowed) or red (blocked) based on the log message outcome; the bottom bar shows a running Blocked counter alongside Total Probes
+- **Colour-coded by suite** — every suite has a distinct arc colour so you can see at a glance which test is generating which traffic; colour groups: DNS (blue), HTTP/Web (purple), Bandwidth (amber), Threat/Scan (orange), Pornography (rose), AI/LLM (green), Anon/VPN (light green), C2/Malware (pink), Shadow IT (yellow)
+- **Blocked arcs** — red arcs are reserved exclusively for blocked connections; outcome is detected from log messages (HTTP 403, TCP RST, proxy refused, DNS sinkhole, etc.); sub-result lines (`↳ HTTP 403`) are attributed to the last seen host so two-line log formats count correctly
 - **Destination markers** — circle markers are placed once per unique host; hover to see the hostname, city, and suite that first resolved it
 - **Geo resolution** — static lookup table covers ~230 common hostnames; unknown hosts are resolved via the built-in `/api/geo` server-side endpoint (no browser rate limits), which resolves the hostname to an IP, fetches city/ISP from ip-api.com, and caches results in memory; private/loopback IPs are skipped
-- **Suite coverage** — all 55 suites generate arcs; suites whose log lines carry no extractable hostname (icmp, ips-ua, cve-probe, ntp, snmp) use a curated fallback list of known target hosts for visual representation
-- **Source location** — your public IP is resolved at startup via the server's `/api/netinfo` endpoint (retried up to 8×); the source marker shows city, state, and ISP/provider; falls back to US-central while resolving
-- **Bottom panel** — replaces the old right-side overlay; contains a stats bar (Active Arcs · Total Probes · Blocked · Countries · Endpoints · Source city + ISP), an inline suite legend, a **By Country** top-10 list (auto-refreshes every 5 s), and a **Live Hit Feed** with OK/BLOCKED outcome badges
+- **Suite coverage** — all 55 suites generate arcs; suites whose log lines carry no extractable hostname (icmp, ntp, snmp, bgp, msf-*, web-scanner, and others) use a curated per-suite fallback list of known target hosts for visual representation
+- **Source location** — your public IP is resolved at startup via the server's `/api/netinfo` endpoint (retried up to 8×); the source marker shows city and ISP/provider; falls back to US-central while resolving
+- **Layout** — left column: map + bottom bar (suite legend left · stats center); right sidebar: **By Country** top-10 list (auto-refreshes every 5 s) + **Live Hit Feed** with OK/BLOCKED outcome badges
+- **Light mode** — fully supported; arc and marker colours shift to darker palette variants for readability on the light CartoDB tile layer
 
 ### Diagnostics
 
