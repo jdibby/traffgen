@@ -1587,6 +1587,53 @@ select.diag-input{appearance:none;-webkit-appearance:none;background-color:var(-
 .panel{display:none;flex-direction:column;gap:14px;padding:18px;flex:1;min-height:0;overflow-y:auto}
 .panel.active{display:flex}
 #tab-output.panel{padding:0;gap:0;overflow:hidden}
+#tab-trafficmap.panel{padding:0;gap:0;overflow:hidden}
+#tab-trafficmap.panel.active{flex-direction:row}
+#tmap{position:absolute;inset:0}
+.tmap-strip{position:absolute;bottom:0;left:0;right:0;z-index:1000;background:linear-gradient(transparent,rgba(4,6,10,.95) 40%);padding:20px 24px 16px;pointer-events:none;display:flex;justify-content:center}
+.tmap-strip-inner{display:flex;gap:1px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:12px;overflow:hidden;backdrop-filter:blur(12px)}
+.tmap-stat{padding:10px 24px;text-align:center;border-right:1px solid rgba(255,255,255,.06)}
+.tmap-stat:last-child{border:none}
+.tmap-n{font-size:20px;font-weight:800;line-height:1;letter-spacing:-.5px}
+.tmap-l{font-size:10px;color:#4a5568;text-transform:uppercase;letter-spacing:1px;margin-top:3px;font-weight:600}
+.tmap-ng{color:#00ff88;text-shadow:0 0 20px rgba(0,255,136,.5)}
+.tmap-nb{color:#63b3ed;text-shadow:0 0 20px rgba(99,179,237,.5)}
+.tmap-np{color:#d6bcfa;text-shadow:0 0 20px rgba(214,188,250,.4)}
+.tmap-no{color:#f6ad55;text-shadow:0 0 20px rgba(246,173,85,.4)}
+.tmap-legend{position:absolute;top:52px;right:14px;z-index:1000;background:rgba(4,6,10,.85);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px 14px;font-size:11px;backdrop-filter:blur(8px);pointer-events:none}
+.tmap-leg-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#4a5568;margin-bottom:8px}
+.tmap-leg-row{display:flex;align-items:center;gap:7px;padding:2px 0;color:#718096}
+.tmap-leg-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.tmap-fs-btn{position:absolute;top:14px;left:14px;z-index:1000;background:rgba(4,6,10,.85);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:5px 10px;font-size:16px;color:#718096;cursor:pointer;backdrop-filter:blur(8px);transition:color .15s,border-color .15s;line-height:1}
+.tmap-fs-btn:hover{color:#e2e8f0;border-color:rgba(255,255,255,.2)}
+.tmap-right{width:280px;background:#0d1117;border-left:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+.tmap-r-hdr{padding:14px 16px 10px;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0}
+.tmap-r-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:#4a5568;margin-bottom:10px}
+.tmap-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.tmap-sbox{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:6px;padding:8px 10px}
+.tmap-sn{font-size:18px;font-weight:700;line-height:1.1}
+.tmap-sl{font-size:10px;color:#4a5568;margin-top:1px}
+.tmap-c-section{padding:10px 16px 6px;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0}
+.tmap-c-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#4a5568;margin-bottom:8px}
+.tmap-c-row{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12px}
+.tmap-c-bar-wrap{flex:1;height:4px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden}
+.tmap-c-bar{height:100%;border-radius:2px;background:#63b3ed;transition:width .5s}
+.tmap-c-count{color:#4a5568;font-size:11px;min-width:18px;text-align:right}
+.tmap-c-name{min-width:80px;color:#a0aec0;font-size:11px}
+.tmap-feed-section{flex:1;overflow-y:auto;min-height:0}
+.tmap-feed-title{padding:10px 16px 6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#4a5568;position:sticky;top:0;background:#0d1117;border-bottom:1px solid rgba(255,255,255,.04)}
+.tmap-feed-item{display:flex;gap:10px;padding:8px 16px;border-bottom:1px solid rgba(255,255,255,.04);align-items:flex-start;animation:tmap-slide-in .2s ease}
+@keyframes tmap-slide-in{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:none}}
+.tmap-f-dot{width:7px;height:7px;border-radius:50%;margin-top:4px;flex-shrink:0}
+.tmap-f-body{flex:1;min-width:0}
+.tmap-f-host{font-size:12px;font-weight:600;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tmap-f-meta{display:flex;gap:6px;margin-top:2px;align-items:center;flex-wrap:wrap}
+.tmap-f-loc{font-size:10px;color:#4a5568}
+.tmap-f-suite{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:1px 5px;border-radius:3px}
+.tmap-f-time{font-size:10px;color:#2d3748;margin-left:auto}
+.leaflet-container{background:#04060a !important}
+.leaflet-tooltip{background:rgba(4,6,10,.95)!important;border:1px solid rgba(99,179,237,.25)!important;color:#e2e8f0!important;font-size:12px;border-radius:8px;padding:8px 12px;box-shadow:0 0 20px rgba(0,0,0,.8)!important}
+.leaflet-tooltip::before{display:none!important}
 /* Widget grids: capped at 1400px, centered, full-height overflow-y */
 #ov-grid,#sec-grid,#health-grid{display:flex;flex-direction:column;gap:14px;max-width:1400px;width:100%;margin:0 auto}
 /* Max-width cap on other panel content (About, Tests, etc.) */
@@ -1840,6 +1887,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
   <button class="nav-item" data-tab="latency" onclick="showTab(this)"><span class="nav-ico">&#128202;</span>Latency</button>
   <button class="nav-item" data-tab="diagnostics" onclick="showTab(this)"><span class="nav-ico">&#128300;</span>Diagnostics</button>
   <button class="nav-item" data-tab="iperf3" onclick="showTab(this)"><span class="nav-ico">&#128246;</span>iperf3</button>
+  <button class="nav-item" data-tab="trafficmap" onclick="showTab(this)"><span class="nav-ico">🗺</span>Traffic Map</button>
   <div class="nav-lbl">System</div>
   <button class="nav-item" data-tab="health" onclick="showTab(this)"><span class="nav-ico">&#9889;</span>Health</button>
   <div class="nav-lbl">Info</div>
@@ -2283,6 +2331,51 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
             <div id="ip3-table"></div>
             <div id="ip3-summary" style="margin-top:8px"></div>
           </div>
+        </div>
+      </div>
+    </div>
+    <!-- Traffic Map -->
+    <div id="tab-trafficmap" class="panel">
+      <div id="tmap-container" style="flex:1;position:relative;min-width:0;background:#04060a">
+        <div id="tmap"></div>
+        <div class="tmap-strip">
+          <div class="tmap-strip-inner">
+            <div class="tmap-stat"><div class="tmap-n tmap-ng" id="tmap-s-arcs">0</div><div class="tmap-l">Active Arcs</div></div>
+            <div class="tmap-stat"><div class="tmap-n tmap-nb" id="tmap-s-total">0</div><div class="tmap-l">Total Probes</div></div>
+            <div class="tmap-stat"><div class="tmap-n tmap-np" id="tmap-s-ctry">0</div><div class="tmap-l">Countries</div></div>
+            <div class="tmap-stat"><div class="tmap-n tmap-no" id="tmap-s-src" style="font-size:13px;letter-spacing:0">—</div><div class="tmap-l">Source</div></div>
+          </div>
+        </div>
+        <div class="tmap-legend">
+          <div class="tmap-leg-title">Suite Category</div>
+          <div class="tmap-leg-row"><div class="tmap-leg-dot" style="background:#63b3ed"></div>DNS / DoH / DoT</div>
+          <div class="tmap-leg-row"><div class="tmap-leg-dot" style="background:#b794f4"></div>HTTPS / Web</div>
+          <div class="tmap-leg-row"><div class="tmap-leg-dot" style="background:#f6ad55"></div>iperf3 / Bandwidth</div>
+          <div class="tmap-leg-row"><div class="tmap-leg-dot" style="background:#fc8181"></div>Nmap / IDS / IPS</div>
+          <div class="tmap-leg-row"><div class="tmap-leg-dot" style="background:#68d391"></div>AI / LLM</div>
+          <div class="tmap-leg-row"><div class="tmap-leg-dot" style="background:#9ae6b4"></div>Anonymizer / VPN</div>
+          <div class="tmap-leg-row"><div class="tmap-leg-dot" style="background:#f687b3"></div>C2 / Malware</div>
+          <div class="tmap-leg-row"><div class="tmap-leg-dot" style="background:#fbd38d"></div>Shadow IT</div>
+        </div>
+        <button class="tmap-fs-btn" onclick="tmapFullscreen()" title="Toggle fullscreen">&#x26F6;</button>
+      </div>
+      <div class="tmap-right">
+        <div class="tmap-r-hdr">
+          <div class="tmap-r-title">Traffic Overview</div>
+          <div class="tmap-stat-grid">
+            <div class="tmap-sbox"><div class="tmap-sn tmap-ng" id="tmap-rs-arcs">0</div><div class="tmap-sl">Active arcs</div></div>
+            <div class="tmap-sbox"><div class="tmap-sn tmap-nb" id="tmap-rs-total">0</div><div class="tmap-sl">Total probes</div></div>
+            <div class="tmap-sbox"><div class="tmap-sn tmap-np" id="tmap-rs-ctry">0</div><div class="tmap-sl">Countries</div></div>
+            <div class="tmap-sbox"><div class="tmap-sn tmap-no" id="tmap-rs-ep">0</div><div class="tmap-sl">Endpoints</div></div>
+          </div>
+        </div>
+        <div class="tmap-c-section">
+          <div class="tmap-c-title">By Country</div>
+          <div id="tmap-ctry-list"></div>
+        </div>
+        <div class="tmap-feed-section">
+          <div class="tmap-feed-title">Live Hit Feed</div>
+          <div id="tmap-feed"></div>
         </div>
       </div>
     </div>
@@ -2941,7 +3034,7 @@ let _healthTimer=null,_netInfoTimer=null,_lastHealth=null,_netHist=[],_hNetHist=
 let _cpuHist=[],_memHist=[];
 function uptime(t){const s=Math.floor(Date.now()/1000-t);return[Math.floor(s/3600),Math.floor((s%3600)/60),s%60].map(v=>String(v).padStart(2,'0')).join(':');}
 function elapsed(t){if(!t)return'';const s=Math.floor(Date.now()/1000-t);if(s<60)return s+'s elapsed';if(s<3600)return Math.floor(s/60)+'m '+(s%60)+'s elapsed';return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m elapsed';}
-const PAGE_TITLES={overview:'Overview',security:'Security',tests:'Tests',output:'Live View',latency:'Latency',diagnostics:'Diagnostics',iperf3:'iperf3',health:'Health',about:'About',changelog:'Changelog'};
+const PAGE_TITLES={overview:'Overview',security:'Security',tests:'Tests',output:'Live View',latency:'Latency',diagnostics:'Diagnostics',iperf3:'iperf3',trafficmap:'Traffic Map',health:'Health',about:'About',changelog:'Changelog'};
 const SUITE_ICONS={
   'ad-tracker':'🎯','ai-browse':'🤖','bgp':'🌐','bulk-transfer':'💾',
   'blocklist-probe':'🚫','c2-beacon':'📡','llm-dlp':'🧠','web-crawl':'🕷️','dlp':'🔒',
@@ -3148,6 +3241,7 @@ function showTab(btn){
   clearInterval(_secTimer);_secTimer=null;
   if(btn.dataset.tab==='health'){pollHealth();pollNetInfo();_healthTimer=setInterval(()=>{pollHealth();},2500);_netInfoTimer=setInterval(pollNetInfo,15000);_initDrag('health-grid');}
   if(btn.dataset.tab==='security'){updateSecurityTab();_secTimer=setInterval(updateSecurityTab,_secInterval);_initDrag('sec-grid');}
+  if(btn.dataset.tab==='trafficmap')initTrafficMap();
 }
 function navTo(tab){if(tab==='tests'){const btn=$('nav-tests');if(btn)toggleTestsNav(btn);return;}if(tab==='overview'){const btn=$('nav-overview');if(btn)toggleOvNav(btn);return;}const btn=document.querySelector('.nav-item[data-tab="'+tab+'"]');if(btn)showTab(btn);}
 function drawDonut(ok,fail){
@@ -4570,6 +4664,348 @@ _initDrag('health-grid');
     overlay.remove();
   });
 })();
+
+// ── Traffic Map ────────────────────────────────────────────────────────────────
+let _tmap=null,_tmapEs=null,_tmapExpanded=false,_tmapSrc=null,_tmapPlacedHosts=new Set();
+let _tmapArcs=0,_tmapTotal=0,_tmapEps=new Set();
+const _tmapCtry={};
+const _tmapFlags={US:'🇺🇸',GB:'🇬🇧',FR:'🇫🇷',NL:'🇳🇱',CH:'🇨🇭',DE:'🇩🇪',JP:'🇯🇵',AU:'🇦🇺',CA:'🇨🇦',SE:'🇸🇪',NZ:'🇳🇿',PA:'🇵🇦',CY:'🇨🇾',CN:'🇨🇳',SG:'🇸🇬',IE:'🇮🇪',HK:'🇭🇰',RO:'🇷🇴',VG:'🇻🇬',IL:'🇮🇱',NO:'🇳🇴',MY:'🇲🇾'};
+const _tmapCNames={US:'United States',GB:'United Kingdom',FR:'France',NL:'Netherlands',CH:'Switzerland',DE:'Germany',JP:'Japan',AU:'Australia',CA:'Canada',SE:'Sweden',NZ:'New Zealand',PA:'Panama',CY:'Cyprus',CN:'China',SG:'Singapore',IE:'Ireland',HK:'Hong Kong',RO:'Romania',VG:'British Virgin Is.',IL:'Israel',NO:'Norway',MY:'Malaysia'};
+const _tmapSuiteColor={'dns':'#63b3ed','doh':'#63b3ed','dot':'#63b3ed','http':'#b794f4','https':'#b794f4','ftp':'#b794f4','ssh':'#b794f4','tls-inspection':'#b794f4','http3':'#b794f4','web-crawl':'#b794f4','iperf3':'#f6ad55','speedtest':'#f6ad55','bulk-transfer':'#f6ad55','url-latency':'#f6ad55','s3':'#f6ad55','nmap':'#fc8181','web-scanner':'#fc8181','ids-sigs':'#fc8181','ips-ua':'#fc8181','cve-probe':'#fc8181','waf-attack':'#fc8181','log4shell':'#fc8181','msf-webapp':'#fc8181','msf-enterprise':'#fc8181','msf-appliance':'#fc8181','msf-cisa-kev':'#fc8181','msf-middleware':'#fc8181','msf-recon':'#fc8181','msf-aux-scan':'#fc8181','msf-payload-delivery':'#fc8181','msf-cred-spray':'#fc8181','blocklist-probe':'#fc8181','phishing-domains':'#fc8181','squatting':'#fc8181','pornography':'#fc8181','ai-browse':'#68d391','llm-dlp':'#68d391','post-quantum':'#68d391','tor-anonymizer':'#9ae6b4','c2-beacon':'#f687b3','c2-useragents':'#f687b3','malware-samples':'#f687b3','lateral-movement':'#f687b3','shadow-it':'#fbd38d','data-exfil-http':'#fbd38d','dlp':'#fbd38d','ad-tracker':'#fbd38d','dns-exfil':'#63b3ed','av-test':'#a0aec0','bgp':'#a0aec0','icmp':'#a0aec0','ntp':'#a0aec0','snmp':'#a0aec0','voip':'#68d391','ucaas':'#68d391'};
+const _tmapGeo={
+  '8.8.8.8':{ll:[37.41,-122.08],city:'Mountain View, CA',country:'US',hint:'dns'},
+  '8.8.4.4':{ll:[37.41,-122.08],city:'Mountain View, CA',country:'US',hint:'dns'},
+  '1.1.1.1':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'dns'},
+  '1.0.0.1':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'dns'},
+  '9.9.9.9':{ll:[47.38,8.54],city:'Zurich',country:'CH',hint:'dns'},
+  '149.112.112.112':{ll:[47.38,8.54],city:'Zurich',country:'CH',hint:'dns'},
+  '208.67.222.222':{ll:[37.34,-121.89],city:'San Jose, CA',country:'US',hint:'dns'},
+  '208.67.220.220':{ll:[37.34,-121.89],city:'San Jose, CA',country:'US',hint:'dns'},
+  '94.140.14.14':{ll:[35.17,33.36],city:'Limassol',country:'CY',hint:'dns'},
+  '94.140.15.15':{ll:[35.17,33.36],city:'Limassol',country:'CY',hint:'dns'},
+  '64.6.64.6':{ll:[38.96,-77.09],city:'Reston, VA',country:'US',hint:'dns'},
+  '64.6.65.6':{ll:[38.96,-77.09],city:'Reston, VA',country:'US',hint:'dns'},
+  '4.2.2.2':{ll:[39.04,-77.49],city:'Ashburn, VA',country:'US',hint:'dns'},
+  '4.2.2.3':{ll:[39.04,-77.49],city:'Ashburn, VA',country:'US',hint:'dns'},
+  '4.2.2.4':{ll:[39.04,-77.49],city:'Ashburn, VA',country:'US',hint:'dns'},
+  '84.200.69.80':{ll:[51.17,6.98],city:'Düsseldorf',country:'DE',hint:'dns'},
+  '84.200.70.40':{ll:[51.17,6.98],city:'Düsseldorf',country:'DE',hint:'dns'},
+  '76.76.19.19':{ll:[42.88,-78.87],city:'Buffalo, NY',country:'US',hint:'dns'},
+  'cloudflare-dns.com':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'doh'},
+  'dns.google':{ll:[37.41,-122.08],city:'Mountain View, CA',country:'US',hint:'doh'},
+  'doh.opendns.com':{ll:[37.34,-121.89],city:'San Jose, CA',country:'US',hint:'doh'},
+  'dns.opendns.com':{ll:[37.34,-121.89],city:'San Jose, CA',country:'US',hint:'doh'},
+  'dns.quad9.net':{ll:[47.38,8.54],city:'Zurich',country:'CH',hint:'doh'},
+  'doh.quad9.net':{ll:[47.38,8.54],city:'Zurich',country:'CH',hint:'doh'},
+  'doh.cleanbrowsing.org':{ll:[48.86,2.35],city:'Paris',country:'FR',hint:'doh'},
+  'dns.nextdns.io':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'doh'},
+  'doh.dns.sb':{ll:[1.29,103.85],city:'Singapore',country:'SG',hint:'doh'},
+  'rdns.ipv64.net':{ll:[51.17,6.98],city:'Düsseldorf',country:'DE',hint:'doh'},
+  'dns.adguard-dns.com':{ll:[35.17,33.36],city:'Limassol',country:'CY',hint:'doh'},
+  'unfiltered.adguard-dns.com':{ll:[35.17,33.36],city:'Limassol',country:'CY',hint:'doh'},
+  'lon.clouvider.net':{ll:[51.51,-0.13],city:'London',country:'GB',hint:'iperf3'},
+  'nyc.clouvider.net':{ll:[40.71,-74.01],city:'New York, NY',country:'US',hint:'iperf3'},
+  'la.clouvider.net':{ll:[34.05,-118.24],city:'Los Angeles, CA',country:'US',hint:'iperf3'},
+  'ams.clouvider.net':{ll:[52.37,4.90],city:'Amsterdam',country:'NL',hint:'iperf3'},
+  'bouygues.iperf.fr':{ll:[48.86,2.35],city:'Paris',country:'FR',hint:'iperf3'},
+  'ping.online.net':{ll:[48.86,2.35],city:'Paris',country:'FR',hint:'iperf3'},
+  'ping6.online.net':{ll:[48.86,2.35],city:'Paris',country:'FR',hint:'iperf3'},
+  'iperf.scottlinux.com':{ll:[39.74,-104.98],city:'Denver, CO',country:'US',hint:'iperf3'},
+  'iperf3.moji.fr':{ll:[48.86,2.35],city:'Paris',country:'FR',hint:'iperf3'},
+  'speedtest.serverius.net':{ll:[52.52,5.47],city:'Dronten',country:'NL',hint:'iperf3'},
+  'microsoft.com':{ll:[47.67,-122.12],city:'Redmond, WA',country:'US',hint:'https'},
+  'www.microsoft.com':{ll:[47.67,-122.12],city:'Redmond, WA',country:'US',hint:'https'},
+  'copilot.microsoft.com':{ll:[47.67,-122.12],city:'Redmond, WA',country:'US',hint:'ai-browse'},
+  'api.cognitive.microsoft.com':{ll:[47.67,-122.12],city:'Redmond, WA',country:'US',hint:'llm-dlp'},
+  'eastus.api.cognitive.microsoft.com':{ll:[39.04,-77.49],city:'Ashburn, VA',country:'US',hint:'llm-dlp'},
+  'sydney.bing.com':{ll:[47.67,-122.12],city:'Redmond, WA',country:'US',hint:'llm-dlp'},
+  'google.com':{ll:[37.41,-122.08],city:'Mountain View, CA',country:'US',hint:'https'},
+  'www.google.com':{ll:[37.41,-122.08],city:'Mountain View, CA',country:'US',hint:'https'},
+  'accounts.google.com':{ll:[37.41,-122.08],city:'Mountain View, CA',country:'US',hint:'https'},
+  'maps.google.com':{ll:[37.41,-122.08],city:'Mountain View, CA',country:'US',hint:'https'},
+  'docs.google.com':{ll:[37.41,-122.08],city:'Mountain View, CA',country:'US',hint:'https'},
+  'play.google.com':{ll:[37.41,-122.08],city:'Mountain View, CA',country:'US',hint:'https'},
+  'plus.google.com':{ll:[37.41,-122.08],city:'Mountain View, CA',country:'US',hint:'https'},
+  'sites.google.com':{ll:[37.41,-122.08],city:'Mountain View, CA',country:'US',hint:'https'},
+  'support.google.com':{ll:[37.41,-122.08],city:'Mountain View, CA',country:'US',hint:'https'},
+  'time.google.com':{ll:[37.41,-122.08],city:'Mountain View, CA',country:'US',hint:'ntp'},
+  'bard.google.com':{ll:[37.41,-122.08],city:'Mountain View, CA',country:'US',hint:'ai-browse'},
+  'gemini.google.com':{ll:[37.41,-122.08],city:'Mountain View, CA',country:'US',hint:'ai-browse'},
+  'generativelanguage.googleapis.com':{ll:[37.41,-122.08],city:'Mountain View, CA',country:'US',hint:'llm-dlp'},
+  'storage.googleapis.com':{ll:[37.41,-122.08],city:'Mountain View, CA',country:'US',hint:'s3'},
+  'deepmind.google':{ll:[51.51,-0.13],city:'London',country:'GB',hint:'ai-browse'},
+  'apple.com':{ll:[37.33,-122.03],city:'Cupertino, CA',country:'US',hint:'https'},
+  'www.apple.com':{ll:[37.33,-122.03],city:'Cupertino, CA',country:'US',hint:'https'},
+  'www.icloud.com':{ll:[37.33,-122.03],city:'Cupertino, CA',country:'US',hint:'shadow-it'},
+  'amazon.com':{ll:[47.61,-122.33],city:'Seattle, WA',country:'US',hint:'https'},
+  's3.amazonaws.com':{ll:[39.04,-77.49],city:'Ashburn, VA',country:'US',hint:'s3'},
+  'bedrock-runtime.us-east-1.amazonaws.com':{ll:[39.04,-77.49],city:'Ashburn, VA',country:'US',hint:'llm-dlp'},
+  'bedrock-runtime.us-west-2.amazonaws.com':{ll:[45.52,-122.68],city:'Portland, OR',country:'US',hint:'llm-dlp'},
+  'adobe.com':{ll:[37.34,-121.89],city:'San Jose, CA',country:'US',hint:'https'},
+  'www.adobe.com':{ll:[37.34,-121.89],city:'San Jose, CA',country:'US',hint:'https'},
+  'tesla.com':{ll:[30.27,-97.74],city:'Austin, TX',country:'US',hint:'https'},
+  'github.com':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'https'},
+  'vimeo.com':{ll:[40.71,-74.01],city:'New York, NY',country:'US',hint:'https'},
+  'youtube.com':{ll:[37.41,-122.08],city:'Mountain View, CA',country:'US',hint:'https'},
+  'www.netflix.com':{ll:[37.26,-121.96],city:'Los Gatos, CA',country:'US',hint:'https'},
+  'linkedin.com':{ll:[37.41,-122.08],city:'Sunnyvale, CA',country:'US',hint:'https'},
+  'twitter.com':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'https'},
+  'wordpress.org':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'https'},
+  'mozilla.org':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'https'},
+  'en.wikipedia.org':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'https'},
+  'www.att.com':{ll:[32.78,-96.80],city:'Dallas, TX',country:'US',hint:'https'},
+  'abc.com':{ll:[40.71,-74.01],city:'New York, NY',country:'US',hint:'https'},
+  'info.cern.ch':{ll:[46.23,6.05],city:'Geneva',country:'CH',hint:'https'},
+  'www.thelegacy.de':{ll:[52.52,13.40],city:'Berlin',country:'DE',hint:'https'},
+  'www.unco.edu':{ll:[40.40,-104.71],city:'Greeley, CO',country:'US',hint:'https'},
+  'adn.com':{ll:[47.61,-122.33],city:'Seattle, WA',country:'US',hint:'https'},
+  'neverssl.com':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'http'},
+  'api.openai.com':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'llm-dlp'},
+  'chat.openai.com':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'ai-browse'},
+  'chatgpt.com':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'ai-browse'},
+  'openai.com':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'ai-browse'},
+  'api.anthropic.com':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'llm-dlp'},
+  'anthropic.com':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'ai-browse'},
+  'www.anthropic.com':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'ai-browse'},
+  'claude.ai':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'ai-browse'},
+  'api.mistral.ai':{ll:[48.86,2.35],city:'Paris',country:'FR',hint:'llm-dlp'},
+  'www.mistral.ai':{ll:[48.86,2.35],city:'Paris',country:'FR',hint:'ai-browse'},
+  'chat.mistral.ai':{ll:[48.86,2.35],city:'Paris',country:'FR',hint:'ai-browse'},
+  'api.cohere.ai':{ll:[43.65,-79.38],city:'Toronto',country:'CA',hint:'llm-dlp'},
+  'api.cohere.com':{ll:[43.65,-79.38],city:'Toronto',country:'CA',hint:'llm-dlp'},
+  'coral.cohere.com':{ll:[43.65,-79.38],city:'Toronto',country:'CA',hint:'ai-browse'},
+  'api.perplexity.ai':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'llm-dlp'},
+  'perplexity.ai':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'ai-browse'},
+  'www.perplexity.ai':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'ai-browse'},
+  'api.deepseek.com':{ll:[30.29,120.16],city:'Hangzhou',country:'CN',hint:'llm-dlp'},
+  'chat.deepseek.com':{ll:[30.29,120.16],city:'Hangzhou',country:'CN',hint:'ai-browse'},
+  'api.x.ai':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'llm-dlp'},
+  'grok.x.ai':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'ai-browse'},
+  'grok.com':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'ai-browse'},
+  'api.groq.com':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'llm-dlp'},
+  'api.together.xyz':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'llm-dlp'},
+  'api.together.ai':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'llm-dlp'},
+  'api.fireworks.ai':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'llm-dlp'},
+  'openrouter.ai':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'llm-dlp'},
+  'api-inference.huggingface.co':{ll:[48.86,2.35],city:'Paris',country:'FR',hint:'llm-dlp'},
+  'huggingface.co':{ll:[48.86,2.35],city:'Paris',country:'FR',hint:'ai-browse'},
+  'api.ai21.com':{ll:[32.08,34.78],city:'Tel Aviv',country:'IL',hint:'llm-dlp'},
+  'api.cerebras.ai':{ll:[37.26,-121.96],city:'Los Gatos, CA',country:'US',hint:'llm-dlp'},
+  'api.nvidia.com':{ll:[37.36,-121.97],city:'Santa Clara, CA',country:'US',hint:'llm-dlp'},
+  'api.llama-api.com':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'llm-dlp'},
+  'llama.developer.meta.com':{ll:[37.48,-122.15],city:'Menlo Park, CA',country:'US',hint:'llm-dlp'},
+  'meta.ai':{ll:[37.48,-122.15],city:'Menlo Park, CA',country:'US',hint:'ai-browse'},
+  'www.meta.ai':{ll:[37.48,-122.15],city:'Menlo Park, CA',country:'US',hint:'ai-browse'},
+  'poe.com':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'ai-browse'},
+  'character.ai':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'ai-browse'},
+  'beta.character.ai':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'ai-browse'},
+  'you.com':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'ai-browse'},
+  'www.you.com':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'ai-browse'},
+  'pi.ai':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'ai-browse'},
+  'cursor.com':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'ai-browse'},
+  'www.stability.ai':{ll:[51.51,-0.13],city:'London',country:'GB',hint:'ai-browse'},
+  'www.canva.com':{ll:[-33.87,151.21],city:'Sydney',country:'AU',hint:'ai-browse'},
+  'leonardo.ai':{ll:[-33.87,151.21],city:'Sydney',country:'AU',hint:'ai-browse'},
+  'www.runwayml.com':{ll:[40.71,-74.01],city:'New York, NY',country:'US',hint:'ai-browse'},
+  'replicate.com':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'ai-browse'},
+  'www.synthesia.io':{ll:[51.51,-0.13],city:'London',country:'GB',hint:'ai-browse'},
+  'www.elevenlabs.io':{ll:[40.71,-74.01],city:'New York, NY',country:'US',hint:'ai-browse'},
+  'elevenlabs.io':{ll:[40.71,-74.01],city:'New York, NY',country:'US',hint:'ai-browse'},
+  'www.suno.ai':{ll:[42.36,-71.06],city:'Boston, MA',country:'US',hint:'ai-browse'},
+  'www.jasper.ai':{ll:[30.27,-97.74],city:'Austin, TX',country:'US',hint:'ai-browse'},
+  'www.d-id.com':{ll:[32.08,34.78],city:'Tel Aviv',country:'IL',hint:'ai-browse'},
+  'krisp.ai':{ll:[34.05,-118.24],city:'Los Angeles, CA',country:'US',hint:'ai-browse'},
+  'otter.ai':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'ai-browse'},
+  'fireflies.ai':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'ai-browse'},
+  'www.midjourney.com':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'ai-browse'},
+  'ideogram.ai':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'ai-browse'},
+  'pika.art':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'ai-browse'},
+  'www.dropbox.com':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'shadow-it'},
+  'www.box.com':{ll:[37.49,-122.24],city:'Redwood City, CA',country:'US',hint:'shadow-it'},
+  'mega.nz':{ll:[-36.86,174.76],city:'Auckland',country:'NZ',hint:'shadow-it'},
+  'wetransfer.com':{ll:[52.37,4.90],city:'Amsterdam',country:'NL',hint:'shadow-it'},
+  'transfer.sh':{ll:[52.37,4.90],city:'Amsterdam',country:'NL',hint:'shadow-it'},
+  'onedrive.live.com':{ll:[47.67,-122.12],city:'Redmond, WA',country:'US',hint:'shadow-it'},
+  'discord.com':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'shadow-it'},
+  'web.telegram.org':{ll:[52.52,13.40],city:'Berlin',country:'DE',hint:'shadow-it'},
+  'web.whatsapp.com':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'shadow-it'},
+  'proton.me':{ll:[46.20,6.14],city:'Geneva',country:'CH',hint:'shadow-it'},
+  'tutanota.com':{ll:[52.52,13.40],city:'Hanover',country:'DE',hint:'shadow-it'},
+  'guerrillamail.com':{ll:[47.61,-122.33],city:'Seattle, WA',country:'US',hint:'shadow-it'},
+  'pastebin.com':{ll:[40.71,-74.01],city:'New York, NY',country:'US',hint:'shadow-it'},
+  'filebin.net':{ll:[59.91,10.74],city:'Oslo',country:'NO',hint:'shadow-it'},
+  'gofile.io':{ll:[48.86,2.35],city:'Paris',country:'FR',hint:'shadow-it'},
+  'www.coinbase.com':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'shadow-it'},
+  'etherscan.io':{ll:[40.71,-74.01],city:'New York, NY',country:'US',hint:'shadow-it'},
+  'www.binance.com':{ll:[1.29,103.85],city:'Singapore',country:'SG',hint:'shadow-it'},
+  'notion.so':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'shadow-it'},
+  'trello.com':{ll:[40.71,-74.01],city:'New York, NY',country:'US',hint:'shadow-it'},
+  'www.airtable.com':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'shadow-it'},
+  'check.torproject.org':{ll:[47.61,-122.33],city:'Seattle, WA',country:'US',hint:'tor-anonymizer'},
+  'www.torproject.org':{ll:[47.61,-122.33],city:'Seattle, WA',country:'US',hint:'tor-anonymizer'},
+  'torproject.org':{ll:[47.61,-122.33],city:'Seattle, WA',country:'US',hint:'tor-anonymizer'},
+  'protonvpn.com':{ll:[46.20,6.14],city:'Geneva',country:'CH',hint:'tor-anonymizer'},
+  'nordvpn.com':{ll:[8.99,-79.52],city:'Panama City',country:'PA',hint:'tor-anonymizer'},
+  'mullvad.net':{ll:[57.71,11.97],city:'Gothenburg',country:'SE',hint:'tor-anonymizer'},
+  'www.expressvpn.com':{ll:[18.42,-64.64],city:'Road Town',country:'VG',hint:'tor-anonymizer'},
+  'www.ipvanish.com':{ll:[32.78,-96.80],city:'Dallas, TX',country:'US',hint:'tor-anonymizer'},
+  'kproxy.com':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'tor-anonymizer'},
+  'hide.me':{ll:[3.14,101.69],city:'Kuala Lumpur',country:'MY',hint:'tor-anonymizer'},
+  'hidemy.name':{ll:[51.51,-0.13],city:'London',country:'GB',hint:'tor-anonymizer'},
+  'www.anonymouse.org':{ll:[53.55,9.99],city:'Hamburg',country:'DE',hint:'tor-anonymizer'},
+  'filterbypass.me':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'tor-anonymizer'},
+  'www.croxyproxy.com':{ll:[48.86,2.35],city:'Paris',country:'FR',hint:'tor-anonymizer'},
+  'www.proxysite.com':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'tor-anonymizer'},
+  '4everproxy.com':{ll:[39.04,-77.49],city:'Ashburn, VA',country:'US',hint:'tor-anonymizer'},
+  'www.freeproxyserver.net':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'tor-anonymizer'},
+  'www.testmyids.com':{ll:[37.53,-121.99],city:'Fremont, CA',country:'US',hint:'ids-sigs'},
+  'testmyids.com':{ll:[37.53,-121.99],city:'Fremont, CA',country:'US',hint:'ids-sigs'},
+  'scanme.nmap.org':{ll:[37.53,-121.99],city:'Fremont, CA',country:'US',hint:'nmap'},
+  'httpbin.org':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'c2-beacon'},
+  'postman-echo.com':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'c2-beacon'},
+  'public.requestbin.com':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'c2-beacon'},
+  'juice-shop.herokuapp.com':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'waf-attack'},
+  'hackazon.webscantest.com':{ll:[40.71,-74.01],city:'New York, NY',country:'US',hint:'waf-attack'},
+  'testhtml5.vulnweb.com':{ll:[40.71,-74.01],city:'New York, NY',country:'US',hint:'waf-attack'},
+  'hastebin.com':{ll:[51.51,-0.13],city:'London',country:'GB',hint:'data-exfil-http'},
+  'paste2.org':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'data-exfil-http'},
+  'api.paste.fo':{ll:[59.91,10.74],city:'Oslo',country:'NO',hint:'data-exfil-http'},
+  'route-views.routeviews.org':{ll:[44.05,-123.09],city:'Eugene, OR',country:'US',hint:'bgp'},
+  'bgp.he.net':{ll:[37.53,-121.99],city:'Fremont, CA',country:'US',hint:'bgp'},
+  'demo.snmplabs.com':{ll:[37.77,-122.42],city:'San Francisco, CA',country:'US',hint:'snmp'},
+  '0.us.pool.ntp.org':{ll:[38.96,-77.09],city:'US Pool',country:'US',hint:'ntp'},
+  '1.us.pool.ntp.org':{ll:[38.96,-77.09],city:'US Pool',country:'US',hint:'ntp'},
+  '1.ro.pool.ntp.org':{ll:[44.43,26.10],city:'Bucharest',country:'RO',hint:'ntp'},
+};
+function tmapFullscreen(){
+  const el=document.getElementById('tab-trafficmap');
+  if(document.fullscreenElement){document.exitFullscreen();}
+  else if(el.requestFullscreen){el.requestFullscreen();}
+}
+function _tmapExtractHost(msg){
+  let m=msg.match(/https?:\/\/([^/\s>"']+)/);
+  if(m)return m[1].toLowerCase().replace(/^www2?\./,'');
+  m=msg.match(/\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b/);
+  if(m)return m[1];
+  m=msg.match(/→\s*([a-z0-9][a-z0-9._-]+\.[a-z]{2,})/i);
+  if(m)return m[1].toLowerCase();
+  m=msg.match(/(?:query|probe|target|ping|connect|testing|test)\s*[:=]?\s*([a-z0-9][a-z0-9._-]+\.[a-z]{2,})/i);
+  if(m)return m[1].toLowerCase();
+  return null;
+}
+function _tmapBuildArc(from,to,n){
+  n=n||60;
+  const dLon=Math.abs(to[1]-from[1]);
+  const lift=dLon*.18+Math.abs(to[0]-from[0])*.08;
+  const midLat=(from[0]+to[0])/2+lift;
+  const midLng=(from[1]+to[1])/2;
+  return Array.from({length:n+1},function(_,i){var t=i/n;return[(1-t)*(1-t)*from[0]+2*(1-t)*t*midLat+t*t*to[0],(1-t)*(1-t)*from[1]+2*(1-t)*t*midLng+t*t*to[1]];});
+}
+function _tmapShootArc(geo,suite,host){
+  if(!_tmap||!_tmapSrc)return;
+  const c=_tmapSuiteColor[suite]||'#63b3ed';
+  const from=_tmapSrc,to=geo.ll;
+  if(Math.abs(from[0]-to[0])<0.1&&Math.abs(from[1]-to[1])<0.1)return;
+  _tmapArcs++;_tmapTotal++;_tmapEps.add(host);
+  _tmapCtry[geo.country]=(_tmapCtry[geo.country]||0)+1;
+  _tmapUpdateStats();
+  _tmapAddFeed(host,geo,c,suite);
+  _tmapUpdateCountries();
+  if(!_tmapExpanded&&geo.country!=='US'){
+    _tmapExpanded=true;
+    _tmap.flyTo([30,0],2,{duration:2});
+  }
+  const pts=_tmapBuildArc(from,to);
+  const glow=L.polyline([pts[0]],{color:c,weight:6,opacity:.15,interactive:false,smoothFactor:1}).addTo(_tmap);
+  const core=L.polyline([pts[0]],{color:c,weight:1.5,opacity:.7,interactive:false,smoothFactor:1}).addTo(_tmap);
+  const dot=L.circleMarker(pts[0],{radius:5,color:'#fff',fillColor:c,fillOpacity:1,weight:2,interactive:false}).addTo(_tmap);
+  let i=0;const TRAIL=14;
+  const ticker=setInterval(function(){
+    i++;
+    if(i>=pts.length){
+      clearInterval(ticker);
+      _tmapArcs=Math.max(0,_tmapArcs-1);
+      _tmapUpdateStats();
+      const burst=L.circleMarker(to,{radius:5,color:c,fillColor:c,fillOpacity:.9,weight:0,interactive:false}).addTo(_tmap);
+      let r=5,op=.9;
+      const bT=setInterval(function(){r+=3;op-=.07;if(op<=0){clearInterval(bT);_tmap.removeLayer(burst);}else burst.setStyle({radius:r,fillOpacity:op,opacity:op});},30);
+      let tOp=.7;
+      const fade=setInterval(function(){tOp-=.04;if(tOp<=0){clearInterval(fade);[glow,core,dot].forEach(function(l){_tmap.removeLayer(l);});}else{glow.setStyle({opacity:tOp*.2});core.setStyle({opacity:tOp});dot.setStyle({fillOpacity:tOp,opacity:tOp});}},40);
+      return;
+    }
+    dot.setLatLng(pts[i]);
+    const tail=pts.slice(Math.max(0,i-TRAIL),i+1);
+    glow.setLatLngs(tail);core.setLatLngs(tail);
+  },35);
+}
+function _tmapUpdateStats(){
+  const a=_tmapArcs,t=_tmapTotal,c=Object.keys(_tmapCtry).length,e=_tmapEps.size;
+  [['tmap-s-arcs',a],['tmap-rs-arcs',a],['tmap-s-total',t],['tmap-rs-total',t],['tmap-s-ctry',c],['tmap-rs-ctry',c],['tmap-rs-ep',e]].forEach(function(p){var el=$(p[0]);if(el)el.textContent=p[1];});
+}
+function _tmapUpdateCountries(){
+  const list=$('tmap-ctry-list');if(!list)return;
+  const vals=Object.values(_tmapCtry),max=vals.length?Math.max.apply(null,vals):1;
+  const sorted=Object.entries(_tmapCtry).sort(function(a,b){return b[1]-a[1];}).slice(0,6);
+  list.innerHTML=sorted.map(function(e){var c=e[0],n=e[1];return'<div class="tmap-c-row"><span>'+((_tmapFlags[c])||'🌐')+'</span><span class="tmap-c-name">'+H(_tmapCNames[c]||c)+'</span><div class="tmap-c-bar-wrap"><div class="tmap-c-bar" style="width:'+Math.round(n/max*100)+'%"></div></div><span class="tmap-c-count">'+n+'</span></div>';}).join('');
+}
+function _tmapAddFeed(host,geo,c,suite){
+  const feed=$('tmap-feed');if(!feed)return;
+  const now=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+  const el=document.createElement('div');el.className='tmap-feed-item';
+  el.innerHTML='<div class="tmap-f-dot" style="background:'+c+'"></div><div class="tmap-f-body"><div class="tmap-f-host">'+H(host)+'</div><div class="tmap-f-meta"><span class="tmap-f-loc">📍 '+H(geo.city)+'</span><span class="tmap-f-suite" style="background:'+c+'22;color:'+c+';border:1px solid '+c+'44">'+H(suite)+'</span><span class="tmap-f-time">'+now+'</span></div></div>';
+  feed.insertBefore(el,feed.firstChild);
+  while(feed.children.length>40)feed.removeChild(feed.lastChild);
+}
+function _tmapHandleLog(d){
+  if(!d||!d.msg)return;
+  const host=_tmapExtractHost(d.msg);
+  if(!host)return;
+  const geo=_tmapGeo[host];
+  if(!geo)return;
+  const suite=d.test||geo.hint||'dns';
+  if(!_tmapPlacedHosts.has(host)){
+    _tmapPlacedHosts.add(host);
+    const c=_tmapSuiteColor[geo.hint]||'#63b3ed';
+    L.circleMarker(geo.ll,{radius:4,color:c,fillColor:c,fillOpacity:.25,weight:1.5,opacity:.5}).addTo(_tmap)
+     .bindTooltip('<div style="font-weight:700;color:'+c+'">'+H(host)+'</div><div style="color:#4a5568;font-size:11px">📍 '+H(geo.city)+'</div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:'+c+';margin-top:3px">'+H(geo.hint)+'</div>',{className:'',sticky:true,offset:[10,0]});
+  }
+  _tmapShootArc(geo,suite,host);
+}
+function _tmapConnectLog(){
+  if(_tmapEs)return;
+  _tmapEs=new EventSource('/log');
+  _tmapEs.onmessage=function(ev){try{_tmapHandleLog(JSON.parse(ev.data));}catch(e){}};
+  _tmapEs.onerror=function(){_tmapEs.close();_tmapEs=null;setTimeout(_tmapConnectLog,3000);};
+}
+function initTrafficMap(){
+  if(_tmap){_tmap.invalidateSize();if(!_tmapEs)_tmapConnectLog();return;}
+  if(!document.getElementById('leaflet-css')){
+    var lk=document.createElement('link');lk.id='leaflet-css';lk.rel='stylesheet';lk.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';document.head.appendChild(lk);
+  }
+  function _doInit(){
+    var mapEl=document.getElementById('tmap');
+    if(!mapEl||!mapEl.offsetHeight){setTimeout(_doInit,100);return;}
+    _tmap=L.map('tmap',{center:[39,-98],zoom:4,zoomControl:false,attributionControl:false});
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:14}).addTo(_tmap);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:14,pane:'overlayPane'}).addTo(_tmap);
+    L.control.zoom({position:'topright'}).addTo(_tmap);
+    fetch('https://ip-api.com/json?fields=lat,lon,city,regionName,countryCode')
+      .then(function(r){return r.json();}).then(function(j){
+        _tmapSrc=[j.lat||39,j.lon||-98];
+        var srcEl=$('tmap-s-src');if(srcEl)srcEl.textContent=(j.city||'')+(j.regionName?', '+j.regionName:'');
+        var srcIcon=L.divIcon({html:'<div style="position:relative;width:20px;height:20px"><div style="position:absolute;inset:0;border-radius:50%;background:#00ff88;opacity:.9;box-shadow:0 0 6px #00ff88,0 0 20px rgba(0,255,136,.6)"></div><div style="position:absolute;inset:-6px;border-radius:50%;border:1.5px solid rgba(0,255,136,.5);animation:tmapR1 2s ease-out infinite"></div><div style="position:absolute;inset:-14px;border-radius:50%;border:1px solid rgba(0,255,136,.25);animation:tmapR1 2s ease-out .5s infinite"></div></div><style>@keyframes tmapR1{0%{transform:scale(.8);opacity:.9}100%{transform:scale(1.8);opacity:0}}</style>',className:'',iconSize:[20,20],iconAnchor:[10,10],zIndexOffset:1000});
+        L.marker(_tmapSrc,{icon:srcIcon,interactive:false}).addTo(_tmap);
+        _tmapConnectLog();
+      }).catch(function(){
+        _tmapSrc=[39,-98];
+        var srcEl=$('tmap-s-src');if(srcEl)srcEl.textContent='Unknown';
+        _tmapConnectLog();
+      });
+  }
+  if(!window.L){
+    var sc=document.createElement('script');sc.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';sc.onload=_doInit;document.head.appendChild(sc);
+  }else{_doInit();}
+}
 </script>
 </body></html>"""
 _LOG_HTML = """<!DOCTYPE html>
