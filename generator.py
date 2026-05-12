@@ -577,15 +577,37 @@ _bigfile_rr_idx: int  = 0  # round-robin position across bigfile() invocations
 
 
 def _web_flush() -> None:
-    """Atomically write _WEB_STATE (minus private keys) to the state file."""
+    """Atomically write _WEB_STATE (minus private keys) to the state file.
+
+    When a test is actively running, a 'live' key is included with a snapshot
+    of the current per-request counters from _stats so the dashboard can show
+    real-time progress without waiting for the test to complete.
+    """
     tmp = _WEB_STATE_FILE + ".tmp"
     try:
         snapshot = {k: v for k, v in _WEB_STATE.items() if not k.startswith("_")}
+        if snapshot.get("status") == "running":
+            snapshot["live"] = {
+                "attempts": _stats.attempts,
+                "responses": _stats.responses,
+                "blocked":  _stats.blocked,
+                "dropped":  _stats.dropped,
+                "allowed":  _stats.allowed,
+                "errors":   _stats.errors,
+            }
         with open(tmp, "w") as f:
             json.dump(snapshot, f, separators=(",", ":"))
         os.replace(tmp, _WEB_STATE_FILE)
     except Exception:
         pass
+
+
+def _live_flush_worker() -> None:
+    """Background thread: flush state every second while a test is running."""
+    while True:
+        time.sleep(1)
+        if _WEB_STATE.get("status") == "running":
+            _web_flush()
 
 
 def _web_record(name: str, ok: bool, dur_ms: int,
@@ -5476,6 +5498,7 @@ if __name__ == "__main__":
             pass
 
         _start_heartbeat()
+        threading.Thread(target=_live_flush_worker, daemon=True, name="live-flush").start()
         WATCHDOG  = Watchdog(timeout_seconds=600)
 
         suite = build_testsuite()
