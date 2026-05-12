@@ -2599,14 +2599,15 @@ def urlresponse_random() -> None:
                     console.log(f"({i}/{n}) {url}  {t:.3f}s")
                     _stats.record(str(r.status_code))
                 except requests.exceptions.ConnectionError as e:
-                    console.log(f"[yellow]skip[/] {url}")
                     if "Connection refused" in str(e) or "ECONNREFUSED" in str(e) or "Reset" in str(e):
+                        console.log(f"[yellow]skip (Connection refused)[/] {url}")
                         _stats.block()
                     else:
+                        console.log(f"[yellow]skip (unreachable)[/] {url}")
                         _stats.drop()
                 except (requests.exceptions.Timeout, requests.exceptions.ConnectTimeout,
                         requests.exceptions.ReadTimeout):
-                    console.log(f"[yellow]skip[/] {url}")
+                    console.log(f"[yellow]skip (timeout)[/] {url}")
                     _stats.drop()
                 except Exception:
                     console.log(f"[yellow]skip[/] {url}")
@@ -3100,8 +3101,10 @@ def http3_random() -> None:
             console.log(f"[yellow]HTTP3 ({idx}/{n}) {url}  → timeout[/]")
             _stats.drop()
         except OSError as e:
-            console.log(f"[yellow]HTTP3 ({idx}/{n}) {url}  → {e.__class__.__name__}[/]")
-            if "refused" in str(e).lower() or "rst" in str(e).lower():
+            _e_low = str(e).lower()
+            _e_lbl = "Connection refused" if ("refused" in _e_low or "rst" in _e_low) else e.__class__.__name__
+            console.log(f"[yellow]HTTP3 ({idx}/{n}) {url}  → {_e_lbl}[/]")
+            if "refused" in _e_low or "rst" in _e_low:
                 _stats.block()
             else:
                 _stats.drop()
@@ -3174,6 +3177,7 @@ def c2_beacon() -> None:
                     _stats.record(str(resp.status_code))
                 except requests.exceptions.ConnectionError as e:
                     if "Connection refused" in str(e) or "ECONNREFUSED" in str(e) or "Reset" in str(e):
+                        console.log(f"[yellow]C2 ({i}/{beacons}) {target}  → Connection refused[/]")
                         _stats.block()
                     else:
                         _stats.drop()  # Unreachable targets are expected / normal

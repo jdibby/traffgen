@@ -5111,7 +5111,7 @@ function _tmapBuildArc(from,to,n){
 }
 function _tmapOutcome(msg){
   if(!msg)return'';
-  if(/\b(403|block(?:ed|ing)?|refused|reject(?:ed)?|denied|RST|sinkhole|silently.?drop|not.?allowed|forbidden)\b/i.test(msg))return'blocked';
+  if(/\b(403|407|451|511|block(?:ed|ing)?|refused|reject(?:ed)?|denied|RST|sinkhole|silently.?drop|not.?allowed|forbidden)\b/i.test(msg))return'blocked';
   if(/\b(2\d\d|ok|success(?:ful)?|reachable|established|open|allowed)\b/i.test(msg))return'allowed';
   return'';
 }
