@@ -2339,6 +2339,10 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
     <div id="tab-trafficmap" class="panel">
       <div id="tmap-container">
         <div id="tmap"></div>
+        <div id="tmap-status" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:2000;background:rgba(4,6,10,.85);flex-direction:column;gap:10px;pointer-events:none">
+          <div style="color:#00ff88;font-size:13px;font-family:monospace" id="tmap-status-msg">Loading map…</div>
+          <div style="width:120px;height:2px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden"><div id="tmap-status-bar" style="height:100%;width:0%;background:#00ff88;transition:width .4s"></div></div>
+        </div>
         <div class="tmap-strip">
           <div class="tmap-strip-inner">
             <div class="tmap-stat"><div class="tmap-n tmap-ng" id="tmap-s-arcs">0</div><div class="tmap-l">Active Arcs</div></div>
@@ -4997,29 +5001,42 @@ function initTrafficMap(){
     var srcIcon=L.divIcon({html:'<div style="position:relative;width:20px;height:20px"><div style="position:absolute;inset:0;border-radius:50%;background:#00ff88;opacity:.9;box-shadow:0 0 6px #00ff88,0 0 20px rgba(0,255,136,.6)"></div><div style="position:absolute;inset:-6px;border-radius:50%;border:1.5px solid rgba(0,255,136,.5);animation:tmapR1 2s ease-out infinite"></div><div style="position:absolute;inset:-14px;border-radius:50%;border:1px solid rgba(0,255,136,.25);animation:tmapR1 2s ease-out .5s infinite"></div></div><style>@keyframes tmapR1{0%{transform:scale(.8);opacity:.9}100%{transform:scale(1.8);opacity:0}}</style>',className:'',iconSize:[20,20],iconAnchor:[10,10],zIndexOffset:1000});
     _tmapSrcMarker=L.marker(_tmapSrc,{icon:srcIcon,interactive:false}).addTo(_tmap);
   }
-  // Load CSS immediately (no onload dependency — unreliable cross-browser for stylesheets)
+  function _tmapStatus(msg,pct){var m=$('tmap-status-msg');if(m)m.textContent=msg;var b=$('tmap-status-bar');if(b)b.style.width=(pct||0)+'%';}
+  function _tmapHideStatus(){var s=$('tmap-status');if(s)s.style.display='none';}
+  _tmapStatus('Loading Leaflet…',10);
+  // Load CSS immediately (parallel with JS)
   if(!document.getElementById('leaflet-css')){
     var lk=document.createElement('link');lk.id='leaflet-css';lk.rel='stylesheet';
-    lk.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    lk.href='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css';
     document.head.appendChild(lk);
   }
   function _doInit(){
     if(!window.L){setTimeout(_doInit,50);return;}
     var mapEl=document.getElementById('tmap');
     if(!mapEl||(!mapEl.offsetHeight&&!mapEl.offsetWidth)){setTimeout(_doInit,100);return;}
+    _tmapStatus('Initializing map…',70);
     _tmap=L.map(mapEl,{center:[39,-98],zoom:4,zoomControl:false,attributionControl:false});
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:14}).addTo(_tmap);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:14,pane:'overlayPane'}).addTo(_tmap);
     L.control.zoom({position:'topright'}).addTo(_tmap);
-    // Force tile refresh after layout settles
-    setTimeout(function(){if(_tmap)_tmap.invalidateSize();},300);
+    setTimeout(function(){if(_tmap){_tmap.invalidateSize();_tmapHideStatus();}},300);
     _tmapPlaceSrc();
     _tmapConnectLog();
   }
   if(!window.L){
-    var sc=document.createElement('script');sc.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-    sc.onload=_doInit;document.head.appendChild(sc);
-  }else{_doInit();}
+    _tmapStatus('Loading Leaflet JS…',30);
+    var sc=document.createElement('script');
+    sc.src='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js';
+    sc.onload=function(){_tmapStatus('Leaflet loaded',60);_doInit();};
+    sc.onerror=function(){_tmapStatus('CDN blocked — trying fallback…',35);
+      var sc2=document.createElement('script');
+      sc2.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      sc2.onload=function(){_tmapStatus('Leaflet loaded',60);_doInit();};
+      sc2.onerror=function(){_tmapStatus('Failed to load Leaflet (CDN unreachable)',0);};
+      document.head.appendChild(sc2);
+    };
+    document.head.appendChild(sc);
+  }else{_tmapStatus('Leaflet ready',60);_doInit();}
 }
 </script>
 </body></html>"""
