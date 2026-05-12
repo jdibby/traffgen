@@ -24,7 +24,7 @@ import threading
 
 logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
-from flask import Flask, Response, jsonify, redirect, request, session, url_for  # noqa: E402
+from flask import Flask, Response, jsonify, redirect, request, send_from_directory, session, url_for  # noqa: E402
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 _STATE_FILE  = "/tmp/traffgen_state.json"
@@ -716,6 +716,13 @@ def change_password():
             session["must_change"] = False
             return redirect(url_for("index"))
     return Response(_change_pw_page(error), mimetype="text/html")
+
+
+_PREVIEW_DIR = os.path.join(os.path.dirname(__file__), "preview")
+
+@app.route("/preview/<path:filename>")
+def serve_preview(filename):
+    return send_from_directory(_PREVIEW_DIR, filename)
 
 
 @app.route("/api/state")
