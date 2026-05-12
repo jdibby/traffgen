@@ -143,11 +143,12 @@ Live animated world map showing traffic destinations as arcs from your host to r
 
 - **Animated arcs** — each outbound connection fires a bezier arc from your source IP to the destination; a neon glow line with an animated travelling dot gives instant visual feedback of traffic intensity
 - **Colour-coded by suite** — every suite has a distinct arc colour so you can see at a glance which test is generating which traffic (DNS, ICMP, HTTP, C2 beacons, etc.)
+- **Allowed vs Blocked** — arcs fire in green/blue (allowed) or red (blocked) based on the log message outcome; the bottom bar shows a running Blocked counter alongside Total Probes
 - **Destination markers** — circle markers are placed once per unique host; hover to see the hostname, city, and suite that first resolved it
-- **Traffic Overview panel** — collapsible right-side panel lists recent destination hosts with city and country, colour-coded by suite
-- **Geo resolution** — static lookup table covers ~230 common hostnames; unknown hosts are resolved via the built-in `/api/geo` server-side endpoint (no browser rate limits), which resolves the hostname to an IP and calls ip-api.com from the server with in-memory caching
+- **Geo resolution** — static lookup table covers ~230 common hostnames; unknown hosts are resolved via the built-in `/api/geo` server-side endpoint (no browser rate limits), which resolves the hostname to an IP, fetches city/ISP from ip-api.com, and caches results in memory; private/loopback IPs are skipped
 - **Suite coverage** — all 55 suites generate arcs; suites whose log lines carry no extractable hostname (icmp, ips-ua, cve-probe, ntp, snmp) use a curated fallback list of known target hosts for visual representation
-- **Source location** — your public IP is resolved once at startup to place the arc origin correctly on the map; falls back to a US-central default if resolution fails
+- **Source location** — your public IP is resolved at startup via the server's `/api/netinfo` endpoint (retried up to 8×); the source marker shows city, state, and ISP/provider; falls back to US-central while resolving
+- **Bottom panel** — replaces the old right-side overlay; contains a stats bar (Active Arcs · Total Probes · Blocked · Countries · Endpoints · Source city + ISP), an inline suite legend, a **By Country** top-10 list (auto-refreshes every 5 s), and a **Live Hit Feed** with OK/BLOCKED outcome badges
 
 ### Diagnostics
 

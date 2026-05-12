@@ -176,7 +176,10 @@ dns_urls = [
 
 # ── ICMP / traceroute targets ──────────────────────────────────────────────────
 icmp_endpoints = [
-    # United States
+    # United States — Alaska
+    "192.234.141.1",                  # ACS (Alaska Communications Systems) — Anchorage
+    "12.12.12.12",                    # GCI / AT&T — Anchorage, AK
+    # United States — Continental
     "8.8.8.8", "8.8.4.4",            # Google DNS
     "1.1.1.1", "1.0.0.1",            # Cloudflare
     "208.67.222.222", "208.67.220.220",  # OpenDNS
