@@ -1898,6 +1898,23 @@ input:checked+.tslider:before{transform:translateX(17px)}
 html.light{--bg:#f6f8fa;--sidebar:#eef1f5;--surf:#ffffff;--surf2:#f0f3f7;--border:#d0d7de;--border2:#8c959f;--text:#1f2328;--muted:#636e7b;--dim:#8c959f}
 html.light .obody{background:#f0f4f8}html.light .obody .llm{color:#24292f}html.light .obody .llt{color:#8c959f}
 html.light .obody .ll:hover{background:rgba(0,0,0,.04)}html.light .cmd-blk{background:#f0f4f8;color:#24292f}
+html.light #tmap-container{background:#e8ecf0}html.light .leaflet-container{background:#e8ecf0!important}
+html.light .tmap-bottom{background:#f0f3f7;border-top:1px solid #d0d7de}
+html.light .tmap-bottom-bar{border-bottom:1px solid #d0d7de}
+html.light .tmap-stat{border-right-color:#d0d7de}
+html.light .tmap-bottom-sep{background:#d0d7de}
+html.light .tmap-c-section{border-right-color:#d0d7de}
+html.light .tmap-c-title{color:#636e7b;background:#f0f3f7}
+html.light .tmap-feed-title{color:#636e7b;background:#f0f3f7;border-bottom-color:#d0d7de}
+html.light .tmap-l{color:#636e7b}
+html.light .tmap-leg-item{color:#4a5568}
+html.light .tmap-src-city{color:#b7791f;text-shadow:none}
+html.light .tmap-src-isp{color:#b7791f}
+html.light .tmap-nr{color:#c53030!important;text-shadow:none!important}
+html.light .tmap-ng{color:#276749!important}
+html.light .tmap-nb{color:#2b6cb0!important}
+html.light .tmap-np{color:#6b46c1!important}
+html.light .tmap-no{color:#b7791f!important}
 .h-gauges{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .h-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media(max-width:860px){.h-gauges,.h-row{grid-template-columns:1fr}}
@@ -4079,6 +4096,7 @@ function toggleTheme(){
   const on=document.documentElement.classList.toggle('light');
   $('btn-theme').innerHTML=on?'&#9788;':'&#9790;';
   try{localStorage.setItem('tg-theme',on?'light':'dark');}catch(e){}
+  _tmapApplyTiles();
 }
 // Restore saved theme preference
 try{if(localStorage.getItem('tg-theme')==='light'){document.documentElement.classList.add('light');$('btn-theme').innerHTML='&#9788;';}}catch(e){}
@@ -4745,10 +4763,24 @@ _initDrag('health-grid');
 // ── Traffic Map ────────────────────────────────────────────────────────────────
 let _tmap=null,_tmapEs=null,_tmapExpanded=false,_tmapSrc=null,_tmapSrcMarker=null,_tmapPlacedHosts=new Set();
 let _tmapArcs=0,_tmapTotal=0,_tmapBlocked=0,_tmapEps=new Set();
+let _tmapTileBase=null,_tmapTileLabels=null;
+function _tmapApplyTiles(){
+  if(!_tmap)return;
+  const light=_tmapIsLight();
+  if(_tmapTileBase){_tmap.removeLayer(_tmapTileBase);_tmapTileBase=null;}
+  if(_tmapTileLabels){_tmap.removeLayer(_tmapTileLabels);_tmapTileLabels=null;}
+  const variant=light?'light':'dark';
+  _tmapTileBase=L.tileLayer('https://{s}.basemaps.cartocdn.com/'+variant+'_nolabels/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:14}).addTo(_tmap);
+  _tmapTileLabels=L.tileLayer('https://{s}.basemaps.cartocdn.com/'+variant+'_only_labels/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:14,pane:'overlayPane'}).addTo(_tmap);
+}
 const _tmapCtry={};
 const _tmapFlags={US:'🇺🇸',GB:'🇬🇧',FR:'🇫🇷',NL:'🇳🇱',CH:'🇨🇭',DE:'🇩🇪',JP:'🇯🇵',AU:'🇦🇺',CA:'🇨🇦',SE:'🇸🇪',NZ:'🇳🇿',PA:'🇵🇦',CY:'🇨🇾',CN:'🇨🇳',SG:'🇸🇬',IE:'🇮🇪',HK:'🇭🇰',RO:'🇷🇴',VG:'🇻🇬',IL:'🇮🇱',NO:'🇳🇴',MY:'🇲🇾'};
 const _tmapCNames={US:'United States',GB:'United Kingdom',FR:'France',NL:'Netherlands',CH:'Switzerland',DE:'Germany',JP:'Japan',AU:'Australia',CA:'Canada',SE:'Sweden',NZ:'New Zealand',PA:'Panama',CY:'Cyprus',CN:'China',SG:'Singapore',IE:'Ireland',HK:'Hong Kong',RO:'Romania',VG:'British Virgin Is.',IL:'Israel',NO:'Norway',MY:'Malaysia'};
 const _tmapSuiteColor={'dns':'#63b3ed','doh':'#63b3ed','dot':'#63b3ed','http':'#b794f4','https':'#b794f4','ftp':'#b794f4','ssh':'#b794f4','tls-inspection':'#b794f4','http3':'#b794f4','web-crawl':'#b794f4','iperf3':'#f6ad55','speedtest':'#f6ad55','bulk-transfer':'#f6ad55','url-latency':'#f6ad55','s3':'#f6ad55','nmap':'#fc8181','web-scanner':'#fc8181','ids-sigs':'#fc8181','ips-ua':'#fc8181','cve-probe':'#fc8181','waf-attack':'#fc8181','log4shell':'#fc8181','msf-webapp':'#fc8181','msf-enterprise':'#fc8181','msf-appliance':'#fc8181','msf-cisa-kev':'#fc8181','msf-middleware':'#fc8181','msf-recon':'#fc8181','msf-aux-scan':'#fc8181','msf-payload-delivery':'#fc8181','msf-cred-spray':'#fc8181','blocklist-probe':'#fc8181','phishing-domains':'#fc8181','squatting':'#fc8181','pornography':'#fc8181','ai-browse':'#68d391','llm-dlp':'#68d391','post-quantum':'#68d391','tor-anonymizer':'#9ae6b4','c2-beacon':'#f687b3','c2-useragents':'#f687b3','malware-samples':'#f687b3','lateral-movement':'#f687b3','shadow-it':'#fbd38d','data-exfil-http':'#fbd38d','dlp':'#fbd38d','ad-tracker':'#fbd38d','dns-exfil':'#63b3ed','av-test':'#a0aec0','bgp':'#a0aec0','icmp':'#a0aec0','ntp':'#a0aec0','snmp':'#a0aec0','voip':'#68d391','ucaas':'#68d391'};
+const _tmapSuiteColorLight={'dns':'#2b6cb0','doh':'#2b6cb0','dot':'#2b6cb0','http':'#6b46c1','https':'#6b46c1','ftp':'#6b46c1','ssh':'#6b46c1','tls-inspection':'#6b46c1','http3':'#6b46c1','web-crawl':'#6b46c1','iperf3':'#c05621','speedtest':'#c05621','bulk-transfer':'#c05621','url-latency':'#c05621','s3':'#c05621','nmap':'#c53030','web-scanner':'#c53030','ids-sigs':'#c53030','ips-ua':'#c53030','cve-probe':'#c53030','waf-attack':'#c53030','log4shell':'#c53030','msf-webapp':'#c53030','msf-enterprise':'#c53030','msf-appliance':'#c53030','msf-cisa-kev':'#c53030','msf-middleware':'#c53030','msf-recon':'#c53030','msf-aux-scan':'#c53030','msf-payload-delivery':'#c53030','msf-cred-spray':'#c53030','blocklist-probe':'#c53030','phishing-domains':'#c53030','squatting':'#c53030','pornography':'#c53030','ai-browse':'#276749','llm-dlp':'#276749','post-quantum':'#276749','tor-anonymizer':'#276749','c2-beacon':'#97266d','c2-useragents':'#97266d','malware-samples':'#97266d','lateral-movement':'#97266d','shadow-it':'#b7791f','data-exfil-http':'#b7791f','dlp':'#b7791f','ad-tracker':'#b7791f','dns-exfil':'#2b6cb0','av-test':'#4a5568','bgp':'#4a5568','icmp':'#4a5568','ntp':'#4a5568','snmp':'#4a5568','voip':'#276749','ucaas':'#276749'};
+function _tmapIsLight(){return document.documentElement.classList.contains('light');}
+function _tmapColor(suite){return(_tmapIsLight()?_tmapSuiteColorLight:_tmapSuiteColor)[suite]||(_tmapIsLight()?'#2b6cb0':'#63b3ed');}
+function _tmapBlockedColor(){return _tmapIsLight()?'#c53030':'#fc8181';}
 const _tmapGeo={
   '8.8.8.8':{ll:[37.41,-122.08],city:'Mountain View, CA',country:'US',hint:'dns'},
   '8.8.4.4':{ll:[37.41,-122.08],city:'Mountain View, CA',country:'US',hint:'dns'},
@@ -5079,7 +5111,7 @@ function _tmapOutcome(msg){
 function _tmapShootArc(geo,suite,host,outcome){
   if(!_tmap)return;
   const blocked=outcome==='blocked';
-  const c=blocked?'#fc8181':(_tmapSuiteColor[suite]||'#63b3ed');
+  const c=blocked?_tmapBlockedColor():_tmapColor(suite);
   const from=_tmapSrc||[39,-98],to=geo.ll;
   if(Math.abs(from[0]-to[0])<0.1&&Math.abs(from[1]-to[1])<0.1)return;
   _tmapArcs++;_tmapTotal++;if(blocked)_tmapBlocked++;_tmapEps.add(host);
@@ -5203,7 +5235,7 @@ function _tmapLiveGeo(host,suite,outcome){
 function _tmapShootArcWithMarker(host,geo,suite,outcome){
   if(!_tmapPlacedHosts.has(host)){
     _tmapPlacedHosts.add(host);
-    const c=_tmapSuiteColor[geo.hint]||'#63b3ed';
+    const c=_tmapColor(geo.hint);
     if(_tmap)L.circleMarker(geo.ll,{radius:4,color:c,fillColor:c,fillOpacity:.25,weight:1.5,opacity:.5}).addTo(_tmap)
      .bindTooltip('<div style="font-weight:700;color:'+c+'">'+H(host)+'</div><div style="color:#4a5568;font-size:11px">📍 '+H(geo.city)+'</div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:'+c+';margin-top:3px">'+H(geo.hint)+'</div>',{className:'',sticky:false,direction:'right',offset:[6,0]});
   }
@@ -5275,8 +5307,7 @@ function initTrafficMap(){
     if(!mapEl||(!mapEl.offsetHeight&&!mapEl.offsetWidth)){setTimeout(_doInit,100);return;}
     _tmapStatus('Initializing map…',70);
     _tmap=L.map(mapEl,{center:[39,-98],zoom:4,zoomControl:false,attributionControl:false});
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:14}).addTo(_tmap);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:14,pane:'overlayPane'}).addTo(_tmap);
+    _tmapApplyTiles();
     L.control.zoom({position:'topright'}).addTo(_tmap);
     setTimeout(function(){if(_tmap){_tmap.invalidateSize();}  _tmapHideStatus();},300);
     _tmapPlaceSrc();
