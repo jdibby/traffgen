@@ -1590,6 +1590,8 @@ select.diag-input{appearance:none;-webkit-appearance:none;background-color:var(-
 #tab-output.panel{padding:0;gap:0;overflow:hidden}
 #tab-trafficmap.panel{padding:0;gap:0;overflow:hidden}
 #tab-trafficmap.panel.active{flex-direction:row}
+/* Override the generic .panel>* rule which forces width:100%/align-self:center on all panel children */
+#tab-trafficmap.panel>#tmap-container,#tab-trafficmap.panel>.tmap-right{max-width:none!important;width:auto!important;align-self:stretch!important}
 #tmap-container{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;position:relative;background:#04060a}
 #tmap{flex:1;min-height:300px}
 .tmap-strip{position:absolute;bottom:0;left:0;right:0;z-index:1000;background:linear-gradient(transparent,rgba(4,6,10,.95) 40%);padding:20px 24px 16px;pointer-events:none;display:flex;justify-content:center}
@@ -5020,7 +5022,7 @@ function initTrafficMap(){
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:14}).addTo(_tmap);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:14,pane:'overlayPane'}).addTo(_tmap);
     L.control.zoom({position:'topright'}).addTo(_tmap);
-    setTimeout(function(){if(_tmap){_tmap.invalidateSize();_tmapHideStatus();}},300);
+    setTimeout(function(){if(_tmap){_tmap.invalidateSize();}  _tmapHideStatus();},300);
     _tmapPlaceSrc();
     _tmapConnectLog();
   }
