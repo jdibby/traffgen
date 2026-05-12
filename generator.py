@@ -3124,11 +3124,18 @@ def http3_random() -> None:
             _stats.fail()
 
     async def _run_all(urls: list) -> None:
-        for i, url in enumerate(urls, 1):
-            ua = random.choice(user_agents)
-            await _probe(url, ua, i)
-            if i < len(urls):
-                await asyncio.sleep(random.uniform(0.2, 1.0))
+        sem = asyncio.Semaphore(8)
+
+        async def _bounded(i: int, url: str) -> None:
+            async with sem:
+                ua = random.choice(user_agents)
+                try:
+                    await asyncio.wait_for(_probe(url, ua, i), timeout=8.0)
+                except asyncio.TimeoutError:
+                    console.log(f"[yellow]HTTP3 ({i}/{n}) {url}  → connect timeout[/]")
+                    _stats.drop()
+
+        await asyncio.gather(*[_bounded(i, url) for i, url in enumerate(urls, 1)])
 
     try:
         random.shuffle(https_endpoints)
