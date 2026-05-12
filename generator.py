@@ -1645,15 +1645,9 @@ def _msf_run_rc_parsed(rc_name: str, banner: str, subtitle: str, timeout: int) -
         out = ""
 
     found = 0
-    aux_ok: set[int] = set()
-    aux_err: set[int] = set()
-    module_idx = 0
 
     for line in (out or "").splitlines():
         ll = line.lower()
-        # Track module boundaries to pair auxiliary completions with modules
-        if ll.strip().startswith("use ") or "using configured payload" in ll:
-            module_idx += 1
         if any(p in ll for p in (
             "not exploitable", "not vulnerable",
             "appears to be vulnerable", "appears vulnerable",
@@ -1666,14 +1660,9 @@ def _msf_run_rc_parsed(rc_name: str, banner: str, subtitle: str, timeout: int) -
         elif "check failed" in ll:
             _stats.fail(); found += 1
         elif "auxiliary module execution completed" in ll:
-            aux_ok.add(module_idx); found += 1
+            _stats.ok(); found += 1
         elif any(p in ll for p in ("[-] error:", "module failed", "exploit failed")):
-            aux_err.add(module_idx); found += 1
-
-    for idx in aux_ok - aux_err:
-        _stats.ok()
-    for idx in aux_err:
-        _stats.fail()
+            _stats.fail(); found += 1
 
     if found == 0:
         if proc.returncode in (0, None):
