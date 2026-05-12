@@ -91,6 +91,8 @@ _health_cache: dict = {}
 _health_lock2 = threading.Lock()
 _net_info_cache: dict = {}
 _net_info_lock = threading.Lock()
+_geo_cache: dict = {}
+_geo_cache_lock = threading.Lock()
 
 
 def _sample_health() -> None:
@@ -548,7 +550,7 @@ _SEC_HEADERS = {
         "style-src 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; "
         "script-src 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; "
         "img-src 'self' data: https://*.basemaps.cartocdn.com; "
-        "connect-src 'self' https://cdn.jsdelivr.net https://unpkg.com https://ip-api.com https://ipapi.co"
+        "connect-src 'self' https://cdn.jsdelivr.net https://unpkg.com"
     ),
     "Strict-Transport-Security": "max-age=31536000",
     "Permissions-Policy":        "geolocation=(), microphone=(), camera=()",
@@ -742,6 +744,49 @@ def api_health():
 def api_netinfo():
     with _net_info_lock:
         return jsonify(dict(_net_info_cache))
+
+
+@app.route("/api/geo")
+def api_geo():
+    import ipaddress as _ipaddress
+    import urllib.request as _urlreq
+
+    host = request.args.get("host", "").strip()
+    if not host:
+        return jsonify({}), 400
+    with _geo_cache_lock:
+        if host in _geo_cache:
+            return jsonify(_geo_cache[host])
+    try:
+        ip = _socket.gethostbyname(host)
+    except Exception:
+        ip = host
+    try:
+        addr = _ipaddress.ip_address(ip)
+        if addr.is_private or addr.is_loopback:
+            return jsonify({}), 404
+    except Exception:
+        pass
+    try:
+        url = f"http://ip-api.com/json/{ip}?fields=lat,lon,city,regionCode,countryCode,status"
+        with _urlreq.urlopen(url, timeout=4) as resp:
+            data = json.loads(resp.read())
+        if data.get("status") == "success":
+            city = data.get("city", "")
+            if data.get("regionCode"):
+                city = city + ", " + data["regionCode"]
+            result = {
+                "lat": data["lat"],
+                "lon": data["lon"],
+                "city": city,
+                "country": data.get("countryCode", "US"),
+            }
+            with _geo_cache_lock:
+                _geo_cache[host] = result
+            return jsonify(result)
+    except Exception:
+        pass
+    return jsonify({}), 404
 
 
 def _is_admin() -> bool:
@@ -5011,23 +5056,24 @@ const _tmapSuiteHosts={
 };
 function _tmapIsPrivateIP(h){return/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|0\.0\.0\.0|::1|fc|fd|fe80)/.test(h);}
 let _tmapGeoQueue=[],_tmapGeoRunning=0,_tmapGeoTimer=null;
-const _TMAP_GEO_CONCUR=2,_TMAP_GEO_DELAY=2200;
+const _TMAP_GEO_CONCUR=4,_TMAP_GEO_DELAY=50;
 function _tmapDrainGeoQueue(){
+  _tmapGeoTimer=null;
   while(_tmapGeoRunning<_TMAP_GEO_CONCUR&&_tmapGeoQueue.length){
     const {host,suite}=_tmapGeoQueue.shift();
     _tmapGeoRunning++;
-    fetch('https://ipapi.co/'+host+'/json/')
-      .then(function(r){return r.json();})
+    fetch('/api/geo?host='+encodeURIComponent(host))
+      .then(function(r){return r.ok?r.json():null;})
       .then(function(j){
-        if(j&&j.latitude){
-          const geo={ll:[j.latitude,j.longitude],city:(j.city||'')+(j.region_code?', '+j.region_code:''),country:j.country_code||'US',hint:suite};
+        if(j&&j.lat!=null){
+          const geo={ll:[j.lat,j.lon],city:j.city||'',country:j.country||'US',hint:suite};
           _tmapGeo[host]=geo;
           _tmapShootArcWithMarker(host,geo,suite);
         }
       }).catch(function(){})
       .finally(function(){
         _tmapGeoRunning--;
-        if(_tmapGeoQueue.length)_tmapGeoTimer=setTimeout(_tmapDrainGeoQueue,_TMAP_GEO_DELAY);
+        if(_tmapGeoQueue.length&&!_tmapGeoTimer)_tmapGeoTimer=setTimeout(_tmapDrainGeoQueue,_TMAP_GEO_DELAY);
       });
   }
 }
