@@ -3406,13 +3406,22 @@ function apply(s){
   if(tsa&&cur){clearInterval(_elTimer);const upEl=()=>$('s-test').textContent=elapsed(tsa);upEl();_elTimer=setInterval(upEl,1000);}
   else{clearInterval(_elTimer);$('s-test').textContent=s.loop?'Loop mode':'Single-run';}
   $('v-iter').textContent=s.iteration?'#'+N(s.iteration):'—';$('s-iter').textContent='Suite: '+(s.suite||'—')+' \xb7 Size: '+(s.size||'—');
-  drawDonut(ok,fail);$('leg-ok').textContent=N(ok)+' OK';$('leg-fail').textContent=N(fail)+' Fail';
+  // Seed donut with live request counts when no tests have completed yet
+  const _dOk=ok||(live&&!att?live.allowed||0:0),_dFail=fail||(live&&!att?live.errors||0:0);
+  drawDonut(_dOk,_dFail);$('leg-ok').textContent=N(_dOk)+' OK';$('leg-fail').textContent=N(_dFail)+' Fail';
   const hist=s.history||[];drawSpark(hist);if(hist.length>1)$('hist-info').textContent=hist.length+' samples';
   if(hist.length>=2){const h0=hist[hist.length-2],h1=hist[hist.length-1],dt=h1.t-h0.t,dp=(h1.ok+h1.fail)-(h0.ok+h0.fail);if(dt>0){const ppm=Math.round(dp/dt*60);$('v-ppm').textContent=N(ppm);$('s-ppm').textContent='probes per minute';}}else{$('v-ppm').textContent='—';$('s-ppm').textContent='accumulating…';}
-  const tests=s.tests||{},names=Object.keys(tests).sort(),tb=$('tbl-body');
+  const tests=s.tests||{};
+  // Augment breakdown table with live row for the currently running test
+  const _augTests=Object.assign({},tests);
+  if(live&&cur){
+    if(!_augTests[cur]){_augTests[cur]={attempts:0,ok:0,fail:0,responses:live.responses||0,blocked:live.blocked||0,dropped:live.dropped||0,allowed:live.allowed||0,avg_dur_ms:0,last_dur_ms:0,last_run_at:0,codes:{},probes:[]};}
+    else{const _e=_augTests[cur];_augTests[cur]=Object.assign({},_e,{responses:(_e.responses||0)+(live.responses||0),blocked:(_e.blocked||0)+(live.blocked||0),dropped:(_e.dropped||0)+(live.dropped||0),allowed:(_e.allowed||0)+(live.allowed||0)});}
+  }
+  const names=Object.keys(_augTests).sort(),tb=$('tbl-body');
   if(!names.length){tb.innerHTML='<tr><td colspan="8" class="empty">Waiting…</td></tr>';}
   else tb.innerHTML=names.map(n=>{
-    const t=tests[n],ta=t.attempts||0,tok=t.ok||0,tf=t.fail||0,tp=ta?tok/ta*100:0;
+    const t=_augTests[n],ta=t.attempts||0,tok=t.ok||0,tf=t.fail||0,tp=ta?tok/ta*100:0;
     const bc=RC(tp),lr=t.last_run_at?Tc(t.last_run_at):'—',act=n===cur,exp=_xRows.has(n);
     const codes=t.codes||{};
     const ctags=Object.entries(codes).sort().map(([k,v])=>`<span class="ctag">${H(k)}: ${N(v)}</span>`).join('');
@@ -3433,6 +3442,7 @@ function apply(s){
       <div class="xi"><div class="xl">HTTP Codes</div><div class="ctags">${ctags||'<span style="color:var(--dim)">none yet</span>'}</div></div>
       <div class="xi"><div class="xl">Blocked</div>${N(t.blocked||0)}</div>
       <div class="xi"><div class="xl">Dropped</div>${N(t.dropped||0)}</div>
+      <div class="xi"><div class="xl">Allowed</div>${N(t.allowed||0)}</div>
     </div></td></tr>`;
   }).join('');
   _sortTableBody('tbl-body');
@@ -4053,8 +4063,15 @@ function updateSecurityTab(){
     if(_secHist.length>120)_secHist.shift();
   }
   drawSecTrend(_secHist);
-  // per-suite table — sort by blocked desc
-  const rows=Object.entries(tests).map(([n,t])=>({n,t,ta:t.attempts||0,rch:t.allowed||0,blk:t.blocked||0,drp:t.dropped||0,tot:(t.allowed||0)+(t.blocked||0)+(t.dropped||0),probes:t.probes||[]}));
+  // per-suite table — sort by blocked desc; inject live row for currently running test
+  const rows=Object.entries(tests).map(([n,t])=>({n,t,ta:t.attempts||0,rch:t.allowed||0,blk:t.blocked||0,drp:t.dropped||0,tot:(t.allowed||0)+(t.blocked||0)+(t.dropped||0),probes:t.probes||[],isLive:false}));
+  const _curTest=_lastState.current_test||'';
+  if(_live&&_curTest){
+    const existing=rows.find(r=>r.n===_curTest);
+    const liveRch=_live.allowed||0,liveBlk=_live.blocked||0,liveDrp=_live.dropped||0,liveTot=liveRch+liveBlk+liveDrp;
+    if(existing){existing.rch+=liveRch;existing.blk+=liveBlk;existing.drp+=liveDrp;existing.tot+=liveTot;existing.isLive=true;}
+    else if(liveTot>0){rows.push({n:_curTest,t:{},ta:0,rch:liveRch,blk:liveBlk,drp:liveDrp,tot:liveTot,probes:[],isLive:true});}
+  }
   rows.sort((a,b)=>b.blk-a.blk||(b.drp-a.drp));
   const tb=$('sec-tbl');
   if(!rows.length){tb.innerHTML='<tr><td colspan="7" class="empty">Waiting…</td></tr>';}
