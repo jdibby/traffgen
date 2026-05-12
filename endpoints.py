@@ -89,6 +89,9 @@ dns_endpoints = [
     "84.200.69.80", "84.200.70.40",  # DNS.Watch — Germany
     "80.67.169.40",                   # FDN — France
     "194.168.4.100",                  # BT — UK
+    "82.132.254.2",                   # Virgin Media — UK
+    "212.69.36.35",                   # Sky Broadband — UK
+    "81.103.221.35",                  # EE — UK
     "194.109.6.66",                   # SURFnet — Netherlands
     "194.132.32.32",                  # Bahnhof — Sweden
     "91.239.100.100", "89.233.43.71", # UncensoredDNS — Denmark
@@ -111,11 +114,16 @@ dns_endpoints = [
     "168.95.1.1", "168.95.192.1",    # Chunghwa — Taiwan
     "203.80.96.10",                   # HKBN — Hong Kong
     "202.166.205.61",                 # Singtel — Singapore
-    "103.8.45.5", "103.8.46.5",      # India
+    "103.8.45.5", "103.8.46.5",      # BSNL — India
+    "122.160.36.29",                  # Airtel — India (New Delhi)
+    "59.144.75.1",                    # BSNL — India (Chennai)
+    "115.115.115.115",                # BSNL — India (Mumbai)
     "203.113.0.110",                  # TOT — Thailand
     "203.162.4.190",                  # VDC — Vietnam
     "202.155.0.10",                   # Telkom — Indonesia
     "210.213.131.235",                # PLDT — Philippines
+    "202.90.136.56",                  # Globe Telecom — Philippines (Manila)
+    "112.198.67.235",                 # Globe Telecom — Philippines (Cebu)
     "202.188.0.132",                  # TMnet — Malaysia
     "203.82.80.8",                    # PTCL — Pakistan
     "202.4.96.2",                     # Grameen — Bangladesh
@@ -176,16 +184,164 @@ dns_urls = [
 
 # ── ICMP / traceroute targets ──────────────────────────────────────────────────
 icmp_endpoints = [
-    # United States — Alaska
-    "192.234.141.1",                  # ACS (Alaska Communications Systems) — Anchorage
-    "12.12.12.12",                    # GCI / AT&T — Anchorage, AK
-    # United States — Continental
+    # United States — Alabama (AL)
+    "131.204.122.1",                  # UAB — Birmingham
+    "12.106.32.1",                    # AT&T Southeast — Birmingham
+    # United States — Alaska (AK)
+    "192.234.141.1",                  # ACS (Alaska Communications) — Anchorage
+    "12.12.12.12",                    # GCI / AT&T — Anchorage
+    # United States — Arizona (AZ)
+    "150.135.0.1",                    # University of Arizona — Tucson
+    "150.169.0.1",                    # Arizona State University — Tempe
+    # United States — Arkansas (AR)
+    "130.184.0.1",                    # University of Arkansas — Fayetteville
+    "69.135.176.1",                   # Windstream — Little Rock
+    # United States — California (CA)
+    "128.97.0.1",                     # UCLA — Los Angeles
+    "171.67.0.1",                     # Stanford University — Palo Alto
+    # United States — Colorado (CO)
+    "128.138.0.1",                    # University of Colorado — Boulder
+    "24.116.0.201",                   # Comcast — Denver
+    # United States — Connecticut (CT)
+    "130.132.0.1",                    # Yale University — New Haven
+    "68.87.196.1",                    # Comcast — Hartford
+    # United States — Delaware (DE)
+    "128.175.0.1",                    # University of Delaware — Newark
+    "68.85.78.1",                     # Comcast — Wilmington
+    # United States — Florida (FL)
+    "128.186.0.1",                    # Florida State University — Tallahassee
+    "128.227.0.1",                    # University of Florida — Gainesville
+    # United States — Georgia (GA)
+    "130.207.0.1",                    # Georgia Tech — Atlanta
+    "68.87.85.98",                    # Comcast — Atlanta
+    # United States — Hawaii (HI)
+    "128.171.0.1",                    # University of Hawaii — Honolulu
+    "66.25.0.1",                      # Hawaiian Telcom — Honolulu
+    # United States — Idaho (ID)
+    "132.178.0.1",                    # University of Idaho — Moscow
+    "65.175.64.1",                    # CenturyLink — Boise
+    # United States — Illinois (IL)
+    "128.174.0.1",                    # University of Illinois — Urbana-Champaign
+    "68.85.4.1",                      # Comcast — Chicago
+    # United States — Indiana (IN)
+    "128.210.0.1",                    # Purdue University — West Lafayette
+    "68.87.64.146",                   # Comcast — Indianapolis
+    # United States — Iowa (IA)
+    "128.255.0.1",                    # University of Iowa — Iowa City
+    "66.92.0.1",                      # MidAmerican Energy/ISU — Ames
+    # United States — Kansas (KS)
+    "129.237.0.1",                    # University of Kansas — Lawrence
+    "65.113.0.1",                     # Southwestern Bell — Wichita
+    # United States — Kentucky (KY)
+    "128.163.0.1",                    # University of Kentucky — Lexington
+    "68.87.52.1",                     # Comcast — Louisville
+    # United States — Louisiana (LA)
+    "130.39.0.1",                     # Louisiana State University — Baton Rouge
+    "69.135.64.1",                    # Cox — New Orleans
+    # United States — Maine (ME)
+    "130.111.0.1",                    # University of Maine — Orono
+    "67.211.128.1",                   # Spectrum/Charter — Portland
+    # United States — Maryland (MD)
+    "128.220.0.1",                    # University of Maryland — College Park
+    "68.87.196.2",                    # Comcast — Baltimore
+    # United States — Massachusetts (MA)
+    "18.7.0.1",                       # MIT — Cambridge
+    "68.87.230.1",                    # Comcast — Boston
+    # United States — Michigan (MI)
+    "141.211.0.1",                    # University of Michigan — Ann Arbor
+    "68.87.64.1",                     # Comcast — Detroit
+    # United States — Minnesota (MN)
+    "134.84.0.1",                     # University of Minnesota — Minneapolis
+    "67.211.0.1",                     # Comcast — Minneapolis
+    # United States — Mississippi (MS)
+    "130.74.0.1",                     # University of Mississippi — Oxford
+    "69.135.192.1",                   # C Spire — Jackson
+    # United States — Missouri (MO)
+    "128.252.0.1",                    # Washington University — St. Louis
+    "68.87.22.1",                     # Comcast — Kansas City
+    # United States — Montana (MT)
+    "153.90.0.1",                     # Montana State University — Bozeman
+    "65.175.128.1",                   # CenturyLink — Billings
+    # United States — Nebraska (NE)
+    "129.93.0.1",                     # University of Nebraska — Lincoln
+    "66.27.96.1",                     # Cox — Omaha
+    # United States — Nevada (NV)
+    "134.197.0.1",                    # University of Nevada — Reno
+    "68.105.28.11",                   # Cox — Las Vegas
+    # United States — New Hampshire (NH)
+    "132.177.0.1",                    # University of New Hampshire — Durham
+    "67.211.224.1",                   # Comcast — Manchester
+    # United States — New Jersey (NJ)
+    "128.6.0.1",                      # Rutgers University — New Brunswick
+    "68.87.216.1",                    # Comcast — Newark
+    # United States — New Mexico (NM)
+    "129.24.0.1",                     # University of New Mexico — Albuquerque
+    "65.113.128.1",                   # CenturyLink — Albuquerque
+    # United States — New York (NY)
+    "128.122.0.1",                    # New York University — New York City
+    "68.87.240.1",                    # Comcast — Buffalo
+    # United States — North Carolina (NC)
+    "152.2.0.1",                      # UNC Chapel Hill
+    "68.87.44.1",                     # Comcast — Charlotte
+    # United States — North Dakota (ND)
+    "134.129.0.1",                    # University of North Dakota — Grand Forks
+    "65.113.192.1",                   # CenturyLink — Fargo
+    # United States — Ohio (OH)
+    "128.146.0.1",                    # Ohio State University — Columbus
+    "68.87.72.1",                     # Comcast — Cleveland
+    # United States — Oklahoma (OK)
+    "129.15.0.1",                     # University of Oklahoma — Norman
+    "69.135.128.1",                   # Cox — Tulsa
+    # United States — Oregon (OR)
+    "128.223.0.1",                    # University of Oregon — Eugene
+    "68.87.176.1",                    # Comcast — Portland
+    # United States — Pennsylvania (PA)
+    "128.91.0.1",                     # University of Pennsylvania — Philadelphia
+    "68.87.202.1",                    # Comcast — Pittsburgh
+    # United States — Rhode Island (RI)
+    "138.99.0.1",                     # Brown University — Providence
+    "68.87.212.1",                    # Comcast — Providence
+    # United States — South Carolina (SC)
+    "129.252.0.1",                    # University of South Carolina — Columbia
+    "69.135.160.1",                   # AT&T — Greenville
+    # United States — South Dakota (SD)
+    "139.32.0.1",                     # South Dakota State University — Brookings
+    "65.113.224.1",                   # CenturyLink — Sioux Falls
+    # United States — Tennessee (TN)
+    "160.36.0.1",                     # Vanderbilt University — Nashville
+    "68.87.60.1",                     # Comcast — Memphis
+    # United States — Texas (TX)
+    "128.83.0.1",                     # University of Texas — Austin
+    "68.87.28.1",                     # Comcast — Houston
+    # United States — Utah (UT)
+    "155.97.0.1",                     # University of Utah — Salt Lake City
+    "65.175.192.1",                   # CenturyLink — Salt Lake City
+    # United States — Vermont (VT)
+    "132.198.0.1",                    # University of Vermont — Burlington
+    "67.211.160.1",                   # Comcast — Burlington
+    # United States — Virginia (VA)
+    "128.143.0.1",                    # University of Virginia — Charlottesville
+    "68.87.108.1",                    # Comcast — Richmond
+    # United States — Washington (WA)
+    "140.142.0.1",                    # University of Washington — Seattle
+    "68.87.184.1",                    # Comcast — Seattle
+    # United States — West Virginia (WV)
+    "157.182.0.1",                    # West Virginia University — Morgantown
+    "67.211.192.1",                   # Comcast — Charleston
+    # United States — Wisconsin (WI)
+    "128.105.0.1",                    # University of Wisconsin — Madison
+    "68.87.12.1",                     # Comcast — Milwaukee
+    # United States — Wyoming (WY)
+    "129.72.0.1",                     # University of Wyoming — Laramie
+    "65.175.224.1",                   # CenturyLink — Cheyenne
+    # United States — General (CDN / anycast)
     "8.8.8.8", "8.8.4.4",            # Google DNS
     "1.1.1.1", "1.0.0.1",            # Cloudflare
     "208.67.222.222", "208.67.220.220",  # OpenDNS
     "9.9.9.9", "149.112.112.112",    # Quad9
     "4.2.2.2", "4.2.2.4",            # Level3
     "64.6.64.6", "64.6.65.6",        # Verisign
+    "24.116.0.202",                   # Comcast/Level3 — US East
     # Canada
     "149.112.121.10",                 # CIRA
     # Brazil
@@ -204,6 +360,9 @@ icmp_endpoints = [
     "80.10.246.2", "80.10.246.129",  # Orange
     # UK
     "194.168.4.100",                  # BT
+    "82.132.254.2",                   # Virgin Media
+    "212.69.36.35",                   # Sky Broadband
+    "81.103.221.35",                  # EE
     # Netherlands
     "194.109.6.66",                   # SURFnet
     # Sweden
@@ -248,10 +407,15 @@ icmp_endpoints = [
     "202.155.0.10",                   # Telkom
     # Philippines
     "210.213.131.235",                # PLDT
+    "202.90.136.56",                  # Globe Telecom — Manila
+    "112.198.67.235",                 # Globe Telecom — Cebu
     # Malaysia
     "202.188.0.132",                  # TMnet
     # India
-    "103.8.45.5", "103.8.46.5",
+    "103.8.45.5", "103.8.46.5",      # BSNL
+    "122.160.36.29",                  # Airtel — New Delhi
+    "59.144.75.1",                    # BSNL — Chennai
+    "115.115.115.115",                # BSNL — Mumbai
     # Pakistan
     "203.82.80.8",                    # PTCL
     # Bangladesh
@@ -276,8 +440,6 @@ icmp_endpoints = [
     "196.202.250.10",                 # Nour
     # Private LAN (test local reachability)
     "172.30.0.1", "172.16.0.1", "172.22.11.1", "192.168.1.1",
-    # Legacy Comcast/Level3 (US East)
-    "68.87.85.98", "68.87.64.146", "24.116.0.201", "24.116.0.202",
     ]
 
 # ── NTP servers ───────────────────────────────────────────────────────────────
