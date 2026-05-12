@@ -1660,7 +1660,7 @@ select.diag-input{appearance:none;-webkit-appearance:none;background-color:var(-
 #tab-trafficmap.panel.active{flex-direction:column}
 .tmap-main-row{display:flex;flex-direction:row;flex:1;min-height:0;overflow:hidden}
 .tmap-left-col{display:flex;flex-direction:column;flex:1;min-width:0}
-#tmap-container{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;position:relative;background:#04060a}
+#tmap-container{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;position:relative;background:#04060a;isolation:isolate}
 #tmap{flex:1;min-height:200px}
 .tmap-strip{display:none}.tmap-legend{display:none}.tmap-right{display:none}
 .tmap-n{font-size:20px;font-weight:800;line-height:1;letter-spacing:-.5px;text-align:center}
