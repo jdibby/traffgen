@@ -1,0 +1,58 @@
+#:schema node_modules/wrangler/config-schema.json
+# Cloudflare Worker configuration for traffgen project stats.
+#
+# Deployment walkthrough lives in worker/README.md.  In short:
+#   1. wrangler login
+#   2. wrangler d1 create traffgen-stats   → paste the printed database_id below
+#   3. wrangler d1 execute traffgen-stats --remote --file=./schema.sql
+#   4. wrangler deploy
+#
+# This file IS committed to the repo on purpose — it contains identifiers
+# (account_id, database_id), not credentials.  See worker/README.md.
+
+name              = "traffgen-stats"
+main              = "src/index.ts"
+compatibility_date = "2025-05-01"
+
+# Replace with your account id (Dashboard → Workers & Pages → right-hand sidebar).
+# Optional: wrangler will use the active account from `wrangler login` if blank.
+account_id = ""
+
+# Public endpoint will be: https://traffgen-stats.<account>.workers.dev
+workers_dev = true
+
+# ── D1 (SQLite) binding ───────────────────────────────────────────────────────
+# After `wrangler d1 create traffgen-stats`, paste the printed database_id here.
+[[d1_databases]]
+binding       = "DB"
+database_name = "traffgen-stats"
+database_id   = ""
+
+# ── Cron Trigger ──────────────────────────────────────────────────────────────
+# Refreshes Docker Hub pull count + rolls up daily aggregates.
+# Runs once per day at 03:17 UTC (off-peak).
+[triggers]
+crons = ["17 3 * * *"]
+
+# ── Hybrid-seed configuration (edit these, then redeploy) ─────────────────────
+# All values are strings.  Empty values are ignored and the dashboard tile
+# falls back to a sensible default (or hides itself).
+#
+# project_started_at:  ISO date of first commit; powers "Running since YYYY-MM-DD"
+# docker_pulls_seed :  optional fallback if Docker Hub API is unreachable
+# releases_seed     :  optional; you can leave empty and the cron will refresh
+# commits_seed      :  optional; ditto
+# baseline_tests    :  if you want the "tests run" tile to start non-zero
+# baseline_runtime  :  in seconds; same idea for "total runtime"
+[vars]
+PROJECT_STARTED_AT  = ""
+DOCKER_HUB_REPO     = "jdibby/traffgen"
+GITHUB_REPO         = "jdibby/traffgen"
+DOCKER_PULLS_SEED   = ""
+RELEASES_SEED       = ""
+COMMITS_SEED        = ""
+BASELINE_TESTS      = ""
+BASELINE_RUNTIME    = ""
+
+# Tighten this if you ever embed the dashboard somewhere specific.
+CORS_ALLOW_ORIGIN   = "*"
