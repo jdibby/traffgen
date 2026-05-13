@@ -41,6 +41,16 @@ MAX_SSE      = 30
 _VALID_SIZES = {"XS", "S", "M", "L", "XL"}
 ADMIN_TOKEN  = os.environ.get("TRAFFGEN_ADMIN_TOKEN", "")
 
+# ── Project telemetry (read-only stats fetched from the public Worker) ────────
+# Default to empty so the About-tab tile is hidden until configured.  Set to
+# your deployed Worker URL (no trailing slash) after `wrangler deploy`.
+_PROJECT_STATS_URL_DEFAULT = ""
+_PROJECT_STATS_URL  = (os.environ.get("TRAFFGEN_TELEMETRY_URL") or _PROJECT_STATS_URL_DEFAULT).rstrip("/")
+_PROJECT_STATS_TTL  = 300          # 5 min cache in-process
+_PROJECT_STATS_HTTP_TIMEOUT = 2.0  # seconds — must never block dashboard load
+_project_stats_cache: dict = {"at": 0, "data": None}
+_project_stats_lock = threading.Lock()
+
 # ── Flask ──────────────────────────────────────────────────────────────────────
 app = Flask(__name__)
 app.secret_key = os.urandom(32)   # new key each process start; sessions invalidate on restart
@@ -735,6 +745,47 @@ def serve_preview(filename):
 @app.route("/api/state")
 def api_state():
     return jsonify(_read_state())
+
+
+@app.route("/api/projectstats")
+def api_projectstats():
+    """Public marketing/activity counters fetched from the traffgen-stats
+    Cloudflare Worker.  Cached in-process for _PROJECT_STATS_TTL seconds.
+    Always returns 200 with whatever's available so the dashboard tile can
+    render gracefully — never fails the page load.
+    """
+    import urllib.request
+    now = int(time.time())
+    with _project_stats_lock:
+        cached = _project_stats_cache.get("data")
+        cached_at = _project_stats_cache.get("at", 0)
+        fresh_enough = cached is not None and (now - cached_at) < _PROJECT_STATS_TTL
+
+    if fresh_enough:
+        return jsonify({"ok": True, "cached": True, "stats": cached})
+
+    if not _PROJECT_STATS_URL:
+        return jsonify({"ok": False, "reason": "not_configured", "stats": cached})
+
+    data = None
+    try:
+        req = urllib.request.Request(
+            f"{_PROJECT_STATS_URL}/v1/stats",
+            headers={"user-agent": "traffgen-webui"},
+        )
+        with urllib.request.urlopen(req, timeout=_PROJECT_STATS_HTTP_TIMEOUT) as r:
+            data = json.loads(r.read().decode("utf-8", errors="replace"))
+    except Exception:
+        data = None  # silent failure — tile shows last cached or "—"
+
+    if data is not None:
+        with _project_stats_lock:
+            _project_stats_cache["data"] = data
+            _project_stats_cache["at"]   = now
+        return jsonify({"ok": True, "cached": False, "stats": data})
+
+    # Network fail: hand back whatever's stale rather than erroring out.
+    return jsonify({"ok": False, "reason": "fetch_failed", "stats": cached})
 
 
 @app.route("/api/health")
@@ -1827,6 +1878,15 @@ table[data-sort-tbody] thead th:hover{color:var(--text)}
 .lk-body{min-width:0;flex:1}
 .lk-name{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lk-url{font-size:12px;color:var(--muted);font-family:'SF Mono',Consolas,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ps-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:4px}
+.ps-tile{background:var(--surf2);border:1px solid var(--border);border-radius:var(--r);padding:14px 12px;text-align:center}
+.ps-num{font-size:22px;font-weight:700;color:var(--green);font-family:'SF Mono',Consolas,monospace;line-height:1.1}
+.ps-lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:6px}
+.ps-meta{font-size:11px;color:var(--dim);margin-top:12px;font-family:'SF Mono',Consolas,monospace}
+.ps-empty{font-size:13px;color:var(--dim);padding:10px 4px}
+.tg-state{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-left:8px}
+.tg-on{background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.4)}
+.tg-off{background:rgba(148,163,184,.10);color:var(--dim);border:1px solid var(--border)}
 .cmd-blk{background:#080c10;border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;font-family:'SF Mono',Consolas,monospace;font-size:13px;line-height:1.85;color:#c9d1d9;white-space:pre-wrap;word-break:break-all}
 .cmd-blk .cmt{color:#374151}.cmd-blk .flg{color:#60a5fa}
 .pg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px}
@@ -2512,6 +2572,34 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
           <a class="lk" href="https://github.com/jdibby/traffgen" target="_blank" rel="noopener"><span class="lk-ico">&#9415;</span><div class="lk-body"><div class="lk-name">GitHub Repository</div><div class="lk-url">github.com/jdibby/traffgen</div></div></a>
           <a class="lk" href="https://hub.docker.com/r/jdibby/traffgen" target="_blank" rel="noopener"><span class="lk-ico">&#127987;</span><div class="lk-body"><div class="lk-name">Docker Hub</div><div class="lk-url">hub.docker.com/r/jdibby/traffgen</div></div></a>
           <a class="lk" href="https://github.com/jdibby/traffgen/tree/main/docs" target="_blank" rel="noopener"><span class="lk-ico">&#128218;</span><div class="lk-body"><div class="lk-name">Documentation</div><div class="lk-url">github.com/jdibby/traffgen/docs</div></div></a>
+        </div>
+      </div>
+      <div class="a-section" id="a-projstats">
+        <div class="a-h">Project Activity <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:12px">aggregate counters from opt-in telemetry &middot; refreshed ~5 min</span></div>
+        <div id="ps-empty" class="ps-empty">Loading project stats&hellip;</div>
+        <div id="ps-tiles" class="ps-grid" style="display:none">
+          <div class="ps-tile"><div class="ps-num" id="ps-docker">&mdash;</div><div class="ps-lbl">Docker pulls</div></div>
+          <div class="ps-tile"><div class="ps-num" id="ps-installs">&mdash;</div><div class="ps-lbl">Installs (lifetime)</div></div>
+          <div class="ps-tile"><div class="ps-num" id="ps-running">&mdash;</div><div class="ps-lbl">Running now</div></div>
+          <div class="ps-tile"><div class="ps-num" id="ps-active24">&mdash;</div><div class="ps-lbl">Active (24h)</div></div>
+          <div class="ps-tile"><div class="ps-num" id="ps-tests">&mdash;</div><div class="ps-lbl">Suite tests run</div></div>
+          <div class="ps-tile"><div class="ps-num" id="ps-runtime">&mdash;</div><div class="ps-lbl">Total runtime</div></div>
+          <div class="ps-tile"><div class="ps-num" id="ps-age">&mdash;</div><div class="ps-lbl">Project age</div></div>
+          <div class="ps-tile"><div class="ps-num" id="ps-releases">&mdash;</div><div class="ps-lbl">Releases</div></div>
+        </div>
+        <div id="ps-meta" class="ps-meta" style="display:none">&mdash;</div>
+      </div>
+      <div class="a-section">
+        <div class="a-h">Telemetry <span id="tg-pill" class="tg-state tg-off">disabled</span></div>
+        <div style="font-size:13px;color:var(--muted);line-height:1.6">
+          Anonymous, opt-in usage counters power the Project Activity tile above.
+          Off by default; the running container's current setting is shown in the badge.
+          <br><br>
+          <strong>Enable:</strong> pass <code>--telemetry</code> on the command line, or set <code>TRAFFGEN_TELEMETRY=1</code> in the environment.
+          <br>
+          <strong>What's sent:</strong> install UUID, version, arch, OS, and aggregate test counts every 5&nbsp;min. Never sent: probe results, target URLs, IPs, hostnames, or configuration.
+          <br><br>
+          <a href="https://github.com/jdibby/traffgen/blob/main/docs/telemetry.md" target="_blank" rel="noopener" style="color:var(--green);text-decoration:none;font-weight:600">&rarr; Full data dictionary &amp; opt-out instructions</a>
         </div>
       </div>
       <div class="a-section">
@@ -3339,6 +3427,49 @@ function showTab(btn){
   if(btn.dataset.tab==='health'){pollHealth();pollNetInfo();_healthTimer=setInterval(()=>{pollHealth();},2500);_netInfoTimer=setInterval(pollNetInfo,15000);_initDrag('health-grid');}
   if(btn.dataset.tab==='security'){updateSecurityTab();_secTimer=setInterval(updateSecurityTab,_secInterval);_initDrag('sec-grid');}
   if(btn.dataset.tab==='trafficmap')initTrafficMap();
+  if(btn.dataset.tab==='about')loadProjectStats();
+}
+function _psFmt(n){if(n==null||!isFinite(n))return'—';n=Number(n);if(n>=1e9)return(n/1e9).toFixed(1)+'B';if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'k';return Math.round(n).toLocaleString();}
+let _psLastFetch=0;
+function loadProjectStats(force){
+  const now=Date.now();
+  if(!force&&now-_psLastFetch<60000)return;  // throttle to 1/min from this page
+  _psLastFetch=now;
+  fetch('/api/projectstats',{cache:'no-store'}).then(r=>r.json()).then(j=>{
+    const s=j&&j.stats;
+    const empty=$('ps-empty'),tiles=$('ps-tiles'),meta=$('ps-meta');
+    if(!s){
+      if(empty)empty.textContent=(j&&j.reason==='not_configured')
+        ?'Project stats endpoint not configured for this dashboard.'
+        :'Project stats are temporarily unavailable.';
+      if(tiles)tiles.style.display='none';
+      if(meta)meta.style.display='none';
+      return;
+    }
+    if(empty)empty.style.display='none';
+    if(tiles)tiles.style.display='';
+    if(meta)meta.style.display='';
+    $('ps-docker').textContent  = _psFmt(s.docker&&s.docker.pulls);
+    $('ps-installs').textContent= _psFmt(s.installs&&s.installs.lifetime);
+    $('ps-running').textContent = _psFmt(s.installs&&s.installs.running_now);
+    $('ps-active24').textContent= _psFmt(s.installs&&s.installs.active_24h);
+    $('ps-tests').textContent   = _psFmt(s.tests&&s.tests.ran_total);
+    $('ps-runtime').textContent = (s.runtime&&s.runtime.human)||'—';
+    const days=s.project&&s.project.age_days;
+    $('ps-age').textContent     = days>=730?Math.floor(days/365)+'y':(days?days+'d':'—');
+    $('ps-releases').textContent= _psFmt(s.project&&s.project.releases);
+    const since=s.live_since?(' · live counters since '+s.live_since):'';
+    meta.textContent='generated '+new Date((s.generated_at||0)*1000).toLocaleString()+since;
+  }).catch(()=>{
+    const empty=$('ps-empty');
+    if(empty)empty.textContent='Project stats are temporarily unavailable.';
+  });
+}
+function _psApplyTelemetry(s){
+  const pill=$('tg-pill');if(!pill)return;
+  const en=!!(s&&s.telemetry&&s.telemetry.enabled);
+  pill.textContent=en?'enabled':'disabled';
+  pill.className='tg-state '+(en?'tg-on':'tg-off');
 }
 function navTo(tab){if(tab==='tests'){const btn=$('nav-tests');if(btn)toggleTestsNav(btn);return;}if(tab==='overview'){const btn=$('nav-overview');if(btn)toggleOvNav(btn);return;}const btn=document.querySelector('.nav-item[data-tab="'+tab+'"]');if(btn)showTab(btn);}
 function drawDonut(ok,fail){
@@ -3376,6 +3507,7 @@ function apply(s){
   if(s.suites&&s.suites.length&&!Object.keys(_SD).length){s.suites.forEach(su=>{_SD[su.name]=su.description||'';});}
   const ver=s.version||'—';
   $('s-ver').textContent=ver;$('about-ver').textContent=ver;
+  _psApplyTelemetry(s);
   if(s.started_at&&!_start){_start=s.started_at;clearInterval(_uptimer);_uptimer=setInterval(()=>$('s-uptime').textContent='up '+uptime(_start),1000);}
   const st=s.status||'starting';
   if(st==='between_tests'){const pu=s.pause_until||0,now=Date.now()/1000;_showWaitBanner(pu>now?pu:0);}else{_hideWaitBanner();}

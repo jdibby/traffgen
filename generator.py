@@ -228,7 +228,31 @@ def ui_startup_banner() -> None:
     cfg.add_row("[bold]Max Wait[/]",     ":", f"{ARGS.max_wait_secs}s")
     cfg.add_row("[bold]No-wait[/]",      ":", "[green]yes[/]" if ARGS.nowait else "[dim]no[/]")
     cfg.add_row("[bold]Crawl Start[/]",  ":", ARGS.crawl_start)
+    cfg.add_row("[bold]Telemetry[/]",    ":",
+                "[green]enabled[/]" if _TELEMETRY_ENABLED else "[dim]disabled[/]")
     console.print(Panel(cfg, title="Run Configuration", border_style="blue", box=box.ROUNDED))
+
+    # Telemetry disclosure — always shown so users know the project's stance.
+    if _TELEMETRY_ENABLED:
+        console.print(Panel(
+            "[bold]Anonymous usage telemetry is ENABLED.[/]\n"
+            f"Sending counters to: [cyan]{_TELEMETRY_URL or '(not configured)'}[/]\n"
+            "What's sent: install UUID, version, arch, OS, test counts, runtime.\n"
+            "What's NOT sent: probe results, targets, IPs, hostnames, configs.\n"
+            "Disable with [bold]--no-telemetry[/] or TRAFFGEN_TELEMETRY=0.\n"
+            "Full data dictionary: "
+            "https://github.com/jdibby/traffgen/blob/main/docs/telemetry.md",
+            title="Telemetry", border_style="green", box=box.ROUNDED,
+        ))
+    else:
+        console.print(Panel(
+            "[bold]Telemetry is disabled.[/]\n"
+            "Enable with [bold]--telemetry[/] to share anonymous counters that "
+            "power the project's public activity dashboard.\n"
+            "What would be sent: "
+            "https://github.com/jdibby/traffgen/blob/main/docs/telemetry.md",
+            title="Telemetry", border_style="dim", box=box.ROUNDED,
+        ))
 
     # Suite reference table (only shown when running 'all' or on first boot)
     if ARGS.suite == "all":
@@ -712,6 +736,197 @@ def _web_log(msg: str, level: str = "info", test: str = "") -> None:
             pass
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# Telemetry (opt-in, fire-and-forget)
+# ══════════════════════════════════════════════════════════════════════════════
+# All telemetry HTTP calls run on background daemon threads with 2-second
+# timeouts; every failure is silently swallowed.  Telemetry must NEVER affect
+# test execution or container behaviour.
+#
+# Configure via:
+#   - CLI flag: --telemetry / --no-telemetry  (default off)
+#   - Env var:  TRAFFGEN_TELEMETRY=1          (default off)
+#   - Env var:  TRAFFGEN_TELEMETRY_URL=https://...workers.dev
+# See docs/telemetry.md for the full data dictionary.
+
+# ── Set this to your deployed Worker URL after running `wrangler deploy`. ────
+# Leave empty to ship without a default; users will need to set
+# TRAFFGEN_TELEMETRY_URL explicitly.  Honoured only when telemetry is enabled.
+_TELEMETRY_URL_DEFAULT  = ""
+
+_TELEMETRY_URL = (os.environ.get("TRAFFGEN_TELEMETRY_URL") or _TELEMETRY_URL_DEFAULT).rstrip("/")
+_TELEMETRY_INSTALL_FILE = "/var/lib/traffgen/install_id"
+_TELEMETRY_HEARTBEAT_S  = 300        # 5 minutes
+_TELEMETRY_TIMEOUT_S    = 2.0
+_TELEMETRY_ENABLED      = False      # flipped by _telemetry_init()
+
+_telemetry_lock          = threading.Lock()
+_telemetry_install_id    = ""
+_telemetry_tests_delta   = 0
+_telemetry_runtime_start = time.time()
+_telemetry_runtime_sent  = 0         # cumulative seconds already reported
+_telemetry_by_suite: dict = {}
+
+
+def _telemetry_load_or_create_install_id() -> str:
+    """Read the persistent install_id; generate + persist one if absent.
+
+    Falls back to /tmp if /var/lib/traffgen is not writable.  Returns the
+    generated UUID either way — at worst it lives in memory for this process
+    only.  All filesystem errors are swallowed so telemetry init can't crash
+    the container.
+    """
+    import uuid
+    paths = [_TELEMETRY_INSTALL_FILE, "/tmp/traffgen_install_id"]
+    for path in paths:
+        try:
+            if os.path.exists(path):
+                with open(path) as f:
+                    val = f.read().strip()
+                if len(val) == 36:
+                    return val
+        except Exception:
+            continue
+    new_id = str(uuid.uuid4())
+    for path in paths:
+        try:
+            d = os.path.dirname(path)
+            if d:
+                os.makedirs(d, exist_ok=True)
+            with open(path, "w") as f:
+                f.write(new_id)
+            return new_id
+        except Exception:
+            continue
+    return new_id
+
+
+def _telemetry_detect_arch() -> str:
+    try:
+        m = os.uname().machine.lower()
+        if m in ("x86_64", "amd64"):     return "amd64"
+        if m in ("aarch64", "arm64"):    return "arm64"
+        if m.startswith("armv7"):        return "arm/v7"
+        if m.startswith("i") and m.endswith("86"): return "i386"
+        return "other"
+    except Exception:
+        return "other"
+
+
+def _telemetry_detect_os() -> str:
+    try:
+        with open("/etc/os-release") as f:
+            for line in f:
+                if line.startswith("ID="):
+                    val = line.split("=", 1)[1].strip().strip('"').lower()
+                    if "raspbian" in val or "rpi" in val:
+                        return "rpi"
+                    if val in ("ubuntu", "debian", "rocky", "alpine", "fedora", "centos"):
+                        return val
+                    return val[:16] or "other"
+    except Exception:
+        pass
+    return "other"
+
+
+def _telemetry_post(path: str, payload: dict) -> None:
+    """Fire one POST.  Returns silently on any success, failure, or timeout."""
+    if not _TELEMETRY_URL:
+        return
+    try:
+        body = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            f"{_TELEMETRY_URL}{path}",
+            data=body,
+            headers={
+                "content-type": "application/json",
+                "user-agent":   f"traffgen/{VERSION}",
+            },
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=_TELEMETRY_TIMEOUT_S).read()
+    except Exception:
+        pass
+
+
+def _telemetry_record(suite_name: str) -> None:
+    """Increment counters after a completed test.  No-op when disabled."""
+    if not _TELEMETRY_ENABLED:
+        return
+    try:
+        with _telemetry_lock:
+            global _telemetry_tests_delta
+            _telemetry_tests_delta += 1
+            _telemetry_by_suite[suite_name] = _telemetry_by_suite.get(suite_name, 0) + 1
+    except Exception:
+        pass
+
+
+def _telemetry_heartbeat_loop() -> None:
+    """Background daemon: POST /v1/heartbeat every _TELEMETRY_HEARTBEAT_S."""
+    global _telemetry_runtime_sent, _telemetry_tests_delta
+    while True:
+        try:
+            time.sleep(_TELEMETRY_HEARTBEAT_S)
+            with _telemetry_lock:
+                tests_delta   = _telemetry_tests_delta
+                by_suite      = dict(_telemetry_by_suite)
+                _telemetry_tests_delta = 0
+                _telemetry_by_suite.clear()
+                now_runtime   = int(time.time() - _telemetry_runtime_start)
+                runtime_delta = max(0, now_runtime - _telemetry_runtime_sent)
+                _telemetry_runtime_sent = now_runtime
+            _telemetry_post("/v1/heartbeat", {
+                "install_id":            _telemetry_install_id,
+                "version":               VERSION,
+                "tests_run_delta":       tests_delta,
+                "runtime_seconds_delta": runtime_delta,
+                "by_suite":              by_suite,
+            })
+        except Exception:
+            pass  # heartbeat thread must never die
+
+
+def _telemetry_resolve_enabled(args_ns) -> bool:
+    """Combine CLI flag + env var into a single on/off decision.  --no-telemetry
+    always wins; otherwise --telemetry or TRAFFGEN_TELEMETRY=1 turns it on."""
+    if getattr(args_ns, "no_telemetry", False):
+        return False
+    if getattr(args_ns, "telemetry", False):
+        return True
+    env = os.environ.get("TRAFFGEN_TELEMETRY", "").strip().lower()
+    return env in ("1", "true", "yes", "on")
+
+
+def _telemetry_init(enabled: bool) -> None:
+    """Wire telemetry up.  Safe to call when disabled — becomes a no-op."""
+    global _TELEMETRY_ENABLED, _telemetry_install_id
+    if not enabled or not _TELEMETRY_URL:
+        _TELEMETRY_ENABLED = False
+        return
+    try:
+        _telemetry_install_id = _telemetry_load_or_create_install_id()
+        if not _telemetry_install_id:
+            _TELEMETRY_ENABLED = False
+            return
+        _TELEMETRY_ENABLED = True
+        threading.Thread(
+            target=lambda: _telemetry_post("/v1/install", {
+                "install_id": _telemetry_install_id,
+                "version":    VERSION,
+                "arch":       _telemetry_detect_arch(),
+                "os":         _telemetry_detect_os(),
+            }),
+            daemon=True, name="telemetry-install",
+        ).start()
+        threading.Thread(
+            target=_telemetry_heartbeat_loop,
+            daemon=True, name="telemetry-heartbeat",
+        ).start()
+    except Exception:
+        _TELEMETRY_ENABLED = False  # any error → silently disable
+
+
 def _argv_from_cmd(cmd: dict) -> list:
     """Build a validated generator argv list from a web control command dict."""
     valid_suites = {"all"} | set(_SUITE_MAP.keys())
@@ -748,6 +963,18 @@ def _argv_from_cmd(cmd: dict) -> list:
         lat_nets = []
     if lat_nets:
         argv.append(f"--lateral-networks={','.join(lat_nets)}")
+
+    # Preserve telemetry state across web-triggered restarts.  The dashboard
+    # Settings drawer sends an explicit boolean — fall back to whatever the
+    # current process resolved on startup if absent.
+    if "telemetry" in cmd:
+        if bool(cmd.get("telemetry")):
+            argv.append("--telemetry")
+        else:
+            argv.append("--no-telemetry")
+    elif _TELEMETRY_ENABLED:
+        argv.append("--telemetry")
+
     return argv
 
 
@@ -1088,6 +1315,7 @@ def _run_guarded(func) -> None:
     _web_record(suite_name, run_ok, dur_ms, _stats.responses, dict(_stats.codes),
                 blocked=_stats.blocked, dropped=_stats.dropped, allowed=_stats.allowed,
                 probe_detail=list(_stats.probes))
+    _telemetry_record(suite_name)
     _web_log(
         f"{suite_name}: {_stats.attempts} attempts, "
         f"{_stats.responses} ok, {_stats.errors} fail — {dur_ms}ms",
@@ -5398,6 +5626,21 @@ def parse_cli() -> argparse.Namespace:
         ),
     )
 
+    telem = parser.add_argument_group("Telemetry (opt-in)")
+    telem.add_argument(
+        "--telemetry", action="store_true",
+        help=(
+            "Enable anonymous usage telemetry — sends an install ID and aggregate\n"
+            "test counters to a public Cloudflare Worker every 5 minutes.\n"
+            "No test results, target URLs, IPs, or hostnames are sent.\n"
+            "Off by default; see docs/telemetry.md for the full data dictionary."
+        ),
+    )
+    telem.add_argument(
+        "--no-telemetry", action="store_true",
+        help="Force telemetry off (overrides TRAFFGEN_TELEMETRY=1 in the environment).",
+    )
+
     args = parser.parse_args()
 
     # --list: print suite descriptions and exit without running tests.
@@ -5472,6 +5715,14 @@ if __name__ == "__main__":
         STARTTIME = time.time()
         ARGS      = parse_cli()
 
+        # Initialise telemetry FIRST so the banner can show its state and so
+        # the install ping fires before the first test starts.  Wrapped in
+        # try/except as a safety net — telemetry init must never crash main.
+        try:
+            _telemetry_init(_telemetry_resolve_enabled(ARGS))
+        except Exception:
+            pass
+
         # Initialise web UI state from CLI arguments
         _detected_lans = _detect_host_lans()
         _lat_filter = [n.strip() for n in getattr(ARGS, "lateral_networks", "").split(",") if n.strip()]
@@ -5489,6 +5740,11 @@ if __name__ == "__main__":
                     {"ip": ip, "cidr": cidr} for ip, cidr in _detected_lans
                 ],
                 "lateral_networks": _lat_filter,
+                "telemetry": {
+                    "enabled":     _TELEMETRY_ENABLED,
+                    "url":         _TELEMETRY_URL,
+                    "docs_url":    "https://github.com/jdibby/traffgen/blob/main/docs/telemetry.md",
+                },
             })
         _web_flush()
         _web_log(

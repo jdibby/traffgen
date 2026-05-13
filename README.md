@@ -62,6 +62,25 @@ curl -sk https://raw.githubusercontent.com/jdibby/traffgen/refs/heads/main/stage
 | [Deployment Guide](docs/deployment.md) | Docker commands, stager.sh, network modes, TLS proxy setup, architecture, building |
 | [Configuration](docs/configuration.md) | CLI flags, `--size`, traffic pacing, custom endpoints |
 | [Web Dashboard](docs/web-dashboard.md) | Dashboard tabs, controls, draggable widgets, chart hover, multi-user mode |
+| [Telemetry](docs/telemetry.md) | Opt-in anonymous usage counters — full data dictionary, opt-out instructions |
+
+---
+
+## 📡 Telemetry (opt-in)
+
+Traffgen can optionally send **anonymous** usage counters to a public Cloudflare Worker so the project can show its activity (Docker pulls, lifetime installs, total suite tests run, etc.) on the dashboard's About tab.
+
+- **Off by default.** Nothing is sent unless you pass `--telemetry` or set `TRAFFGEN_TELEMETRY=1`.
+- **What's sent:** randomly-generated install UUID, version, arch, OS family, and aggregate test counters every 5 minutes.
+- **What's NOT sent:** probe results, target URLs, IPs, hostnames, configuration.
+- **Fire-and-forget:** 2-second HTTP timeout, all failures silently dropped — telemetry never affects test execution.
+
+Enable for a run:
+```bash
+docker run -e TRAFFGEN_TELEMETRY=1 ... jdibby/traffgen:latest --suite=all --loop
+```
+
+Full disclosure and Worker source: [docs/telemetry.md](docs/telemetry.md) · [worker/](worker/).
 
 ---
 
