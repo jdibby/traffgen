@@ -4774,7 +4774,8 @@ def lateral_movement_sim() -> None:
         live_hosts: list[str] = []
         try:
             sweep = subprocess.run(
-                ["nmap", "-sn", "--send-ip", "-T4",
+                ["nmap", "-sn", "-PE", "--send-ip", "-T5",
+                 "--min-parallelism", "100", "--min-rate", "1000",
                  "--max-retries", "1", "--host-timeout", "10s",
                  "-oG", "-", subnet],
                 capture_output=True, text=True, timeout=240,
