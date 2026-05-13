@@ -4777,6 +4777,7 @@ def lateral_movement_sim() -> None:
                 ["nmap", "-sn", "-PE", "--send-ip", "-T5",
                  "--min-parallelism", "100", "--min-rate", "1000",
                  "--max-retries", "1", "--host-timeout", "10s",
+                 "--exclude", gw_ip,
                  "-oG", "-", subnet],
                 capture_output=True, text=True, timeout=240,
             )
