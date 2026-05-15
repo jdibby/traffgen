@@ -1904,6 +1904,10 @@ html.light .tmap-right-col{background:#f0f3f7;border-left-color:#d0d7de}
 html.light .tmap-c-section{border-bottom-color:#d0d7de}
 html.light .tmap-c-title{color:#636e7b;background:#f0f3f7}
 html.light .tmap-feed-title{color:#636e7b;background:#f0f3f7;border-bottom-color:#d0d7de}
+html.light .tmap-feed-item{border-bottom-color:#e6eaf0}
+html.light .tmap-f-host{color:#1f2937}
+html.light .tmap-f-loc{color:#4a5568}
+html.light .tmap-f-time{color:#6b7280}
 html.light .tmap-l{color:#636e7b}
 html.light .tmap-leg-item{color:#4a5568}
 html.light .tmap-src-city{color:#b7791f;text-shadow:none}
@@ -5107,8 +5111,10 @@ function _tmapExtractHost(msg){
   // 0. DNS dig line — extract the @server_ip (the actual connection target)
   let m=msg.match(/\bdig\b[^@]*@(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/);
   if(m)return m[1];
-  // 1. Full URL — most reliable
-  m=msg.match(/https?:\/\/([^/\s>"']+)/);
+  // 1. Full URL — restrict captured host to valid hostname characters so
+  //    trailing punctuation in log lines (e.g. "https://site.com: 403")
+  //    doesn't get included in the captured hostname.
+  m=msg.match(/https?:\/\/([a-z0-9._-]+)/i);
   if(m)return m[1].toLowerCase().replace(/^www2?\./,'');
   // 2. Arrow notation: "→ host[:port]"
   m=msg.match(/→\s*([a-z0-9][a-z0-9._-]+\.[a-z]{2,})/i);
