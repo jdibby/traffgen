@@ -5242,6 +5242,43 @@ const _tmapSuiteHosts={
   'phishing-domains':['phishtank.org','openphish.com','safe.dnsfilter.com','urlhaus-api.abuse.ch'],
   'tls-inspection':['expired.badssl.com','wrong.host.badssl.com','self-signed.badssl.com','untrusted-root.badssl.com'],
   'lateral-movement':['8.8.8.8','1.1.1.1','scanme.nmap.org','testmyids.com'],
+  // ── HTTP/web family — most log URLs inline; fallbacks for empty windows ────
+  'http':['link.testfile.org','wordpress.org','example.com','httpforever.com'],
+  'https':['google.com','cloudflare.com','example.com','www.wikipedia.org'],
+  'http3':['cloudflare-quic.com','www.cloudflare.com','www.google.com','quic.aiortc.org'],
+  'web-crawl':['data.commoncrawl.org','en.wikipedia.org','news.ycombinator.com','reddit.com'],
+  'ftp':['ftp.gnu.org','ftp.fau.de','speedtest.tele2.net'],
+  'ssh':['github.com','gitlab.com','bitbucket.org'],
+  'post-quantum':['pq.cloudflareresearch.com','www.cloudflare.com','www.google.com'],
+  'url-latency':['google.com','cloudflare.com','amazon.com','microsoft.com','apple.com'],
+  's3':['s3.amazonaws.com','s3.us-east-1.amazonaws.com','s3.us-west-2.amazonaws.com'],
+  'iperf3':['iperf3.serverius.net','iperf.he.net','speedtest.serverius.net','bouygues.iperf.fr','iperf.it-north.net'],
+  // ── DNS family ────────────────────────────────────────────────────────────
+  'doh':['cloudflare-dns.com','dns.google','doh.opendns.com','dns.quad9.net','dns.nextdns.io','dns.adguard-dns.com'],
+  'dot':['1.1.1.1','8.8.8.8','9.9.9.9','208.67.222.222','94.140.14.14'],
+  'dns-exfil':['testmyids.com','scanme.nmap.org','example.com','example.org','info.cern.ch'],
+  // ── Voice / video ─────────────────────────────────────────────────────────
+  'voip':['stun.l.google.com','stun.cloudflare.com','stun.zoom.us','sip.linphone.org','sip.voip.ms','sip.callcentric.com'],
+  'ucaas':['zoom.us','teams.microsoft.com','webex.com','meet.google.com','slack.com','ringcentral.com','8x8.com'],
+  // ── DLP / data-exfil ──────────────────────────────────────────────────────
+  'dlp':['dlptest.com'],
+  'data-exfil-http':['pastebin.com','hastebin.com','paste2.org','transfer.sh','filebin.net','api.paste.fo'],
+  // ── AI / LLM ──────────────────────────────────────────────────────────────
+  'ai-browse':['openai.com','chat.openai.com','claude.ai','gemini.google.com','copilot.microsoft.com','perplexity.ai','character.ai'],
+  'llm-dlp':['api.openai.com','api.anthropic.com','generativelanguage.googleapis.com','api.cohere.com','api.together.ai','api.mistral.ai'],
+  // ── Threat / malware ──────────────────────────────────────────────────────
+  'av-test':['secure.eicar.org','2016.eicar.org','www.eicar.org','wildfire.paloaltonetworks.com'],
+  'malware-samples':['testmyids.com','www.testmyids.com','wildfire.paloaltonetworks.com'],
+  'c2-beacon':['www.testmyids.com','httpbin.org','testmyids.com'],
+  'c2-useragents':['testmyids.com','www.testmyids.com'],
+  'waf-attack':['juice-shop.herokuapp.com','www.testmyids.com','hackazon.webscantest.com','testhtml5.vulnweb.com'],
+  'nmap':['scanme.nmap.org'],
+  // ── Categories: trackers, anonymizers, shadow IT, content filters ─────────
+  'ad-tracker':['doubleclick.net','googletagmanager.com','google-analytics.com','adsystem.amazon.com','scorecardresearch.com'],
+  'tor-anonymizer':['check.torproject.org','www.torproject.org','protonvpn.com','nordvpn.com','mullvad.net','www.expressvpn.com'],
+  'shadow-it':['dropbox.com','box.com','mega.nz','wetransfer.com','transfer.sh','discord.com','web.telegram.org','www.coinbase.com','www.binance.com'],
+  'pornography':['pornhub.com','xvideos.com','xhamster.com','youporn.com','redtube.com'],
+  'squatting':['google.com','facebook.com','amazon.com','apple.com','microsoft.com'],
 };
 function _tmapIsPrivateIP(h){return/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|0\.0\.0\.0|::1|fc|fd|fe80)/.test(h);}
 let _tmapGeoQueue=[],_tmapGeoRunning=0,_tmapGeoTimer=null;
