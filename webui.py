@@ -5362,10 +5362,17 @@ function _tmapHandleLog(d){
     else _tmapLiveGeo(_tmapLastHost,suite,outcome);
     return;
   }
-  // Fallback: for suites whose logs lack extractable hosts, use suite's known targets
+  // Fallback: for suites whose logs lack extractable hosts, use suite's known
+  // targets — but only for *semantically meaningful* lines (those with a
+  // detected outcome, or warn/error level).  Plain info-level banner /
+  // progress lines without an outcome would otherwise repeatedly pick random
+  // fallback hosts and drown out the real activity in the feed.
   if(!host&&_tmapSuiteHosts[suite]){
-    const arr=_tmapSuiteHosts[suite];
-    host=arr[Math.floor(Math.random()*arr.length)];
+    const meaningful=outcome||(d.level&&d.level!=='info');
+    if(meaningful){
+      const arr=_tmapSuiteHosts[suite];
+      host=arr[Math.floor(Math.random()*arr.length)];
+    }
   }
   if(!host)return;
   const geo=_tmapGeo[host];
