@@ -3316,13 +3316,13 @@ function _onTestSearch(q){
   _testSearch=q;
   const clr=$('test-search-clear');if(clr)clr.style.display=q?'':'none';
   const inp=$('test-search');if(inp)inp.style.borderColor=q?'var(--green)':'';
-  if(_lastState)renderState(_lastState);
+  if(_lastState)apply(_lastState);
 }
 function setTestsCat(el,cat){
   _testsCat=cat;
   document.querySelectorAll('.nav-sub-item').forEach(b=>b.classList.remove('active'));
   el.classList.add('active');
-  if(_lastState)renderState(_lastState);
+  if(_lastState)apply(_lastState);
 }
 function showTab(btn){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
