@@ -422,6 +422,15 @@ class SuiteStats:
             self.codes[bucket] = self.codes.get(bucket, 0) + 1
             if target and len(self.probes) < _PROBE_DETAIL_MAX:
                 self.probes.append({"t": target, "o": "blocked", "c": bucket})
+        # Emit a marker into the SSE log stream so the Traffic Map can detect
+        # the block — many block() call sites are otherwise silent (HTTP 200
+        # captive portals, port-scan results, TLS-inspection intercepts) and
+        # the regex in _tmapOutcome has nothing to match in the surrounding
+        # log lines.  The literal word "blocked" is the matched keyword.
+        try:
+            _web_log(f"blocked {target}".strip(), level="warn")
+        except Exception:
+            pass
 
     def drop(self, exit_code: int = 28, target: str = "") -> None:
         """Record a silent drop (timeout, no route, DNS sinkhole)."""
