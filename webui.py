@@ -96,7 +96,11 @@ _geo_cache: dict = {}
 _geo_cache_lock = threading.Lock()
 _geo_rate_window: collections.deque = collections.deque()  # timestamps of ip-api.com calls
 _geo_rate_lock = threading.Lock()
-_GEO_RATE_MAX = 40  # max ip-api.com calls per 60 s (free tier allows 45)
+_GEO_RATE_MAX = 40            # max ip-api.com calls per 60 s (free tier allows 45)
+_GEO_NEG_CACHE_TTL = 300      # cache "not found / failed" results for 5 min so a
+                              # high-throughput suite (e.g. web-crawl) doesn't keep
+                              # retrying the same unreachable hosts every minute.
+_geo_neg_cache: dict = {}     # host -> unix epoch when the negative result expires
 
 
 def _sample_health() -> None:
@@ -750,22 +754,97 @@ def api_netinfo():
         return jsonify(dict(_net_info_cache))
 
 
+def _geo_lookup_ipapi(ip: str) -> "dict | None":
+    """Try ip-api.com (free tier, 45 calls/min/IP).  Returns a result dict or None."""
+    import urllib.request as _urlreq
+    now = time.time()
+    with _geo_rate_lock:
+        cutoff = now - 60.0
+        while _geo_rate_window and _geo_rate_window[0] < cutoff:
+            _geo_rate_window.popleft()
+        if len(_geo_rate_window) >= _GEO_RATE_MAX:
+            return None  # caller will fall through to next provider
+        _geo_rate_window.append(now)
+    try:
+        url = f"http://ip-api.com/json/{ip}?fields=lat,lon,city,regionCode,countryCode,org,status,message"
+        with _urlreq.urlopen(url, timeout=4) as resp:
+            data = json.loads(resp.read())
+        if data.get("status") != "success":
+            return None
+        city = data.get("city", "")
+        if data.get("regionCode"):
+            city = (city + ", " + data["regionCode"]) if city else data["regionCode"]
+        return {
+            "lat":     data["lat"],
+            "lon":     data["lon"],
+            "city":    city,
+            "country": data.get("countryCode", "US"),
+            "isp":     data.get("org", ""),
+        }
+    except Exception:
+        return None
+
+
+def _geo_lookup_geojs(ip: str) -> "dict | None":
+    """Fallback: geojs.io — no documented per-IP rate limit, no API key.
+    Used when ip-api.com is throttling us or otherwise failed.
+    """
+    import urllib.request as _urlreq
+    try:
+        url = f"https://get.geojs.io/v1/ip/geo/{ip}.json"
+        with _urlreq.urlopen(url, timeout=4) as resp:
+            data = json.loads(resp.read())
+        lat = data.get("latitude")
+        lon = data.get("longitude")
+        if lat is None or lon is None:
+            return None
+        city = data.get("city", "") or ""
+        region = data.get("region", "") or ""
+        if region and city:
+            city = city + ", " + region
+        elif region:
+            city = region
+        return {
+            "lat":     float(lat),
+            "lon":     float(lon),
+            "city":    city,
+            "country": data.get("country_code", "US"),
+            "isp":     data.get("organization_name", "") or "",
+        }
+    except Exception:
+        return None
+
+
 @app.route("/api/geo")
 def api_geo():
     import ipaddress as _ipaddress
-    import urllib.request as _urlreq
 
     host = request.args.get("host", "").strip()
     if not host:
         return jsonify({}), 400
+
+    # Positive cache hit
     with _geo_cache_lock:
         if host in _geo_cache:
             return jsonify(_geo_cache[host])
+
+    # Negative cache hit — avoid retry storms on hosts that just failed
+    now_ts = time.time()
+    with _geo_cache_lock:
+        expiry = _geo_neg_cache.get(host, 0)
+    if expiry > now_ts:
+        return jsonify({}), 404
+    elif expiry:
+        # Stale negative cache entry — drop it so we'll retry
+        with _geo_cache_lock:
+            _geo_neg_cache.pop(host, None)
+
     # Resolve hostname → IP
     try:
         ip = _socket.gethostbyname(host)
     except Exception:
         ip = host
+
     # Reject private / loopback IPs immediately
     try:
         addr = _ipaddress.ip_address(ip)
@@ -773,42 +852,17 @@ def api_geo():
             return jsonify({}), 404
     except Exception:
         pass
-    # Enforce server-side rate limit before calling ip-api.com
-    now = time.time()
-    with _geo_rate_lock:
-        cutoff = now - 60.0
-        while _geo_rate_window and _geo_rate_window[0] < cutoff:
-            _geo_rate_window.popleft()
-        if len(_geo_rate_window) >= _GEO_RATE_MAX:
-            retry_after = max(1, int(61 - (now - _geo_rate_window[0])))
-            resp = jsonify({"error": "rate_limited"})
-            resp.headers["Retry-After"] = str(retry_after)
-            return resp, 429
-        _geo_rate_window.append(now)
-    try:
-        url = f"http://ip-api.com/json/{ip}?fields=lat,lon,city,regionCode,countryCode,org,status"
-        with _urlreq.urlopen(url, timeout=4) as resp:
-            data = json.loads(resp.read())
-        if data.get("status") == "fail" and "notAllowed" in str(data.get("message", "")):
-            resp = jsonify({"error": "rate_limited"})
-            resp.headers["Retry-After"] = "10"
-            return resp, 429
-        if data.get("status") == "success":
-            city = data.get("city", "")
-            if data.get("regionCode"):
-                city = city + ", " + data["regionCode"]
-            result = {
-                "lat": data["lat"],
-                "lon": data["lon"],
-                "city": city,
-                "country": data.get("countryCode", "US"),
-                "isp": data.get("org", ""),
-            }
-            with _geo_cache_lock:
-                _geo_cache[host] = result
-            return jsonify(result)
-    except Exception:
-        pass
+
+    # Try ip-api.com first, then geojs.io as a no-rate-limit fallback.
+    result = _geo_lookup_ipapi(ip) or _geo_lookup_geojs(ip)
+    if result:
+        with _geo_cache_lock:
+            _geo_cache[host] = result
+        return jsonify(result)
+
+    # Both providers failed — negative-cache for _GEO_NEG_CACHE_TTL seconds.
+    with _geo_cache_lock:
+        _geo_neg_cache[host] = now_ts + _GEO_NEG_CACHE_TTL
     return jsonify({}), 404
 
 
@@ -5282,7 +5336,7 @@ const _tmapSuiteHosts={
 };
 function _tmapIsPrivateIP(h){return/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|0\.0\.0\.0|::1|fc|fd|fe80)/.test(h);}
 let _tmapGeoQueue=[],_tmapGeoRunning=0,_tmapGeoTimer=null;
-const _TMAP_GEO_CONCUR=2,_TMAP_GEO_DELAY=400;
+const _TMAP_GEO_CONCUR=4,_TMAP_GEO_DELAY=200;
 const _tmapGeoDeferred={};
 function _tmapDrainGeoQueue(){
   _tmapGeoTimer=null;
