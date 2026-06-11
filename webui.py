@@ -2636,6 +2636,17 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
       <div style="max-width:900px">
 
         <div class="a-section">
+          <div class="a-h">v3.10.0 &mdash; <span style="color:var(--muted);font-weight:400">Jun 2026</span></div>
+          <table class="st-table" style="margin-top:10px">
+            <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td><strong>crypto-mining suite</strong> — stratum port probes (ports 3333/4444/9200/10128/13333/14444/45700) on authorised test hosts plus DNS lookups for 15 mining-pool domains; validates ET COINMINER Snort/Suricata signatures, stratum DPI, and crypto-mining DNS threat-intel feeds on any NGFW, IDS/IPS, or SASE platform</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Suites</td><td><strong>ransomware suite</strong> — three-vector pre-encryption simulation: DNS lookups for sinkholed/seized C2 domains (WannaCry kill-switch, REvil, Conti, DarkSide, Maze, Cl0p, Dharma/Phobos); geo-IP check-in with ransomware-family UAs; HTTP beacons to safe echo services using ransomware URI patterns (/gate.php, /is_alive, /token) and observed implant UAs (Go-http-client, python-requests, WinHTTP, PowerShell)</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>nmap</td><td><strong>nmap_cve parallelism</strong> — replaced <code>--script=ALL</code> (600+ NSE scripts, 10–20 min/host) with targeted set <code>default,vuln,exploit,malware,auth</code>; hosts now scanned in parallel (up to 3 workers) keeping total wall-clock time under 2.5 minutes</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Docs</td><td><strong>CHANGELOG.md</strong> — new file tracking version history back to v3.9.0, linked from README</td></tr>
+          </table>
+        </div>
+
+        <div class="a-section">
           <div class="a-h">v3.9.3 &mdash; <span style="color:var(--muted);font-weight:400">May 2026</span></div>
           <table class="st-table" style="margin-top:10px">
             <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
