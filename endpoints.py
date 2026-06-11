@@ -72,6 +72,12 @@ Variable index (matches generator.py usage names 1-to-1):
     ips_ua_targets           Safe IDS/IPS test hosts for UA-based probes (ips_ua)
     cve_http_probes          CVE exploit probe tuples (cve_probe) — IPS signature detection
     cve_probe_targets        Safe IDS/IPS test hosts for CVE probes (cve_probe)
+    crypto_mining_probe_targets  Safe IDS/IPS test hosts for stratum port probes (crypto_mining)
+    crypto_mining_stratum_ports  Stratum port numbers used as TCP probe destinations (crypto_mining)
+    crypto_mining_pool_domains   Mining pool domain names for DNS threat-intel lookups (crypto_mining)
+    ransomware_c2_domains    Sinkholed/seized ransomware C2 domains for DNS lookups (ransomware_sim)
+    ransomware_http_beacons  (method, url, label) tuples for ransomware C2 HTTP patterns (ransomware_sim)
+    ransomware_user_agents   UA strings observed in ransomware implants / loaders (ransomware_sim)
 """
 
 # ── DNS resolvers ──────────────────────────────────────────────────────────────
@@ -4642,4 +4648,130 @@ data_exfil_targets: list[str] = [
     "https://transfer.sh/upload",
     "https://filebin.net",
     "https://api.paste.fo/v1/pastes",
+]
+
+# ── Crypto-mining detection suite ─────────────────────────────────────────────
+# Safe IDS/IPS test hosts used as TCP targets for stratum port probes.
+# Stratum ports are well-known (3333, 4444, 9200, etc.); NGFW / IDS DPI fires
+# on the port number and protocol content regardless of whether the remote host
+# runs a miner.  Using authorised test infrastructure avoids connecting to any
+# real mining-pool operator.
+crypto_mining_probe_targets: list[str] = [
+    "testmyids.com",
+    "scanme.nmap.org",
+]
+
+# Common stratum ports.  A sample is used as destination ports when probing
+# crypto_mining_probe_targets.
+crypto_mining_stratum_ports: list[int] = [
+    3333,   # canonical stratum (XMR, BTC, ETH pools)
+    4444,   # alternate stratum (ETH / multi-algo)
+    9200,   # NiceHash stratum
+    10128,  # MoneroOcean
+    13333,  # C3Pool
+    14444,  # common alternate
+    45700,  # XMRig default
+]
+
+# Domain-only list for DNS threat-intel lookups.  Querying these names exercises
+# NGFW / SASE crypto-mining DNS block-list feeds without making any TCP
+# connection to mining-pool operators.
+crypto_mining_pool_domains: list[str] = [
+    "pool.supportxmr.com",
+    "mine.c3pool.com",
+    "gulf.moneroocean.stream",
+    "pool.hashvault.pro",
+    "xmr.nanopool.org",
+    "auto.nicehash.com",
+    "stratum.slushpool.com",
+    "btc.f2pool.com",
+    "eu1.ethermine.org",
+    "eth.2miners.com",
+    "rx.unmineable.com",
+    "xmr.2miners.com",
+    "fr.minexmr.com",
+    "de.minexmr.com",
+    "xmr.pool.minergate.com",
+]
+
+# ── Ransomware detection suite ─────────────────────────────────────────────────
+# Domains that appear in threat-intel and DNS-reputation feeds under the
+# "ransomware" or "malware C2" category.  All are non-operational:
+# sinkholed, seized by law enforcement, or from disbanded groups.
+# Sources: CISA advisories AA21-131A, AA22-228A; FBI Flash CU-000149-MW;
+#          DOJ seizure notices (2021-2024); public threat-intelligence reports.
+ransomware_c2_domains: list[str] = [
+    # WannaCry kill-switch — sinkholed May 2017 (Marcus Hutchins / MalwareTech);
+    # present in every major threat-intel feed under ransomware/WannaCry category.
+    "iuqerfsodp9ifjaposdfjhgosurijfaewrwergwea.com",
+    "ifferfsodp9ifjaposdfjhgosurijfaewrwergwea.com",
+    # REvil / Sodinokibi — victim portal domains seized by DOJ/FBI Jan 2022
+    "decoder.re",
+    "dmca.rest",
+    # Conti — group disbanded May 2022 (CISA AA22-228A); infrastructure offline
+    "contirecovery.ws",
+    # DarkSide — disbanded May 2021 after Colonial Pipeline (CISA AA21-131A)
+    "darkside-gang.com",
+    # Maze — publicly disbanded Nov 2020; domains no longer operational
+    "mazenews.top",
+    # DoppelPaymer — Europol/FBI disruption March 2023
+    "dopplemerchant.com",
+    # Cl0p — widely in threat-intel feeds; Russian-language ransomware-as-a-service
+    "cl0p.ws",
+    # Dharma/Phobos family — common in MSSP/MDR threat feeds
+    "decryptmyfiles.top",
+    "filesencrypted.online",
+    "helpdecrypt.xyz",
+]
+
+# (method, url_template, label) tuples for ransomware C2 HTTP beacon patterns.
+# All HTTP targets are httpbin.org, postman-echo.com, or testmyids.com —
+# public echo / IDS-test services.  URI patterns and payloads match signatures
+# in NGFW / SASE ransomware behavioural detection rule-sets.
+# {uid} is replaced at runtime with a random base64 victim ID.
+ransomware_http_beacons: list[tuple[str, str, str]] = [
+    # REvil / Sodinokibi-style gate check-in (POST to /gate.php or similar)
+    ("POST", "https://httpbin.org/anything/gate.php",          "REvil gate.php check-in"),
+    ("POST", "https://httpbin.org/anything/gate.php?id={uid}", "REvil gate.php with victim ID"),
+    # LockBit-style heartbeat
+    ("POST", "https://httpbin.org/anything/is_alive",          "LockBit heartbeat"),
+    ("POST", "https://httpbin.org/anything/ping",              "generic ransomware beacon"),
+    # Conti / Ryuk-style token/registration
+    ("POST", "https://httpbin.org/anything/token",             "Conti token registration"),
+    ("POST", "https://httpbin.org/anything/report",            "ransomware exfil report"),
+    # IP geolocation check — first step in almost all modern ransomware families
+    # (skip-list logic: avoid encrypting CIS-region machines to stay off LE radar)
+    ("GET",  "https://api.ipify.org/?format=json",             "geo-IP check (ipify)"),
+    ("GET",  "https://ipinfo.io/json",                         "geo-IP check (ipinfo)"),
+    ("GET",  "https://ifconfig.me/all.json",                   "geo-IP check (ifconfig.me)"),
+    # Postman echo — mirrors full request; triggers URI-reputation + UA checks
+    ("POST", "https://postman-echo.com/post",                  "generic C2 beacon"),
+    # testmyids.com — triggers IDS alert on connection alone
+    ("GET",  "http://www.testmyids.com",                       "IDS trigger"),
+]
+
+# UA strings observed in ransomware implants, loaders, and dropper stagers.
+# Sources: Mandiant, Unit 42, CrowdStrike, Secureworks threat reports (2020-2024).
+ransomware_user_agents: list[str] = [
+    # Go-based ransomware families (ALPHV/BlackCat, Hive Go variant)
+    "Go-http-client/1.1",
+    "Go-http-client/2.0",
+    # Rust-based (BlackCat/ALPHV Rust rewrite, Royal)
+    "reqwest/0.11.18",
+    # Python-based loaders / droppers (many RaaS initial access tools)
+    "python-requests/2.25.1",
+    "python-requests/2.28.2",
+    "python-urllib/3.9",
+    # PowerShell web-client (Conti, Ryuk, DarkSide initial stages)
+    "Mozilla/5.0 (Windows NT; Windows NT 10.0; en-US) WindowsPowerShell/5.1.19041.1",
+    "WindowsPowerShell/5.1",
+    # WinHTTP (Ryuk, Conti, Maze Windows stagers)
+    "WinHTTP/1.1",
+    # REvil UA observed in samples (Unit 42 report)
+    "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)",
+    # Generic Windows BITS / update-mimicry pattern
+    "Microsoft BITS/7.8",
+    # curl-based shell droppers
+    "curl/7.68.0",
+    "curl/7.74.0",
 ]
