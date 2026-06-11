@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-generator.py — Traffic Generator v3.9.3
+generator.py — Traffic Generator v3.10.0
 ========================================
 Simulates realistic network traffic across a wide range of protocols and
 behaviours: DNS, HTTP/HTTPS/HTTP3, FTP, SSH, NTP, BGP, ICMP, SNMP,
@@ -58,7 +58,7 @@ from rich import box
 from endpoints import *           # noqa: F401,F403  (large data file)
 
 # ── Globals ───────────────────────────────────────────────────────────────────
-VERSION = "3.9.3"
+VERSION = "3.10.0"
 
 
 class _DualWriter:
@@ -1044,7 +1044,7 @@ _SUITE_TIMEOUTS: dict[str, int] = {
     "web_scanner":        300,
     "lateral_movement_sim": 480,
     "nmap_1024os":        210,
-    "nmap_cve":           210,
+    "nmap_cve":           150,
     "bigfile":            180,
     "bgp_peering":        120,
     "llm_dlp_sim":        120,
@@ -2484,39 +2484,58 @@ def nmap_1024os() -> None:
 
 def nmap_cve() -> None:
     """
-    Nmap service-version scan with the full script library (--script=ALL)
-    on sampled `nmap_endpoints`.  Triggers a broad sweep of NSE scripts
-    including many CVE-detection scripts.
+    Nmap service-version scan with targeted NSE script categories on sampled
+    `nmap_endpoints`.  Runs hosts in parallel (up to 3 workers) so total
+    wall-clock time stays bounded regardless of host count.
+
+    Script set: default,vuln,exploit,malware,auth
+      • default   — common scripts run by -sC (service info, version detection)
+      • vuln      — CVE / vulnerability detection (the key IDS/IPS triggers)
+      • exploit   — scripts that probe for exploitable conditions
+      • malware   — backdoor / malware indicators
+      • auth      — auth bypass and weak-credential checks
+
+    This replaces --script=ALL (600+ scripts, 10-20 min per host) with the
+    ~80 scripts that actually produce security-relevant IDS triggers, while
+    keeping per-host wall-clock time under 90 seconds.
     """
-    n = _size_to_limits(ARGS.size, 1, 2, 5, len(nmap_endpoints))
-    ui_banner("Nmap CVE scripts", f"{n} hosts")
+    n = _size_to_limits(ARGS.size, 1, 2, 4, len(nmap_endpoints))
+    ui_banner("Nmap CVE scripts", f"{n} hosts (parallel)")
+
+    _script_set = "default,vuln,exploit,malware,auth"
+
+    def _scan_one(ip: str) -> tuple[str, int, int, int]:
+        result = subprocess.run(
+            ["nmap", "-sV", f"--script={_script_set}", ip, "-T4",
+             "--max-retries", "1", "--max-parallelism", "4",
+             "--host-timeout", "90s", "--script-timeout", "30s", "-oG", "-"],
+            capture_output=True, text=True, timeout=100,
+        )
+        o, c, f = _nmap_classify(result.stdout)
+        return ip, o, c, f
+
     try:
-        random.shuffle(nmap_endpoints)
-        for i, ip in enumerate(nmap_endpoints[:n], 1):
-            console.log(f"nmap --script=ALL ({i}/{n}) {ip}")
-            try:
-                result = subprocess.run(
-                    ["nmap", "-sV", "--script=ALL", ip, "-T4",
-                     "--max-retries", "0", "--max-parallelism", "2",
-                     "--randomize-hosts", "--host-timeout", "1m",
-                     "--script-timeout", "1m", "-oG", "-"],
-                    capture_output=True, text=True, timeout=120,
-                )
-                open_c, closed_c, filtered_c = _nmap_classify(result.stdout)
-                console.log(f"  ↳ {ip}  open:{open_c}  closed:{closed_c}  filtered:{filtered_c}")
-                if open_c:
-                    _stats.ok()
-                elif closed_c and not filtered_c:
-                    _stats.block()
-                elif filtered_c:
-                    _stats.drop()
-                else:
+        targets = random.sample(nmap_endpoints, k=min(n, len(nmap_endpoints)))
+        workers = min(3, n)
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {pool.submit(_scan_one, ip): ip for ip in targets}
+            for fut in as_completed(futures):
+                try:
+                    ip, open_c, closed_c, filtered_c = fut.result()
+                    console.log(
+                        f"  ↳ {ip}  open:{open_c}  closed:{closed_c}  filtered:{filtered_c}"
+                    )
+                    if open_c:
+                        _stats.ok()
+                    elif closed_c and not filtered_c:
+                        _stats.block()
+                    elif filtered_c:
+                        _stats.drop()
+                    else:
+                        _stats.fail()
+                except Exception as e:
+                    console.log(f"[yellow]nmap {futures[fut]}: {e}[/]")
                     _stats.fail()
-            except Exception as e:
-                console.log(f"[yellow]nmap {ip}: {e}[/]")
-                _stats.fail()
-            if i < n:
-                time.sleep(random.uniform(1.0, 3.0))
         ui_ok("Nmap CVE scan complete")
     except Exception as e:
         _stats.fail()
@@ -5125,6 +5144,167 @@ def cve_probe() -> None:
     ui_ok(f"CVE probe complete  ({ok_count}/{len(sample)} sent)")
 
 
+def crypto_mining() -> None:
+    """
+    Crypto-mining traffic simulation — stratum protocol handshakes (on
+    authorised test hosts) and DNS lookups for mining-pool infrastructure.
+
+    Simulates two detection vectors present in all major NGFW, IDS/IPS, and
+    SASE platforms:
+
+      • Stratum TCP probes: open connections to testmyids.com and
+        scanme.nmap.org on common stratum ports (3333, 4444, 9200, 10128,
+        13333, 14444, 45700) and send a mining.subscribe JSON line.  NGFW /
+        IDS DPI fires on the destination port and protocol content regardless
+        of whether the host runs a miner — the SYN to port 3333 is the
+        trigger.  No connection is made to real mining-pool operators.
+
+      • DNS lookups: resolve well-known mining-pool hostnames.  NGFW and DNS
+        security platforms maintain crypto-mining block-list feeds (ET COINMINER
+        category, Cisco Umbrella, Zscaler DNS) that NXDOMAIN or redirect
+        these queries.
+
+    Validates Snort/Suricata ET COINMINER sid:2034000+ signatures, stratum
+    protocol DPI, and crypto-mining DNS threat-intel category blocks.
+    """
+    n_stratum = _size_to_limits(ARGS.size, 3, 5, 8, len(crypto_mining_stratum_ports))
+    n_dns     = _size_to_limits(ARGS.size, 3, 5, 8, len(crypto_mining_pool_domains))
+    ui_banner("Crypto Mining Simulation",
+              f"{n_stratum} stratum probes + {n_dns} DNS lookups")
+    ok = 0
+
+    port_sample = random.sample(crypto_mining_stratum_ports,
+                                k=min(n_stratum, len(crypto_mining_stratum_ports)))
+    for port in port_sample:
+        host = random.choice(crypto_mining_probe_targets)
+        console.log(f"  stratum → {host}:{port}")
+        try:
+            with socket.create_connection((host, port), timeout=5) as sock:
+                subscribe = json.dumps({
+                    "id": 1,
+                    "method": "mining.subscribe",
+                    "params": ["traffgen/stratum-probe", "x"],
+                }) + "\n"
+                sock.sendall(subscribe.encode())
+                data = sock.recv(256)
+                console.log(f"    ↳ [yellow]connected (not blocked)[/]  {data[:40]!r}")
+                _stats.record("200")
+        except ConnectionRefusedError:
+            console.log(f"    ↳ [green]connection refused (blocked/RST)[/]")
+            _stats.block()
+        except (socket.timeout, TimeoutError, OSError) as e:
+            console.log(f"    ↳ [dim]dropped: {e}[/]")
+            _stats.drop()
+        ok += 1
+        time.sleep(random.uniform(0.3, 0.8))
+
+    domain_sample = random.sample(crypto_mining_pool_domains,
+                                  k=min(n_dns, len(crypto_mining_pool_domains)))
+    for domain in domain_sample:
+        console.log(f"  DNS → {domain}")
+        try:
+            addrs = socket.getaddrinfo(domain, None, socket.AF_INET)
+            ip    = addrs[0][4][0]
+            console.log(f"    ↳ [yellow]resolved → {ip} (not blocked)[/]")
+            _stats.record("200")
+        except socket.gaierror as e:
+            console.log(f"    ↳ [green]NXDOMAIN / sinkholed: {e}[/]")
+            _stats.block()
+        ok += 1
+        time.sleep(random.uniform(0.1, 0.3))
+
+    ui_ok(f"Crypto mining simulation complete  ({ok}/{n_stratum + n_dns} probes)")
+
+
+def ransomware_sim() -> None:
+    """
+    Ransomware traffic simulation — DNS lookups for known (non-operational)
+    ransomware C2 domains, geo-IP check-ins, and HTTP beacons using URI
+    patterns and user-agent strings observed in major ransomware families.
+
+    Simulates the pre-encryption network activity common to LockBit, ALPHV/
+    BlackCat, REvil, Conti, Cl0p, DarkSide, and Hive:
+
+      • DNS queries to ransomware-associated domains: all targets are either
+        sinkholed (WannaCry kill-switch), seized (REvil DOJ 2022, Hive FBI
+        2023), or from disbanded groups.  Triggers threat-intel and ransomware-
+        category DNS feeds (Cisco Umbrella, Zscaler DNS Security, Palo Alto
+        DNS Security, Quad9).
+
+      • Geo-IP check: GET requests to public IP-geolocation APIs with
+        ransomware-style UAs.  Modern ransomware checks the victim's country
+        code before encrypting to avoid CIS-region machines; this pattern
+        (automated, non-browser UA + geolocation API) is a strong pre-
+        encryption indicator and fires behavioural anomaly rules.
+
+      • C2 HTTP beacons: POST/GET to httpbin.org, postman-echo.com, and
+        testmyids.com using ransomware-family URI patterns (/gate.php,
+        /is_alive, /token) and known ransomware user-agent strings.  Validates
+        URI-reputation, UA-based, and POST-pattern detection rules.
+
+    All HTTP requests target only public echo / IDS-test services.  No
+    ransomware code is executed and no files are encrypted.
+    """
+    n_dns  = _size_to_limits(ARGS.size, 3, 5, 8,  len(ransomware_c2_domains))
+    n_http = _size_to_limits(ARGS.size, 3, 6, 10, len(ransomware_http_beacons))
+    ui_banner("Ransomware Traffic Simulation",
+              f"{n_dns} DNS lookups + {n_http} C2 beacons")
+    ok = 0
+    uid = base64.b64encode(os.urandom(12)).decode().rstrip("=")
+
+    domain_sample = random.sample(ransomware_c2_domains,
+                                  k=min(n_dns, len(ransomware_c2_domains)))
+    for domain in domain_sample:
+        console.log(f"  DNS → {domain}")
+        try:
+            addrs = socket.getaddrinfo(domain, None, socket.AF_INET)
+            ip    = addrs[0][4][0]
+            console.log(f"    ↳ [yellow]resolved → {ip} (not blocked)[/]")
+            _stats.record("200")
+        except socket.gaierror as e:
+            console.log(f"    ↳ [green]NXDOMAIN / sinkholed / blocked: {e}[/]")
+            _stats.block()
+        ok += 1
+        time.sleep(random.uniform(0.1, 0.3))
+
+    beacon_sample = random.sample(ransomware_http_beacons,
+                                  k=min(n_http, len(ransomware_http_beacons)))
+    for method, url_tmpl, label in beacon_sample:
+        url = url_tmpl.format(uid=uid)
+        ua  = random.choice(ransomware_user_agents)
+        console.log(f"  {method} {url}  [{label}]  ua={_short_ua(ua)}")
+        try:
+            resp = requests.request(
+                method, url,
+                headers={"User-Agent": ua, "Accept": "*/*", "Connection": "close"},
+                data=json.dumps({"id": uid, "ver": "3.0", "os": "win10"})
+                     if method == "POST" else None,
+                timeout=6,
+                verify=False,
+                allow_redirects=False,
+            )
+            _stats.record(str(resp.status_code))
+            console.log(
+                f"    ↳ [{_status_style(str(resp.status_code))}]HTTP {resp.status_code}[/]"
+            )
+        except requests.exceptions.ConnectionError as e:
+            if any(kw in str(e) for kw in ("refused", "ECONNREFUSED", "Reset")):
+                console.log(f"    ↳ [green]connection refused (blocked)[/]")
+                _stats.block()
+            else:
+                _stats.drop()
+        except (requests.exceptions.Timeout,
+                requests.exceptions.ConnectTimeout,
+                requests.exceptions.ReadTimeout):
+            _stats.drop()
+        except Exception:
+            _stats.fail()
+        ok += 1
+        time.sleep(random.uniform(0.3, 1.0))
+
+    ui_ok(f"Ransomware simulation complete  ({ok}/{n_dns + n_http} probes)")
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # CLI & RUNNER
 # ══════════════════════════════════════════════════════════════════════════════
@@ -5186,6 +5366,8 @@ _SUITE_MAP: dict[str, list] = {
     "iperf3":           [iperf3_bandwidth],
     "ips-ua":           [ips_ua],
     "cve-probe":        [cve_probe],
+    "crypto-mining":    [crypto_mining],
+    "ransomware":       [ransomware_sim],
 }
 
 
