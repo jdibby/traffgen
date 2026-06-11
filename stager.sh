@@ -405,13 +405,13 @@ else
             brew install --cask docker
             ok "Docker Desktop installed — launching..."
             open -a Docker
-            step "Waiting for Docker Desktop to start (this may take up to 60 seconds)"
+            step "Waiting for Docker Desktop to start (this may take up to 120 seconds)"
             _tries=0
             until docker info &>/dev/null 2>&1; do
                 _tries=$((_tries + 1))
-                if [ "$_tries" -ge 30 ]; then
+                if [ "$_tries" -ge 60 ]; then
                     echo "" >&2
-                    echo "ERROR: Docker Desktop did not start within 60 seconds." >&2
+                    echo "ERROR: Docker Desktop did not start within 120 seconds." >&2
                     echo "       Open Docker Desktop from Applications and re-run this script." >&2
                     exit 1
                 fi
@@ -435,12 +435,12 @@ else
             # UBUNTU_CODENAME is the fallback for Mint/Pop!_OS which set it but not VERSION_CODENAME.
             CODENAME="${VERSION_CODENAME:-${UBUNTU_CODENAME:-}}"
 
-            if [ "${ID:-}" = "raspbian" ] && [ "$RPIVER" -ge 5 ]; then
+            if [ "${ID:-}" = "raspbian" ]; then
+                # Raspberry Pi OS (both 32-bit armhf and 64-bit arm64).
+                # The legacy download.docker.com/linux/raspbian repo was deprecated in 2023;
+                # use the Debian repo for all Pi models — it carries armhf and arm64 packages.
                 DOCKER_GPG="https://download.docker.com/linux/debian/gpg"
                 DOCKER_REPO="https://download.docker.com/linux/debian"
-            elif [ "${ID:-}" = "raspbian" ]; then
-                DOCKER_GPG="https://download.docker.com/linux/raspbian/gpg"
-                DOCKER_REPO="https://download.docker.com/linux/raspbian"
             elif is_like "ubuntu" || [ "${ID:-}" = "ubuntu" ]; then
                 DOCKER_GPG="https://download.docker.com/linux/ubuntu/gpg"
                 DOCKER_REPO="https://download.docker.com/linux/ubuntu"
