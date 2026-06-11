@@ -1064,6 +1064,9 @@ def _run_guarded(func) -> None:
     can't block a clean exit.  Exceptions inside func() are caught and logged
     rather than propagating to the caller.
     """
+    # Kick here so the full watchdog budget is available for this test,
+    # regardless of how long the preceding inter-test pause was.
+    WATCHDOG.kick()
     limit = _SUITE_TIMEOUTS.get(func.__name__, 120)
     exc_box: list[BaseException] = []
     suite_name = _FUNC_TO_SUITE.get(func.__name__, func.__name__)
@@ -5016,7 +5019,7 @@ def ips_ua() -> None:
     reach a real victim host.  Validates that IDS/IPS / SASE platforms fire
     on User-Agent–based signatures (Snort/Suricata UA rules, ET category).
     """
-    n = _size_to_limits(ARGS.size, 10, 30, 60, len(ips_ua_signatures), len(ips_ua_signatures))
+    n = _size_to_limits(ARGS.size, 10, 30, 60, len(ips_ua_signatures))
     sample = random.sample(ips_ua_signatures, k=min(n, len(ips_ua_signatures)))
     target = random.choice(ips_ua_targets)
     url = f"http://{target}"
@@ -5077,7 +5080,7 @@ def cve_probe() -> None:
     Validates that network IPS / SASE inline inspection (Cato, Zscaler,
     Palo Alto, Fortinet) fires on CVE-specific HTTP patterns.
     """
-    n = _size_to_limits(ARGS.size, 5, 10, 20, len(cve_http_probes), len(cve_http_probes))
+    n = _size_to_limits(ARGS.size, 5, 10, 20, len(cve_http_probes))
     sample = random.sample(cve_http_probes, k=min(n, len(cve_http_probes)))
 
     ui_banner("CVE HTTP Probe",
@@ -5238,6 +5241,7 @@ def finish_test() -> None:
         _web_flush()
         _web_log("Tests paused — waiting for resume", level="info")
         while os.path.exists(_WEB_PAUSE_FILE):
+            WATCHDOG.kick()
             time.sleep(1)
         with _WEB_STATE_LOCK:
             _WEB_STATE["status"] = "between_tests"
@@ -5283,19 +5287,40 @@ def run_test(func_list: list) -> None:
             func = deck.pop()
             iteration += 1
             console.rule(f"[dim]iteration {iteration}[/]")
-            _run_guarded(func)
-            WATCHDOG.kick()
-            finish_test()
+            try:
+                _run_guarded(func)
+                WATCHDOG.kick()
+                finish_test()
+            except Exception as _loop_exc:
+                ui_error(f"[run_test] {func.__name__}: {_loop_exc!r} — continuing")
+                try:
+                    WATCHDOG.kick()
+                except Exception:
+                    pass
+            # Warn when abandoned threads accumulate (timed-out tests that are still
+            # running in the background can indicate resource pressure).
+            if iteration % 10 == 0:
+                _n_threads = threading.active_count()
+                if _n_threads > 30:
+                    ui_warn(f"[health] {_n_threads} threads alive — "
+                            "possible resource pressure from timed-out tests")
     else:
         _suite_stats.reset(ARGS.suite)
         random.shuffle(func_list)
         for func in func_list:
             iteration += 1
             console.rule(f"[dim]test {iteration}/{len(func_list)}[/]")
-            _run_guarded(func)
-            _suite_stats.merge(_stats)
-            WATCHDOG.kick()
-            finish_test()
+            try:
+                _run_guarded(func)
+                _suite_stats.merge(_stats)
+                WATCHDOG.kick()
+                finish_test()
+            except Exception as _loop_exc:
+                ui_error(f"[run_test] {func.__name__}: {_loop_exc!r} — continuing")
+                try:
+                    WATCHDOG.kick()
+                except Exception:
+                    pass
 
         # Print aggregate only when more than one function ran (avoids duplicate
         # of the per-function summary for single-function suites like 'dns').
