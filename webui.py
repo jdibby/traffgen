@@ -2636,6 +2636,16 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
       <div style="max-width:900px">
 
         <div class="a-section">
+          <div class="a-h">v3.10.1 &mdash; <span style="color:var(--muted);font-weight:400">Jun 2026</span></div>
+          <table class="st-table" style="margin-top:10px">
+            <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Outcomes</td><td><strong>HTTP 200 block-page detection</strong> — responses with status 200 whose bodies contain vendor-agnostic block-page phrases (Access Denied, Request Blocked, Policy Violation, threat prevention, zscaler, fortigate, palo alto networks, etc.) are now reclassified as <strong>blocked</strong> instead of allowed; appear as <code>200bp</code> in the HTTP code breakdown</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>C2 Beacon</td><td><strong>Removed broken HTTPS testmyids.com entry</strong> — <code>https://www.testmyids.com</code> had a TLS certificate error (tlsv1 alert internal error); HTTP entry retained</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>CI</td><td><strong>Node.js 24 migration</strong> — added <code>FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true</code> to all three GitHub Actions workflows ahead of GitHub's forced migration on 2026-06-16</td></tr>
+          </table>
+        </div>
+
+        <div class="a-section">
           <div class="a-h">v3.10.0 &mdash; <span style="color:var(--muted);font-weight:400">Jun 2026</span></div>
           <table class="st-table" style="margin-top:10px">
             <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
