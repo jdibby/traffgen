@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [3.10.1] — 2026-06-11
+
+### Fixed
+- **Block page accuracy** — HTTP 200 responses whose bodies contain vendor-agnostic block-page phrases (`Access Denied`, `Request Blocked`, `Policy Violation`, `threat prevention`, vendor names like `zscaler`, `fortigate`, `palo alto networks`, etc.) are now reclassified as `blocked` instead of `allowed`. Applies to all `requests`-based suite functions. Blocked-via-200 probes appear as `200bp` in the HTTP code breakdown. Curl-based probes (which discard the body with `-o /dev/null`) are unchanged.
+- **`c2_beacon_targets` — broken HTTPS entry** — removed `https://www.testmyids.com` (TLS certificate error: tlsv1 alert internal error). The HTTP entry `http://www.testmyids.com` is retained.
+- **CI — Node.js 24 migration** — added `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true` to all three GitHub Actions workflows (`docker-publish.yml`, `msf-base-publish.yml`, `docs-check.yml`) ahead of GitHub's forced migration on 2026-06-16.
+
+---
+
 ## [3.10.0] — 2026-06-11
 
 ### Added

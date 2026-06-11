@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-generator.py — Traffic Generator v3.10.0
+generator.py — Traffic Generator v3.10.1
 ========================================
 Simulates realistic network traffic across a wide range of protocols and
 behaviours: DNS, HTTP/HTTPS/HTTP3, FTP, SSH, NTP, BGP, ICMP, SNMP,
@@ -58,7 +58,7 @@ from rich import box
 from endpoints import *           # noqa: F401,F403  (large data file)
 
 # ── Globals ───────────────────────────────────────────────────────────────────
-VERSION = "3.10.0"
+VERSION = "3.10.1"
 
 
 class _DualWriter:
@@ -338,6 +338,49 @@ _BLOCK_HTTP   = {"403", "407", "451", "511"}  # content filter / proxy auth / le
 _BLOCK_EXITS  = {5, 7, 35, 97}  # curl: proxy refused, conn refused/RST, SSL intercept, SOCKS refused
 _DROP_EXITS   = {6, 28}         # curl: DNS resolve failure (sinkhole), timeout (silent drop)
 
+# Vendor-agnostic phrases present in block-page bodies across all major NGFW,
+# SASE, and proxy platforms (Zscaler, Palo Alto, Fortinet, Cisco, Netskope,
+# Cato, Sophos, Symantec, F5, Squid, etc.).  When an HTTP 200 response body
+# contains any of these, the traffic was intercepted — not allowed.
+_BLOCK_PAGE_PATTERNS = {
+    "access denied",
+    "access blocked",
+    "request blocked",
+    "request denied",
+    "content blocked",
+    "this page is blocked",
+    "site blocked",
+    "url blocked",
+    "web blocked",
+    "blocked by",
+    "policy violation",
+    "security policy",
+    "threat prevention",
+    "malware blocked",
+    "phishing blocked",
+    "your connection has been blocked",
+    "this website has been blocked",
+    "internet access blocked",
+    "acceptable use policy",
+    "this site has been blocked",
+    "the requested url was rejected",
+    "transaction rejected",
+    "fortigate",            # Fortinet block page
+    "palo alto networks",   # PAN block page
+    "zscaler",              # Zscaler block page
+    "umbrella",             # Cisco Umbrella block page
+    "netskope",             # Netskope block page
+    "symantec web security", # Symantec proxy
+}
+
+
+def _is_block_page(body: str) -> bool:
+    """Return True if a 200 response body looks like an inline security block page."""
+    if not body:
+        return False
+    low = body[:4096].lower()  # only scan the first 4 KB — block pages are short
+    return any(pat in low for pat in _BLOCK_PAGE_PATTERNS)
+
 
 class SuiteStats:
     """Thread-safe per-suite probe counters with HTTP response-code tracking."""
@@ -362,9 +405,11 @@ class SuiteStats:
         self.probes: list[dict] = []  # per-probe details for drill-down
         self.start_time = time.time()
 
-    def record(self, code, exit_code: int = 0, target: str = "") -> None:
-        """Record an HTTP status code (and optional curl exit code).
-        '---' / '000' / '' counts as a drop/error."""
+    def record(self, code, exit_code: int = 0, target: str = "",
+               body: str = "") -> None:
+        """Record an HTTP status code (and optional curl exit code / response body).
+        '---' / '000' / '' counts as a drop/error.
+        HTTP 200 bodies matching _BLOCK_PAGE_PATTERNS are reclassified as blocked."""
         with self._lock:
             self.attempts += 1
             c = str(code).strip()
@@ -387,6 +432,12 @@ class SuiteStats:
                 self.responses += 1
                 bucket = (c[0] + "xx") if c[:1].isdigit() else c[:3]
                 self.codes[bucket] = self.codes.get(bucket, 0) + 1
+            elif c == "200" and body and _is_block_page(body):
+                # Inline block page — security control returned 200 with a deny body
+                outcome = "blocked"
+                self.blocked   += 1
+                self.responses += 1
+                self.codes["200bp"] = self.codes.get("200bp", 0) + 1
             else:
                 outcome = "allowed"
                 self.allowed   += 1
@@ -1304,7 +1355,7 @@ def bigfile() -> None:
             ) as resp:
                 if resp.status_code in (403, 429, 451):
                     ui_warn(f"HTTP {resp.status_code} from provider — skipping")
-                    _stats.record(str(resp.status_code))
+                    _stats.record(str(resp.status_code), body=resp.text)
                     continue
                 resp.raise_for_status()
                 total = int(resp.headers.get("content-length", 0))
@@ -2639,7 +2690,7 @@ def urlresponse_random() -> None:
                                      headers=_browser_headers_dict(_rt_ua))
                     t = r.elapsed.total_seconds()
                     console.log(f"({i}/{n}) {url}  {t:.3f}s")
-                    _stats.record(str(r.status_code))
+                    _stats.record(str(r.status_code), body=r.text)
                 except requests.exceptions.ConnectionError as e:
                     if "Connection refused" in str(e) or "ECONNREFUSED" in str(e) or "Reset" in str(e):
                         console.log(f"[yellow]skip (Connection refused)[/] {url}")
@@ -2752,7 +2803,7 @@ def s3_sim() -> None:
             )
             sc = str(resp.status_code)
             console.log(f"s3-get ({i}/{n_dl}) {url}  [{_status_style(sc)}]HTTP {sc}[/]")
-            _stats.record(sc)
+            _stats.record(sc, body=resp.text)
         except requests.exceptions.ConnectionError as e:
             console.log(f"[yellow]s3-get ({i}/{n_dl}) {url}  {e.__class__.__name__}[/]")
             if "Connection refused" in str(e) or "ECONNREFUSED" in str(e) or "Reset" in str(e):
@@ -2782,7 +2833,7 @@ def s3_sim() -> None:
             )
             sc = str(resp.status_code)
             console.log(f"s3-put ({i}/{n_ul}) {url}  [{_status_style(sc)}]HTTP {sc}[/]")
-            _stats.record(sc)
+            _stats.record(sc, body=resp.text)
         except requests.exceptions.ConnectionError as e:
             console.log(f"[yellow]s3-put ({i}/{n_ul}) {url}  {e.__class__.__name__}[/]")
             if "Connection refused" in str(e) or "ECONNREFUSED" in str(e) or "Reset" in str(e):
@@ -3223,7 +3274,7 @@ def c2_beacon() -> None:
                         verify=False,
                         allow_redirects=True,
                     )
-                    _stats.record(str(resp.status_code))
+                    _stats.record(str(resp.status_code), body=resp.text)
                 except requests.exceptions.ConnectionError as e:
                     if "Connection refused" in str(e) or "ECONNREFUSED" in str(e) or "Reset" in str(e):
                         console.log(f"[yellow]C2 ({i}/{beacons}) {target}  → Connection refused[/]")
@@ -3633,7 +3684,7 @@ def llm_dlp_sim() -> None:
                         f"  ↳ HTTP {resp.status_code} "
                         f"({'expected' if resp.status_code in (401, 403, 422) else 'check'})"
                     )
-                    _stats.record(str(resp.status_code))
+                    _stats.record(str(resp.status_code), body=resp.text)
                 except requests.exceptions.ConnectionError as e:
                     console.log("  ↳ unreachable (expected)")
                     if "Connection refused" in str(e) or "ECONNREFUSED" in str(e) or "Reset" in str(e):
@@ -3717,7 +3768,7 @@ def _probe_domain_list(local_path: str, n: int = 10) -> None:
                 r = requests.get(url, timeout=3, verify=False, allow_redirects=True,
                                  headers=_browser_headers_dict(_probe_ua))
                 console.log(f"({i}/{len(sample)}) {url}  →  {r.status_code}")
-                _stats.record(str(r.status_code))
+                _stats.record(str(r.status_code), body=r.text)
             except requests.exceptions.ConnectionError as e:
                 console.log(f"({i}/{len(sample)}) {url}  →  {e.__class__.__name__}")
                 if "Connection refused" in str(e) or "ECONNREFUSED" in str(e) or "Reset" in str(e):
@@ -3835,7 +3886,7 @@ def scrape_single_link(url: str) -> str | None:
         resp.raise_for_status()
         resp.encoding = resp.apparent_encoding or "utf-8"
         html = resp.text
-        _stats.record(str(resp.status_code))
+        _stats.record(str(resp.status_code), body=resp.text)
     except requests.exceptions.HTTPError as e:
         if e.response is not None:
             _stats.record(str(e.response.status_code))
@@ -4425,7 +4476,7 @@ def data_exfil_http() -> None:
                 verify=False,
                 allow_redirects=False,
             )
-            _stats.record(str(resp.status_code))
+            _stats.record(str(resp.status_code), body=resp.text)
             console.log(f"    ↳ [{_status_style(str(resp.status_code))}]HTTP {resp.status_code}[/]")
             ok_count += 1
         except requests.exceptions.ConnectionError as e:
@@ -4525,7 +4576,7 @@ def waf_attack() -> None:
                     resp = requests.post(url, data=body or {}, headers=headers,
                                          timeout=6, verify=False, allow_redirects=False)
                 status = str(resp.status_code)
-                _stats.record(status)
+                _stats.record(status, body=resp.text)
             console.log(f"    ↳ [{_status_style(status)}]HTTP {status}[/]")
             ok_count += 1
         except Exception as e:
@@ -5134,7 +5185,7 @@ def cve_probe() -> None:
                     allow_redirects=False,
                 )
                 status = str(resp.status_code)
-                _stats.record(status)
+                _stats.record(status, body=resp.text)
             console.log(f"    ↳ [{_status_style(status)}]HTTP {status}[/]")
             ok_count += 1
         except Exception as e:
@@ -5283,7 +5334,7 @@ def ransomware_sim() -> None:
                 verify=False,
                 allow_redirects=False,
             )
-            _stats.record(str(resp.status_code))
+            _stats.record(str(resp.status_code), body=resp.text)
             console.log(
                 f"    ↳ [{_status_style(str(resp.status_code))}]HTTP {resp.status_code}[/]"
             )

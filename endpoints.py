@@ -4320,9 +4320,8 @@ dot_servers = [
 # them ideal for C2 detection rule validation without live infrastructure.
 # ---------------------------------------------------------------------------
 c2_beacon_targets = [
-    # Classic IDS trigger
+    # Classic IDS trigger (HTTP only — testmyids.com TLS cert is broken)
     "http://www.testmyids.com",
-    "https://www.testmyids.com",
 
     # httpbin — full request echo (POST body, headers, JSON visible to DLP/IDS)
     "https://httpbin.org/post",
