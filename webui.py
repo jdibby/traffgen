@@ -5215,8 +5215,15 @@ function _tmapBuildArc(from,to,n){
 }
 function _tmapOutcome(msg){
   if(!msg)return'';
-  if(/\b(403|407|451|511|block(?:ed|ing)?|refused|reject(?:ed)?|denied|RST|reset(?:\s+by\s+peer)?|sinkhole|silently.?drop|not.?allowed|forbidden|filtered|intercepted|ECONNRESET|ECONNREFUSED)\b/i.test(msg))return'blocked';
-  if(/\b(2\d\d|ok|success(?:ful)?|reachable|established|open|allowed)\b/i.test(msg))return'allowed';
+  // Unambiguous block keywords — match anywhere in the message.
+  if(/\b(block(?:ed|ing)?|refused|reject(?:ed)?|denied|sinkhole|silently.?drop|not.?allowed|forbidden|filtered|intercepted|ECONNRESET|ECONNREFUSED|reset by peer)\b/i.test(msg))return'blocked';
+  // Unambiguous allow keywords.
+  if(/\b(success(?:ful)?|reachable|established|allowed)\b/i.test(msg))return'allowed';
+  // HTTP status codes — require explicit HTTP/status/code/↳ context so
+  // banner lines like "200 endpoints sampled" don't get classified as
+  // allowed and "Tested 403 hosts" doesn't get classified as blocked.
+  if(/(?:\bHTTP\b\s+|\bstatus:?\s*|\bcode:?\s*|↳.*?HTTP\s+)(40[37]|45[12]|511)\b/i.test(msg))return'blocked';
+  if(/(?:\bHTTP\b\s+|\bstatus:?\s*|\bcode:?\s*|↳.*?HTTP\s+)(2\d\d)\b/i.test(msg)||/\b2\d\d\s+OK\b/i.test(msg))return'allowed';
   return'';
 }
 function _tmapShootArc(geo,suite,host,outcome){
@@ -5270,9 +5277,37 @@ function _tmapUpdateCountries(){
 function _tmapAddFeed(host,geo,c,suite,outcome){
   const feed=$('tmap-feed');if(!feed)return;
   const now=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
-  const el=document.createElement('div');el.className='tmap-feed-item';
   const obadge=outcome==='blocked'?'<span class="tmap-f-outcome" style="background:#fc818122;color:#fc8181;border:1px solid #fc818144">BLOCKED</span>':
                outcome==='allowed'?'<span class="tmap-f-outcome" style="background:#00ff8822;color:#00ff88;border:1px solid #00ff8844">OK</span>':'';
+
+  // Dedup: if the most recent feed entry is for the same (host, suite), update
+  // it in-place instead of inserting a duplicate.  Promote outcome to the
+  // strongest seen so a "→ url" + "↳ HTTP 200" pair shows one row with the OK
+  // badge, not two rows.  Same applies to a burst of deferred geo arcs.
+  const first=feed.firstChild;
+  if(first&&first.dataset&&first.dataset.host===host&&first.dataset.suite===suite){
+    if(outcome&&first.dataset.outcome!==outcome){
+      // Replace badge in the existing meta row
+      const meta=first.querySelector('.tmap-f-meta');
+      if(meta){
+        const oldBadge=meta.querySelector('.tmap-f-outcome');
+        if(oldBadge)oldBadge.remove();
+        if(obadge){
+          const timeEl=meta.querySelector('.tmap-f-time');
+          if(timeEl)timeEl.insertAdjacentHTML('beforebegin',obadge);
+          else meta.insertAdjacentHTML('beforeend',obadge);
+        }
+      }
+      first.dataset.outcome=outcome;
+    }
+    const t=first.querySelector('.tmap-f-time');if(t)t.textContent=now;
+    return;
+  }
+
+  const el=document.createElement('div');el.className='tmap-feed-item';
+  el.dataset.host=host;
+  el.dataset.suite=suite;
+  el.dataset.outcome=outcome||'';
   el.innerHTML='<div class="tmap-f-dot" style="background:'+c+'"></div><div class="tmap-f-body"><div class="tmap-f-host">'+H(host)+'</div><div class="tmap-f-meta"><span class="tmap-f-loc">📍 '+H(geo.city)+'</span><span class="tmap-f-suite" style="background:'+c+'22;color:'+c+';border:1px solid '+c+'44">'+H(suite)+'</span>'+obadge+'<span class="tmap-f-time">'+now+'</span></div></div>';
   feed.insertBefore(el,feed.firstChild);
   while(feed.children.length>50)feed.removeChild(feed.lastChild);
