@@ -2636,6 +2636,16 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
       <div style="max-width:900px">
 
         <div class="a-section">
+          <div class="a-h">v3.11.0 &mdash; <span style="color:var(--muted);font-weight:400">Jul 2026</span></div>
+          <table class="st-table" style="margin-top:10px">
+            <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Fingerprinting</td><td><strong><code>--impersonate</code> flag</strong> — adds curl-impersonate (8 profiles: chrome116, chrome116-linux, chrome99-android, ff117, ff117-linux, edge101, edge101-linux, safari15-5) and wires it into every HTTP(S)-probing suite for browser-accurate TLS/HTTP2 fingerprints and Client Hints. Confirmed live against a production Cato Networks deployment: system curl/requests are always classified as a generic automation client regardless of declared User-Agent, while curl-impersonate profiles are correctly classified as real browser engines (chromium, webkit)</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Tooling</td><td><strong>tools/fingerprint-matrix.sh</strong> — cycles every impersonate profile against every suite that honors it, timestamped for correlation against a SASE/NGFW dashboard's event log</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Entrypoint</td><td><strong>curl-impersonate Firefox profiles were silently broken</strong> — missing <code>nss-plugin-pem</code> package meant every curl_ff* request failed with no response; fixed for both the stock and Linux-corrected Firefox profiles</td></tr>
+          </table>
+        </div>
+
+        <div class="a-section">
           <div class="a-h">v3.10.2 &mdash; <span style="color:var(--muted);font-weight:400">Jul 2026</span></div>
           <table class="st-table" style="margin-top:10px">
             <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>

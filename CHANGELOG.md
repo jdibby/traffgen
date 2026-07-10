@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [3.11.0] — 2026-07-10
+
+### Added
+- **`--impersonate` flag — browser-accurate TLS/HTTP2 fingerprinting**: adds [curl-impersonate](https://github.com/lwthiker/curl-impersonate) (8 profiles: `chrome116`, `chrome116-linux`, `chrome99-android`, `ff117`, `ff117-linux`, `edge101`, `edge101-linux`, `safari15-5`) to the Docker image and wires it into every HTTP(S)-probing suite (`_curl_head`/`_run_head_batch`, `_curl_download`, and `_probe_domain_list` — effectively all of them). Confirmed live against a production Cato Networks deployment: system curl/Python `requests` are always classified `Client Class: restclient cpp`/`unclassified tls` by JA3-aware SASE/NGFW traffic classifiers regardless of declared `User-Agent`, while curl-impersonate profiles are correctly classified as real browser engines (`chromium`, `webkit`). The `-linux` profile variants correct the stock (Windows/macOS-declaring) profiles' UA/`Sec-CH-UA-Platform` to Linux, since that's traffgen's actual runtime OS.
+- **`tools/fingerprint-matrix.sh`** — cycles through every `--impersonate` profile against every suite that honors it, printing UTC timestamps for correlating results against a SASE/NGFW dashboard's event log.
+
+### Fixed
+- **`docker-entrypoint.sh` — curl-impersonate's Firefox profiles were silently broken**: `curl-impersonate-ff` links against NSS and needs the `nss-plugin-pem` package to load the system CA bundle; without it every `curl_ff*` request failed with no response. Fixed for the stock Firefox profile as well as the new Linux variant.
+
+---
+
 ## [3.10.2] — 2026-07-10
 
 ### Fixed
