@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [3.10.2] — 2026-07-10
+
+### Fixed
+- **`docker-entrypoint.sh` — TLS-interception auto-probe blind spot**: the automatic proxy-CA detection (`auto_trust_proxy_ca()`, Option 3) only probed 15 cloud/developer-infra hosts (Google, Microsoft, Apple, GitHub, package registries, CA/OCSP endpoints). Most SASE/TLS-inspection vendors (Cato Networks, Zscaler, Palo Alto Prisma, Netskope, etc.) ship default bypass rules exempting exactly these categories — and in practice often major consumer brands and AI/LLM services too — from inspection, so the probe could report "no interception detected" and skip installing the proxy's CA even while the proxy was actively inspecting — and breaking cert validation on — traffgen's actual test traffic. Added 10 ordinary consumer-web hosts (news, commerce, reference, entertainment) and 8 AI/LLM hosts (ChatGPT, Claude, Gemini, Copilot, Perplexity, Character.AI, Hugging Face) to the probe set (32 hosts total, all rarely on a vendor's default bypass list), and added an explicit warning when the probe comes back fully clean, pointing at Option 1 (bind-mount) / Option 2 (`EXTRA_CA_CERT`) as the reliable fallback.
+- **`docs/deployment.md`** — documented the bypass-list blind spot and updated the auto-probe host count/example output.
+
+### Added
+- **TLS-inspection vendor detection** (`tls-inspection` suite, `_PROXY_VENDOR_MAP`) — added issuer CN/Org matching for 22 more SASE/firewall vendors: SonicWall, Hillstone Networks, Stormshield, Array Networks, Sangfor, Huawei, Zyxel, Netgate/pfSense, OPNsense/Deciso, HPE Aruba Networking, VMware/Broadcom VeloCloud, Citrix/NetScaler, Todyl, NordLayer, Absolute Secure Access, Axis Security (HPE), Ericom Security, GFI KerioControl, and Untangle/Arista ETM/Smoothwall.
+
+---
+
 ## [3.10.1] — 2026-06-11
 
 ### Fixed

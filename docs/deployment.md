@@ -185,7 +185,7 @@ When a TLS-inspection proxy (Cato Networks, Prisma Access, Palo Alto, Zscaler, N
 
 ### Option 3 — Fully automatic _(zero configuration)_
 
-Just run the container — no flags, no cert files. On startup the entrypoint probes **15 diverse HTTPS hosts** in parallel spanning CDN providers, cloud platforms, developer tooling, OS vendors, and social platforms. For every host that fails TLS verification the entrypoint:
+Just run the container — no flags, no cert files. On startup the entrypoint probes **32 diverse HTTPS hosts** in parallel: 14 cloud/developer-infra hosts (CDN providers, cloud platforms, developer tooling, OS vendors, CA/PKI infrastructure), 10 ordinary consumer-web hosts (news, commerce, reference, entertainment), and 8 AI/LLM hosts (ChatGPT, Claude, Gemini, Copilot, Perplexity, Character.AI, Hugging Face). For every host that fails TLS verification the entrypoint:
 
 1. Fetches the full certificate chain the proxy is presenting (`openssl s_client -showcerts`)
 2. Fingerprints (SHA-256) every `CA:TRUE` cert in the chain not yet in the system trust store
@@ -194,12 +194,12 @@ Just run the container — no flags, no cert files. On startup the entrypoint pr
 5. Runs a **verification pass** on a sample of previously-failed hosts to confirm the fix worked
 
 ```
-[entrypoint] Probing 15 hosts to detect TLS interception...
-[entrypoint] Results: 3 clean  11 intercepted  1 unreachable
+[entrypoint] Probing 32 hosts to detect TLS interception...
+[entrypoint] Results: 3 clean  28 intercepted  1 unreachable
 [entrypoint] Selective bypass detected:
 [entrypoint]   Bypassed (clean cert) : www.apple.com ocsp.pki.goog www.digicert.com
 [entrypoint]   Intercepted           : www.google.com www.cloudflare.com github.com ...
-[entrypoint] Proxy CA identified (seen on 11 of 11 intercepted host(s)):
+[entrypoint] Proxy CA identified (seen on 28 of 28 intercepted host(s)):
 [entrypoint]   Subject    : CN=Cato Networks Root CA, O=Cato Networks, C=IL
 [entrypoint]   Expires    : Dec 31 23:59:59 2035 GMT
 [entrypoint]   SHA-256 fp : 4A3B...
@@ -208,6 +208,8 @@ Just run the container — no flags, no cert files. On startup the entrypoint pr
 ```
 
 Set `DISABLE_AUTO_CA=1` to skip this step if you want to manage certs entirely yourself.
+
+**Known limitation:** many SASE/proxy vendors (Cato, Zscaler, Palo Alto Prisma, Netskope, etc.) ship default bypass rules that exempt cloud/developer infrastructure — Microsoft/Google/Apple domains, package registries, CA/OCSP endpoints — from inspection, and in practice this often extends to major consumer brands (news, streaming, retail) and even AI/LLM services (ChatGPT, Claude, Gemini, Copilot) as well, since those are frequently grouped into the same "trusted/reputable SaaS" bypass category. Because of this, the entrypoint probes cloud/dev infra, ordinary consumer-web hosts, and AI/LLM hosts (32 total), since a broader mix is much less likely to be uniformly bypassed. Even so, no fixed probe list can guarantee catching every proxy's bypass policy. If the auto-probe reports "no interception detected" (or only partial interception) but traffgen's own test suites (`tls-inspection`, or any HTTPS-based suite) still show TLS/certificate errors on other hosts, don't trust the clean result — your proxy is very likely bypassing every probed host by category while still inspecting other traffic. In that case, fall back to Option 1 or Option 2 below and install the proxy's CA directly.
 
 ### Option 1 — Bind-mount a certificate file
 
