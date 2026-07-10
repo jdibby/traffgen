@@ -986,6 +986,25 @@ def _browser_headers(ua: str) -> str:
 # SUBPROCESS HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
 
+# curl-impersonate binaries (installed in the Docker image — see Dockerfile)
+# replicate a real browser's TLS ClientHello (cipher order, extensions, ALPS),
+# HTTP/2 fingerprint, and Client Hint headers.  System curl's own TLS stack
+# (plain OpenSSL) is trivially distinguished from any browser by JA3/JA4-aware
+# NGFW/SASE traffic classifiers regardless of which User-Agent header is sent.
+# "chrome116-linux" is a local variant of curl-impersonate's stock chrome116
+# profile with the UA/Sec-CH-UA-Platform corrected to Linux — traffgen's own
+# runtime is genuinely Linux, so this is the accurate profile, not a disguise.
+_IMPERSONATE_BINS = {
+    "off":              None,
+    "chrome116":        "curl_chrome116",
+    "chrome116-linux":  "curl_chrome116_linux",
+    "chrome99-android": "curl_chrome99_android",
+    "ff117":            "curl_ff117",
+    "edge101":          "curl_edge101",
+    "safari15-5":       "curl_safari15_5",
+}
+
+
 def _curl_head(url: str, user_agent: str,
                connect_timeout: int = 3, max_time: int = 5,
                extra_flags: str = "") -> tuple[str, int]:
@@ -996,15 +1015,30 @@ def _curl_head(url: str, user_agent: str,
     the same TLS fingerprint, header order, and timing patterns as a real
     browser-side tool.  The response body is discarded; only the status code
     is returned for logging.
+
+    When --impersonate is set to something other than "off", the request is
+    issued through a curl-impersonate binary instead — its baked-in cipher
+    list, TLS extensions, and Client Hint headers already match the profile's
+    browser, so *user_agent* and the usual browser-header synthesis are
+    skipped entirely rather than layered on top.
     """
-    bh = _browser_headers(user_agent) if user_agent else ""
-    cmd = (
-        f"curl -k -s --show-error "
-        f"--connect-timeout {connect_timeout} "
-        f"-I -o /dev/null -w '%{{http_code}}' --max-time {max_time} "
-        f"{extra_flags} "
-        f"-A '{user_agent}' {bh} {url}"
-    )
+    impersonate_bin = _IMPERSONATE_BINS.get(getattr(ARGS, "impersonate", "off"))
+    if impersonate_bin:
+        cmd = (
+            f"{impersonate_bin} -k -s --show-error "
+            f"--connect-timeout {connect_timeout} "
+            f"-I -o /dev/null -w '%{{http_code}}' --max-time {max_time} "
+            f"{extra_flags} {url}"
+        )
+    else:
+        bh = _browser_headers(user_agent) if user_agent else ""
+        cmd = (
+            f"curl -k -s --show-error "
+            f"--connect-timeout {connect_timeout} "
+            f"-I -o /dev/null -w '%{{http_code}}' --max-time {max_time} "
+            f"{extra_flags} "
+            f"-A '{user_agent}' {bh} {url}"
+        )
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True,
                             timeout=max_time + 5)
     return result.stdout.strip() or "---", result.returncode
@@ -5687,6 +5721,18 @@ def parse_cli() -> argparse.Namespace:
         help=(
             "Comma-separated list of CIDRs to target in the 'lateral-movement' suite\n"
             "(e.g. 192.168.1.0/24,10.0.0.0/24). Omit to scan all detected networks."
+        ),
+    )
+    specific.add_argument(
+        "--impersonate", type=str.lower, choices=sorted(_IMPERSONATE_BINS.keys()),
+        default="off", metavar="PROFILE",
+        help=(
+            "Use a curl-impersonate binary (browser-accurate TLS/HTTP2 fingerprint\n"
+            "and Client Hints) instead of system curl for HEAD-based probes\n"
+            "(_curl_head / _run_head_batch — e.g. tor-anonymizer, llm-dlp web-UI\n"
+            "checks, http/https/ai HEAD suites). Does not affect suites built on\n"
+            "requests/curl-download (e.g. phishing-domains). Default: off.\n"
+            f"Choices: {', '.join(sorted(_IMPERSONATE_BINS.keys()))}"
         ),
     )
 

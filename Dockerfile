@@ -32,6 +32,7 @@ FROM jdibby/msf-base:latest AS msf-build
 
 # ---------- Stage 3: runtime ----------
 FROM debian:bookworm-slim
+ARG TARGETARCH
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=America/Denver
 ENV BUNDLE_GEMFILE=/opt/metasploit-framework/Gemfile
@@ -54,6 +55,38 @@ RUN apt-get update && apt-get upgrade -y --no-install-recommends && \
   && ln -fs /usr/share/zoneinfo/$TZ /etc/localtime \
   && echo "$TZ" > /etc/timezone \
   && rm -rf /var/lib/apt/lists/*
+
+ARG CURL_IMPERSONATE_VERSION=v0.6.1
+
+# curl-impersonate — statically-linked curl builds that replicate real browser
+# TLS ClientHello (cipher order, extensions, ALPS), HTTP/2 fingerprints, and
+# Client Hint headers (sec-ch-ua-platform, etc.), unlike system curl which is
+# trivially bucketed as a generic/automation client by JA3/JA4-aware NGFW and
+# SASE traffic classifiers. Installed alongside system curl (not replacing it)
+# as curl_chromeNNN / curl_ff*/curl_edgeNNN / curl_safariNNN wrapper scripts,
+# plus a local curl_chrome116_linux variant (stock chrome116 profile with the
+# UA/Sec-CH-UA-Platform corrected to Linux, matching this image's real OS).
+# Only x86_64/aarch64/arm (armv7) prebuilt binaries exist upstream, matching
+# this image's three published platforms.
+RUN case "${TARGETARCH}" in \
+      amd64) CI_ARCH="x86_64-linux-gnu" ;; \
+      arm64) CI_ARCH="aarch64-linux-gnu" ;; \
+      arm)   CI_ARCH="arm-linux-gnueabihf" ;; \
+      *) echo "curl-impersonate: unsupported TARGETARCH '${TARGETARCH}'" >&2; exit 1 ;; \
+    esac && \
+    curl -fsSL "https://github.com/lwthiker/curl-impersonate/releases/download/${CURL_IMPERSONATE_VERSION}/curl-impersonate-${CURL_IMPERSONATE_VERSION}.${CI_ARCH}.tar.gz" \
+      -o /tmp/curl-impersonate.tar.gz && \
+    mkdir -p /opt/curl-impersonate && \
+    tar xzf /tmp/curl-impersonate.tar.gz -C /opt/curl-impersonate && \
+    rm -f /tmp/curl-impersonate.tar.gz && \
+    sed \
+      -e 's/Windows NT 10\.0; Win64; x64/X11; Linux x86_64/' \
+      -e 's/sec-ch-ua-platform: "Windows"/sec-ch-ua-platform: "Linux"/' \
+      /opt/curl-impersonate/curl_chrome116 > /opt/curl-impersonate/curl_chrome116_linux && \
+    chmod +x /opt/curl-impersonate/curl_chrome116_linux && \
+    for f in /opt/curl-impersonate/*; do \
+      ln -sf "$f" "/usr/local/bin/$(basename "$f")"; \
+    done
 
 ARG NIKTO_VERSION=2.1.6
 
@@ -133,7 +166,8 @@ ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 # App files
 WORKDIR /traffgen
 COPY generator.py endpoints.py webui.py healthcheck.sh docker-entrypoint.sh ./
-RUN chmod +x /traffgen/docker-entrypoint.sh
+COPY tools/ ./tools/
+RUN chmod +x /traffgen/docker-entrypoint.sh /traffgen/tools/*.sh
 
 # Ensure checks/suites dirs exist; copy RC scripts; move targets.list up one level
 RUN mkdir -p /opt/metasploit-framework/ms_checks/checks \
