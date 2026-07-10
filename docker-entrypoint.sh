@@ -73,17 +73,23 @@ fi
 # ── Option 3: auto-detect TLS interception across diverse probe hosts ──────────
 #
 # Strategy:
-#   1. Probe 32 hosts spanning different ASNs, providers, and URL categories:
+#   1. Probe 44 hosts spanning different ASNs, providers, and URL categories:
 #      14 cloud/developer-infra hosts (frequently exempted from inspection by
 #      policy — a clean result here alone is NOT proof of no interception),
 #      10 ordinary consumer-web hosts (news, commerce, reference,
 #      entertainment) that are rarely on any vendor's default bypass list and
 #      therefore give the real signal for whether traffgen's own traffic
 #      (which mostly looks like ordinary/adversarial web traffic, not cloud
-#      infra) is actually being inspected, and 8 AI/LLM hosts (ChatGPT,
-#      Claude, Gemini, Copilot, Perplexity, Character.AI, Hugging Face) since
-#      GenAI traffic is an active DLP/CASB inspection target for most SASE
-#      vendors but is often still bundled into a "trusted SaaS" bypass rule.
+#      infra) is actually being inspected, 8 AI/LLM hosts (ChatGPT, Claude,
+#      Gemini, Copilot, Perplexity, Character.AI, Hugging Face) since GenAI
+#      traffic is an active DLP/CASB inspection target for most SASE vendors
+#      but is often still bundled into a "trusted SaaS" bypass rule, and 12
+#      anonymizer/VPN/proxy-avoidance hosts (Tor, ProtonVPN, NordVPN,
+#      ExpressVPN, IPVanish, Mullvad, and public web proxies) — live testing
+#      against a real Cato Networks deployment showed this category gets
+#      TLS-inspected essentially unconditionally (unlike GenAI/cloud infra,
+#      which are frequently bypassed), making it the single most reliable
+#      probe category for confirming interception is active at all.
 #   2. For every host that fails TLS verification, extract CA certs from the
 #      presented chain and fingerprint them (SHA-256).
 #   3. Vote: a CA fingerprint seen on N > 1 hosts is almost certainly the proxy
@@ -137,6 +143,23 @@ auto_trust_proxy_ca() {
         "perplexity.ai:443"
         "character.ai:443"
         "huggingface.co:443"
+        # Anonymizers / VPN / proxy avoidance — empirically the most reliably
+        # inspected category (confirmed via live Cato dashboard events across
+        # dozens of requests): SASE/NGFW vendors treat this as a security-risk
+        # category, not a "trusted SaaS" bypass exemption, so a clean result
+        # here is a strong signal.
+        "www.torproject.org:443"
+        "check.torproject.org:443"
+        "www.protonvpn.com:443"
+        "nordvpn.com:443"
+        "www.expressvpn.com:443"
+        "www.ipvanish.com:443"
+        "mullvad.net:443"
+        "www.proxysite.com:443"
+        "www.croxyproxy.com:443"
+        "filterbypass.me:443"
+        "4everproxy.com:443"
+        "www.freeproxyserver.net:443"
     )
 
     local TMP_DIR
