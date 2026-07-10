@@ -3230,12 +3230,16 @@ def http3_random() -> None:
             verify_mode=_ssl.CERT_NONE,
             server_name=host,
         )
-        try:
+
+        async def _do() -> str | None:
             async with quic_connect(
                 host, port, configuration=cfg,
                 create_protocol=_H3Client,
             ) as proto:
-                status = await proto.head(url, ua)
+                return await proto.head(url, ua)
+
+        try:
+            status = await asyncio.wait_for(_do(), timeout=10.0)
             code = status or "000"
             console.log(f"HTTP3 ({idx}/{n}) {url}  → [{_status_style(code)}]{code}[/]")
             _stats.record(code)
