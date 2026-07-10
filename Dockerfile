@@ -46,12 +46,16 @@ ENV BUNDLE_WITHOUT=development:test
 #                → fixed in GnuTLS 3.8.13
 #   libnghttp2-14: CVE-2026-27135 (assertion failure after session termination)
 #                  → fixed in nghttp2 1.68.1
+# nss-plugin-pem: curl-impersonate's Firefox profiles (curl-impersonate-ff)
+#   link against NSS and need this PEM-reader module to load the system CA
+#   bundle — without it every curl_ff* request fails with no TLS connection.
 RUN apt-get update && apt-get upgrade -y --no-install-recommends && \
     apt-get install -y --no-install-recommends \
     tzdata ca-certificates curl git \
     iproute2 traceroute iputils-ping netcat-openbsd dnsutils openssh-client \
     nmap snmp openssl procps iperf3 \
     perl python3 python3-pip sqlite3 ruby bash \
+    nss-plugin-pem \
   && ln -fs /usr/share/zoneinfo/$TZ /etc/localtime \
   && echo "$TZ" > /etc/timezone \
   && rm -rf /var/lib/apt/lists/*
@@ -64,8 +68,10 @@ ARG CURL_IMPERSONATE_VERSION=v0.6.1
 # trivially bucketed as a generic/automation client by JA3/JA4-aware NGFW and
 # SASE traffic classifiers. Installed alongside system curl (not replacing it)
 # as curl_chromeNNN / curl_ff*/curl_edgeNNN / curl_safariNNN wrapper scripts,
-# plus a local curl_chrome116_linux variant (stock chrome116 profile with the
-# UA/Sec-CH-UA-Platform corrected to Linux, matching this image's real OS).
+# plus local curl_chrome116_linux / curl_ff117_linux / curl_edge101_linux
+# variants (stock profiles with the UA/Sec-CH-UA-Platform corrected to Linux,
+# matching this image's real OS — Firefox has no Sec-CH-UA* to correct, only
+# a User-Agent platform token).
 # Only x86_64/aarch64/arm (armv7) prebuilt binaries exist upstream, matching
 # this image's three published platforms.
 RUN case "${TARGETARCH}" in \
@@ -84,6 +90,15 @@ RUN case "${TARGETARCH}" in \
       -e 's/sec-ch-ua-platform: "Windows"/sec-ch-ua-platform: "Linux"/' \
       /opt/curl-impersonate/curl_chrome116 > /opt/curl-impersonate/curl_chrome116_linux && \
     chmod +x /opt/curl-impersonate/curl_chrome116_linux && \
+    sed \
+      -e 's/Windows NT 10\.0; Win64; x64; rv:109\.0/X11; Linux x86_64; rv:109.0/' \
+      /opt/curl-impersonate/curl_ff117 > /opt/curl-impersonate/curl_ff117_linux && \
+    chmod +x /opt/curl-impersonate/curl_ff117_linux && \
+    sed \
+      -e 's/Windows NT 10\.0; Win64; x64/X11; Linux x86_64/' \
+      -e 's/sec-ch-ua-platform: "Windows"/sec-ch-ua-platform: "Linux"/' \
+      /opt/curl-impersonate/curl_edge101 > /opt/curl-impersonate/curl_edge101_linux && \
+    chmod +x /opt/curl-impersonate/curl_edge101_linux && \
     for f in /opt/curl-impersonate/*; do \
       ln -sf "$f" "/usr/local/bin/$(basename "$f")"; \
     done

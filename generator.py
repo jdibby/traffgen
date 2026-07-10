@@ -1000,7 +1000,9 @@ _IMPERSONATE_BINS = {
     "chrome116-linux":  "curl_chrome116_linux",
     "chrome99-android": "curl_chrome99_android",
     "ff117":            "curl_ff117",
+    "ff117-linux":      "curl_ff117_linux",
     "edge101":          "curl_edge101",
+    "edge101-linux":    "curl_edge101_linux",
     "safari15-5":       "curl_safari15_5",
 }
 
