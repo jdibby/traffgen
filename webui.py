@@ -2636,6 +2636,15 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
       <div style="max-width:900px">
 
         <div class="a-section">
+          <div class="a-h">v3.10.2 &mdash; <span style="color:var(--muted);font-weight:400">Jul 2026</span></div>
+          <table class="st-table" style="margin-top:10px">
+            <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Entrypoint</td><td><strong>TLS-interception auto-probe blind spot</strong> — <code>auto_trust_proxy_ca()</code> only probed 15 cloud/developer-infra hosts, exactly the categories most SASE vendors (Cato Networks, Zscaler, Palo Alto Prisma, Netskope, etc.) default-bypass, so the probe could report "no interception detected" and skip installing the proxy CA while the proxy was actively inspecting other traffic. Probe set expanded to 32 hosts (10 consumer-web + 8 AI/LLM added), and a clean result now surfaces an explicit warning pointing at Option 1/2 manual CA injection instead of implying "no interception"</td></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>tls-inspection</td><td><strong>Vendor detection expanded</strong> — <code>_PROXY_VENDOR_MAP</code> gains issuer CN/Org matching for 22 more SASE/firewall vendors (SonicWall, Hillstone, Stormshield, Array Networks, Sangfor, Huawei, Zyxel, Netgate/pfSense, OPNsense/Deciso, HPE Aruba, VMware/Broadcom VeloCloud, Citrix/NetScaler, Todyl, NordLayer, Absolute Secure Access, Axis Security, Ericom, GFI KerioControl, Untangle/Arista ETM/Smoothwall)</td></tr>
+          </table>
+        </div>
+
+        <div class="a-section">
           <div class="a-h">v3.10.1 &mdash; <span style="color:var(--muted);font-weight:400">Jun 2026</span></div>
           <table class="st-table" style="margin-top:10px">
             <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-generator.py — Traffic Generator v3.10.1
+generator.py — Traffic Generator v3.10.2
 ========================================
 Simulates realistic network traffic across a wide range of protocols and
 behaviours: DNS, HTTP/HTTPS/HTTP3, FTP, SSH, NTP, BGP, ICMP, SNMP,
@@ -58,7 +58,7 @@ from rich import box
 from endpoints import *           # noqa: F401,F403  (large data file)
 
 # ── Globals ───────────────────────────────────────────────────────────────────
-VERSION = "3.10.1"
+VERSION = "3.10.2"
 
 
 class _DualWriter:
@@ -4063,6 +4063,29 @@ def tls_inspection_check() -> None:
         ("f5",               "F5 BIG-IP"),
         ("a10 networks",     "A10 Networks"),
         ("juniper",          "Juniper Networks"),
+        ("sonicwall",        "SonicWall"),
+        ("hillstone",        "Hillstone Networks"),
+        ("stormshield",      "Stormshield"),
+        ("array networks",   "Array Networks"),
+        ("sangfor",          "Sangfor"),
+        ("huawei",           "Huawei"),
+        ("zyxel",            "Zyxel"),
+        ("netgate",          "Netgate/pfSense"),
+        ("pfsense",          "Netgate/pfSense"),
+        ("opnsense",         "OPNsense"),
+        ("deciso",           "OPNsense/Deciso"),
+        ("aruba",            "HPE Aruba Networking"),
+        ("velocloud",        "VMware/Broadcom VeloCloud"),
+        ("netscaler",        "Citrix NetScaler"),
+        ("citrix",           "Citrix"),
+        ("todyl",            "Todyl"),
+        ("nordlayer",        "NordLayer"),
+        ("absolute secure access", "Absolute Secure Access"),
+        ("axis security",    "Axis Security (HPE)"),
+        ("ericom",           "Ericom Security"),
+        ("kerio",            "GFI KerioControl"),
+        ("untangle",         "Untangle/Arista ETM"),
+        ("smoothwall",       "Smoothwall"),
     ]
 
     def _detect_vendor(issuer_cn: str, issuer_org: str) -> str:

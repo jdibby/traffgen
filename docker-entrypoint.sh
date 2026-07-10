@@ -35,11 +35,17 @@ DISCLAIMER
 #     docker run -e EXTRA_CA_CERT="$(cat proxy-ca.crt)" jdibby/traffgen:latest
 #
 #   Option 3 — fully automatic (no configuration required):
-#     Just run the container.  The entrypoint probes 15 diverse HTTPS hosts,
+#     Just run the container.  The entrypoint probes 32 diverse HTTPS hosts,
 #     detects TLS interception by fingerprinting CA certs across failures,
 #     and installs the most-seen untrusted CA automatically.  Handles partial
 #     bypass (some hosts whitelisted by the proxy) by requiring the CA to appear
 #     on more than one host before treating it as confirmed.
+#
+#     Note: most SASE/proxy vendors ship default bypass rules for cloud/dev
+#     infra (Microsoft/Google/Apple, package registries, CA/OCSP endpoints),
+#     so the probe set also includes ordinary consumer web hosts that are
+#     rarely exempted — a clean result on infra hosts alone does not prove
+#     there's no interception happening on real traffic.
 #
 # All options can be combined.  Manual certs (Options 1 & 2) are installed first
 # so that if they cover the proxy, the auto-probe (Option 3) sees a clean chain
@@ -67,9 +73,17 @@ fi
 # ── Option 3: auto-detect TLS interception across diverse probe hosts ──────────
 #
 # Strategy:
-#   1. Probe 15 hosts spanning different ASNs, providers, and URL categories.
-#      Inspection platforms sometimes whitelist categories (finance, health,
-#      government), so using diverse targets catches selective bypass.
+#   1. Probe 32 hosts spanning different ASNs, providers, and URL categories:
+#      14 cloud/developer-infra hosts (frequently exempted from inspection by
+#      policy — a clean result here alone is NOT proof of no interception),
+#      10 ordinary consumer-web hosts (news, commerce, reference,
+#      entertainment) that are rarely on any vendor's default bypass list and
+#      therefore give the real signal for whether traffgen's own traffic
+#      (which mostly looks like ordinary/adversarial web traffic, not cloud
+#      infra) is actually being inspected, and 8 AI/LLM hosts (ChatGPT,
+#      Claude, Gemini, Copilot, Perplexity, Character.AI, Hugging Face) since
+#      GenAI traffic is an active DLP/CASB inspection target for most SASE
+#      vendors but is often still bundled into a "trusted SaaS" bypass rule.
 #   2. For every host that fails TLS verification, extract CA certs from the
 #      presented chain and fingerprint them (SHA-256).
 #   3. Vote: a CA fingerprint seen on N > 1 hosts is almost certainly the proxy
@@ -81,9 +95,9 @@ fi
 auto_trust_proxy_ca() {
     local AUTO_CA="${CERT_DIR}/auto-proxy-ca.crt"
 
-    # 15 diverse targets: CDN, cloud, social, developer tools, OS vendors,
-    # financial — chosen to surface bypass rules that whitelist specific
-    # categories or ASNs.
+    # Cloud / developer infra — CDN, cloud, developer tools, OS vendors, CA/PKI
+    # infra.  Commonly on a proxy's default bypass list, so a clean result
+    # here does not by itself mean there's no interception.
     local PROBES=(
         "www.google.com:443"
         "www.cloudflare.com:443"
@@ -92,7 +106,6 @@ auto_trust_proxy_ca() {
         "www.amazon.com:443"
         "github.com:443"
         "login.microsoftonline.com:443"
-        "www.reddit.com:443"
         "pypi.org:443"
         "registry.npmjs.org:443"
         "hub.docker.com:443"
@@ -100,6 +113,30 @@ auto_trust_proxy_ca() {
         "www.digicert.com:443"
         "ocsp.pki.goog:443"
         "one.one.one.one:443"
+        # Ordinary consumer web — news, social, commerce, reference,
+        # entertainment.  Rarely exempted from inspection, so failures here
+        # are a much stronger signal that real traffic is being intercepted.
+        "www.reddit.com:443"
+        "www.bbc.com:443"
+        "www.cnn.com:443"
+        "www.espn.com:443"
+        "www.nytimes.com:443"
+        "www.ebay.com:443"
+        "stackoverflow.com:443"
+        "www.imdb.com:443"
+        "www.weather.com:443"
+        "en.wikipedia.org:443"
+        # AI / LLM services — a growing DLP/CASB inspection target for most
+        # SASE vendors, but frequently still bundled into the same "trusted
+        # SaaS" bypass category as other major cloud services.
+        "chat.openai.com:443"
+        "claude.ai:443"
+        "api.anthropic.com:443"
+        "gemini.google.com:443"
+        "copilot.microsoft.com:443"
+        "perplexity.ai:443"
+        "character.ai:443"
+        "huggingface.co:443"
     )
 
     local TMP_DIR
@@ -188,9 +225,22 @@ auto_trust_proxy_ca() {
 
     echo "[entrypoint] Results: ${#passed[@]} clean  ${#failed[@]} intercepted  ${#unreachable[@]} unreachable"
 
-    # Nothing failed — no interception
+    # Nothing failed — no interception detected among the probed hosts. This is
+    # NOT the same as "no interception is happening": most SASE/proxy vendors
+    # bypass inspection for cloud/dev infra by default, so if only those hosts
+    # were reachable, a clean result here can still hide real interception on
+    # ordinary traffic. Only trust this if the general-web hosts were reached.
     if [ "${#failed[@]}" -eq 0 ]; then
-        echo "[entrypoint] TLS: all reachable hosts verified — no interception detected."
+        if [ "${#unreachable[@]}" -ge "${#PROBES[@]}" ]; then
+            echo "[entrypoint] TLS: no probe hosts were reachable — could not evaluate interception."
+        else
+            echo "[entrypoint] TLS: all reachable probe hosts verified clean — no interception detected on this set."
+            echo "[entrypoint] NOTE: if traffgen's own test suites still show TLS/cert errors, your proxy"
+            echo "[entrypoint]       may bypass inspection for these specific hosts (common for cloud/dev"
+            echo "[entrypoint]       infra) while still inspecting other traffic. If that happens, use"
+            echo "[entrypoint]       Option 1 (bind-mount) or Option 2 (EXTRA_CA_CERT) to install the"
+            echo "[entrypoint]       proxy's CA directly instead of relying on auto-detection."
+        fi
         rm -rf "$TMP_DIR"
         return 0
     fi
