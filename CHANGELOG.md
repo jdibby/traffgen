@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [3.12.0] — 2026-07-10
+
+### Added
+- **TLS-interception auto-probe — anonymizer/VPN category**: `auto_trust_proxy_ca()` in `docker-entrypoint.sh` gains a 12-host anonymizer/VPN/proxy-avoidance probe category (Tor, ProtonVPN, NordVPN, ExpressVPN, IPVanish, Mullvad, proxysite.com, croxyproxy.com, filterbypass.me, 4everproxy.com, freeproxyserver.net), bringing the probe set from 32 to 44 hosts. Live testing against a production Cato Networks deployment showed this category is inspected essentially unconditionally (a security-risk category, not a "trusted SaaS" bypass exemption) while cloud-infra/consumer-web/AI-LLM hosts are frequently bypassed — making it the most reliable single category for confirming interception is active at all.
+
+### Fixed
+- **`trafficmap` — Live Hit Feed duplicate entries**: a normal multi-line probe (URL line + result line) produced two feed rows for the same host — one neutral, one with the outcome badge. `_tmapAddFeed` now stores `host`/`suite`/`outcome` on the feed-item dataset and updates the most recent matching `(host, suite)` entry in place instead of inserting a duplicate.
+- **`trafficmap` — outcome regex false positives**: banner/info lines containing a bare 3-digit number (e.g. `"Tested 403 endpoints"`, `"Crawl seed (200/300)"`) were misclassified as blocked/allowed. HTTP status codes now only match with an explicit `HTTP `/`status:`/`code:` prefix or trailing ` OK`.
+- **`http3` — QUIC handshake stalls with no timeout**: `asyncio.wait_for(self._done.wait(), timeout=5.0)` in `head()` only bounded the wait for response headers — `quic_connect()` itself had no timeout, so a silently-dropped UDP/443 firewall rule stalled each probe for ~60 s (the OS socket timeout) instead of failing fast. The full `quic_connect()` + `head()` chain is now wrapped in a 10 s `asyncio.wait_for()`; blocked endpoints now report `timeout` in ~10 s.
+
+---
+
 ## [3.11.0] — 2026-07-10
 
 ### Added
