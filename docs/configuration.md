@@ -11,6 +11,7 @@
 | `--nowait` | — | off | Disable all inter-test pauses (loop and single-run mode) |
 | `--crawl-start` | URL | `https://data.commoncrawl.org` | Seed URL for the `web-crawl` suite |
 | `--lateral-networks` | CIDRs | *(auto-detect)* | Comma-separated CIDRs to target in the `lateral-movement` suite (e.g. `192.168.1.0/24,10.0.0.0/24`). Omit to scan all auto-detected networks. |
+| `--impersonate` | `off` `chrome116` `chrome116-linux` `chrome99-android` `ff117` `ff117-linux` `edge101` `edge101-linux` `safari15-5` | `off` | Issue HTTP(S) probes through a [curl-impersonate](https://github.com/lwthiker/curl-impersonate) binary instead of system curl / Python `requests`, replicating a real browser's TLS ClientHello, HTTP/2 fingerprint, and Client Hint headers. Applies to every HTTP(S)-probing suite. See [Browser Fingerprint Impersonation](#browser-fingerprint-impersonation---impersonate) below. |
 | `--list` | — | — | Print all suites with descriptions and exit |
 | `--version` | — | — | Print version and exit |
 
@@ -136,3 +137,40 @@ The `user_agents` list ships **500 entries** covering current 2024–2025 device
 - **Smart TVs** — Samsung Tizen, LG webOS, Sony Android TV
 - **Gaming** — PS5, Xbox Series X/S
 - **Other** — Meta Quest 2/3, Apple TV
+
+---
+
+## Browser Fingerprint Impersonation (`--impersonate`)
+
+By default, HTTP(S)-probing suites send a realistic browser `User-Agent` and matching headers, but the underlying TLS connection is made by system `curl` (OpenSSL) or Python's `requests` library — both of which have a distinct TLS ClientHello fingerprint (JA3/JA4) that JA3-aware NGFW/SASE traffic classifiers can distinguish from a real browser, regardless of what `User-Agent` string is attached. This was confirmed live against a production Cato Networks deployment: every plain-curl/requests-based probe was classified `Client Class: restclient cpp` / `unclassified tls`, no matter which browser UA was randomly picked that round.
+
+`--impersonate` routes the request through a [curl-impersonate](https://github.com/lwthiker/curl-impersonate) binary instead — a curl build that replicates a specific browser's actual TLS cipher order/extensions, ALPS, HTTP/2 settings frame, and Client Hint headers (`Sec-CH-UA-Platform`, etc.), not just its `User-Agent` string. In the same live testing, this correctly flipped `Client Class` to real browser-engine identifiers (`chromium`, `webkit`) instead of the generic automation bucket.
+
+```bash
+# Run the tor-anonymizer suite impersonating desktop Chrome on Linux
+docker run --pull=always -it jdibby/traffgen:latest \
+  --suite=tor-anonymizer --impersonate=chrome116-linux
+
+# Run everything, impersonating Firefox
+docker run --pull=always -it jdibby/traffgen:latest \
+  --suite=all --impersonate=ff117
+```
+
+| Profile | Browser | Platform declared |
+|---|---|---|
+| `chrome116` | Chrome 116 | Windows |
+| `chrome116-linux` | Chrome 116 | Linux (UA + `Sec-CH-UA-Platform` corrected — this container's actual OS) |
+| `chrome99-android` | Chrome 99 Mobile | Android |
+| `ff117` | Firefox 117 | Windows |
+| `ff117-linux` | Firefox 117 | Linux |
+| `edge101` | Edge 101 | Windows |
+| `edge101-linux` | Edge 101 | Linux |
+| `safari15-5` | Safari 15.5 | macOS |
+
+The `-linux` variants exist because traffgen's own runtime genuinely is Linux — declaring Windows/macOS is not more "realistic," it's just inaccurate. curl-impersonate's stock profiles all default to Windows or macOS since those are the common desktop-browser cases; the Linux variants only rewrite the platform-declaring tokens (User-Agent + `Sec-CH-UA-Platform` where present), leaving the actual TLS/HTTP2 fingerprint untouched.
+
+`tools/fingerprint-matrix.sh` (in the repo) cycles through every profile against every suite that honors `--impersonate`, printing UTC timestamps so results can be correlated against your NGFW/SASE dashboard event log.
+
+**Scope:** applies to all HTTP(S)-probing suites (built on `_curl_head`, `_curl_download`, or `_probe_domain_list`) — effectively every suite except protocol-specific ones with no HTTP layer (DNS, ICMP, SNMP, BGP, SSH, etc).
+
+**Separately:** `Device OS Type`/`OS Type` fields in some SASE dashboards (as opposed to `Client Class`) were observed to be a *persistent, per-device cached classification* rather than a live per-request signal — they did not change with `--impersonate` across live testing, regardless of profile. This appears to be inherent to how these platforms do passive device fingerprinting (TCP/IP stack-level), not something any HTTP/TLS-layer client change can influence.
