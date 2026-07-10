@@ -5,6 +5,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [3.13.0] — 2026-07-10
+
+### Added
+- **Traffic Map — click-to-inspect host panel**: clicking any host marker opens a detail panel with hit count, allowed/blocked breakdown, last-seen time, and the suites that have hit it.
+- **Traffic Map — filter by category, country, and outcome**: the color legend is now clickable to toggle suite categories on/off, "By Country" rows can isolate a single country, and a new "Blocked only" toggle scopes arcs, markers, and the Live Hit Feed to a chosen slice without discarding the underlying counters.
+- **Traffic Map — historical replay**: a capped in-session history buffer (last 800 hits) feeds a play/pause/scrub control bar with a speed selector, so a burst of activity can be rewound and stepped through independent of live traffic. Live processing pauses automatically while replay is open and resumes cleanly on exit with no marker loss, even past the history cap.
+- **Traffic Map — export hit history**: a toolbar button downloads the current session's hit history as JSON.
+- **Traffic Map — marker clustering**: host markers cluster at low zoom via a lazily-loaded Leaflet.markercluster plugin (degrades gracefully to unclustered markers if the CDN is unreachable).
+- **Traffic Map — `prefers-reduced-motion` support**: arc flights and the pulsing source-location marker collapse to a brief static fade instead of continuous animation when the OS-level reduced-motion preference is set.
+- **Traffic Map — concurrent-arc cap**: caps simultaneous animated arcs at 60 (with a dropped-arc count surfaced via tooltip) so a scan-heavy suite can't spawn unbounded animation layers; live counters stay accurate regardless of the cap.
+- **Traffic Map — pauses when not visible**: stops processing incoming log lines into arcs when the Traffic Map tab isn't the active panel or the browser tab is hidden, instead of animating invisibly in the background.
+- **Traffic Map — persisted view + adaptive sizing**: map center/zoom/expanded-view state persists across reloads; a `ResizeObserver` on the map container (not just `window.resize`) keeps the map correctly sized through sidebar/layout changes, and a new responsive breakpoint stacks the country/feed sidebar below the map under 820px.
+- **Dashboard — search everywhere**: Live View, the Security per-suite breakdown table, and the Changelog tab all gained a search box (previously only the Tests tab had one).
+- **Dashboard — more export coverage**: CSV/JSON export added to the Security and Health tabs, matching the existing Overview export.
+- **Dashboard — drill-down from summary cards**: clicking Overview's "Active Test" card jumps to that suite in the Tests tab; clicking a Security summary card (Blocked/Dropped/Allowed) jumps to Live View pre-filtered to matching log lines.
+- **Dashboard — theme auto-detection**: a fresh browser with no saved preference now follows the OS `prefers-color-scheme` instead of always defaulting to dark.
+- **Dashboard — keyboard-accessible widget reordering**: the drag-to-reorder handles on the Security and Health grids are now focusable and respond to ↑/↓ arrow keys, in addition to mouse drag.
+- **Dashboard — portable settings bundle**: new topbar buttons export/import dashboard preferences (theme, widget order, map view) as a JSON file — never the admin token or run history.
+
+---
+
 ## [3.12.0] — 2026-07-10
 
 ### Added
