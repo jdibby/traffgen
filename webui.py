@@ -1762,7 +1762,7 @@ select.diag-input{appearance:none;-webkit-appearance:none;background-color:var(-
 /* Widget grids: capped at 1400px, centered, full-height overflow-y */
 #ov-grid,#sec-grid,#health-grid{display:flex;flex-direction:column;gap:14px;max-width:1400px;width:100%;margin:0 auto}
 /* Max-width cap on other panel content (About, Tests, etc.) */
-.panel>*:not(#ov-grid):not(#sec-grid):not(#health-grid){max-width:1400px;width:100%;box-sizing:border-box;align-self:center}
+.panel>*:not(#ov-grid):not(#sec-grid):not(#health-grid):not(.tmap-main-row){max-width:1400px;width:100%;box-sizing:border-box;align-self:center}
 /* Stat cards: fully fluid, min 130px per card */
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px}
 .card{background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:2px;transition:border-color .15s,box-shadow .15s;box-shadow:0 1px 4px rgba(0,0,0,.25)}
@@ -2636,6 +2636,17 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
       <div style="max-width:900px">
 
         <div class="a-section">
+          <div class="a-h">v3.12.0 &mdash; <span style="color:var(--muted);font-weight:400">Jul 2026</span></div>
+          <table class="st-table" style="margin-top:10px">
+            <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-feat">FEAT</span></td><td>Entrypoint</td><td><strong>TLS auto-probe — anonymizer/VPN category</strong> — <code>auto_trust_proxy_ca()</code> gains 12 anonymizer/VPN/proxy-avoidance hosts (Tor, ProtonVPN, NordVPN, ExpressVPN, IPVanish, Mullvad, and public web proxies), bringing the probe set from 32 to 44 hosts. Live-confirmed against Cato Networks: this category is inspected essentially unconditionally, unlike cloud-infra/consumer-web/AI-LLM hosts which are frequently bypassed — the single most reliable category for confirming interception is active at all</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Trafficmap</td><td><strong>Live Hit Feed duplicate entries</strong> — a multi-line probe (URL line + result line) produced two feed rows for the same host; the feed now updates the most recent matching host/suite entry in place instead of inserting a duplicate</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Trafficmap</td><td><strong>Outcome regex false positives</strong> — banner lines containing a bare 3-digit number (e.g. "Tested 403 endpoints") were misclassified as blocked/allowed; status codes now require an explicit HTTP/status/code prefix or trailing " OK"</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>http3</td><td><strong>QUIC handshake stalls with no timeout</strong> — the inner response-wait timeout didn't cover <code>quic_connect()</code> itself, so a silently-dropped UDP/443 firewall rule stalled each probe ~60s; the full connect+head chain is now wrapped in a 10s timeout</td></tr>
+          </table>
+        </div>
+
+        <div class="a-section">
           <div class="a-h">v3.11.0 &mdash; <span style="color:var(--muted);font-weight:400">Jul 2026</span></div>
           <table class="st-table" style="margin-top:10px">
             <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
@@ -3470,6 +3481,7 @@ const ST_CLS={running:'tp-running',between_tests:'tp-paused',paused:'tp-paused',
 const ST_LBL={running:'Running',between_tests:'Between Tests',paused:'Paused',stopped:'Stopped',starting:'Starting'};
 function apply(s){
   _lastState=s;
+  if(_tmap)_tmapUpdateStats();
   _trackRunHistory(s);
   if(s.suites&&s.suites.length&&!Object.keys(_SD).length){s.suites.forEach(su=>{_SD[su.name]=su.description||'';});}
   const ver=s.version||'—';
@@ -4797,9 +4809,11 @@ function exportResults(fmt){
     if($('lat-heatmap'))_renderHeatmap();
   },3000);
 })();
+let _resizeTmapTimer=null;
 window.addEventListener('resize',()=>{
   if(_lastState){drawSpark(_lastState.history||[]);drawSecTrend(_secHist);}
   if(_lastHealth){drawDiskBars(_lastHealth.disk_read_kbps||0,_lastHealth.disk_write_kbps||0);drawNetSpark('net-spark',_netHist);drawNetSpark('h-net-spark',_hNetHist);}
+  if(_tmap){clearTimeout(_resizeTmapTimer);_resizeTmapTimer=setTimeout(()=>{if(_tmap)_tmap.invalidateSize();},150);}
 });
 // -- Canvas hover tooltips --------------------------------------------------
 const _tt=document.createElement('div');_tt.className='tt';document.body.appendChild(_tt);
@@ -4887,6 +4901,7 @@ _initDrag('health-grid');
 // ── Traffic Map ────────────────────────────────────────────────────────────────
 let _tmap=null,_tmapEs=null,_tmapExpanded=false,_tmapSrc=null,_tmapSrcMarker=null,_tmapPlacedHosts=new Set();
 let _tmapArcs=0,_tmapTotal=0,_tmapBlocked=0,_tmapEps=new Set();
+let _tmapBlockedBaseline=null;
 let _tmapTileBase=null,_tmapTileLabels=null;
 function _tmapApplyTiles(){
   if(!_tmap)return;
@@ -5224,14 +5239,6 @@ function _tmapExtractHost(msg){
   if(m)return m[1];
   return null;
 }
-function _tmapBuildArc(from,to,n){
-  n=n||60;
-  const dLon=Math.abs(to[1]-from[1]);
-  const lift=dLon*.18+Math.abs(to[0]-from[0])*.08;
-  const midLat=(from[0]+to[0])/2+lift;
-  const midLng=(from[1]+to[1])/2;
-  return Array.from({length:n+1},function(_,i){var t=i/n;return[(1-t)*(1-t)*from[0]+2*(1-t)*t*midLat+t*t*to[0],(1-t)*(1-t)*from[1]+2*(1-t)*t*midLng+t*t*to[1]];});
-}
 function _tmapOutcome(msg){
   if(!msg)return'';
   // Unambiguous block keywords — match anywhere in the message.
@@ -5245,6 +5252,15 @@ function _tmapOutcome(msg){
   if(/(?:\bHTTP\b\s+|\bstatus:?\s*|\bcode:?\s*|↳.*?HTTP\s+)(2\d\d)\b/i.test(msg)||/\b2\d\d\s+OK\b/i.test(msg))return'allowed';
   return'';
 }
+function _tmapArcPos(from,to,t){
+  const dLon=Math.abs(to[1]-from[1]);
+  const lift=dLon*.18+Math.abs(to[0]-from[0])*.08;
+  const midLat=(from[0]+to[0])/2+lift;
+  const midLng=(from[1]+to[1])/2;
+  const mt=1-t;
+  return[mt*mt*from[0]+2*mt*t*midLat+t*t*to[0],mt*mt*from[1]+2*mt*t*midLng+t*t*to[1]];
+}
+function _tmapEaseOut(t){return 1-Math.pow(1-t,3);}
 function _tmapShootArc(geo,suite,host,outcome){
   if(!_tmap)return;
   const blocked=outcome==='blocked';
@@ -5260,31 +5276,66 @@ function _tmapShootArc(geo,suite,host,outcome){
     _tmapExpanded=true;
     _tmap.flyTo([30,0],2,{duration:2});
   }
-  const pts=_tmapBuildArc(from,to);
-  const glow=L.polyline([pts[0]],{color:c,weight:6,opacity:.15,interactive:false,smoothFactor:1}).addTo(_tmap);
-  const core=L.polyline([pts[0]],{color:c,weight:1.5,opacity:.7,interactive:false,smoothFactor:1}).addTo(_tmap);
-  const dot=L.circleMarker(pts[0],{radius:5,color:'#fff',fillColor:c,fillOpacity:1,weight:2,interactive:false}).addTo(_tmap);
-  let i=0;const TRAIL=14;
-  const ticker=setInterval(function(){
-    i++;
-    if(i>=pts.length){
-      clearInterval(ticker);
+  const p0=_tmapArcPos(from,to,0);
+  const glow=L.polyline([p0],{color:c,weight:6,opacity:.15,interactive:false,smoothFactor:1}).addTo(_tmap);
+  const core=L.polyline([p0],{color:c,weight:1.5,opacity:.7,interactive:false,smoothFactor:1}).addTo(_tmap);
+  const dot=L.circleMarker(p0,{radius:5,color:'#fff',fillColor:c,fillOpacity:1,weight:2,interactive:false}).addTo(_tmap);
+  const DURATION=2000;
+  const TRAIL_FRAC=0.22;
+  let startTs=null;
+  function frame(ts){
+    if(!_tmap)return;
+    if(startTs===null)startTs=ts;
+    const rawT=Math.min(1,(ts-startTs)/DURATION);
+    const t=_tmapEaseOut(rawT);
+    const head=_tmapArcPos(from,to,t);
+    dot.setLatLng(head);
+    const trailStartT=Math.max(0,t-TRAIL_FRAC);
+    const STEPS=16;
+    const tail=Array.from({length:STEPS+1},function(_,i){return _tmapArcPos(from,to,trailStartT+(t-trailStartT)*(i/STEPS));});
+    glow.setLatLngs(tail);core.setLatLngs(tail);
+    if(rawT>=1){
       _tmapArcs=Math.max(0,_tmapArcs-1);
       _tmapUpdateStats();
-      const burst=L.circleMarker(to,{radius:5,color:c,fillColor:c,fillOpacity:.9,weight:0,interactive:false}).addTo(_tmap);
-      let r=5,op=.9;
-      const bT=setInterval(function(){r+=3;op-=.07;if(op<=0){clearInterval(bT);_tmap.removeLayer(burst);}else burst.setStyle({radius:r,fillOpacity:op,opacity:op});},30);
-      let tOp=.7;
-      const fade=setInterval(function(){tOp-=.04;if(tOp<=0){clearInterval(fade);[glow,core,dot].forEach(function(l){_tmap.removeLayer(l);});}else{glow.setStyle({opacity:tOp*.2});core.setStyle({opacity:tOp});dot.setStyle({fillOpacity:tOp,opacity:tOp});}},40);
+      _tmapArcArrive(to,c,glow,core,dot);
       return;
     }
-    dot.setLatLng(pts[i]);
-    const tail=pts.slice(Math.max(0,i-TRAIL),i+1);
-    glow.setLatLngs(tail);core.setLatLngs(tail);
-  },35);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+function _tmapArcArrive(to,c,glow,core,dot){
+  const burst=L.circleMarker(to,{radius:5,color:c,fillColor:c,fillOpacity:.9,weight:0,interactive:false}).addTo(_tmap);
+  const BURST_MS=600,FADE_MS=900;
+  let bStart=null;
+  function burstFrame(ts){
+    if(!_tmap){_tmap&&_tmap.removeLayer(burst);return;}
+    if(bStart===null)bStart=ts;
+    const bt=Math.min(1,(ts-bStart)/BURST_MS);
+    burst.setStyle({radius:5+bt*20,fillOpacity:.9*(1-bt),opacity:.9*(1-bt)});
+    if(bt<1)requestAnimationFrame(burstFrame);else _tmap.removeLayer(burst);
+  }
+  requestAnimationFrame(burstFrame);
+  let fStart=null;
+  function fadeFrame(ts){
+    if(!_tmap)return;
+    if(fStart===null)fStart=ts;
+    const ft=Math.min(1,(ts-fStart)/FADE_MS);
+    const op=.7*(1-ft);
+    glow.setStyle({opacity:op*.2});core.setStyle({opacity:op});dot.setStyle({fillOpacity:op,opacity:op});
+    if(ft<1)requestAnimationFrame(fadeFrame);else{[glow,core,dot].forEach(function(l){_tmap.removeLayer(l);});}
+  }
+  requestAnimationFrame(fadeFrame);
 }
 function _tmapUpdateStats(){
-  const a=_tmapArcs,t=_tmapTotal,b=_tmapBlocked,c=Object.keys(_tmapCtry).length,e=_tmapEps.size;
+  const a=_tmapArcs,t=_tmapTotal,c=Object.keys(_tmapCtry).length,e=_tmapEps.size;
+  let b=_tmapBlocked;
+  if(_lastState&&_lastState.totals){
+    const liveBlk=(_lastState.status==='running'&&_lastState.live)?(_lastState.live.blocked||0):0;
+    const serverBlk=(_lastState.totals.blocked||0)+liveBlk;
+    if(_tmapBlockedBaseline===null)_tmapBlockedBaseline=serverBlk;
+    b=Math.max(0,serverBlk-_tmapBlockedBaseline);
+  }
   [['tmap-s-arcs',a],['tmap-s-total',t],['tmap-s-blocked',b],['tmap-s-ctry',c],['tmap-s-ep',e]].forEach(function(p){var el=$(p[0]);if(el)el.textContent=p[1];});
 }
 function _tmapUpdateCountries(){
