@@ -1055,15 +1055,28 @@ def _curl_download(url: str, rate_limit: str = "3M",
     `rate_limit` caps bandwidth (e.g. "3M" = 3 MB/s) so the test doesn't
     saturate the uplink.  Use an empty string to remove the cap.
     Returns (http_code, curl_exit_code, content_type).
+
+    Honors --impersonate the same way _curl_head does: when set, the request
+    is issued through a curl-impersonate binary instead, and *user_agent* /
+    the usual browser-header synthesis are skipped in favor of the profile's
+    own baked-in headers.
     """
+    impersonate_bin = _IMPERSONATE_BINS.get(getattr(ARGS, "impersonate", "off"))
     rate_flag = f"--limit-rate {rate_limit}" if rate_limit else ""
-    ua_flag   = f"-A '{user_agent}'"          if user_agent  else ""
-    bh        = _browser_headers(user_agent)  if user_agent  else ""
-    cmd = (
-        f"curl {rate_flag} -k --show-error "
-        f"--connect-timeout {connect_timeout} "
-        f"-L -o /dev/null -w '%{{response_code}} %{{content_type}}' {ua_flag} {bh} {url}"
-    )
+    if impersonate_bin:
+        cmd = (
+            f"{impersonate_bin} {rate_flag} -k --show-error "
+            f"--connect-timeout {connect_timeout} "
+            f"-L -o /dev/null -w '%{{response_code}} %{{content_type}}' {url}"
+        )
+    else:
+        ua_flag = f"-A '{user_agent}'"         if user_agent else ""
+        bh      = _browser_headers(user_agent) if user_agent else ""
+        cmd = (
+            f"curl {rate_flag} -k --show-error "
+            f"--connect-timeout {connect_timeout} "
+            f"-L -o /dev/null -w '%{{response_code}} %{{content_type}}' {ua_flag} {bh} {url}"
+        )
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True,
                             timeout=timeout)
     out   = result.stdout.strip()
@@ -3781,6 +3794,12 @@ def _probe_domain_list(local_path: str, n: int = 10) -> None:
     Read a plain-text domain list (one domain per line, # comments ignored),
     pick `n` random entries, and issue an HTTPS GET to each.  Exercises
     threat-intel domain-blocklist enforcement.
+
+    Honors --impersonate: when set, requests go through a curl-impersonate
+    binary instead of Python's `requests` (whose own TLS stack is just as
+    distinguishable from a real browser as system curl's), preserving the
+    response body so the existing HTTP-200 block-page detection in
+    _stats.record() still works.
     """
     console.log(f"Reading domains from: {local_path}")
     try:
@@ -3792,6 +3811,7 @@ def _probe_domain_list(local_path: str, n: int = 10) -> None:
         return
 
     sample = random.sample(domains, min(n, len(domains)))
+    impersonate_bin = _IMPERSONATE_BINS.get(getattr(ARGS, "impersonate", "off"))
 
     with Progress(SpinnerColumn(), TextColumn("[cyan]Probe[/]"),
                   MofNCompleteColumn(), BarColumn(), TimeElapsedColumn(),
@@ -3799,6 +3819,36 @@ def _probe_domain_list(local_path: str, n: int = 10) -> None:
         task = prog.add_task("probe", total=len(sample))
         for i, domain in enumerate(sample, 1):
             url = f"https://{domain}"
+            if impersonate_bin:
+                try:
+                    cmd = (
+                        f"{impersonate_bin} -k -s -L --show-error "
+                        f"--connect-timeout 3 --max-time 3 "
+                        f"-o - -w '\\n__STATUS__%{{http_code}}' {url}"
+                    )
+                    result = subprocess.run(cmd, shell=True, capture_output=True,
+                                            text=True, timeout=8)
+                    body, sep, status = result.stdout.rpartition("\n__STATUS__")
+                    if not sep:
+                        body, status = "", ""
+                    if result.returncode in _BLOCK_EXITS:
+                        console.log(f"({i}/{len(sample)}) {url}  →  blocked (exit {result.returncode})")
+                        _stats.record(status, exit_code=result.returncode, body=body)
+                    elif result.returncode in _DROP_EXITS or not status or status == "000":
+                        console.log(f"({i}/{len(sample)}) {url}  →  timeout/unreachable")
+                        _stats.drop()
+                    else:
+                        console.log(f"({i}/{len(sample)}) {url}  →  {status}")
+                        _stats.record(status, body=body)
+                except subprocess.TimeoutExpired:
+                    console.log(f"({i}/{len(sample)}) {url}  →  timeout")
+                    _stats.drop()
+                except Exception as e:
+                    console.log(f"({i}/{len(sample)}) {url}  →  {e.__class__.__name__}")
+                    _stats.fail()
+                finally:
+                    prog.update(task, advance=1)
+                continue
             try:
                 _probe_ua = random.choice(user_agents)
                 r = requests.get(url, timeout=3, verify=False, allow_redirects=True,
@@ -5730,10 +5780,11 @@ def parse_cli() -> argparse.Namespace:
         default="off", metavar="PROFILE",
         help=(
             "Use a curl-impersonate binary (browser-accurate TLS/HTTP2 fingerprint\n"
-            "and Client Hints) instead of system curl for HEAD-based probes\n"
-            "(_curl_head / _run_head_batch — e.g. tor-anonymizer, llm-dlp web-UI\n"
-            "checks, http/https/ai HEAD suites). Does not affect suites built on\n"
-            "requests/curl-download (e.g. phishing-domains). Default: off.\n"
+            "and Client Hints) instead of system curl / Python requests. Applies to\n"
+            "every suite built on _curl_head, _curl_download, or _probe_domain_list —\n"
+            "i.e. effectively all HTTP(S)-probing suites (tor-anonymizer, llm-dlp,\n"
+            "http, https, ai-browse, av-test, dlp, malware-samples, phishing-domains,\n"
+            "blocklist-probe, and more). Default: off.\n"
             f"Choices: {', '.join(sorted(_IMPERSONATE_BINS.keys()))}"
         ),
     )
