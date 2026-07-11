@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [3.14.0] — 2026-07-11
+
+### Fixed
+- **Dashboard — "Total Requests"/"Success Rate" were measuring suite runs, not requests**: `_web_record()` incremented `attempts` by a hardcoded `+1` per completed suite run instead of using the suite's real per-probe count (`SuiteStats.attempts`, already computed correctly but never passed through — the in-progress `live.attempts` snapshot had it right all along). A `--loop` run with hundreds of probes per suite would show "Total Requests: 42" meaning 42 suite runs, not 42 requests. Added a `requests` field carrying the true per-probe count through to both `tests[name]` and `totals`; the Overview headline and its Success Rate now use it (`allowed/requests`), while `attempts`/`ok`/`fail` keep their original, still-valid suite-run-count meaning (relabeled "Runs" in the Tests-tab table where they're shown next to it, to avoid the same ambiguity).
+- **Security tab — "Other" bucket in the outcome donut could never show anything**: it computed `attempts − (allowed+blocked+dropped)`, but `attempts` is the run counter above — always far smaller than the probe-outcome sum, so `Math.max(0, …)` clamped it to 0 in every realistic scenario. Now compares against the real `requests` total, so probes that got no outcome classification (e.g. a suite-level exception via `fail()`) actually surface.
+- **Security tab — signal-breakdown panel undercounted drops**: `SuiteStats.record()`'s two `dropped` branches (curl exit 6/28, and blank/`000`/`---` responses) incremented `dropped` but never wrote to `codes{}` — only the separate `.drop()` helper did. Since most suites route through `record()`, the "Block Signal Breakdown" panel showed far less than the real dropped total shown right above it. Both branches now populate `codes` (`exit6`/`exit28`/a new `noresp` bucket for blank responses).
+- **Generator — a timed-out suite's abandoned thread could bleed stats into the next suite**: `_run_guarded()` abandons (doesn't kill) a suite thread that exceeds its timeout; since all suites shared one global `SuiteStats` object, an orphaned thread still running in the background could keep calling `.block()`/`.drop()`/etc. after the *next* suite had already reset those counters for itself, corrupting its per-suite blocked/dropped breakdown. `SuiteStats` now tracks which thread is currently "active" (set atomically together with the counter reset via a new `reset_for_run()`), and every outcome-recording method checks it first — an orphan's calls become silent no-ops instead of landing in whichever suite happens to be current.
+
+---
+
 ## [3.13.0] — 2026-07-10
 
 ### Added
