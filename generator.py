@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-generator.py — Traffic Generator v3.13.0
+generator.py — Traffic Generator v3.14.0
 ========================================
 Simulates realistic network traffic across a wide range of protocols and
 behaviours: DNS, HTTP/HTTPS/HTTP3, FTP, SSH, NTP, BGP, ICMP, SNMP,
@@ -58,7 +58,7 @@ from rich import box
 from endpoints import *           # noqa: F401,F403  (large data file)
 
 # ── Globals ───────────────────────────────────────────────────────────────────
-VERSION = "3.13.0"
+VERSION = "3.14.0"
 
 
 class _DualWriter:
@@ -387,11 +387,38 @@ class SuiteStats:
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
+        self._active_thread: "threading.Thread | None" = None
         self._reset("unknown")
 
     def reset(self, name: str) -> None:
         with self._lock:
             self._reset(name)
+
+    def set_active_thread(self, thread: "threading.Thread") -> None:
+        """Mark `thread` as the only thread whose outcomes get recorded.
+
+        _run_guarded() abandons (doesn't kill) a suite thread that exceeds its
+        timeout, so it can still be running when the next suite starts and
+        resets these counters. Every outcome-recording method below checks
+        this before mutating anything, so once the next suite calls this with
+        its own thread, the orphan's calls become silent no-ops instead of
+        bleeding into whichever suite happens to be current.
+        """
+        with self._lock:
+            self._active_thread = thread
+
+    def reset_for_run(self, name: str, thread: "threading.Thread") -> None:
+        """reset() + set_active_thread() in one lock acquisition.
+
+        Doing these separately would leave a brief window, after counters
+        are cleared but before the new thread is marked active, where a
+        still-running orphaned thread from the *previous* run — whose
+        identity still matches _active_thread at that point — could sneak an
+        outcome into the freshly-reset counters.
+        """
+        with self._lock:
+            self._reset(name)
+            self._active_thread = thread
 
     def _reset(self, name: str) -> None:
         self.name       = name
@@ -411,6 +438,8 @@ class SuiteStats:
         '---' / '000' / '' counts as a drop/error.
         HTTP 200 bodies matching _BLOCK_PAGE_PATTERNS are reclassified as blocked."""
         with self._lock:
+            if threading.current_thread() is not self._active_thread:
+                return
             self.attempts += 1
             c = str(code).strip()
             if exit_code in _BLOCK_EXITS:
@@ -422,10 +451,13 @@ class SuiteStats:
                 outcome = "dropped"
                 self.dropped += 1
                 self.errors  += 1   # keep errors count for backwards compat
+                bucket = f"exit{exit_code}"
+                self.codes[bucket] = self.codes.get(bucket, 0) + 1
             elif not c or c in ("---", "000", "0"):
                 outcome = "dropped"
                 self.dropped += 1
                 self.errors  += 1
+                self.codes["noresp"] = self.codes.get("noresp", 0) + 1
             elif c in _BLOCK_HTTP:
                 outcome = "blocked"
                 self.blocked += 1
@@ -450,6 +482,8 @@ class SuiteStats:
     def ok(self, target: str = "") -> None:
         """Record a successful non-HTTP probe (ping, dig, SSH reached, etc.)."""
         with self._lock:
+            if threading.current_thread() is not self._active_thread:
+                return
             self.attempts  += 1
             self.responses += 1
             self.allowed   += 1
@@ -459,6 +493,8 @@ class SuiteStats:
     def fail(self, target: str = "") -> None:
         """Record a failed probe (exception, timeout, unreachable)."""
         with self._lock:
+            if threading.current_thread() is not self._active_thread:
+                return
             self.attempts += 1
             self.errors   += 1
             if target and len(self.probes) < _PROBE_DETAIL_MAX:
@@ -467,6 +503,8 @@ class SuiteStats:
     def block(self, exit_code: int = 7, target: str = "") -> None:
         """Record an explicit non-HTTP block (RST, proxy refusal detected externally)."""
         with self._lock:
+            if threading.current_thread() is not self._active_thread:
+                return
             self.attempts += 1
             self.blocked  += 1
             bucket = f"exit{exit_code}"
@@ -486,6 +524,8 @@ class SuiteStats:
     def drop(self, exit_code: int = 28, target: str = "") -> None:
         """Record a silent drop (timeout, no route, DNS sinkhole)."""
         with self._lock:
+            if threading.current_thread() is not self._active_thread:
+                return
             self.attempts += 1
             self.dropped  += 1
             self.errors   += 1
@@ -625,7 +665,7 @@ _WEB_STATE: dict = {
     "pause_until": 0.0,     # epoch seconds when current inter-test pause ends (0 = not pausing)
     "test_started_at": 0.0,
     "tests": {}, "suites": [],
-    "totals": {"attempts": 0, "ok": 0, "fail": 0, "blocked": 0, "dropped": 0, "allowed": 0},
+    "totals": {"attempts": 0, "requests": 0, "ok": 0, "fail": 0, "blocked": 0, "dropped": 0, "allowed": 0},
     "history": [{"t": int(__import__("time").time()), "ok": 0, "fail": 0}], "events": [],
     "_history_last_t": 0.0,
 }
@@ -673,16 +713,25 @@ def _live_flush_worker() -> None:
 def _web_record(name: str, ok: bool, dur_ms: int,
                 responses: int = 0, codes: "dict | None" = None,
                 blocked: int = 0, dropped: int = 0, allowed: int = 0,
-                probe_detail: "list | None" = None) -> None:
-    """Record one completed test run into the web state and flush to disk."""
+                attempts: int = 0, probe_detail: "list | None" = None) -> None:
+    """Record one completed test run into the web state and flush to disk.
+
+    `attempts` here is the suite's real per-probe attempt count
+    (SuiteStats.attempts) and is stored as `requests` — distinct from this
+    dict's own `attempts` key, which counts completed suite *runs* (it
+    advances by exactly 1 per call, in lockstep with ok/fail). Conflating
+    the two used to make "Total Requests"/"Success Rate" in the dashboard
+    actually measure suite-run counts rather than request volume.
+    """
     with _WEB_STATE_LOCK:
         t = _WEB_STATE["tests"].setdefault(name, {
-            "attempts": 0, "ok": 0, "fail": 0, "responses": 0,
+            "attempts": 0, "ok": 0, "fail": 0, "responses": 0, "requests": 0,
             "last_run_at": 0, "last_ok": True,
             "last_dur_ms": 0, "avg_dur_ms": 0, "codes": {},
             "blocked": 0, "dropped": 0, "allowed": 0, "probes": [],
         })
         t["attempts"]   += 1
+        t["requests"]   += attempts
         t["responses"]  += responses
         t["blocked"]    += blocked
         t["dropped"]    += dropped
@@ -718,6 +767,7 @@ def _web_record(name: str, ok: bool, dur_ms: int,
 
         tot = _WEB_STATE["totals"]
         tot["attempts"] += 1
+        tot["requests"]  = tot.get("requests", 0) + attempts
         tot["blocked"]   = tot.get("blocked", 0) + blocked
         tot["dropped"]   = tot.get("dropped", 0) + dropped
         tot["allowed"]   = tot.get("allowed", 0) + allowed
@@ -1171,7 +1221,14 @@ def _run_guarded(func) -> None:
     exc_box: list[BaseException] = []
     suite_name = _FUNC_TO_SUITE.get(func.__name__, func.__name__)
 
-    _stats.reset(func.__name__)
+    def _wrapper() -> None:
+        try:
+            func()
+        except BaseException as e:  # noqa: BLE001
+            exc_box.append(e)
+
+    t = threading.Thread(target=_wrapper, daemon=True, name=func.__name__)
+    _stats.reset_for_run(func.__name__, t)
     with _WEB_STATE_LOCK:
         _WEB_STATE["current_test"]    = suite_name
         _WEB_STATE["test_started_at"] = time.time()
@@ -1180,13 +1237,6 @@ def _run_guarded(func) -> None:
     _web_log(f"Starting {suite_name}", level="info", test=suite_name)
     t0 = time.time()
 
-    def _wrapper() -> None:
-        try:
-            func()
-        except BaseException as e:  # noqa: BLE001
-            exc_box.append(e)
-
-    t = threading.Thread(target=_wrapper, daemon=True, name=func.__name__)
     t.start()
     t.join(timeout=limit)
     if t.is_alive():
@@ -1199,7 +1249,7 @@ def _run_guarded(func) -> None:
     run_ok = not exc_box and not t.is_alive()
     _web_record(suite_name, run_ok, dur_ms, _stats.responses, dict(_stats.codes),
                 blocked=_stats.blocked, dropped=_stats.dropped, allowed=_stats.allowed,
-                probe_detail=list(_stats.probes))
+                attempts=_stats.attempts, probe_detail=list(_stats.probes))
     _web_log(
         f"{suite_name}: {_stats.attempts} attempts, "
         f"{_stats.responses} ok, {_stats.errors} fail — {dur_ms}ms",

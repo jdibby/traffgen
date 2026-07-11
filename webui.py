@@ -2185,7 +2185,7 @@ body.ro-mode .ro-ctrl{opacity:.32;cursor:not-allowed}
                 <button onclick="exportResults('json')" title="Download results as JSON" style="padding:3px 11px;background:var(--surf2);border:1px solid var(--border2);border-radius:6px;color:var(--text);cursor:pointer;font-size:12px;font-weight:400;letter-spacing:0;text-transform:none">&#11123; JSON</button>
               </div>
             </div>
-            <table data-sort-tbody="tbl-body"><thead><tr><th></th><th>Test</th><th class="r">Attempts</th><th class="r">OK</th><th class="r">Fail</th><th class="r">Rate</th><th class="r">Avg</th><th class="r">Last Run</th></tr></thead>
+            <table data-sort-tbody="tbl-body"><thead><tr><th></th><th>Test</th><th class="r" title="Completed suite runs (not individual requests)">Runs</th><th class="r">OK</th><th class="r">Fail</th><th class="r">Rate</th><th class="r">Avg</th><th class="r">Last Run</th></tr></thead>
             <tbody id="tbl-body"><tr><td colspan="8" class="empty">Waiting for data&#8230;</td></tr></tbody></table>
           </div>
           <div class="ecard" data-widget="live-events">
@@ -2721,6 +2721,17 @@ docker run --pull=always -it jdibby/traffgen:latest --suite=dns --size=L</div>
     <div id="tab-changelog" class="panel">
       <div style="max-width:900px">
         <input id="changelog-search" type="text" placeholder="&#128269; Search changelog&#8230;" oninput="_onChangelogSearch(this.value)" autocomplete="off" spellcheck="false" style="width:100%;max-width:320px;background:var(--surf2);border:1px solid var(--border2);border-radius:8px;padding:7px 12px;color:var(--text);font-size:14px;font-family:inherit;outline:none;margin-bottom:14px">
+
+        <div class="a-section">
+          <div class="a-h">v3.14.0 &mdash; <span style="color:var(--muted);font-weight:400">Jul 2026</span></div>
+          <table class="st-table" style="margin-top:10px">
+            <tr><th style="width:80px">Type</th><th style="width:140px">Area</th><th>Description</th></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Dashboard</td><td><strong>"Total Requests"/"Success Rate" were measuring suite runs, not requests</strong> — the server was incrementing "attempts" once per completed suite run instead of using the real per-probe count it already tracked internally. Added a <code>requests</code> field carrying the true probe count through; the Overview headline and Success Rate now use it, while the run-counter keeps its original meaning (relabeled "Runs" in the Tests tab)</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Security</td><td><strong>"Other" bucket in the outcome donut could never show anything</strong> — it compared the suite-run counter against the probe-outcome sum, which clamped to 0 in every realistic scenario; now compares against the real request total, so unclassified probes actually surface</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Security</td><td><strong>Signal-breakdown panel undercounted drops</strong> — the two most common "dropped" code paths never wrote to the per-code breakdown, only a rarer explicit-drop path did; both now populate it (including a new "No response" bucket for blank/timeout responses)</td></tr>
+            <tr><td><span class="cl-fix">FIX</span></td><td>Generator</td><td><strong>A timed-out suite's abandoned thread could bleed stats into the next suite</strong> — suites share one global stats object, and a suite thread abandoned after a timeout could keep writing block/drop outcomes into whichever suite runs next. Stats now track which thread is currently active and silently ignore outcomes from any other</td></tr>
+          </table>
+        </div>
 
         <div class="a-section">
           <div class="a-h">v3.13.0 &mdash; <span style="color:var(--muted);font-weight:400">Jul 2026</span></div>
@@ -3635,10 +3646,16 @@ function apply(s){
   const lp=$('pill-live');if(isStopped){lp.className='tp-pill tp-stopped';lp.innerHTML='&#9654; RESTART';lp.title='Click to restart tests';}else{lp.className='tp-pill tp-running';lp.innerHTML='<span class="pulse"></span>LIVE';lp.title='Click to stop all tests';}
   $('cfg-s-pill').textContent='suite:'+(s.suite||'—');$('cfg-z-pill').textContent='size:'+(s.size||'—');
   const live=st==='running'&&s.live?s.live:null;
-  const tot=s.totals||{},ok=tot.ok||0,fail=tot.fail||0,att=tot.attempts||0,p=att?ok/att*100:0,blk=tot.blocked||0,drp=tot.dropped||0;
-  $('v-total').textContent=N(att);
-  {const livePart=live?' \xb7 ↻ '+N(live.attempts)+' req in progress':'';$('s-total').textContent=N(ok)+' ok \xb7 '+N(fail)+' fail'+(blk?' \xb7 '+N(blk)+' blocked':'')+(drp?' \xb7 '+N(drp)+' dropped':'')+livePart;}
-  $('v-rate').textContent=att?p.toFixed(1)+'%':'—';$('v-rate').style.color=att?RC(p):'var(--muted)';$('s-rate').textContent=att?N(att)+' total requests':'No data yet';
+  // "requests"/"allowed"/"blocked"/"dropped" are real per-probe counts; "attempts"/"ok"/"fail"
+  // are a separate, coarser per-suite-*run* counter (advances by 1 per completed suite,
+  // regardless of how many probes it made) — kept distinct so neither metric gets diluted
+  // by the other's unit.
+  const tot=s.totals||{},ok=tot.ok||0,fail=tot.fail||0,blk=(tot.blocked||0)+(live?live.blocked||0:0),drp=(tot.dropped||0)+(live?live.dropped||0:0);
+  const req=(tot.requests||0)+(live?live.attempts||0:0),allowedTot=(tot.allowed||0)+(live?live.allowed||0:0);
+  const p=req?allowedTot/req*100:0;
+  $('v-total').textContent=N(req);
+  {const livePart=live?' \xb7 ↻ '+N(live.attempts)+' req in progress':'';$('s-total').textContent=N(ok)+' runs ok \xb7 '+N(fail)+' runs failed'+(blk?' \xb7 '+N(blk)+' blocked':'')+(drp?' \xb7 '+N(drp)+' dropped':'')+livePart;}
+  $('v-rate').textContent=req?p.toFixed(1)+'%':'—';$('v-rate').style.color=req?RC(p):'var(--muted)';$('s-rate').textContent=req?N(req)+' total requests':'No data yet';
   const cur=s.current_test||'',tsa=s.test_started_at||0;
   $('v-test').textContent=cur?cur:'—';
   const tbt=$('tb-test'),tbn=$('tb-test-name'),tbi=$('tb-test-ico');
@@ -3678,6 +3695,7 @@ function apply(s){
     <tr class="xrow${exp?' open':''}"><td class="xcell" colspan="8"><div class="xinner">
       <div class="xi"><div class="xl">Last Dur</div>${t.last_dur_ms?Dur(t.last_dur_ms):'—'}</div>
       <div class="xi"><div class="xl">Avg Dur</div>${t.avg_dur_ms?Dur(t.avg_dur_ms):'—'}</div>
+      <div class="xi"><div class="xl">Requests</div>${N(t.requests||0)}</div>
       <div class="xi"><div class="xl">Responses</div>${N(t.responses||0)}</div>
       <div class="xi"><div class="xl">HTTP Codes</div><div class="ctags">${ctags||'<span style="color:var(--dim)">none yet</span>'}</div></div>
       <div class="xi"><div class="xl">Blocked</div>${N(t.blocked||0)}</div>
@@ -4315,12 +4333,18 @@ function updateSecurityTab(){
   const _live=_lastState.status==='running'&&_lastState.live?_lastState.live:null;
   const blk=(tot.blocked||0)+(_live?_live.blocked||0:0),drp=(tot.dropped||0)+(_live?_live.dropped||0:0),rch=(tot.allowed||0)+(_live?_live.allowed||0:0);
   const totalProbes=rch+blk+drp;
-  const other=Math.max(0,(tot.attempts||0)-totalProbes);
+  // reqTotal is the true per-probe attempt count (see apply()); comparing it
+  // against totalProbes (allowed+blocked+dropped) surfaces probes that never
+  // got an outcome classification — e.g. a suite-level exception via fail().
+  // (tot.attempts, the suite-*run* counter, is unrelated and far smaller —
+  // comparing against that made this always clamp to 0.)
+  const reqTotal=(tot.requests||0)+(_live?_live.attempts||0:0);
+  const other=Math.max(0,reqTotal-totalProbes);
   const pct=(n,d)=>d?((n/d)*100).toFixed(1)+'%':'—';
-  $('sec-total').textContent=N(totalProbes);$('sec-total-sub').textContent=totalProbes?'total probes':'No data yet';
-  $('sec-blocked').textContent=N(blk);$('sec-blocked-sub').textContent=totalProbes?pct(blk,totalProbes)+' of probes':'—';
-  $('sec-dropped').textContent=N(drp);$('sec-dropped-sub').textContent=totalProbes?pct(drp,totalProbes)+' of probes':'—';
-  $('sec-allowed').textContent=N(rch);$('sec-allowed-sub').textContent=totalProbes?pct(rch,totalProbes)+' of probes':'—';
+  $('sec-total').textContent=N(reqTotal);$('sec-total-sub').textContent=reqTotal?'total probes':'No data yet';
+  $('sec-blocked').textContent=N(blk);$('sec-blocked-sub').textContent=reqTotal?pct(blk,reqTotal)+' of probes':'—';
+  $('sec-dropped').textContent=N(drp);$('sec-dropped-sub').textContent=reqTotal?pct(drp,reqTotal)+' of probes':'—';
+  $('sec-allowed').textContent=N(rch);$('sec-allowed-sub').textContent=reqTotal?pct(rch,reqTotal)+' of probes':'—';
   $('sec-leg-allowed').textContent=N(rch)+' Allowed';
   $('sec-leg-blocked').textContent=N(blk)+' Blocked';
   $('sec-leg-dropped').textContent=N(drp)+' Dropped';
@@ -4329,7 +4353,7 @@ function updateSecurityTab(){
   // snapshot for trend (rate-limited to configured interval)
   const now=Date.now()/1000;
   if(!_secHist.length||now-_secHist[_secHist.length-1].t>=(_secInterval/1000)-1){
-    _secHist.push({t:now,block_pct:totalProbes?blk/totalProbes*100:0,drop_pct:totalProbes?drp/totalProbes*100:0,reach_pct:totalProbes?rch/totalProbes*100:0});
+    _secHist.push({t:now,block_pct:reqTotal?blk/reqTotal*100:0,drop_pct:reqTotal?drp/reqTotal*100:0,reach_pct:reqTotal?rch/reqTotal*100:0});
     if(_secHist.length>120)_secHist.shift();
   }
   drawSecTrend(_secHist);
@@ -4371,13 +4395,13 @@ function updateSecurityTab(){
     '4xx':'HTTP 4xx','exit7':'TCP RST (firewall block)','exit5':'Proxy refused',
     'exit35':'TLS intercept','exit97':'SOCKS refused','exit6':'DNS sinkhole',
     'exit28':'Timeout (silent drop)','2xx':'HTTP 2xx (allowed)','3xx':'HTTP 3xx (redirect)',
-    '5xx':'HTTP 5xx (server error)',
+    '5xx':'HTTP 5xx (server error)','noresp':'No response (blank/timeout)',
   };
   const sigEl=$('sec-signals');
   const entries=Object.entries(codeTotals).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
   if(!entries.length){sigEl.innerHTML='<div class="empty">No data yet</div>';return;}
   const blockCodes=new Set(['4xx','exit7','exit5','exit35','exit97']);
-  const dropCodes=new Set(['exit6','exit28']);
+  const dropCodes=new Set(['exit6','exit28','noresp']);
   sigEl.innerHTML=entries.map(([k,v])=>{
     const lbl=signalDefs[k]||k;
     const col=blockCodes.has(k)?'var(--amber)':dropCodes.has(k)?'#818cf8':k.startsWith('2')?'#22c55e':'var(--muted)';
@@ -4839,14 +4863,14 @@ document.addEventListener('DOMContentLoaded',_renderRunHistory);
 function exportResults(fmt){
   if(!_lastState){toast('No data to export yet',false);return;}
   const tests=_lastState.tests||{},tot=_lastState.totals||{};
-  const rows=Object.keys(tests).sort().map(n=>{const t=tests[n];return{suite:n,attempts:t.attempts||0,ok:t.ok||0,fail:t.fail||0,allowed:t.allowed||0,blocked:t.blocked||0,dropped:t.dropped||0};});
+  const rows=Object.keys(tests).sort().map(n=>{const t=tests[n];return{suite:n,runs:t.attempts||0,requests:t.requests||0,ok:t.ok||0,fail:t.fail||0,allowed:t.allowed||0,blocked:t.blocked||0,dropped:t.dropped||0};});
   let content,mime,ext;
   if(fmt==='json'){
     const payload={exported_at:new Date().toISOString(),status:_lastState.status||'',totals:tot,suites:rows};
     content=JSON.stringify(payload,null,2);mime='application/json';ext='json';
   } else {
-    const hdr='suite,attempts,ok,fail,allowed,blocked,dropped\\n';
-    content=hdr+rows.map(r=>[r.suite,r.attempts,r.ok,r.fail,r.allowed,r.blocked,r.dropped].join(',')).join('\\n');
+    const hdr='suite,runs,requests,ok,fail,allowed,blocked,dropped\\n';
+    content=hdr+rows.map(r=>[r.suite,r.runs,r.requests,r.ok,r.fail,r.allowed,r.blocked,r.dropped].join(',')).join('\\n');
     mime='text/csv';ext='csv';
   }
   _download(content,mime,'traffgen-results-'+new Date().toISOString().slice(0,19).replace(/[T:]/g,'-')+'.'+ext);
@@ -4854,7 +4878,7 @@ function exportResults(fmt){
 function exportSecurity(fmt){
   if(!_lastState){toast('No data to export yet',false);return;}
   const tests=_lastState.tests||{};
-  const rows=Object.keys(tests).sort().map(n=>{const t=tests[n];const rch=t.allowed||0,blk=t.blocked||0,drp=t.dropped||0,tot=rch+blk+drp;return{suite:n,probes:tot,allowed:rch,blocked:blk,dropped:drp,block_pct:tot?+(blk/tot*100).toFixed(1):0,drop_pct:tot?+(drp/tot*100).toFixed(1):0};});
+  const rows=Object.keys(tests).sort().map(n=>{const t=tests[n];const rch=t.allowed||0,blk=t.blocked||0,drp=t.dropped||0,probeTotal=t.requests||(rch+blk+drp);return{suite:n,probes:probeTotal,allowed:rch,blocked:blk,dropped:drp,block_pct:probeTotal?+(blk/probeTotal*100).toFixed(1):0,drop_pct:probeTotal?+(drp/probeTotal*100).toFixed(1):0};});
   let content,mime,ext;
   if(fmt==='json'){
     content=JSON.stringify({exported_at:new Date().toISOString(),totals:_lastState.totals||{},suites:rows},null,2);mime='application/json';ext='json';
